@@ -383,7 +383,14 @@ PYTHONPATH=src python3 -m patchsmith.cli release-hygiene \
   --json
 ```
 
-Latest release hygiene evidence is saved in `artifacts/experiments/release_hygiene.md` and `artifacts/experiments/release_hygiene.json`. Current status is `ready_with_warnings`: CI, architecture-diagram, demo-media, calibration-readiness, and local Git metadata checks pass, while live LLM calibration remains unproven and must stay visible in release claims.
+Latest release hygiene evidence is saved in `artifacts/experiments/release_hygiene.md` and `artifacts/experiments/release_hygiene.json`. Current status is `ready_with_warnings`: CI, packaging metadata, architecture-diagram, demo-media, calibration-readiness, and local Git metadata checks pass, while live LLM calibration remains unproven and must stay visible in release claims.
+
+Build package artifacts:
+
+```bash
+python -m pip install -e ".[dev]"
+python -m build --sdist --wheel --outdir dist
+```
 
 Run LangGraph with a live OpenAI planner:
 

@@ -27,3 +27,6 @@ jobs:
 
       - name: Run tests
         run: python -m pytest -q
+
+      - name: Build package artifacts
+        run: python -m build --sdist --wheel --outdir dist

@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import struct
+import tomllib
 import zlib
 from collections import Counter
 from dataclasses import asdict, dataclass
@@ -1382,6 +1383,7 @@ def _release_hygiene_checks(
             ),
         ),
         _git_repository_check(project_root),
+        _packaging_config_check(project_root),
         _release_check(
             name="CI Workflow",
             status="passed"
@@ -1546,6 +1548,77 @@ def _git_repository_check(project_root: Path) -> ReleaseHygieneCheck:
         evidence=f"Git commit {head.stdout.strip()} on {branch_name}; worktree clean.",
         next_action="Create a tag only after final verification.",
     )
+
+
+def _packaging_config_check(project_root: Path) -> ReleaseHygieneCheck:
+    pyproject_path = project_root / "pyproject.toml"
+    try:
+        pyproject = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
+    except OSError:
+        return _release_check(
+            name="Packaging Config",
+            status="blocked",
+            evidence="pyproject.toml is missing.",
+            next_action="Restore project package metadata before release.",
+        )
+    except tomllib.TOMLDecodeError as error:
+        return _release_check(
+            name="Packaging Config",
+            status="blocked",
+            evidence=f"pyproject.toml could not be parsed: {error}",
+            next_action="Fix package metadata before release.",
+        )
+
+    project = pyproject.get("project", {})
+    optional_deps = project.get("optional-dependencies", {})
+    dev_extra = optional_deps.get("dev", [])
+    wheel = (
+        pyproject.get("tool", {})
+        .get("hatch", {})
+        .get("build", {})
+        .get("targets", {})
+        .get("wheel", {})
+    )
+    wheel_packages = wheel.get("packages", [])
+    project_name = project.get("name")
+    project_version = project.get("version")
+    missing: list[str] = []
+    if not project_name:
+        missing.append("project.name")
+    if not project_version:
+        missing.append("project.version")
+    if "src/patchsmith" not in wheel_packages:
+        missing.append("tool.hatch.build.targets.wheel.packages includes src/patchsmith")
+    if not _dependency_present(dev_extra, "pytest"):
+        missing.append("project.optional-dependencies.dev includes pytest")
+    if not _dependency_present(dev_extra, "build"):
+        missing.append("project.optional-dependencies.dev includes build")
+
+    if missing:
+        return _release_check(
+            name="Packaging Config",
+            status="blocked",
+            evidence=f"Missing package metadata: {', '.join(missing)}.",
+            next_action="Fix pyproject package metadata before claiming release readiness.",
+        )
+
+    return _release_check(
+        name="Packaging Config",
+        status="passed",
+        evidence=(
+            f"{project_name} {project_version}; wheel packages {', '.join(wheel_packages)}; "
+            "dev extra includes pytest and build."
+        ),
+        next_action="Keep package build validation in CI.",
+    )
+
+
+def _dependency_present(dependencies: list[Any], package_name: str) -> bool:
+    prefix = package_name.lower()
+    for dependency in dependencies:
+        if isinstance(dependency, str) and dependency.lower().startswith(prefix):
+            return True
+    return False
 
 
 def _run_git(project_root: Path, *args: str) -> subprocess.CompletedProcess[str]:

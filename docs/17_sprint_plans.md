@@ -653,7 +653,7 @@ Latest evidence:
 - readiness status: `ready_with_caveats`,
 - live calibration readiness: `not_configured`,
 - release hygiene status: `ready_with_warnings`,
-- release hygiene checks: 9 passed, 1 warning, 0 blockers,
+- release hygiene checks: 10 passed, 1 warning, 0 blockers,
 - indexed experiments: 12,
 - indexed saved runs: 353,
 - normalized metric rows: 25,
@@ -668,6 +668,7 @@ Latest evidence:
 - caveat: no non-offline live provider metadata was found.
 - remaining release warning: live LLM calibration.
 - local Git metadata: initialized on `main`.
+- packaging metadata: Hatch wheel target ships `src/patchsmith`; `dev` extra includes `pytest` and `build`.
 - added CI workflow: `.github/workflows/ci.yml`.
 - added architecture diagram: Mermaid block in `docs/03_architecture.md`.
 

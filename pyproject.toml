@@ -12,6 +12,7 @@ dependencies = ["langgraph>=1.0.7"]
 
 [project.optional-dependencies]
 deepagents = ["deepagents>=0.6.3"]
+dev = ["build>=1.2", "pytest>=8.0"]
 
 [project.scripts]
 patchsmith = "patchsmith.cli:main"
@@ -27,3 +28,20 @@ norecursedirs = ["tests/fixtures"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/patchsmith"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/README.md",
+  "/adr",
+  "/docs",
+  "/evals",
+  "/experiments",
+  "/manifest.json",
+  "/pyproject.toml",
+  "/src",
+  "/templates",
+  "/tests",
+]

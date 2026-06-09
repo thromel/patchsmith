@@ -13,6 +13,23 @@ from patchsmith.portfolio import write_final_evaluation_report, write_release_hy
 
 
 def _write_release_hygiene_fixture(project_root: Path, artifacts_dir: Path) -> None:
+    (project_root / "pyproject.toml").write_text(
+        "\n".join(
+            [
+                "[project]",
+                'name = "patchsmith-research"',
+                'version = "0.1.0"',
+                "",
+                "[project.optional-dependencies]",
+                'dev = ["build>=1.2", "pytest>=8.0"]',
+                "",
+                "[tool.hatch.build.targets.wheel]",
+                'packages = ["src/patchsmith"]',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
     for doc_path in [
         "README.md",
         "docs/09_roadmap.md",
@@ -385,6 +402,23 @@ def test_demo_readiness_report_summarizes_launch_evidence(
     assert cli_final_payload["decision_count"] >= 5
     assert cli_final_output.exists()
 
+    (tmp_path / "pyproject.toml").write_text(
+        "\n".join(
+            [
+                "[project]",
+                'name = "patchsmith-research"',
+                'version = "0.1.0"',
+                "",
+                "[project.optional-dependencies]",
+                'dev = ["build>=1.2", "pytest>=8.0"]',
+                "",
+                "[tool.hatch.build.targets.wheel]",
+                'packages = ["src/patchsmith"]',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
     for doc_path in [
         "README.md",
         "docs/09_roadmap.md",
@@ -433,6 +467,7 @@ def test_demo_readiness_report_summarizes_launch_evidence(
     assert hygiene.release_status == "blocked"
     assert hygiene.blocked_count == 1
     assert any(check.name == "Git Repository" and check.status == "blocked" for check in hygiene.checks)
+    assert any(check.name == "Packaging Config" and check.status == "passed" for check in hygiene.checks)
     assert any(check.name == "Planning Docs" and check.status == "passed" for check in hygiene.checks)
     hygiene_text = hygiene_output.read_text(encoding="utf-8")
     assert "# PatchSmith Release Hygiene Report" in hygiene_text
@@ -493,6 +528,10 @@ def test_release_hygiene_requires_committed_clean_git_repository(tmp_path: Path)
     git_check = next(check for check in clean_repo_report.checks if check.name == "Git Repository")
     assert git_check.status == "passed"
     assert "worktree clean" in git_check.evidence
+    assert any(
+        check.name == "Packaging Config" and check.status == "passed"
+        for check in clean_repo_report.checks
+    )
 
     (project_root / "README.md").write_text(
         "ready_with_caveats offline live LLM calibration\nmodified\n",
