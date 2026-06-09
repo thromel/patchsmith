@@ -7,6 +7,7 @@ from patchsmith.portfolio import (
     write_demo_media_assets,
     write_demo_readiness_report,
     write_demo_script_report,
+    write_live_calibration_report,
 )
 from patchsmith.portfolio import write_final_evaluation_report, write_release_hygiene_report
 
@@ -31,6 +32,8 @@ def _write_release_hygiene_fixture(project_root: Path, artifacts_dir: Path) -> N
         "experiments/failure_report.json",
         "experiments/demo_readiness.md",
         "experiments/demo_readiness.json",
+        "experiments/calibration_readiness.md",
+        "experiments/calibration_readiness.json",
         "experiments/demo_script.md",
         "experiments/demo_script.json",
         "experiments/demo_media.md",
@@ -52,6 +55,7 @@ def _git(project_root: Path, *args: str) -> None:
 def test_demo_readiness_report_summarizes_launch_evidence(
     tmp_path: Path,
     capsys,
+    monkeypatch,
 ) -> None:
     artifacts_dir = tmp_path / "artifacts"
     retrieval_dir = artifacts_dir / "experiments" / "retrieval_eval_v1"
@@ -221,6 +225,45 @@ def test_demo_readiness_report_summarizes_launch_evidence(
     assert cli_payload["model_providers"] == {"offline_fake_model": 1}
     assert cli_output.exists()
 
+    calibration_output = tmp_path / "calibration_readiness.md"
+    calibration_json_output = tmp_path / "calibration_readiness.json"
+    calibration = write_live_calibration_report(
+        artifacts_dir=artifacts_dir,
+        output_path=calibration_output,
+        json_output_path=calibration_json_output,
+        environment={},
+        package_availability={"openai": True, "deepagents": False},
+    )
+    assert calibration.calibration_status == "not_configured"
+    assert calibration.saved_live_provider_count == 0
+    calibration_statuses = {check.name: check.status for check in calibration.checks}
+    assert calibration_statuses["OpenAI SDK"] == "passed"
+    assert calibration_statuses["OpenAI Credentials"] == "missing"
+    assert calibration_statuses["DeepAgents Package"] == "warning"
+    assert calibration_statuses["Saved Live Provider Evidence"] == "missing"
+    calibration_text = calibration_output.read_text(encoding="utf-8")
+    assert "# PatchSmith Live Calibration Readiness" in calibration_text
+    assert "offline seeded-suite evidence" in calibration_text
+    calibration_payload = json.loads(calibration_json_output.read_text(encoding="utf-8"))
+    assert calibration_payload["calibration_status"] == "not_configured"
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    cli_calibration_output = tmp_path / "cli_calibration_readiness.md"
+    exit_code = main(
+        [
+            "live-calibration",
+            "--artifacts-dir",
+            str(artifacts_dir),
+            "--output",
+            str(cli_calibration_output),
+            "--json",
+        ]
+    )
+    assert exit_code == 0
+    cli_calibration_payload = json.loads(capsys.readouterr().out)
+    assert cli_calibration_payload["calibration_status"] == "not_configured"
+    assert cli_calibration_output.exists()
+
     script_output = tmp_path / "demo_script.md"
     script_json_output = tmp_path / "demo_script.json"
     script = write_demo_script_report(
@@ -364,6 +407,8 @@ def test_demo_readiness_report_summarizes_launch_evidence(
         "experiments/failure_report.json",
         "experiments/demo_readiness.md",
         "experiments/demo_readiness.json",
+        "experiments/calibration_readiness.md",
+        "experiments/calibration_readiness.json",
         "experiments/demo_script.md",
         "experiments/demo_script.json",
         "experiments/demo_media.md",

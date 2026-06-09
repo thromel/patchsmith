@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import struct
 import zlib
@@ -8,6 +9,7 @@ from collections import Counter
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from html import escape
+from importlib.util import find_spec
 from pathlib import Path
 from typing import Any
 
@@ -57,6 +59,39 @@ class DemoReadinessReport:
             "model_providers": self.model_providers,
             "gates": [gate.to_dict() for gate in self.gates],
             "demo_commands": self.demo_commands,
+        }
+
+
+@dataclass(frozen=True)
+class LiveCalibrationCheck:
+    name: str
+    status: str
+    evidence: str
+    next_action: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class LiveCalibrationReport:
+    artifacts_dir: str
+    generated_at: str
+    calibration_status: str
+    saved_live_provider_count: int
+    model_providers: dict[str, int]
+    checks: list[LiveCalibrationCheck]
+    smoke_commands: list[str]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "artifacts_dir": self.artifacts_dir,
+            "generated_at": self.generated_at,
+            "calibration_status": self.calibration_status,
+            "saved_live_provider_count": self.saved_live_provider_count,
+            "model_providers": self.model_providers,
+            "checks": [check.to_dict() for check in self.checks],
+            "smoke_commands": self.smoke_commands,
         }
 
 
@@ -265,6 +300,7 @@ def build_release_hygiene_report(
             "artifacts/experiments/index.html",
             "artifacts/experiments/failure_report.md",
             "artifacts/experiments/demo_readiness.md",
+            "artifacts/experiments/calibration_readiness.md",
             "artifacts/experiments/demo_script.md",
             "artifacts/experiments/demo_media.svg",
             "artifacts/experiments/demo_media.png",
@@ -335,6 +371,86 @@ def render_release_hygiene_report(report: ReleaseHygieneReport) -> str:
         ]
     )
     return "\n".join(lines) + "\n"
+
+
+def build_live_calibration_report(
+    *,
+    artifacts_dir: Path,
+    environment: dict[str, str] | None = None,
+    package_availability: dict[str, bool] | None = None,
+) -> LiveCalibrationReport:
+    artifacts_dir = artifacts_dir.resolve()
+    environment = dict(os.environ if environment is None else environment)
+    model_providers = _discover_model_providers(artifacts_dir)
+    live_providers = _live_providers(model_providers)
+    checks = _live_calibration_checks(
+        model_providers=model_providers,
+        environment=environment,
+        package_availability=package_availability,
+    )
+    return LiveCalibrationReport(
+        artifacts_dir=str(artifacts_dir),
+        generated_at=_utc_now(),
+        calibration_status=_live_calibration_status(checks, live_providers),
+        saved_live_provider_count=sum(model_providers[provider] for provider in live_providers),
+        model_providers=model_providers,
+        checks=checks,
+        smoke_commands=_live_calibration_commands(),
+    )
+
+
+def write_live_calibration_report(
+    *,
+    artifacts_dir: Path,
+    output_path: Path,
+    json_output_path: Path | None = None,
+    environment: dict[str, str] | None = None,
+    package_availability: dict[str, bool] | None = None,
+) -> LiveCalibrationReport:
+    report = build_live_calibration_report(
+        artifacts_dir=artifacts_dir,
+        environment=environment,
+        package_availability=package_availability,
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(render_live_calibration_report(report), encoding="utf-8")
+    if json_output_path is not None:
+        json_output_path.parent.mkdir(parents=True, exist_ok=True)
+        json_output_path.write_text(
+            json.dumps(report.to_dict(), indent=2) + "\n",
+            encoding="utf-8",
+        )
+    return report
+
+
+def render_live_calibration_report(report: LiveCalibrationReport) -> str:
+    lines = [
+        "# PatchSmith Live Calibration Readiness",
+        "",
+        f"- Generated at: `{report.generated_at}`",
+        f"- Artifacts directory: `{report.artifacts_dir}`",
+        f"- Calibration status: `{report.calibration_status}`",
+        f"- Saved live-provider runs: `{report.saved_live_provider_count}`",
+        f"- Model providers: `{_provider_summary(report.model_providers)}`",
+        "",
+        "## Checks",
+        "",
+        "| Check | Status | Evidence | Next Action |",
+        "|---|---|---|---|",
+    ]
+    for check in report.checks:
+        lines.append(
+            "| "
+            f"{check.name} | "
+            f"{check.status} | "
+            f"{_markdown_cell(check.evidence)} | "
+            f"{_markdown_cell(check.next_action)} |"
+        )
+    lines.extend(["", "## Smoke Commands", ""])
+    for command in report.smoke_commands:
+        lines.extend(["```bash", command, "```", ""])
+    lines.extend(["## Decision", "", _live_calibration_decision(report)])
+    return "\n".join(lines).rstrip() + "\n"
 
 
 def build_final_evaluation_report(
@@ -909,6 +1025,133 @@ def _readiness_status(gates: list[DemoReadinessGate]) -> str:
     return "ready"
 
 
+def _live_calibration_checks(
+    *,
+    model_providers: dict[str, int],
+    environment: dict[str, str],
+    package_availability: dict[str, bool] | None,
+) -> list[LiveCalibrationCheck]:
+    live_providers = _live_providers(model_providers)
+    openai_sdk_available = _package_available("openai", package_availability)
+    deepagents_available = _package_available("deepagents", package_availability)
+    openai_key_present = bool(environment.get("OPENAI_API_KEY"))
+    model_name = environment.get("PATCHSMITH_OPENAI_MODEL", "").strip()
+    input_rate = environment.get("PATCHSMITH_OPENAI_INPUT_COST_PER_1M", "").strip()
+    output_rate = environment.get("PATCHSMITH_OPENAI_OUTPUT_COST_PER_1M", "").strip()
+
+    return [
+        LiveCalibrationCheck(
+            name="OpenAI SDK",
+            status="passed" if openai_sdk_available else "missing",
+            evidence=(
+                "`openai` package is importable."
+                if openai_sdk_available
+                else "`openai` package is not importable."
+            ),
+            next_action=(
+                "No action needed."
+                if openai_sdk_available
+                else "Install runtime dependencies before attempting a live-provider run."
+            ),
+        ),
+        LiveCalibrationCheck(
+            name="OpenAI Credentials",
+            status="passed" if openai_key_present else "missing",
+            evidence="OPENAI_API_KEY is configured." if openai_key_present else "OPENAI_API_KEY is not set.",
+            next_action=(
+                "Run the live smoke command and save artifacts."
+                if openai_key_present
+                else "Set OPENAI_API_KEY only in the local shell used for calibration."
+            ),
+        ),
+        LiveCalibrationCheck(
+            name="OpenAI Model Selection",
+            status="passed" if model_name else "warning",
+            evidence=(
+                f"PATCHSMITH_OPENAI_MODEL={model_name}."
+                if model_name
+                else "PATCHSMITH_OPENAI_MODEL is not set; planner default will be used."
+            ),
+            next_action=(
+                "Keep the model name in the saved run metadata."
+                if model_name
+                else "Set PATCHSMITH_OPENAI_MODEL explicitly before a publishable calibration run."
+            ),
+        ),
+        LiveCalibrationCheck(
+            name="Cost Rate Configuration",
+            status="passed" if input_rate and output_rate else "warning",
+            evidence=(
+                "Input and output cost rates are configured."
+                if input_rate and output_rate
+                else "Cost rates are not fully configured."
+            ),
+            next_action=(
+                "Report quality, token use, and estimated cost together."
+                if input_rate and output_rate
+                else (
+                    "Set PATCHSMITH_OPENAI_INPUT_COST_PER_1M and "
+                    "PATCHSMITH_OPENAI_OUTPUT_COST_PER_1M when cost claims matter."
+                )
+            ),
+        ),
+        LiveCalibrationCheck(
+            name="DeepAgents Package",
+            status="passed" if deepagents_available else "warning",
+            evidence=(
+                "`deepagents` package is importable."
+                if deepagents_available
+                else "`deepagents` package is not importable; adapter evidence remains compatibility-mode only."
+            ),
+            next_action=(
+                "Run the DeepAgents adapter under the installed package before making package-backed claims."
+                if deepagents_available
+                else "Install the optional `deepagents` extra before claiming real package execution."
+            ),
+        ),
+        LiveCalibrationCheck(
+            name="Saved Live Provider Evidence",
+            status="passed" if live_providers else "missing",
+            evidence=(
+                _provider_summary({provider: model_providers[provider] for provider in live_providers})
+                if live_providers
+                else "No non-offline model provider metadata found in saved artifacts."
+            ),
+            next_action=(
+                "Use saved live-provider rows for calibrated claims."
+                if live_providers
+                else "Run and preserve at least one credential-gated live-provider smoke artifact."
+            ),
+        ),
+    ]
+
+
+def _live_calibration_status(
+    checks: list[LiveCalibrationCheck],
+    live_providers: list[str],
+) -> str:
+    if live_providers:
+        return "calibrated"
+    statuses = {check.name: check.status for check in checks}
+    if (
+        statuses.get("OpenAI SDK") == "passed"
+        and statuses.get("OpenAI Credentials") == "passed"
+    ):
+        return "ready_to_run"
+    if "missing" in statuses.values():
+        return "not_configured"
+    return "needs_review"
+
+
+def _package_available(
+    package_name: str,
+    package_availability: dict[str, bool] | None,
+) -> bool:
+    if package_availability is not None and package_name in package_availability:
+        return package_availability[package_name]
+    return find_spec(package_name) is not None
+
+
 def _discover_model_providers(artifacts_dir: Path) -> dict[str, int]:
     providers: Counter[str] = Counter()
     experiments_dir = artifacts_dir / "experiments"
@@ -919,6 +1162,7 @@ def _discover_model_providers(artifacts_dir: Path) -> dict[str, int]:
             "index.json",
             "failure_report.json",
             "demo_readiness.json",
+            "calibration_readiness.json",
             "demo_script.json",
             "demo_media.json",
             "final_evaluation.json",
@@ -1076,6 +1320,8 @@ def _release_hygiene_checks(
         "experiments/failure_report.json",
         "experiments/demo_readiness.md",
         "experiments/demo_readiness.json",
+        "experiments/calibration_readiness.md",
+        "experiments/calibration_readiness.json",
         "experiments/demo_script.md",
         "experiments/demo_script.json",
         "experiments/final_evaluation.md",
@@ -1529,6 +1775,7 @@ def _final_review_artifacts() -> list[str]:
         "artifacts/experiments/index.md",
         "artifacts/experiments/failure_report.md",
         "artifacts/experiments/demo_readiness.md",
+        "artifacts/experiments/calibration_readiness.md",
         "artifacts/experiments/demo_script.md",
         "artifacts/experiments/demo_media.md",
         "artifacts/experiments/demo_media.svg",
@@ -1621,6 +1868,12 @@ def _demo_commands() -> list[str]:
             "--artifacts-dir artifacts "
             "--output artifacts/experiments/demo_readiness.md "
             "--json-output artifacts/experiments/demo_readiness.json --json"
+        ),
+        (
+            "PYTHONPATH=src python3 -m patchsmith.cli live-calibration "
+            "--artifacts-dir artifacts "
+            "--output artifacts/experiments/calibration_readiness.md "
+            "--json-output artifacts/experiments/calibration_readiness.json --json"
         ),
         (
             "PYTHONPATH=src python3 -m patchsmith.cli demo-script "
@@ -1770,6 +2023,12 @@ def _demo_script_rehearsal_commands() -> list[str]:
             "--json-output artifacts/experiments/demo_readiness.json --json"
         ),
         (
+            "PYTHONPATH=src python3 -m patchsmith.cli live-calibration "
+            "--artifacts-dir artifacts "
+            "--output artifacts/experiments/calibration_readiness.md "
+            "--json-output artifacts/experiments/calibration_readiness.json --json"
+        ),
+        (
             "PYTHONPATH=src python3 -m patchsmith.cli demo-script "
             "--artifacts-dir artifacts "
             "--output artifacts/experiments/demo_script.md "
@@ -1784,6 +2043,59 @@ def _demo_script_rehearsal_commands() -> list[str]:
             "--json-output artifacts/experiments/demo_media.json --json"
         ),
     ]
+
+
+def _live_calibration_commands() -> list[str]:
+    return [
+        (
+            "export OPENAI_API_KEY=...\n"
+            "export PATCHSMITH_OPENAI_MODEL=<model>\n"
+            "export PATCHSMITH_OPENAI_INPUT_COST_PER_1M=<input_rate>\n"
+            "export PATCHSMITH_OPENAI_OUTPUT_COST_PER_1M=<output_rate>"
+        ),
+        (
+            "PYTHONPATH=src python3 -m patchsmith.cli run "
+            "--repo evals/tasks/seeded_bugs_v1/task_001_logic_bug/repo "
+            "--issue-file evals/tasks/seeded_bugs_v1/task_001_logic_bug/issue.md "
+            "--test-command \"python3 -m pytest\" "
+            "--runtime langgraph --planner openai --context-provider native_hybrid "
+            "--artifacts-dir artifacts --json"
+        ),
+        (
+            "PYTHONPATH=src python3 -m patchsmith.cli eval-repair "
+            "--dataset evals/tasks/seeded_bugs_v1 "
+            "--runtime langgraph --planner openai --context-provider native_hybrid "
+            "--output artifacts/experiments/live_openai_repair_eval_v1 --json"
+        ),
+        (
+            "PYTHONPATH=src python3 -m patchsmith.cli live-calibration "
+            "--artifacts-dir artifacts "
+            "--output artifacts/experiments/calibration_readiness.md "
+            "--json-output artifacts/experiments/calibration_readiness.json --json"
+        ),
+    ]
+
+
+def _live_calibration_decision(report: LiveCalibrationReport) -> str:
+    if report.calibration_status == "calibrated":
+        return (
+            "Saved non-offline provider evidence exists. Report it with token and cost "
+            "metadata before making live-provider claims."
+        )
+    if report.calibration_status == "ready_to_run":
+        return (
+            "The environment appears ready for a live OpenAI smoke run, but saved "
+            "live-provider artifacts are still missing."
+        )
+    if report.calibration_status == "not_configured":
+        return (
+            "Live calibration is not configured. Keep current public claims scoped to "
+            "offline seeded-suite evidence."
+        )
+    return (
+        "Live calibration needs review before publishable claims. Resolve warning checks "
+        "and preserve the resulting run artifacts."
+    )
 
 
 def _failure_summary(categories: dict[str, int]) -> str:

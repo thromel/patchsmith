@@ -132,6 +132,7 @@ Generated artifacts:
 - `artifacts/experiments/index.md`,
 - `artifacts/experiments/failure_report.md`,
 - `artifacts/experiments/demo_readiness.md`,
+- `artifacts/experiments/calibration_readiness.md`,
 - `artifacts/experiments/demo_script.md`,
 - `artifacts/experiments/demo_media.svg`,
 - `artifacts/experiments/demo_media.png`,
@@ -178,4 +179,4 @@ Use the risk register when:
 
 ## Current delivery decision
 
-The active implementation work is Sprint 10 portfolio launch packaging. Static artifact indexing, failure inspection, demo-readiness reporting, demo-script generation, demo-media generation, final-evaluation reporting, release-hygiene reporting, CI workflow coverage, demo media, architecture evidence, and local Git metadata now provide the review surface. The next implementation work should focus on live-provider calibration or explicitly preserving that warning while keeping offline seeded-suite claims separate from live LLM quality claims.
+The active implementation work is Sprint 10 portfolio launch packaging. Static artifact indexing, failure inspection, demo-readiness reporting, live-calibration readiness reporting, demo-script generation, demo-media generation, final-evaluation reporting, release-hygiene reporting, CI workflow coverage, demo media, architecture evidence, and local Git metadata now provide the review surface. The next implementation work should focus on running live-provider calibration when credentials and budget are available while keeping offline seeded-suite claims separate from live LLM quality claims.

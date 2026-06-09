@@ -106,6 +106,18 @@ PYTHONPATH=src python3 -m patchsmith.cli demo-media \
 
 Current demo media output includes a readable SVG summary and compact PNG preview generated from saved evidence.
 
+Generate the live calibration readiness report:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli live-calibration \
+  --artifacts-dir artifacts \
+  --output artifacts/experiments/calibration_readiness.md \
+  --json-output artifacts/experiments/calibration_readiness.json \
+  --json
+```
+
+Current live calibration readiness output is `not_configured`: the OpenAI SDK is importable locally, but `OPENAI_API_KEY` is not set, the optional `deepagents` package is not importable, and saved provider evidence is offline-only. This is the operational proof behind the remaining live LLM calibration caveat.
+
 Generate the final evaluation narrative:
 
 ```bash
@@ -129,7 +141,7 @@ PYTHONPATH=src python3 -m patchsmith.cli release-hygiene \
   --json
 ```
 
-Current release hygiene output is `ready_with_warnings`: 9 checks pass, 1 check warns, and 0 checks block release. Local Git metadata now exists, so the remaining release caveat is live LLM calibration.
+Current release hygiene output is `ready_with_warnings`: generated review artifacts now include calibration-readiness evidence, local Git metadata exists, and the remaining release caveat is live LLM calibration.
 
 ## Example flagship demo scenario
 

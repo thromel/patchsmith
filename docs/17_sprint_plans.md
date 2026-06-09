@@ -589,7 +589,7 @@ Acceptance criteria:
 
 Current status:
 
-Started. The README now surfaces current seeded-suite metrics, limitations, scaffold comparison, artifact dashboard generation, failure report generation, demo readiness generation, demo script generation, demo media generation, final evaluation generation, and release hygiene generation. The failure-analysis surface is generated from saved traces through `inspect-failures`, the launch review surface is generated through `demo-readiness`, the timed recording script is generated through `demo-script`, demo media is generated through `demo-media`, the portfolio-facing evaluation narrative is generated through `final-evaluation`, and release checks are generated through `release-hygiene`. Current readiness is `ready_with_caveats`: offline seeded-suite evidence is coherent, but live LLM calibration is not present beyond `offline_fake_model` metadata. Current release hygiene is `ready_with_warnings` after restoring local Git metadata. CI workflow coverage, a Mermaid architecture diagram, and SVG/PNG demo media now exist. The remaining Sprint 10 work is resolving or explicitly labeling the live-provider calibration warning.
+Started. The README now surfaces current seeded-suite metrics, limitations, scaffold comparison, artifact dashboard generation, failure report generation, demo readiness generation, live calibration readiness generation, demo script generation, demo media generation, final evaluation generation, and release hygiene generation. The failure-analysis surface is generated from saved traces through `inspect-failures`, the launch review surface is generated through `demo-readiness`, the live-provider readiness surface is generated through `live-calibration`, the timed recording script is generated through `demo-script`, demo media is generated through `demo-media`, the portfolio-facing evaluation narrative is generated through `final-evaluation`, and release checks are generated through `release-hygiene`. Current readiness is `ready_with_caveats`: offline seeded-suite evidence is coherent, but live LLM calibration is not present beyond `offline_fake_model` metadata. Current live calibration readiness is `not_configured`: no `OPENAI_API_KEY`, no importable `deepagents` package, and no saved non-offline provider rows. Current release hygiene is `ready_with_warnings` after restoring local Git metadata. CI workflow coverage, a Mermaid architecture diagram, and SVG/PNG demo media now exist. The remaining Sprint 10 work is running live-provider calibration when credentials and budget are available.
 
 Latest verification command:
 
@@ -598,6 +598,12 @@ PYTHONPATH=src python3 -m patchsmith.cli demo-readiness \
   --artifacts-dir artifacts \
   --output artifacts/experiments/demo_readiness.md \
   --json-output artifacts/experiments/demo_readiness.json \
+  --json
+
+PYTHONPATH=src python3 -m patchsmith.cli live-calibration \
+  --artifacts-dir artifacts \
+  --output artifacts/experiments/calibration_readiness.md \
+  --json-output artifacts/experiments/calibration_readiness.json \
   --json
 
 PYTHONPATH=src python3 -m patchsmith.cli demo-script \
@@ -632,6 +638,8 @@ Latest evidence:
 
 - `artifacts/experiments/demo_readiness.md`,
 - `artifacts/experiments/demo_readiness.json`,
+- `artifacts/experiments/calibration_readiness.md`,
+- `artifacts/experiments/calibration_readiness.json`,
 - `artifacts/experiments/demo_script.md`,
 - `artifacts/experiments/demo_script.json`,
 - `artifacts/experiments/demo_media.md`,
@@ -643,6 +651,7 @@ Latest evidence:
 - `artifacts/experiments/release_hygiene.md`,
 - `artifacts/experiments/release_hygiene.json`,
 - readiness status: `ready_with_caveats`,
+- live calibration readiness: `not_configured`,
 - release hygiene status: `ready_with_warnings`,
 - release hygiene checks: 9 passed, 1 warning, 0 blockers,
 - indexed experiments: 12,
@@ -650,6 +659,7 @@ Latest evidence:
 - normalized metric rows: 25,
 - runs requiring attention: 62,
 - model providers: `offline_fake_model` 23,
+- saved live-provider runs: 0,
 - demo script sections: 6,
 - demo script target duration: 3m 10s,
 - demo media: SVG and PNG generated from saved evidence,

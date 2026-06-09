@@ -199,6 +199,18 @@ PYTHONPATH=src python3 -m patchsmith.cli demo-readiness \
 
 The demo readiness report checks whether the saved artifact set contains experiment evidence, saved runs, normalized metrics, retrieval evidence, repair or scaffold evidence, patch-search evidence, visible failures, and live-provider metadata. `ready_with_caveats` means the offline portfolio demo is coherent but one or more warnings, such as missing live LLM calibration, must be stated publicly.
 
+Live calibration readiness:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli live-calibration \
+  --artifacts-dir artifacts \
+  --output artifacts/experiments/calibration_readiness.md \
+  --json-output artifacts/experiments/calibration_readiness.json \
+  --json
+```
+
+The live calibration readiness report checks whether the OpenAI SDK is importable, credentials are configured, cost-rate environment variables are present, the optional DeepAgents package is importable, and saved artifacts contain non-offline provider metadata. `not_configured` means live calibration has not been run and public claims must stay scoped to offline seeded-suite evidence.
+
 Demo script:
 
 ```bash
@@ -254,7 +266,7 @@ Live OpenAI planner smoke run:
 
 ```bash
 export OPENAI_API_KEY=...
-export PATCHSMITH_OPENAI_MODEL=gpt-5.5
+export PATCHSMITH_OPENAI_MODEL=<model>
 
 PYTHONPATH=src python3 -m patchsmith.cli run \
   --repo evals/tasks/seeded_bugs_v1/task_001_logic_bug/repo \
@@ -368,6 +380,8 @@ artifacts/
   experiments/failure_report.json
   experiments/demo_readiness.md
   experiments/demo_readiness.json
+  experiments/calibration_readiness.md
+  experiments/calibration_readiness.json
   experiments/demo_script.md
   experiments/demo_script.json
   experiments/demo_media.md

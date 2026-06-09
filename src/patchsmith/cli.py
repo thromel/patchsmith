@@ -20,6 +20,7 @@ from patchsmith.portfolio import (
     write_demo_media_assets,
     write_demo_script_report,
     write_final_evaluation_report,
+    write_live_calibration_report,
     write_release_hygiene_report,
 )
 from patchsmith.retrieval import GraphRetriever, HybridRetriever, KeywordRetriever
@@ -482,6 +483,38 @@ def main(argv: list[str] | None = None) -> int:
             )
         return 0
 
+    if args.command == "live-calibration":
+        json_output_path = Path(args.json_output) if args.json_output else None
+        report = write_live_calibration_report(
+            artifacts_dir=Path(args.artifacts_dir),
+            output_path=Path(args.output),
+            json_output_path=json_output_path,
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "artifacts_dir": report.artifacts_dir,
+                        "generated_at": report.generated_at,
+                        "calibration_status": report.calibration_status,
+                        "saved_live_provider_count": report.saved_live_provider_count,
+                        "model_providers": report.model_providers,
+                        "report_path": str(Path(args.output)),
+                        "json_path": str(json_output_path) if json_output_path else None,
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(f"Live calibration report: {Path(args.output)}")
+            if json_output_path:
+                print(f"JSON: {json_output_path}")
+            print(
+                f"Status: {report.calibration_status} "
+                f"Saved live-provider runs: {report.saved_live_provider_count}"
+            )
+        return 0
+
     if args.command == "release-hygiene":
         json_output_path = Path(args.json_output) if args.json_output else None
         max_failure_runs = None if args.max_failure_runs == 0 else args.max_failure_runs
@@ -874,6 +907,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="Maximum recent runs to scan for failure visibility. Use 0 to scan all runs.",
     )
     final_evaluation.add_argument("--json", action="store_true", help="Print JSON summary.")
+
+    live_calibration = subparsers.add_parser(
+        "live-calibration",
+        help="Generate a live-provider calibration readiness report.",
+    )
+    live_calibration.add_argument(
+        "--artifacts-dir",
+        default="artifacts",
+        help="Root artifact directory to scan for saved provider evidence.",
+    )
+    live_calibration.add_argument(
+        "--output",
+        default="artifacts/experiments/calibration_readiness.md",
+        help="Markdown live calibration readiness report output path.",
+    )
+    live_calibration.add_argument(
+        "--json-output",
+        help="Optional JSON live calibration readiness report output path.",
+    )
+    live_calibration.add_argument("--json", action="store_true", help="Print JSON summary.")
 
     release_hygiene = subparsers.add_parser(
         "release-hygiene",
