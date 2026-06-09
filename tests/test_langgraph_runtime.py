@@ -1,0 +1,183 @@
+from pathlib import Path
+
+from patchsmith.ingest import clone_or_copy_repository, index_repository
+from patchsmith.models import RunRequest
+from patchsmith.planning import RepairPlan
+from patchsmith.retrieval import HybridRetriever
+from patchsmith.runtime import AgentTask, DeepAgentsRuntime, LangGraphRuntime
+from patchsmith.workflow import RepairRunner
+
+
+def test_langgraph_runtime_generates_patch_with_deterministic_planner(tmp_path: Path) -> None:
+    fixture = Path("evals/tasks/seeded_bugs_v1/task_001_logic_bug")
+    snapshot = clone_or_copy_repository(str(fixture / "repo"), tmp_path / "repo")
+    repo_index = index_repository(snapshot.repo_path)
+    contexts = HybridRetriever().retrieve(
+        repo_path=snapshot.repo_path,
+        repo_index=repo_index,
+        issue_text=(fixture / "issue.md").read_text(encoding="utf-8"),
+    )
+
+    result = LangGraphRuntime().run(
+        AgentTask(
+            run_id="test-run",
+            repo_path=str(snapshot.repo_path),
+            issue_text=(fixture / "issue.md").read_text(encoding="utf-8"),
+            retrieved_context=contexts,
+            test_command="python3 -m pytest",
+        )
+    )
+
+    assert result.status == "patch_generated"
+    assert "return left + right" in (snapshot.repo_path / "src/simple_calc.py").read_text(
+        encoding="utf-8"
+    )
+    assert [event["node"] for event in result.runtime_trace] == [
+        "triage",
+        "plan",
+        "edit",
+        "analyze",
+        "retry",
+        "review",
+    ]
+
+
+def test_repair_runner_langgraph_runtime_emits_runtime_node_traces(tmp_path: Path) -> None:
+    fixture = Path("evals/tasks/seeded_bugs_v1/task_001_logic_bug")
+
+    result = RepairRunner(artifacts_dir=tmp_path / "artifacts").run(
+        RunRequest(
+            repo=str(fixture / "repo"),
+            issue_text=(fixture / "issue.md").read_text(encoding="utf-8"),
+            test_command="python3 -m pytest",
+            runtime="langgraph",
+            context_provider="native_hybrid",
+            retrieval_strategy="native_hybrid",
+        )
+    )
+
+    assert result.test_result is not None
+    assert result.test_result.exit_code == 0
+    trace_text = result.trace_path.read_text(encoding="utf-8")
+    assert "runtime.triage" in trace_text
+    assert "runtime.analyze" in trace_text
+    assert "runtime.retry" in trace_text
+    assert "runtime.review" in trace_text
+
+
+def test_deepagents_runtime_generates_patch_with_adapter_trace(tmp_path: Path) -> None:
+    fixture = Path("evals/tasks/seeded_bugs_v1/task_001_logic_bug")
+    snapshot = clone_or_copy_repository(str(fixture / "repo"), tmp_path / "repo")
+    repo_index = index_repository(snapshot.repo_path)
+    issue_text = (fixture / "issue.md").read_text(encoding="utf-8")
+    contexts = HybridRetriever().retrieve(
+        repo_path=snapshot.repo_path,
+        repo_index=repo_index,
+        issue_text=issue_text,
+    )
+
+    result = DeepAgentsRuntime().run(
+        AgentTask(
+            run_id="test-run",
+            repo_path=str(snapshot.repo_path),
+            issue_text=issue_text,
+            retrieved_context=contexts,
+            test_command="python3 -m pytest",
+        )
+    )
+
+    assert result.status == "patch_generated"
+    assert result.patch_candidates[0].generation_strategy.startswith("deepagents:")
+    assert "return left + right" in (snapshot.repo_path / "src/simple_calc.py").read_text(
+        encoding="utf-8"
+    )
+    assert [event["node"] for event in result.runtime_trace] == [
+        "harness",
+        "todo",
+        "context",
+        "plan",
+        "edit",
+        "review",
+    ]
+    assert result.runtime_trace[0]["framework"] == "deepagents"
+
+
+def test_repair_runner_deepagents_runtime_emits_runtime_node_traces(tmp_path: Path) -> None:
+    fixture = Path("evals/tasks/seeded_bugs_v1/task_001_logic_bug")
+
+    result = RepairRunner(artifacts_dir=tmp_path / "artifacts").run(
+        RunRequest(
+            repo=str(fixture / "repo"),
+            issue_text=(fixture / "issue.md").read_text(encoding="utf-8"),
+            test_command="python3 -m pytest",
+            runtime="deepagents",
+            context_provider="native_hybrid",
+            retrieval_strategy="native_hybrid",
+        )
+    )
+
+    assert result.test_result is not None
+    assert result.test_result.exit_code == 0
+    report = result.report_path.read_text(encoding="utf-8")
+    assert "Runtime: `deepagents`" in report
+    trace_text = result.trace_path.read_text(encoding="utf-8")
+    assert "runtime.harness" in trace_text
+    assert "runtime.todo" in trace_text
+    assert "runtime.review" in trace_text
+
+
+def test_repair_runner_langgraph_fake_model_planner_generates_patch(tmp_path: Path) -> None:
+    fixture = Path("evals/tasks/seeded_bugs_v1/task_001_logic_bug")
+
+    result = RepairRunner(artifacts_dir=tmp_path / "artifacts").run(
+        RunRequest(
+            repo=str(fixture / "repo"),
+            issue_text=(fixture / "issue.md").read_text(encoding="utf-8"),
+            test_command="python3 -m pytest",
+            runtime="langgraph",
+            planner="fake_model",
+            context_provider="native_hybrid",
+            retrieval_strategy="native_hybrid",
+        )
+    )
+
+    assert result.test_result is not None
+    assert result.test_result.exit_code == 0
+    assert "+    return left + right" in result.final_diff_path.read_text(encoding="utf-8")
+    report = result.report_path.read_text(encoding="utf-8")
+    assert "Planner: `fake_model`" in report
+    assert "Model provider: `offline_fake_model`" in report
+    trace = result.trace_path.read_text(encoding="utf-8")
+    assert "offline_fake_model" in trace
+
+
+def test_langgraph_runtime_retries_no_plan_until_budget_exhausted(tmp_path: Path) -> None:
+    fixture = Path("evals/tasks/seeded_bugs_v1/task_001_logic_bug")
+    snapshot = clone_or_copy_repository(str(fixture / "repo"), tmp_path / "repo")
+
+    result = LangGraphRuntime(planner=NoPlanPlanner()).run(
+        AgentTask(
+            run_id="test-run",
+            repo_path=str(snapshot.repo_path),
+            issue_text=(fixture / "issue.md").read_text(encoding="utf-8"),
+            retrieved_context=[],
+            test_command="python3 -m pytest",
+            runtime_config={"max_retries": 1},
+        )
+    )
+
+    assert result.status == "no_patch_generated"
+    assert [event["node"] for event in result.runtime_trace].count("plan") == 2
+    retry_events = [event for event in result.runtime_trace if event["node"] == "retry"]
+    assert [event["status"] for event in retry_events] == ["scheduled", "exhausted"]
+    assert retry_events[-1]["max_retries"] == 1
+
+
+class NoPlanPlanner:
+    def plan(
+        self,
+        *,
+        issue_text: str,
+        retrieved_context: list[object],
+    ) -> RepairPlan | None:
+        return None

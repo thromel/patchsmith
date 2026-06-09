@@ -1,0 +1,1 @@
+experiment_id,task_id,runtime,retrieval_strategy,model,candidate_count,resolved,targeted_tests_passed,full_tests_passed,top1_touched_file_recall,top3_touched_file_recall,top5_touched_file_recall,input_tokens,output_tokens,estimated_cost,latency_ms,failure_category,notes

@@ -1,0 +1,9 @@
+{
+  "task_id": "task_009_collection_bug",
+  "language": "python",
+  "test_command": "python3 -m pytest",
+  "expected_touched_files": ["src/collections_ext.py"],
+  "expected_related_tests": ["tests/test_collections_ext.py"],
+  "failure_type": "logic_bug"
+}
+

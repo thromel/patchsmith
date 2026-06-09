@@ -1,0 +1,8 @@
+{
+  "task_id": "task_001_test_path_invoice",
+  "language": "python",
+  "test_command": "python3 -m pytest",
+  "expected_touched_files": ["src/invoice.py"],
+  "expected_related_tests": ["tests/test_invoice.py"],
+  "failure_type": "graph_retrieval_test_path"
+}

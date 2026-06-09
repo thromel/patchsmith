@@ -1,0 +1,9 @@
+{
+  "task_id": "task_002_import_bug",
+  "language": "python",
+  "test_command": "python3 -m pytest",
+  "expected_touched_files": ["src/string_tools.py"],
+  "expected_related_tests": ["tests/test_string_tools.py"],
+  "failure_type": "import_bug"
+}
+
