@@ -116,7 +116,7 @@ PYTHONPATH=src python3 -m patchsmith.cli live-calibration \
   --json
 ```
 
-Current live calibration readiness output is `not_configured`: the OpenAI SDK is importable locally, but `OPENAI_API_KEY` is not set, the optional `deepagents` package is not importable, and saved provider evidence is offline-only. This is the operational proof behind the remaining live LLM calibration caveat.
+Current live calibration readiness output is `not_configured`: the OpenAI SDK is importable locally, but `OPENAI_API_KEY` is not set and saved provider evidence is offline-only. DeepAgents has 10 saved package-backed adapter smoke runs and 20 compatibility-mode runs; this proves optional-package import compatibility, not live DeepAgents model quality.
 
 Generate the final evaluation narrative:
 
@@ -128,7 +128,7 @@ PYTHONPATH=src python3 -m patchsmith.cli final-evaluation \
   --json
 ```
 
-Current final evaluation output has `ready_with_caveats`, 25 normalized metric rows, seven decision bullets, and five limitations. Use it as the public-claim boundary for the offline seeded-suite portfolio demo.
+Current final evaluation output has `ready_with_caveats`, 26 normalized metric rows, eight decision bullets, and five limitations. Use it as the public-claim boundary for the offline seeded-suite portfolio demo.
 
 Generate the release hygiene report:
 

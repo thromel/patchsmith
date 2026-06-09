@@ -209,7 +209,21 @@ PYTHONPATH=src python3 -m patchsmith.cli live-calibration \
   --json
 ```
 
-The live calibration readiness report checks whether the OpenAI SDK is importable, credentials are configured, cost-rate environment variables are present, the optional DeepAgents package is importable, and saved artifacts contain non-offline provider metadata. `not_configured` means live calibration has not been run and public claims must stay scoped to offline seeded-suite evidence.
+The live calibration readiness report checks whether the OpenAI SDK is importable, credentials are configured, cost-rate environment variables are present, the optional DeepAgents package is importable in the current shell, saved DeepAgents traces prove package-backed adapter execution, and saved artifacts contain non-offline provider metadata. `not_configured` means live calibration has not been run and public claims must stay scoped to offline seeded-suite evidence.
+
+DeepAgents package-backed adapter smoke:
+
+```bash
+python -m pip install -e ".[dev,deepagents]"
+
+PYTHONPATH=src python3 -m patchsmith.cli eval-repair \
+  --dataset evals/tasks/seeded_bugs_v1 \
+  --runtime deepagents \
+  --planner heuristic \
+  --context-provider native_hybrid \
+  --output artifacts/experiments/deepagents_package_smoke_v1 \
+  --json
+```
 
 Demo script:
 

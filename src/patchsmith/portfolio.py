@@ -80,6 +80,8 @@ class LiveCalibrationReport:
     generated_at: str
     calibration_status: str
     saved_live_provider_count: int
+    deepagents_package_run_count: int
+    deepagents_compatibility_run_count: int
     model_providers: dict[str, int]
     checks: list[LiveCalibrationCheck]
     smoke_commands: list[str]
@@ -90,6 +92,8 @@ class LiveCalibrationReport:
             "generated_at": self.generated_at,
             "calibration_status": self.calibration_status,
             "saved_live_provider_count": self.saved_live_provider_count,
+            "deepagents_package_run_count": self.deepagents_package_run_count,
+            "deepagents_compatibility_run_count": self.deepagents_compatibility_run_count,
             "model_providers": self.model_providers,
             "checks": [check.to_dict() for check in self.checks],
             "smoke_commands": self.smoke_commands,
@@ -176,6 +180,8 @@ class FinalEvaluationReport:
     runs_requiring_attention: int
     failure_categories: dict[str, int]
     model_providers: dict[str, int]
+    deepagents_package_run_count: int
+    deepagents_compatibility_run_count: int
     metrics: list[FinalEvaluationMetric]
     decisions: list[str]
     limitations: list[str]
@@ -192,6 +198,8 @@ class FinalEvaluationReport:
             "runs_requiring_attention": self.runs_requiring_attention,
             "failure_categories": self.failure_categories,
             "model_providers": self.model_providers,
+            "deepagents_package_run_count": self.deepagents_package_run_count,
+            "deepagents_compatibility_run_count": self.deepagents_compatibility_run_count,
             "metrics": [metric.to_dict() for metric in self.metrics],
             "decisions": self.decisions,
             "limitations": self.limitations,
@@ -384,8 +392,10 @@ def build_live_calibration_report(
     environment = dict(os.environ if environment is None else environment)
     model_providers = _discover_model_providers(artifacts_dir)
     live_providers = _live_providers(model_providers)
+    deepagents_modes = _discover_deepagents_adapter_modes(artifacts_dir)
     checks = _live_calibration_checks(
         model_providers=model_providers,
+        deepagents_modes=deepagents_modes,
         environment=environment,
         package_availability=package_availability,
     )
@@ -394,6 +404,8 @@ def build_live_calibration_report(
         generated_at=_utc_now(),
         calibration_status=_live_calibration_status(checks, live_providers),
         saved_live_provider_count=sum(model_providers[provider] for provider in live_providers),
+        deepagents_package_run_count=deepagents_modes.get("package_available", 0),
+        deepagents_compatibility_run_count=deepagents_modes.get("compatibility_mode", 0),
         model_providers=model_providers,
         checks=checks,
         smoke_commands=_live_calibration_commands(),
@@ -432,6 +444,8 @@ def render_live_calibration_report(report: LiveCalibrationReport) -> str:
         f"- Artifacts directory: `{report.artifacts_dir}`",
         f"- Calibration status: `{report.calibration_status}`",
         f"- Saved live-provider runs: `{report.saved_live_provider_count}`",
+        f"- DeepAgents package-backed runs: `{report.deepagents_package_run_count}`",
+        f"- DeepAgents compatibility-mode runs: `{report.deepagents_compatibility_run_count}`",
         f"- Model providers: `{_provider_summary(report.model_providers)}`",
         "",
         "## Checks",
@@ -465,6 +479,7 @@ def build_final_evaluation_report(
         max_failure_runs=max_failure_runs,
     )
     metrics = [_final_metric(metric) for metric in index.metrics]
+    deepagents_modes = _discover_deepagents_adapter_modes(Path(index.artifacts_dir))
     return FinalEvaluationReport(
         artifacts_dir=index.artifacts_dir,
         generated_at=_utc_now(),
@@ -475,9 +490,11 @@ def build_final_evaluation_report(
         runs_requiring_attention=readiness.runs_requiring_attention,
         failure_categories=readiness.failure_categories,
         model_providers=readiness.model_providers,
+        deepagents_package_run_count=deepagents_modes.get("package_available", 0),
+        deepagents_compatibility_run_count=deepagents_modes.get("compatibility_mode", 0),
         metrics=metrics,
-        decisions=_final_evaluation_decisions(readiness, metrics),
-        limitations=_final_evaluation_limitations(readiness),
+        decisions=_final_evaluation_decisions(readiness, metrics, deepagents_modes),
+        limitations=_final_evaluation_limitations(readiness, deepagents_modes),
         review_artifacts=_final_review_artifacts(),
     )
 
@@ -515,6 +532,8 @@ def render_final_evaluation_report(report: FinalEvaluationReport) -> str:
         f"- Saved run count: `{report.run_count}`",
         f"- Normalized metric rows: `{report.metric_count}`",
         f"- Runs requiring attention: `{report.runs_requiring_attention}`",
+        f"- DeepAgents package-backed runs: `{report.deepagents_package_run_count}`",
+        f"- DeepAgents compatibility-mode runs: `{report.deepagents_compatibility_run_count}`",
         "",
         "## Executive Conclusion",
         "",
@@ -1029,6 +1048,7 @@ def _readiness_status(gates: list[DemoReadinessGate]) -> str:
 def _live_calibration_checks(
     *,
     model_providers: dict[str, int],
+    deepagents_modes: dict[str, int],
     environment: dict[str, str],
     package_availability: dict[str, bool] | None,
 ) -> list[LiveCalibrationCheck]:
@@ -1039,6 +1059,8 @@ def _live_calibration_checks(
     model_name = environment.get("PATCHSMITH_OPENAI_MODEL", "").strip()
     input_rate = environment.get("PATCHSMITH_OPENAI_INPUT_COST_PER_1M", "").strip()
     output_rate = environment.get("PATCHSMITH_OPENAI_OUTPUT_COST_PER_1M", "").strip()
+    deepagents_package_runs = deepagents_modes.get("package_available", 0)
+    deepagents_compatibility_runs = deepagents_modes.get("compatibility_mode", 0)
 
     return [
         LiveCalibrationCheck(
@@ -1102,12 +1124,40 @@ def _live_calibration_checks(
             evidence=(
                 "`deepagents` package is importable."
                 if deepagents_available
-                else "`deepagents` package is not importable; adapter evidence remains compatibility-mode only."
+                else (
+                    "`deepagents` package is not importable in the current shell; "
+                    "use saved trace evidence for package-backed adapter claims."
+                    if deepagents_package_runs
+                    else (
+                        "`deepagents` package is not importable; adapter evidence remains "
+                        "compatibility-mode only."
+                    )
+                )
             ),
             next_action=(
                 "Run the DeepAgents adapter under the installed package before making package-backed claims."
                 if deepagents_available
-                else "Install the optional `deepagents` extra before claiming real package execution."
+                else (
+                    "Install the optional `deepagents` extra in the active environment for "
+                    "new package-backed runs."
+                    if deepagents_package_runs
+                    else "Install the optional `deepagents` extra before claiming real package execution."
+                )
+            ),
+        ),
+        LiveCalibrationCheck(
+            name="Saved DeepAgents Package Evidence",
+            status="passed" if deepagents_package_runs else "warning",
+            evidence=(
+                f"{deepagents_package_runs} package-backed run(s); "
+                f"{deepagents_compatibility_runs} compatibility-mode run(s)."
+                if deepagents_package_runs
+                else f"0 package-backed runs; {deepagents_compatibility_runs} compatibility-mode run(s)."
+            ),
+            next_action=(
+                "Use package-backed traces for adapter-import claims; still avoid live-model claims."
+                if deepagents_package_runs
+                else "Run the DeepAgents adapter with the optional extra installed and save traces."
             ),
         ),
         LiveCalibrationCheck(
@@ -1151,6 +1201,46 @@ def _package_available(
     if package_availability is not None and package_name in package_availability:
         return package_availability[package_name]
     return find_spec(package_name) is not None
+
+
+def _discover_deepagents_adapter_modes(artifacts_dir: Path) -> dict[str, int]:
+    modes: dict[str, set[str]] = {
+        "package_available": set(),
+        "compatibility_mode": set(),
+    }
+    experiments_dir = artifacts_dir / "experiments"
+    if not experiments_dir.exists():
+        return {}
+    for trace_path in sorted(experiments_dir.glob("**/traces.jsonl")):
+        try:
+            lines = trace_path.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            continue
+        for line in lines:
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(event, dict):
+                continue
+            payload = event.get("payload")
+            if not isinstance(payload, dict):
+                continue
+            if (
+                event.get("event_type") != "runtime_node"
+                or payload.get("framework") != "deepagents"
+                or payload.get("node") != "harness"
+            ):
+                continue
+            mode = str(payload.get("status") or event.get("status") or "")
+            run_id = str(event.get("run_id") or trace_path.parent.name)
+            if mode in modes:
+                modes[mode].add(run_id)
+    return {
+        mode: len(run_ids)
+        for mode, run_ids in sorted(modes.items())
+        if run_ids
+    }
 
 
 def _discover_model_providers(artifacts_dir: Path) -> dict[str, int]:
@@ -1753,6 +1843,7 @@ def _metric_value(label: str, value: int | float | str | None) -> str:
 def _final_evaluation_decisions(
     readiness: DemoReadinessReport,
     metrics: list[FinalEvaluationMetric],
+    deepagents_modes: dict[str, int],
 ) -> list[str]:
     decisions = [
         (
@@ -1803,6 +1894,14 @@ def _final_evaluation_decisions(
             "Failure cases are preserved for review: "
             f"{_failure_summary(readiness.failure_categories)}."
         )
+    package_runs = deepagents_modes.get("package_available", 0)
+    compatibility_runs = deepagents_modes.get("compatibility_mode", 0)
+    if package_runs:
+        decisions.append(
+            f"DeepAgents adapter evidence now includes {package_runs} package-backed "
+            f"run(s) and {compatibility_runs} compatibility-mode run(s); this proves "
+            "optional-package import compatibility, not live DeepAgents model quality."
+        )
     live_providers = [
         provider
         for provider in readiness.model_providers
@@ -1820,11 +1919,24 @@ def _final_evaluation_decisions(
     return decisions
 
 
-def _final_evaluation_limitations(readiness: DemoReadinessReport) -> list[str]:
+def _final_evaluation_limitations(
+    readiness: DemoReadinessReport,
+    deepagents_modes: dict[str, int],
+) -> list[str]:
+    package_runs = deepagents_modes.get("package_available", 0)
+    deepagents_limitation = (
+        "DeepAgents package-backed adapter smoke evidence exists, but live DeepAgents "
+        "model execution remains uncalibrated."
+        if package_runs
+        else (
+            "DeepAgents evidence is adapter compatibility evidence unless the optional "
+            "package and live model provider are installed and reflected in saved artifacts."
+        )
+    )
     limitations = [
         "The seeded suite is intentionally small and controlled; it proves workflow plumbing and comparative instrumentation, not broad real-world coding-agent quality.",
         "Current public-demo mode should use seeded or preselected repositories until sandboxing is hardened for arbitrary untrusted repos.",
-        "DeepAgents evidence is adapter compatibility evidence unless the optional package and live model provider are installed and reflected in saved artifacts.",
+        deepagents_limitation,
     ]
     live_providers = [
         provider
@@ -2120,6 +2232,13 @@ def _demo_script_rehearsal_commands() -> list[str]:
 
 def _live_calibration_commands() -> list[str]:
     return [
+        'python -m pip install -e ".[dev,deepagents]"',
+        (
+            "PYTHONPATH=src python3 -m patchsmith.cli eval-repair "
+            "--dataset evals/tasks/seeded_bugs_v1 "
+            "--runtime deepagents --planner heuristic --context-provider native_hybrid "
+            "--output artifacts/experiments/deepagents_package_smoke_v1 --json"
+        ),
         (
             "export OPENAI_API_KEY=...\n"
             "export PATCHSMITH_OPENAI_MODEL=<model>\n"

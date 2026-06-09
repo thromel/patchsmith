@@ -332,7 +332,21 @@ PYTHONPATH=src python3 -m patchsmith.cli live-calibration \
   --json
 ```
 
-Latest live calibration readiness evidence is saved in `artifacts/experiments/calibration_readiness.md` and `artifacts/experiments/calibration_readiness.json`. Current status is `not_configured`: the OpenAI SDK is importable, but `OPENAI_API_KEY` is not set, `deepagents` is not importable, and saved model-provider evidence is still offline-only.
+Latest live calibration readiness evidence is saved in `artifacts/experiments/calibration_readiness.md` and `artifacts/experiments/calibration_readiness.json`. Current status is `not_configured`: the OpenAI SDK is importable, but `OPENAI_API_KEY` is not set and saved model-provider evidence is still offline-only. DeepAgents now has 10 saved package-backed adapter smoke runs, while the current shell still does not import `deepagents`.
+
+Run DeepAgents with the optional package installed:
+
+```bash
+python -m pip install -e ".[dev,deepagents]"
+
+PYTHONPATH=src python3 -m patchsmith.cli eval-repair \
+  --dataset evals/tasks/seeded_bugs_v1 \
+  --runtime deepagents \
+  --planner heuristic \
+  --context-provider native_hybrid \
+  --output artifacts/experiments/deepagents_package_smoke_v1 \
+  --json
+```
 
 Generate the timed demo script:
 
@@ -418,7 +432,7 @@ When those rates are set, reports estimate model cost from provider token usage.
 
 ## Next engineering wedges
 
-The context broker boundary, retrieval eval runner, repair eval runner, scaffold comparison runner, patch-search evaluator, static artifact index/dashboard with normalized metrics and generated run-detail trace pages, failure review report, demo readiness report, live calibration readiness report, generated demo script, final evaluation report, release hygiene report, deterministic heuristic runtime, LangGraph orchestration runtime, DeepAgents adapter compatibility mode, offline model-planner seam, credential-gated OpenAI Responses client, and Python Code Context Graph v0 now exist. The current seeded suite has 10 tasks and compares `native`, `native_hybrid`, `native_graph`, and `ctxhelm_cli` for retrieval, including aggregate context packing metadata. Scaffold comparison now includes trace complexity and debuggability metrics. The next useful development step is resolving the remaining live-provider warning, harder patch-search tasks with model-diverse candidates, or live-provider calibration when credentials and budget are explicitly available.
+The context broker boundary, retrieval eval runner, repair eval runner, scaffold comparison runner, patch-search evaluator, static artifact index/dashboard with normalized metrics and generated run-detail trace pages, failure review report, demo readiness report, live calibration readiness report, generated demo script, final evaluation report, release hygiene report, deterministic heuristic runtime, LangGraph orchestration runtime, DeepAgents adapter compatibility mode plus package-backed smoke evidence, offline model-planner seam, credential-gated OpenAI Responses client, and Python Code Context Graph v0 now exist. The current seeded suite has 10 tasks and compares `native`, `native_hybrid`, `native_graph`, and `ctxhelm_cli` for retrieval, including aggregate context packing metadata. Scaffold comparison now includes trace complexity and debuggability metrics. The next useful development step is resolving the remaining live-provider warning, harder patch-search tasks with model-diverse candidates, or live-provider calibration when credentials and budget are explicitly available.
 
 The current LangGraph repair skeleton is:
 

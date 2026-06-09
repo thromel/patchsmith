@@ -549,14 +549,14 @@ Latest evidence:
 - `artifacts/experiments/failure_report.md`,
 - `artifacts/experiments/failure_report.json`,
 - `artifacts/experiments/run-details/`,
-- indexed experiments: 12,
-- indexed saved runs: 353,
-- normalized metric rows: 25,
+- indexed experiments: 13,
+- indexed saved runs: 363,
+- normalized metric rows: 26,
 - recent run links shown in Markdown/HTML: latest 25,
 - generated run-detail pages: 25,
-- full run list stored in JSON: 353,
+- full run list stored in JSON: 363,
 - failure report scans saved traces and preserves failure cases for demo review,
-- failure report run scan: 353,
+- failure report run scan: 363,
 - runs requiring attention: 62,
 - failure categories: `no_patch_generated` 60, `sandbox_test_failed` 2.
 
@@ -589,7 +589,7 @@ Acceptance criteria:
 
 Current status:
 
-Started. The README now surfaces current seeded-suite metrics, limitations, scaffold comparison, artifact dashboard generation, failure report generation, demo readiness generation, live calibration readiness generation, demo script generation, demo media generation, final evaluation generation, and release hygiene generation. The failure-analysis surface is generated from saved traces through `inspect-failures`, the launch review surface is generated through `demo-readiness`, the live-provider readiness surface is generated through `live-calibration`, the timed recording script is generated through `demo-script`, demo media is generated through `demo-media`, the portfolio-facing evaluation narrative is generated through `final-evaluation`, and release checks are generated through `release-hygiene`. Current readiness is `ready_with_caveats`: offline seeded-suite evidence is coherent, but live LLM calibration is not present beyond `offline_fake_model` metadata. Current live calibration readiness is `not_configured`: no `OPENAI_API_KEY`, no importable `deepagents` package, and no saved non-offline provider rows. Current release hygiene is `ready_with_warnings` after restoring local Git metadata. CI workflow coverage, a Mermaid architecture diagram, and SVG/PNG demo media now exist. The remaining Sprint 10 work is running live-provider calibration when credentials and budget are available.
+Started. The README now surfaces current seeded-suite metrics, limitations, scaffold comparison, artifact dashboard generation, failure report generation, demo readiness generation, live calibration readiness generation, demo script generation, demo media generation, final evaluation generation, and release hygiene generation. The failure-analysis surface is generated from saved traces through `inspect-failures`, the launch review surface is generated through `demo-readiness`, the live-provider readiness surface is generated through `live-calibration`, the timed recording script is generated through `demo-script`, demo media is generated through `demo-media`, the portfolio-facing evaluation narrative is generated through `final-evaluation`, and release checks are generated through `release-hygiene`. Current readiness is `ready_with_caveats`: offline seeded-suite evidence is coherent, but live LLM calibration is not present beyond `offline_fake_model` metadata. Current live calibration readiness is `not_configured`: no `OPENAI_API_KEY`, 10 saved DeepAgents package-backed adapter runs, 20 compatibility-mode runs, and no saved non-offline provider rows. Current release hygiene is `ready_with_warnings` after restoring local Git metadata. CI workflow coverage, a Mermaid architecture diagram, and SVG/PNG demo media now exist. The remaining Sprint 10 work is running live-provider calibration when credentials and budget are available.
 
 Latest verification command:
 
@@ -654,16 +654,18 @@ Latest evidence:
 - live calibration readiness: `not_configured`,
 - release hygiene status: `ready_with_warnings`,
 - release hygiene checks: 10 passed, 1 warning, 0 blockers,
-- indexed experiments: 12,
-- indexed saved runs: 353,
-- normalized metric rows: 25,
+- indexed experiments: 13,
+- indexed saved runs: 363,
+- normalized metric rows: 26,
 - runs requiring attention: 62,
 - model providers: `offline_fake_model` 23,
 - saved live-provider runs: 0,
+- DeepAgents package-backed runs: 10,
+- DeepAgents compatibility-mode runs: 20,
 - demo script sections: 6,
 - demo script target duration: 3m 10s,
 - demo media: SVG and PNG generated from saved evidence,
-- final evaluation decision bullets: 7,
+- final evaluation decision bullets: 8,
 - final evaluation limitations: 5,
 - caveat: no non-offline live provider metadata was found.
 - remaining release warning: live LLM calibration.

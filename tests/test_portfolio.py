@@ -253,10 +253,12 @@ def test_demo_readiness_report_summarizes_launch_evidence(
     )
     assert calibration.calibration_status == "not_configured"
     assert calibration.saved_live_provider_count == 0
+    assert calibration.deepagents_package_run_count == 0
     calibration_statuses = {check.name: check.status for check in calibration.checks}
     assert calibration_statuses["OpenAI SDK"] == "passed"
     assert calibration_statuses["OpenAI Credentials"] == "missing"
     assert calibration_statuses["DeepAgents Package"] == "warning"
+    assert calibration_statuses["Saved DeepAgents Package Evidence"] == "warning"
     assert calibration_statuses["Saved Live Provider Evidence"] == "missing"
     calibration_text = calibration_output.read_text(encoding="utf-8")
     assert "# PatchSmith Live Calibration Readiness" in calibration_text
@@ -279,6 +281,7 @@ def test_demo_readiness_report_summarizes_launch_evidence(
     assert exit_code == 0
     cli_calibration_payload = json.loads(capsys.readouterr().out)
     assert cli_calibration_payload["calibration_status"] == "not_configured"
+    assert cli_calibration_payload["deepagents_package_run_count"] == 0
     assert cli_calibration_output.exists()
 
     script_output = tmp_path / "demo_script.md"
@@ -383,6 +386,7 @@ def test_demo_readiness_report_summarizes_launch_evidence(
     assert "Public Claim Boundary" in final_text
     final_payload = json.loads(final_json_output.read_text(encoding="utf-8"))
     assert final_payload["metric_count"] == 3
+    assert final_payload["deepagents_package_run_count"] == 0
 
     cli_final_output = tmp_path / "cli_final_evaluation.md"
     exit_code = main(
@@ -399,6 +403,7 @@ def test_demo_readiness_report_summarizes_launch_evidence(
     cli_final_payload = json.loads(capsys.readouterr().out)
     assert cli_final_payload["readiness_status"] == "ready_with_caveats"
     assert cli_final_payload["metric_count"] == 3
+    assert cli_final_payload["deepagents_package_run_count"] == 0
     assert cli_final_payload["decision_count"] >= 5
     assert cli_final_output.exists()
 
@@ -493,6 +498,90 @@ def test_demo_readiness_report_summarizes_launch_evidence(
     assert cli_hygiene_payload["release_status"] == "blocked"
     assert cli_hygiene_payload["blocked_count"] == 1
     assert cli_hygiene_output.exists()
+
+
+def test_live_calibration_report_counts_saved_deepagents_package_runs(tmp_path: Path) -> None:
+    artifacts_dir = tmp_path / "artifacts"
+    package_trace = (
+        artifacts_dir
+        / "experiments"
+        / "deepagents_package_smoke_v1"
+        / "run_artifacts"
+        / "runs"
+        / "package-run"
+        / "traces.jsonl"
+    )
+    package_trace.parent.mkdir(parents=True)
+    package_trace.write_text(
+        json.dumps(
+            {
+                "run_id": "package-run",
+                "event_type": "runtime_node",
+                "status": "package_available",
+                "payload": {
+                    "runtime": "deepagents",
+                    "framework": "deepagents",
+                    "node": "harness",
+                    "status": "package_available",
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    compatibility_trace = (
+        artifacts_dir
+        / "experiments"
+        / "deepagents_compatibility_v1"
+        / "run_artifacts"
+        / "runs"
+        / "compatibility-run"
+        / "traces.jsonl"
+    )
+    compatibility_trace.parent.mkdir(parents=True)
+    compatibility_trace.write_text(
+        json.dumps(
+            {
+                "run_id": "compatibility-run",
+                "event_type": "runtime_node",
+                "status": "compatibility_mode",
+                "payload": {
+                    "runtime": "deepagents",
+                    "framework": "deepagents",
+                    "node": "harness",
+                    "status": "compatibility_mode",
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    report = write_live_calibration_report(
+        artifacts_dir=artifacts_dir,
+        output_path=tmp_path / "calibration.md",
+        json_output_path=tmp_path / "calibration.json",
+        environment={},
+        package_availability={"openai": True, "deepagents": False},
+    )
+
+    assert report.deepagents_package_run_count == 1
+    assert report.deepagents_compatibility_run_count == 1
+    statuses = {check.name: check.status for check in report.checks}
+    assert statuses["Saved DeepAgents Package Evidence"] == "passed"
+    rendered = (tmp_path / "calibration.md").read_text(encoding="utf-8")
+    assert "DeepAgents package-backed runs: `1`" in rendered
+    payload = json.loads((tmp_path / "calibration.json").read_text(encoding="utf-8"))
+    assert payload["deepagents_package_run_count"] == 1
+
+    final = write_final_evaluation_report(
+        artifacts_dir=artifacts_dir,
+        output_path=tmp_path / "final.md",
+        json_output_path=tmp_path / "final.json",
+    )
+    assert final.deepagents_package_run_count == 1
+    assert any("package-backed" in decision for decision in final.decisions)
+    assert any("live DeepAgents model execution remains uncalibrated" in item for item in final.limitations)
 
 
 def test_release_hygiene_requires_committed_clean_git_repository(tmp_path: Path) -> None:
