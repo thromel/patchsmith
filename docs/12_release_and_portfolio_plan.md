@@ -192,6 +192,17 @@ PYTHONPATH=src python3 -m patchsmith.cli preview-issue-corpus-context \
 
 Current context-preview output should complete all three public issue candidates with source-free retrieved-file summaries. Use it as clone/index/retrieval evidence only; it does not prove public issue repair quality.
 
+Materialize public issue task manifests:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli materialize-issue-corpus-tasks \
+  --corpus evals/issue_corpora/public_issue_smoke_v1/issues.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+Current materialization output should write three source-free task manifests and runbooks. Use it as external-evaluation setup evidence only; it does not prove public issue reproduction or repair quality.
+
 Generate the release hygiene report:
 
 ```bash
@@ -203,7 +214,7 @@ PYTHONPATH=src python3 -m patchsmith.cli release-hygiene \
   --json
 ```
 
-Current release hygiene output is `ready_with_warnings`: generated review artifacts now include calibration-readiness and public issue context-preview evidence, package build metadata exists, local Git metadata exists, and the remaining release caveat is live LLM calibration.
+Current release hygiene output is `ready_with_warnings`: generated review artifacts now include calibration-readiness and public issue context-preview/materialization evidence, package build metadata exists, local Git metadata exists, and the remaining release caveat is live LLM calibration.
 
 ## Example flagship demo scenario
 

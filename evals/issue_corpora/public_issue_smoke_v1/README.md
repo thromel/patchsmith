@@ -36,6 +36,18 @@ PYTHONPATH=src python3 -m patchsmith.cli preview-issue-corpus-context \
 The context preview records source-free retrieved-file summaries only. It does
 not prove issue reproduction, patch generation, or test success.
 
+Task materialization command:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli materialize-issue-corpus-tasks \
+  --corpus evals/issue_corpora/public_issue_smoke_v1/issues.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+Materialized task manifests and runbooks are source-free setup artifacts. They
+do not prove issue reproduction, patch generation, or test success.
+
 Selection criteria:
 
 - public GitHub issue URL,

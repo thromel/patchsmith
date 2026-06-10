@@ -6,6 +6,7 @@ import tempfile
 from pathlib import Path
 
 from patchsmith.evaluation import (
+    materialize_issue_corpus_tasks,
     preflight_issue_corpus_repositories,
     preview_issue_corpus_context,
     run_patch_search_evaluation,
@@ -244,6 +245,38 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f"completed={summary.completed_issues}/{summary.attempted_issues} "
                 f"context_provider={summary.context_provider}"
+            )
+        return 0
+
+    if args.command == "materialize-issue-corpus-tasks":
+        max_issues = None if args.max_issues == 0 else args.max_issues
+        context_preview = (
+            Path(args.context_preview)
+            if args.context_preview
+            else Path(args.output) / "context_preview_results.json"
+        )
+        results, summary = materialize_issue_corpus_tasks(
+            corpus_path=Path(args.corpus),
+            output_dir=Path(args.output),
+            context_preview_path=context_preview,
+            max_issues=max_issues,
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "result_count": len(results),
+                        "report_path": str(Path(args.output) / "materialized_task_report.md"),
+                        "summary": summary.to_dict(),
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(f"Report: {Path(args.output) / 'materialized_task_report.md'}")
+            print(
+                f"materialized={summary.materialized_tasks}/{summary.attempted_issues} "
+                f"source_free={str(summary.source_free).lower()}"
             )
         return 0
 
@@ -934,6 +967,37 @@ def build_parser() -> argparse.ArgumentParser:
         help="Maximum issue entries to preview. Use 0 for all entries.",
     )
     preview_issue_corpus_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print JSON summary.",
+    )
+
+    materialize_issue_corpus_parser = subparsers.add_parser(
+        "materialize-issue-corpus-tasks",
+        help="Write source-free task manifests from public issue context-preview results.",
+    )
+    materialize_issue_corpus_parser.add_argument(
+        "--corpus",
+        default="evals/issue_corpora/public_issue_smoke_v1/issues.json",
+        help="Issue corpus JSON manifest.",
+    )
+    materialize_issue_corpus_parser.add_argument(
+        "--output",
+        default="artifacts/experiments/public_issue_corpus_v1",
+        help="Issue corpus materialization output directory.",
+    )
+    materialize_issue_corpus_parser.add_argument(
+        "--context-preview",
+        default=None,
+        help="Context preview results JSON. Defaults to <output>/context_preview_results.json.",
+    )
+    materialize_issue_corpus_parser.add_argument(
+        "--max-issues",
+        type=int,
+        default=0,
+        help="Maximum issue entries to materialize. Use 0 for all entries.",
+    )
+    materialize_issue_corpus_parser.add_argument(
         "--json",
         action="store_true",
         help="Print JSON summary.",

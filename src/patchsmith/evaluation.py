@@ -174,6 +174,44 @@ class IssueCorpusContextPreviewSummary:
 
 
 @dataclass(frozen=True)
+class IssueCorpusMaterializedTaskResult:
+    task_id: str
+    repository: str
+    issue_url: str
+    status: str
+    error: str | None
+    task_dir: str | None
+    manifest_path: str | None
+    issue_path: str | None
+    runbook_path: str | None
+    repo_url: str
+    commit_hash: str | None
+    context_provider: str | None
+    context_count: int
+    retrieved_files: list[str]
+    suggested_test_commands: list[str]
+    source_free: bool
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class IssueCorpusMaterializedTaskSummary:
+    corpus_path: str
+    context_preview_path: str
+    output_dir: str
+    attempted_issues: int
+    materialized_tasks: int
+    failed_tasks: int
+    repository_count: int
+    source_free: bool
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class RetrievalEvalResult:
     task_id: str
     context_provider: str
@@ -871,6 +909,232 @@ def write_issue_corpus_context_preview_outputs(
     (output_dir / "context_preview_report.md").write_text(
         render_issue_corpus_context_preview_report(
             corpus_path=corpus_path,
+            results=results,
+            summary=summary,
+        ),
+        encoding="utf-8",
+    )
+
+
+def materialize_issue_corpus_tasks(
+    *,
+    corpus_path: Path,
+    output_dir: Path,
+    context_preview_path: Path | None = None,
+    max_issues: int | None = None,
+) -> tuple[
+    list[IssueCorpusMaterializedTaskResult],
+    IssueCorpusMaterializedTaskSummary,
+]:
+    if not corpus_path.exists():
+        raise FileNotFoundError(f"issue corpus does not exist: {corpus_path}")
+    context_preview_path = context_preview_path or output_dir / "context_preview_results.json"
+    if not context_preview_path.exists():
+        raise FileNotFoundError(
+            f"context preview results do not exist: {context_preview_path}"
+        )
+
+    payload = json.loads(corpus_path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict) or not isinstance(payload.get("issues"), list):
+        raise ValueError("issue corpus missing list field: issues")
+    issues = [issue for issue in payload["issues"] if isinstance(issue, dict)]
+    if max_issues is not None:
+        issues = issues[:max_issues]
+
+    preview_payload = json.loads(context_preview_path.read_text(encoding="utf-8"))
+    if not isinstance(preview_payload, list):
+        raise ValueError("context preview results must contain a JSON list")
+    previews_by_task = {
+        str(item.get("task_id")): item
+        for item in preview_payload
+        if isinstance(item, dict) and item.get("task_id")
+    }
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    tasks_dir = output_dir / "materialized_tasks"
+    tasks_dir.mkdir(parents=True, exist_ok=True)
+    results: list[IssueCorpusMaterializedTaskResult] = []
+    corpus_id = payload.get("corpus_id") if isinstance(payload.get("corpus_id"), str) else None
+
+    for issue in issues:
+        task_id = str(issue.get("task_id", "unknown"))
+        repository = str(issue.get("repository", "unknown"))
+        issue_url = str(issue.get("issue_url", ""))
+        repo_url = str(issue.get("repo_url", ""))
+        task_dir = tasks_dir / _safe_artifact_name(task_id)
+        try:
+            preview = previews_by_task.get(task_id)
+            if not isinstance(preview, dict) or preview.get("status") != "completed":
+                raise ValueError(f"missing completed context preview for task: {task_id}")
+            if task_dir.exists():
+                _remove_artifact_dir(root=output_dir, target=task_dir)
+            task_dir.mkdir(parents=True)
+            issue_path = task_dir / "issue.md"
+            manifest_path = task_dir / "task_manifest.json"
+            runbook_path = task_dir / "RUNBOOK.md"
+            manifest = _issue_corpus_task_manifest(
+                issue=issue,
+                preview=preview,
+                corpus_id=corpus_id,
+                task_dir=task_dir,
+                issue_path=issue_path,
+            )
+            issue_path.write_text(
+                _render_materialized_issue(issue=issue, preview=preview),
+                encoding="utf-8",
+            )
+            manifest_path.write_text(
+                json.dumps(manifest, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            runbook_path.write_text(
+                _render_materialized_task_runbook(manifest=manifest),
+                encoding="utf-8",
+            )
+            test_commands = _materialized_test_commands(preview)
+            source_free = _manifest_is_source_free(manifest)
+            results.append(
+                IssueCorpusMaterializedTaskResult(
+                    task_id=task_id,
+                    repository=repository,
+                    issue_url=issue_url,
+                    status="materialized",
+                    error=None,
+                    task_dir=str(task_dir),
+                    manifest_path=str(manifest_path),
+                    issue_path=str(issue_path),
+                    runbook_path=str(runbook_path),
+                    repo_url=repo_url,
+                    commit_hash=_optional_string(preview.get("commit_hash")),
+                    context_provider=_optional_string(preview.get("context_provider")),
+                    context_count=int(preview.get("context_count") or 0),
+                    retrieved_files=_string_list(preview.get("retrieved_files")),
+                    suggested_test_commands=test_commands,
+                    source_free=source_free,
+                )
+            )
+        except Exception as error:  # noqa: BLE001 - keep materialization reports complete.
+            results.append(
+                IssueCorpusMaterializedTaskResult(
+                    task_id=task_id,
+                    repository=repository,
+                    issue_url=issue_url,
+                    status="failed",
+                    error=str(error),
+                    task_dir=str(task_dir),
+                    manifest_path=None,
+                    issue_path=None,
+                    runbook_path=None,
+                    repo_url=repo_url,
+                    commit_hash=None,
+                    context_provider=None,
+                    context_count=0,
+                    retrieved_files=[],
+                    suggested_test_commands=[],
+                    source_free=False,
+                )
+            )
+
+    summary = summarize_issue_corpus_materialized_tasks(
+        corpus_path=corpus_path,
+        context_preview_path=context_preview_path,
+        output_dir=output_dir,
+        results=results,
+    )
+    write_issue_corpus_materialized_task_outputs(
+        output_dir=output_dir,
+        corpus_path=corpus_path,
+        context_preview_path=context_preview_path,
+        results=results,
+        summary=summary,
+    )
+    return results, summary
+
+
+def summarize_issue_corpus_materialized_tasks(
+    *,
+    corpus_path: Path,
+    context_preview_path: Path,
+    output_dir: Path,
+    results: list[IssueCorpusMaterializedTaskResult],
+) -> IssueCorpusMaterializedTaskSummary:
+    materialized = [result for result in results if result.status == "materialized"]
+    return IssueCorpusMaterializedTaskSummary(
+        corpus_path=str(corpus_path),
+        context_preview_path=str(context_preview_path),
+        output_dir=str(output_dir),
+        attempted_issues=len(results),
+        materialized_tasks=len(materialized),
+        failed_tasks=sum(1 for result in results if result.status != "materialized"),
+        repository_count=len({result.repository for result in results}),
+        source_free=all(
+            result.status == "materialized" and result.source_free
+            for result in results
+        ),
+    )
+
+
+def write_issue_corpus_materialized_task_outputs(
+    *,
+    output_dir: Path,
+    corpus_path: Path,
+    context_preview_path: Path,
+    results: list[IssueCorpusMaterializedTaskResult],
+    summary: IssueCorpusMaterializedTaskSummary,
+) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "materialized_task_results.json").write_text(
+        json.dumps([result.to_dict() for result in results], indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (output_dir / "materialized_task_summary.json").write_text(
+        json.dumps(summary.to_dict(), indent=2) + "\n",
+        encoding="utf-8",
+    )
+    with (output_dir / "materialized_task_results.csv").open(
+        "w",
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=[
+                "task_id",
+                "repository",
+                "issue_url",
+                "status",
+                "error",
+                "task_dir",
+                "commit_hash",
+                "context_provider",
+                "context_count",
+                "retrieved_files",
+                "suggested_test_commands",
+                "source_free",
+            ],
+        )
+        writer.writeheader()
+        for result in results:
+            writer.writerow(
+                {
+                    "task_id": result.task_id,
+                    "repository": result.repository,
+                    "issue_url": result.issue_url,
+                    "status": result.status,
+                    "error": result.error,
+                    "task_dir": result.task_dir,
+                    "commit_hash": result.commit_hash,
+                    "context_provider": result.context_provider,
+                    "context_count": result.context_count,
+                    "retrieved_files": ";".join(result.retrieved_files),
+                    "suggested_test_commands": ";".join(result.suggested_test_commands),
+                    "source_free": result.source_free,
+                }
+            )
+    (output_dir / "materialized_task_report.md").write_text(
+        render_issue_corpus_materialized_task_report(
+            corpus_path=corpus_path,
+            context_preview_path=context_preview_path,
             results=results,
             summary=summary,
         ),
@@ -1985,6 +2249,56 @@ def render_issue_corpus_context_preview_report(
     return "\n".join(lines)
 
 
+def render_issue_corpus_materialized_task_report(
+    *,
+    corpus_path: Path,
+    context_preview_path: Path,
+    results: list[IssueCorpusMaterializedTaskResult],
+    summary: IssueCorpusMaterializedTaskSummary,
+) -> str:
+    lines = [
+        "# Public Issue Corpus Materialized Tasks",
+        "",
+        f"- Corpus: `{corpus_path}`",
+        f"- Context preview: `{context_preview_path}`",
+        f"- Output: `{summary.output_dir}`",
+        f"- Attempted issues: `{summary.attempted_issues}`",
+        f"- Materialized tasks: `{summary.materialized_tasks}`",
+        f"- Failed tasks: `{summary.failed_tasks}`",
+        f"- Repositories: `{summary.repository_count}`",
+        f"- Source-free manifests: `{str(summary.source_free).lower()}`",
+        "",
+        "## Results",
+        "",
+        "| Task | Repository | Status | Commit | Contexts | Retrieved Files | Task Dir | Error |",
+        "|---|---|---|---|---:|---|---|---|",
+    ]
+    for result in results:
+        lines.append(
+            "| "
+            f"{result.task_id} | "
+            f"{result.repository} | "
+            f"{result.status} | "
+            f"{(result.commit_hash or 'unknown')[:12]} | "
+            f"{result.context_count} | "
+            f"{', '.join(result.retrieved_files) or 'none'} | "
+            f"{result.task_dir or 'none'} | "
+            f"{result.error or 'none'} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Claim Boundary",
+            "",
+            "- This materialization creates external-evaluation task manifests and runbooks.",
+            "- Manifests intentionally omit source excerpts and issue body scraping.",
+            "- It does not prove issue reproduction, patch generation, or test success.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def render_repair_eval_report(
     *,
     dataset_dir: Path,
@@ -2684,6 +2998,208 @@ def _source_free_context(context: RetrievedContext) -> dict[str, Any]:
         "method": context.method,
         "matched_terms": context.matched_terms,
     }
+
+
+def _issue_corpus_task_manifest(
+    *,
+    issue: dict[str, Any],
+    preview: dict[str, Any],
+    corpus_id: str | None,
+    task_dir: Path,
+    issue_path: Path,
+) -> dict[str, Any]:
+    test_commands = _materialized_test_commands(preview)
+    top_contexts = _source_free_preview_contexts(preview.get("top_contexts"))
+    repo_ref = _optional_string(preview.get("repo_path")) or str(issue.get("repo_url", ""))
+    manifest = {
+        "task_manifest_version": 1,
+        "task_id": str(issue.get("task_id", "unknown")),
+        "source_corpus": corpus_id,
+        "task_dir": str(task_dir),
+        "issue_file": str(issue_path),
+        "issue": {
+            "source": issue.get("source"),
+            "repository": issue.get("repository"),
+            "repo_url": issue.get("repo_url"),
+            "issue_url": issue.get("issue_url"),
+            "issue_number": issue.get("issue_number"),
+            "title": issue.get("title"),
+            "language": issue.get("language"),
+            "task_type": issue.get("task_type"),
+            "state_at_capture": issue.get("state_at_capture"),
+            "captured_at": issue.get("captured_at"),
+            "selection_reason": issue.get("selection_reason"),
+            "expected_workflow": _string_list(issue.get("expected_workflow")),
+        },
+        "repository_snapshot": {
+            "repo_path": preview.get("repo_path"),
+            "commit_hash": preview.get("commit_hash"),
+            "branch": preview.get("branch"),
+            "file_count": preview.get("file_count"),
+            "language_summary": preview.get("language_summary") or {},
+            "package_manager": preview.get("package_manager"),
+            "test_commands": test_commands,
+        },
+        "retrieval_preview": {
+            "context_provider": preview.get("context_provider"),
+            "context_count": preview.get("context_count"),
+            "retrieved_files": _string_list(preview.get("retrieved_files")),
+            "top_contexts": top_contexts,
+        },
+        "suggested_commands": [
+            (
+                "PYTHONPATH=src python3 -m patchsmith.cli run "
+                f"--repo \"{repo_ref}\" "
+                f"--issue-file \"{issue_path}\" "
+                "--runtime langgraph "
+                "--planner fake_model "
+                "--context-provider native_hybrid "
+                f"--test-command \"{test_commands[0]}\" "
+                "--json"
+            )
+        ],
+        "claim_boundary": [
+            "This manifest prepares an external evaluation task.",
+            "It does not prove issue reproduction, patch generation, or test success.",
+            "It intentionally omits source excerpts and scraped issue body text.",
+        ],
+        "source_free": True,
+    }
+    manifest["source_free"] = _manifest_is_source_free(manifest)
+    return manifest
+
+
+def _render_materialized_issue(
+    *,
+    issue: dict[str, Any],
+    preview: dict[str, Any],
+) -> str:
+    workflow = _string_list(issue.get("expected_workflow"))
+    retrieved_files = _string_list(preview.get("retrieved_files"))
+    lines = [
+        f"# {issue.get('title') or issue.get('task_id') or 'Public Issue Task'}",
+        "",
+        f"- Task ID: `{issue.get('task_id', 'unknown')}`",
+        f"- Repository: `{issue.get('repository', 'unknown')}`",
+        f"- Issue: `{issue.get('issue_url', 'unknown')}`",
+        f"- Repository URL: `{issue.get('repo_url', 'unknown')}`",
+        f"- Captured state: `{issue.get('state_at_capture', 'unknown')}`",
+        f"- Task type: `{issue.get('task_type', 'unknown')}`",
+        f"- Context provider: `{preview.get('context_provider', 'unknown')}`",
+        f"- Commit: `{preview.get('commit_hash') or 'unknown'}`",
+        "",
+        "## Expected Workflow",
+        "",
+    ]
+    lines.extend(f"- {item}" for item in workflow)
+    lines.extend(
+        [
+            "",
+            "## Retrieved File Hints",
+            "",
+        ]
+    )
+    lines.extend(f"- `{path}`" for path in retrieved_files)
+    lines.extend(
+        [
+            "",
+            "## Claim Boundary",
+            "",
+            "- This file contains curated public issue metadata and retrieved-file hints.",
+            "- It intentionally omits source excerpts and scraped issue body text.",
+            "- It is not evidence that PatchSmith reproduced or repaired the issue.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def _render_materialized_task_runbook(*, manifest: dict[str, Any]) -> str:
+    issue = manifest.get("issue") if isinstance(manifest.get("issue"), dict) else {}
+    snapshot = (
+        manifest.get("repository_snapshot")
+        if isinstance(manifest.get("repository_snapshot"), dict)
+        else {}
+    )
+    retrieval = (
+        manifest.get("retrieval_preview")
+        if isinstance(manifest.get("retrieval_preview"), dict)
+        else {}
+    )
+    commands = _string_list(manifest.get("suggested_commands"))
+    lines = [
+        f"# {manifest.get('task_id', 'Public Issue Task')} Runbook",
+        "",
+        "## Inputs",
+        "",
+        f"- Repository: `{issue.get('repository', 'unknown')}`",
+        f"- Issue: `{issue.get('issue_url', 'unknown')}`",
+        f"- Local repository snapshot: `{snapshot.get('repo_path') or 'unknown'}`",
+        f"- Commit: `{snapshot.get('commit_hash') or 'unknown'}`",
+        f"- Context provider: `{retrieval.get('context_provider') or 'unknown'}`",
+        f"- Retrieved files: `{', '.join(_string_list(retrieval.get('retrieved_files'))) or 'none'}`",
+        "",
+        "## Suggested Commands",
+        "",
+    ]
+    for command in commands:
+        lines.extend(["```bash", command, "```", ""])
+    lines.extend(
+        [
+            "## Claim Boundary",
+            "",
+            "- Run this task only after confirming dependency and sandbox expectations.",
+            "- A generated manifest is setup evidence, not solved-run evidence.",
+            "- Save normal PatchSmith run artifacts before making repair-quality claims.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def _materialized_test_commands(preview: dict[str, Any]) -> list[str]:
+    commands = _string_list(preview.get("test_commands"))
+    return commands or ["python3 -m pytest"]
+
+
+def _source_free_preview_contexts(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    contexts: list[dict[str, Any]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        contexts.append(
+            {
+                "path": item.get("path"),
+                "rank": item.get("rank"),
+                "score": item.get("score"),
+                "method": item.get("method"),
+                "matched_terms": _string_list(item.get("matched_terms")),
+            }
+        )
+    return contexts
+
+
+def _manifest_is_source_free(value: Any) -> bool:
+    if isinstance(value, dict):
+        return all(
+            key != "excerpt" and _manifest_is_source_free(child)
+            for key, child in value.items()
+        )
+    if isinstance(value, list):
+        return all(_manifest_is_source_free(item) for item in value)
+    return True
+
+
+def _optional_string(value: Any) -> str | None:
+    return value if isinstance(value, str) and value else None
+
+
+def _string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str)]
 
 
 def _supplement_context_preview_source_neighbors(

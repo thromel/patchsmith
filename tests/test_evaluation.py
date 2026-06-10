@@ -5,6 +5,7 @@ from pathlib import Path
 from patchsmith.cli import main
 from patchsmith.evaluation import (
     load_seeded_tasks,
+    materialize_issue_corpus_tasks,
     preflight_issue_corpus_repositories,
     preview_issue_corpus_context,
     recall,
@@ -268,6 +269,85 @@ def test_preview_issue_corpus_context_writes_source_free_outputs(
     )
     assert exit_code == 0
     assert (cli_output / "context_preview_report.md").exists()
+
+
+def test_materialize_issue_corpus_tasks_writes_source_free_manifests(
+    tmp_path: Path,
+) -> None:
+    fixture_repo = Path("evals/tasks/seeded_bugs_v1/task_001_logic_bug/repo").resolve()
+    corpus_path = tmp_path / "issues.json"
+    corpus_path.write_text(
+        json.dumps(
+            {
+                "corpus_id": "local_materialization",
+                "issues": [
+                    {
+                        "task_id": "local_simple_calc",
+                        "source": "github_issue",
+                        "repository": "local/simple_calc",
+                        "repo_url": str(fixture_repo),
+                        "issue_url": "https://github.com/example/simple-calc/issues/1",
+                        "issue_number": 1,
+                        "title": "Addition returns the wrong result in simple_calc",
+                        "language": "python",
+                        "task_type": "logic_bug",
+                        "state_at_capture": "open",
+                        "captured_at": "2026-06-10T08:16:00Z",
+                        "selection_reason": "Local fixture for materialization coverage.",
+                        "expected_workflow": ["retrieve simple_calc implementation"],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    output_dir = tmp_path / "materialization"
+    preview_issue_corpus_context(
+        corpus_path=corpus_path,
+        output_dir=output_dir,
+        context_provider="native_hybrid",
+    )
+
+    results, summary = materialize_issue_corpus_tasks(
+        corpus_path=corpus_path,
+        output_dir=output_dir,
+    )
+
+    assert summary.attempted_issues == 1
+    assert summary.materialized_tasks == 1
+    assert summary.source_free
+    assert results[0].status == "materialized"
+    assert results[0].source_free
+    manifest_path = output_dir / "materialized_tasks" / "local_simple_calc" / "task_manifest.json"
+    runbook_path = output_dir / "materialized_tasks" / "local_simple_calc" / "RUNBOOK.md"
+    issue_path = output_dir / "materialized_tasks" / "local_simple_calc" / "issue.md"
+    assert manifest_path.exists()
+    assert runbook_path.exists()
+    assert issue_path.exists()
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["retrieval_preview"]["retrieved_files"]
+    assert '"excerpt"' not in manifest_path.read_text(encoding="utf-8")
+    assert (output_dir / "materialized_task_report.md").exists()
+    assert (output_dir / "materialized_task_results.csv").exists()
+
+    cli_output = tmp_path / "cli_materialization"
+    preview_issue_corpus_context(
+        corpus_path=corpus_path,
+        output_dir=cli_output,
+        context_provider="native_hybrid",
+    )
+    exit_code = main(
+        [
+            "materialize-issue-corpus-tasks",
+            "--corpus",
+            str(corpus_path),
+            "--output",
+            str(cli_output),
+            "--json",
+        ]
+    )
+    assert exit_code == 0
+    assert (cli_output / "materialized_task_report.md").exists()
 
 
 def test_graph_retrieval_dataset_validates(tmp_path: Path) -> None:

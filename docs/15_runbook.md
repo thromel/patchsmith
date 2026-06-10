@@ -163,6 +163,17 @@ PYTHONPATH=src python3 -m patchsmith.cli preview-issue-corpus-context \
 
 The preview clones and indexes reachable corpus repositories, then records source-free retrieved-file summaries. Treat it as context plumbing evidence only; issue reproduction, patch generation, and test success require normal run artifacts.
 
+Public issue task materialization:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli materialize-issue-corpus-tasks \
+  --corpus evals/issue_corpora/public_issue_smoke_v1/issues.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+The materializer writes per-issue task manifests, issue files, and runbooks from the context preview. Treat these as setup artifacts for an external evaluation lane, not solved-run artifacts.
+
 Scaffold comparison:
 
 ```bash

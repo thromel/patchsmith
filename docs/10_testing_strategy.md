@@ -184,7 +184,16 @@ PYTHONPATH=src python3 -m patchsmith.cli preview-issue-corpus-context \
   --json
 ```
 
-The corpus, preflight, and context-preview reports are planning and plumbing evidence. They are not repair-quality evidence until the issues are reproduced, patched, tested, and saved as normal PatchSmith run artifacts.
+Materialize source-free task manifests after context preview:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli materialize-issue-corpus-tasks \
+  --corpus evals/issue_corpora/public_issue_smoke_v1/issues.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+The corpus, preflight, context-preview, and materialization reports are planning and plumbing evidence. They are not repair-quality evidence until the issues are reproduced, patched, tested, and saved as normal PatchSmith run artifacts.
 
 ## Definition of test completion
 
