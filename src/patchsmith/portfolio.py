@@ -82,6 +82,8 @@ class LiveCalibrationReport:
     saved_live_provider_count: int
     deepagents_package_run_count: int
     deepagents_compatibility_run_count: int
+    openai_agents_package_run_count: int
+    openai_agents_compatibility_run_count: int
     model_providers: dict[str, int]
     checks: list[LiveCalibrationCheck]
     smoke_commands: list[str]
@@ -94,6 +96,10 @@ class LiveCalibrationReport:
             "saved_live_provider_count": self.saved_live_provider_count,
             "deepagents_package_run_count": self.deepagents_package_run_count,
             "deepagents_compatibility_run_count": self.deepagents_compatibility_run_count,
+            "openai_agents_package_run_count": self.openai_agents_package_run_count,
+            "openai_agents_compatibility_run_count": (
+                self.openai_agents_compatibility_run_count
+            ),
             "model_providers": self.model_providers,
             "checks": [check.to_dict() for check in self.checks],
             "smoke_commands": self.smoke_commands,
@@ -182,6 +188,8 @@ class FinalEvaluationReport:
     model_providers: dict[str, int]
     deepagents_package_run_count: int
     deepagents_compatibility_run_count: int
+    openai_agents_package_run_count: int
+    openai_agents_compatibility_run_count: int
     metrics: list[FinalEvaluationMetric]
     decisions: list[str]
     limitations: list[str]
@@ -200,6 +208,10 @@ class FinalEvaluationReport:
             "model_providers": self.model_providers,
             "deepagents_package_run_count": self.deepagents_package_run_count,
             "deepagents_compatibility_run_count": self.deepagents_compatibility_run_count,
+            "openai_agents_package_run_count": self.openai_agents_package_run_count,
+            "openai_agents_compatibility_run_count": (
+                self.openai_agents_compatibility_run_count
+            ),
             "metrics": [metric.to_dict() for metric in self.metrics],
             "decisions": self.decisions,
             "limitations": self.limitations,
@@ -393,9 +405,11 @@ def build_live_calibration_report(
     model_providers = _discover_model_providers(artifacts_dir)
     live_providers = _live_providers(model_providers)
     deepagents_modes = _discover_deepagents_adapter_modes(artifacts_dir)
+    openai_agents_modes = _discover_openai_agents_adapter_modes(artifacts_dir)
     checks = _live_calibration_checks(
         model_providers=model_providers,
         deepagents_modes=deepagents_modes,
+        openai_agents_modes=openai_agents_modes,
         environment=environment,
         package_availability=package_availability,
     )
@@ -406,6 +420,10 @@ def build_live_calibration_report(
         saved_live_provider_count=sum(model_providers[provider] for provider in live_providers),
         deepagents_package_run_count=deepagents_modes.get("package_available", 0),
         deepagents_compatibility_run_count=deepagents_modes.get("compatibility_mode", 0),
+        openai_agents_package_run_count=openai_agents_modes.get("package_available", 0),
+        openai_agents_compatibility_run_count=openai_agents_modes.get(
+            "compatibility_mode", 0
+        ),
         model_providers=model_providers,
         checks=checks,
         smoke_commands=_live_calibration_commands(),
@@ -446,6 +464,11 @@ def render_live_calibration_report(report: LiveCalibrationReport) -> str:
         f"- Saved live-provider runs: `{report.saved_live_provider_count}`",
         f"- DeepAgents package-backed runs: `{report.deepagents_package_run_count}`",
         f"- DeepAgents compatibility-mode runs: `{report.deepagents_compatibility_run_count}`",
+        f"- OpenAI Agents package-backed runs: `{report.openai_agents_package_run_count}`",
+        (
+            "- OpenAI Agents compatibility-mode runs: "
+            f"`{report.openai_agents_compatibility_run_count}`"
+        ),
         f"- Model providers: `{_provider_summary(report.model_providers)}`",
         "",
         "## Checks",
@@ -480,6 +503,7 @@ def build_final_evaluation_report(
     )
     metrics = [_final_metric(metric) for metric in index.metrics]
     deepagents_modes = _discover_deepagents_adapter_modes(Path(index.artifacts_dir))
+    openai_agents_modes = _discover_openai_agents_adapter_modes(Path(index.artifacts_dir))
     return FinalEvaluationReport(
         artifacts_dir=index.artifacts_dir,
         generated_at=_utc_now(),
@@ -492,9 +516,17 @@ def build_final_evaluation_report(
         model_providers=readiness.model_providers,
         deepagents_package_run_count=deepagents_modes.get("package_available", 0),
         deepagents_compatibility_run_count=deepagents_modes.get("compatibility_mode", 0),
+        openai_agents_package_run_count=openai_agents_modes.get("package_available", 0),
+        openai_agents_compatibility_run_count=openai_agents_modes.get(
+            "compatibility_mode", 0
+        ),
         metrics=metrics,
-        decisions=_final_evaluation_decisions(readiness, metrics, deepagents_modes),
-        limitations=_final_evaluation_limitations(readiness, deepagents_modes),
+        decisions=_final_evaluation_decisions(
+            readiness, metrics, deepagents_modes, openai_agents_modes
+        ),
+        limitations=_final_evaluation_limitations(
+            readiness, deepagents_modes, openai_agents_modes
+        ),
         review_artifacts=_final_review_artifacts(),
     )
 
@@ -534,6 +566,11 @@ def render_final_evaluation_report(report: FinalEvaluationReport) -> str:
         f"- Runs requiring attention: `{report.runs_requiring_attention}`",
         f"- DeepAgents package-backed runs: `{report.deepagents_package_run_count}`",
         f"- DeepAgents compatibility-mode runs: `{report.deepagents_compatibility_run_count}`",
+        f"- OpenAI Agents package-backed runs: `{report.openai_agents_package_run_count}`",
+        (
+            "- OpenAI Agents compatibility-mode runs: "
+            f"`{report.openai_agents_compatibility_run_count}`"
+        ),
         "",
         "## Executive Conclusion",
         "",
@@ -1049,18 +1086,22 @@ def _live_calibration_checks(
     *,
     model_providers: dict[str, int],
     deepagents_modes: dict[str, int],
+    openai_agents_modes: dict[str, int],
     environment: dict[str, str],
     package_availability: dict[str, bool] | None,
 ) -> list[LiveCalibrationCheck]:
     live_providers = _live_providers(model_providers)
     openai_sdk_available = _package_available("openai", package_availability)
     deepagents_available = _package_available("deepagents", package_availability)
+    openai_agents_available = _package_available("agents", package_availability)
     openai_key_present = bool(environment.get("OPENAI_API_KEY"))
     model_name = environment.get("PATCHSMITH_OPENAI_MODEL", "").strip()
     input_rate = environment.get("PATCHSMITH_OPENAI_INPUT_COST_PER_1M", "").strip()
     output_rate = environment.get("PATCHSMITH_OPENAI_OUTPUT_COST_PER_1M", "").strip()
     deepagents_package_runs = deepagents_modes.get("package_available", 0)
     deepagents_compatibility_runs = deepagents_modes.get("compatibility_mode", 0)
+    openai_agents_package_runs = openai_agents_modes.get("package_available", 0)
+    openai_agents_compatibility_runs = openai_agents_modes.get("compatibility_mode", 0)
 
     return [
         LiveCalibrationCheck(
@@ -1161,6 +1202,63 @@ def _live_calibration_checks(
             ),
         ),
         LiveCalibrationCheck(
+            name="OpenAI Agents Package",
+            status="passed" if openai_agents_available else "warning",
+            evidence=(
+                "`agents` package is importable."
+                if openai_agents_available
+                else (
+                    "`agents` package is not importable in the current shell; "
+                    "use saved trace evidence for package-backed adapter claims."
+                    if openai_agents_package_runs
+                    else (
+                        "`agents` package is not importable; adapter evidence remains "
+                        "compatibility-mode only."
+                    )
+                )
+            ),
+            next_action=(
+                (
+                    "Run the OpenAI Agents adapter under the installed package before "
+                    "making package-backed claims."
+                )
+                if openai_agents_available
+                else (
+                    "Install the optional `openai-agents` extra in the active environment for "
+                    "new package-backed runs."
+                    if openai_agents_package_runs
+                    else (
+                        "Install the optional `openai-agents` extra before claiming real "
+                        "package execution."
+                    )
+                )
+            ),
+        ),
+        LiveCalibrationCheck(
+            name="Saved OpenAI Agents Package Evidence",
+            status="passed" if openai_agents_package_runs else "warning",
+            evidence=(
+                f"{openai_agents_package_runs} package-backed run(s); "
+                f"{openai_agents_compatibility_runs} compatibility-mode run(s)."
+                if openai_agents_package_runs
+                else (
+                    f"0 package-backed runs; "
+                    f"{openai_agents_compatibility_runs} compatibility-mode run(s)."
+                )
+            ),
+            next_action=(
+                (
+                    "Use package-backed traces for adapter-import claims; still avoid "
+                    "live-model claims."
+                )
+                if openai_agents_package_runs
+                else (
+                    "Run the OpenAI Agents adapter with the optional extra installed and "
+                    "save traces."
+                )
+            ),
+        ),
+        LiveCalibrationCheck(
             name="Saved Live Provider Evidence",
             status="passed" if live_providers else "missing",
             evidence=(
@@ -1204,6 +1302,14 @@ def _package_available(
 
 
 def _discover_deepagents_adapter_modes(artifacts_dir: Path) -> dict[str, int]:
+    return _discover_adapter_modes(artifacts_dir, framework="deepagents")
+
+
+def _discover_openai_agents_adapter_modes(artifacts_dir: Path) -> dict[str, int]:
+    return _discover_adapter_modes(artifacts_dir, framework="openai_agents")
+
+
+def _discover_adapter_modes(artifacts_dir: Path, *, framework: str) -> dict[str, int]:
     modes: dict[str, set[str]] = {
         "package_available": set(),
         "compatibility_mode": set(),
@@ -1228,7 +1334,7 @@ def _discover_deepagents_adapter_modes(artifacts_dir: Path) -> dict[str, int]:
                 continue
             if (
                 event.get("event_type") != "runtime_node"
-                or payload.get("framework") != "deepagents"
+                or payload.get("framework") != framework
                 or payload.get("node") != "harness"
             ):
                 continue
@@ -1844,6 +1950,7 @@ def _final_evaluation_decisions(
     readiness: DemoReadinessReport,
     metrics: list[FinalEvaluationMetric],
     deepagents_modes: dict[str, int],
+    openai_agents_modes: dict[str, int],
 ) -> list[str]:
     decisions = [
         (
@@ -1902,6 +2009,15 @@ def _final_evaluation_decisions(
             f"run(s) and {compatibility_runs} compatibility-mode run(s); this proves "
             "optional-package import compatibility, not live DeepAgents model quality."
         )
+    openai_agents_package_runs = openai_agents_modes.get("package_available", 0)
+    openai_agents_compatibility_runs = openai_agents_modes.get("compatibility_mode", 0)
+    if openai_agents_package_runs:
+        decisions.append(
+            "OpenAI Agents adapter evidence now includes "
+            f"{openai_agents_package_runs} package-backed run(s) and "
+            f"{openai_agents_compatibility_runs} compatibility-mode run(s); this proves "
+            "optional-package import compatibility, not live OpenAI Agents model quality."
+        )
     live_providers = [
         provider
         for provider in readiness.model_providers
@@ -1922,8 +2038,10 @@ def _final_evaluation_decisions(
 def _final_evaluation_limitations(
     readiness: DemoReadinessReport,
     deepagents_modes: dict[str, int],
+    openai_agents_modes: dict[str, int],
 ) -> list[str]:
     package_runs = deepagents_modes.get("package_available", 0)
+    openai_agents_package_runs = openai_agents_modes.get("package_available", 0)
     deepagents_limitation = (
         "DeepAgents package-backed adapter smoke evidence exists, but live DeepAgents "
         "model execution remains uncalibrated."
@@ -1933,10 +2051,20 @@ def _final_evaluation_limitations(
             "package and live model provider are installed and reflected in saved artifacts."
         )
     )
+    openai_agents_limitation = (
+        "OpenAI Agents package-backed adapter smoke evidence exists, but live OpenAI "
+        "Agents model execution remains uncalibrated."
+        if openai_agents_package_runs
+        else (
+            "OpenAI Agents evidence is adapter compatibility evidence unless the optional "
+            "package and live model provider are installed and reflected in saved artifacts."
+        )
+    )
     limitations = [
         "The seeded suite is intentionally small and controlled; it proves workflow plumbing and comparative instrumentation, not broad real-world coding-agent quality.",
         "Current public-demo mode should use seeded or preselected repositories until sandboxing is hardened for arbitrary untrusted repos.",
         deepagents_limitation,
+        openai_agents_limitation,
     ]
     live_providers = [
         provider
@@ -2240,6 +2368,13 @@ def _live_calibration_commands() -> list[str]:
             "--dataset evals/tasks/seeded_bugs_v1 "
             "--runtime deepagents --planner heuristic --context-provider native_hybrid "
             "--output artifacts/experiments/deepagents_package_smoke_v1 --json"
+        ),
+        'python -m pip install -e ".[dev,openai-agents]"',
+        (
+            "PYTHONPATH=src python3 -m patchsmith.cli eval-repair "
+            "--dataset evals/tasks/seeded_bugs_v1 "
+            "--runtime openai_agents --planner heuristic --context-provider native_hybrid "
+            "--output artifacts/experiments/openai_agents_package_smoke_v1 --json"
         ),
         (
             "export OPENAI_API_KEY=...\n"

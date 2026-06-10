@@ -483,6 +483,12 @@ def main(argv: list[str] | None = None) -> int:
                         "deepagents_compatibility_run_count": (
                             report.deepagents_compatibility_run_count
                         ),
+                        "openai_agents_package_run_count": (
+                            report.openai_agents_package_run_count
+                        ),
+                        "openai_agents_compatibility_run_count": (
+                            report.openai_agents_compatibility_run_count
+                        ),
                         "decision_count": len(report.decisions),
                         "limitation_count": len(report.limitations),
                         "report_path": str(Path(args.output)),
@@ -521,6 +527,12 @@ def main(argv: list[str] | None = None) -> int:
                         "deepagents_compatibility_run_count": (
                             report.deepagents_compatibility_run_count
                         ),
+                        "openai_agents_package_run_count": (
+                            report.openai_agents_package_run_count
+                        ),
+                        "openai_agents_compatibility_run_count": (
+                            report.openai_agents_compatibility_run_count
+                        ),
                         "model_providers": report.model_providers,
                         "report_path": str(Path(args.output)),
                         "json_path": str(json_output_path) if json_output_path else None,
@@ -535,7 +547,8 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f"Status: {report.calibration_status} "
                 f"Saved live-provider runs: {report.saved_live_provider_count} "
-                f"DeepAgents package runs: {report.deepagents_package_run_count}"
+                f"DeepAgents package runs: {report.deepagents_package_run_count} "
+                f"OpenAI Agents package runs: {report.openai_agents_package_run_count}"
             )
         return 0
 
