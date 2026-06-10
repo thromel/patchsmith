@@ -36,12 +36,22 @@ def test_focused_setup_policy_allows_only_editable_project_installs() -> None:
         'python3 -m pip install -e ".[test]"',
         workspace=workspace,
     )
+    test_group_install = policy.evaluate(
+        "python3 -m pip install -e . --group test",
+        workspace=workspace,
+    )
     external_install = policy.evaluate("python3 -m pip install requests", workspace=workspace)
+    external_group_install = policy.evaluate(
+        "python3 -m pip install -e . --group dev",
+        workspace=workspace,
+    )
 
     assert project_install.allowed
     assert project_install.reason == "allowed focused setup editable install"
     assert test_extra_install.allowed
+    assert test_group_install.allowed
     assert not external_install.allowed
+    assert not external_group_install.allowed
 
 
 def test_command_policy_rejects_absolute_host_path() -> None:
@@ -100,6 +110,7 @@ def test_docker_sandbox_builds_isolated_command_and_sanitized_env(
     assert command[command.index("--security-opt") + 1] == "no-new-privileges"
     assert command[command.index("--workdir") + 1] == "/workspace"
     assert command[command.index("--volume") + 1] == f"{tmp_path.resolve()}:/workspace"
+    assert "SETUPTOOLS_SCM_PRETEND_VERSION_FOR_PYTEST=9.0.0" in command
     assert command[-4:] == ["patchsmith-test:latest", "python3", "-m", "pytest"]
     env = kwargs["env"]
     assert isinstance(env, dict)

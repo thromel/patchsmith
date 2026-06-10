@@ -148,7 +148,7 @@ PYTHONPATH=src python3 -m patchsmith.cli run \
   --json
 ```
 
-Docker mode runs the policy-checked command inside a per-run container with implicit image pulls disabled, network disabled, dropped capabilities, resource limits, a mounted `/workspace`, and a sanitized host environment. The selected sandbox mode is recorded in each run trace. Use an image that already contains task dependencies. The provided `patchsmith-seeded-smoke:py312` image includes `pytest` and `git` so seeded Docker smoke and focused setup installs can run without falling back to an unbuilt base image.
+Docker mode runs the policy-checked command inside a per-run container with implicit image pulls disabled, network disabled, dropped capabilities, resource limits, a mounted `/workspace`, and a sanitized host environment. The selected sandbox mode is recorded in each run trace. Use an image that already contains task dependencies. The provided `patchsmith-seeded-smoke:py312` image includes current `pip`, `pytest`, and `git` so seeded Docker smoke and focused setup installs can run dependency-group setup without falling back to an unbuilt base image.
 
 Generate the Docker smoke/preflight report:
 
@@ -395,7 +395,7 @@ PYTHONPATH=src python3 -m patchsmith.cli validate-focused-test-setups \
   --json
 ```
 
-The setup-validation report gates validation commands on completed setup execution. Current setup validation executes all three validation commands and records structured failure categories: one `pytest_in_tree_version_metadata` failure where the pytest snapshot imports its own dev version below configured `minversion`, and two `missing_httpbin_fixture_provider` failures where the requests snapshots hit a recursive `httpbin` fixture dependency. These diagnostics point to setup-recipe remediation; they are not repair-quality evidence.
+The setup-validation report gates validation commands on completed setup execution. Current setup validation executes all three validation commands successfully after the focused setup recipes run in Docker. This proves the post-setup validation commands can run; it is still setup/reproduction plumbing evidence, not repair-quality evidence.
 
 Run the seeded repair evaluation:
 
@@ -599,7 +599,7 @@ PYTHONPATH=src python3 -m patchsmith.cli delivery-audit \
   --json
 ```
 
-Latest delivery-audit evidence is saved in `artifacts/experiments/delivery_audit.md` and `artifacts/experiments/delivery_audit.json`. It maps the original planning/development objective to concrete evidence. Docker smoke now passes and environment readiness is warning-class; public issue setup validation remains incomplete with categorized setup failures, and live LLM calibration remains the hard blocker until credentials and a bounded live-provider run exist. Quality-gate evidence is included as an executable verification item.
+Latest delivery-audit evidence is saved in `artifacts/experiments/delivery_audit.md` and `artifacts/experiments/delivery_audit.json`. It maps the original planning/development objective to concrete evidence. Docker smoke and public issue setup validation now pass, environment readiness is warning-class, and live LLM calibration remains the hard blocker until credentials and a bounded live-provider run exist. Quality-gate evidence is included as an executable verification item.
 
 Generate the live calibration readiness report:
 
@@ -687,7 +687,7 @@ PYTHONPATH=src python3 -m patchsmith.cli launch-blockers \
   --json
 ```
 
-Latest launch blocker evidence is saved in `artifacts/experiments/launch_blockers.md` and `artifacts/experiments/launch_blockers.json`. Current status is `ready_with_warnings`: Docker smoke is ready, focused public issue setup-readiness is warning-class rather than blocked, and live-provider calibration plus release hygiene remain caveats. Public issue setup validation still fails on upstream test-environment issues, so it remains setup evidence rather than public issue repair evidence.
+Latest launch blocker evidence is saved in `artifacts/experiments/launch_blockers.md` and `artifacts/experiments/launch_blockers.json`. Current status is `ready_with_warnings`: Docker smoke is ready, focused public issue setup-readiness is warning-class rather than blocked, setup validation passes after the approved Docker setup recipe, and live-provider calibration plus release hygiene remain caveats. Public issue setup validation remains setup evidence rather than public issue repair evidence.
 
 Generate the release hygiene report:
 
@@ -735,7 +735,7 @@ When those rates are set, reports estimate model cost from provider token usage.
 
 ## Next engineering wedges
 
-The context broker boundary, retrieval eval runner, repair eval runner, scaffold comparison runner, patch-search evaluator, public issue corpus validation/preflight/context preview/task materialization, validation, run-readiness, focused-test planning, focused-test execution, focused-test diagnosis, focused-test setup planning, setup-readiness checks, setup-execution dry-run and executed Docker evidence, and setup-validation execution evidence with structured failure categories, static artifact index/dashboard with normalized metrics and generated run-detail trace pages, failure review report, demo readiness report, executable quality-gate report, consolidated project-status report with evidence freshness, environment readiness report, evidence-refresh orchestration report with opt-in Docker smoke refresh, live calibration readiness report and execution plan, delivery audit, launch blocker backlog with dependency-chain remediation commands, generated demo script, final evaluation report, release hygiene report, deterministic heuristic runtime, LangGraph orchestration runtime, DeepAgents adapter compatibility mode plus package-backed smoke evidence, OpenAI Agents SDK adapter compatibility mode, offline model-planner seam, credential-gated OpenAI Responses client, and Python Code Context Graph v0 now exist. The current seeded suite has 10 tasks and compares `native`, `native_hybrid`, `native_graph`, and `ctxhelm_cli` for retrieval, including aggregate context packing metadata. Scaffold comparison now includes trace complexity and debuggability metrics. The next useful development step is resolving the categorized public-issue setup-validation failures, resolving the live-provider warning, harder patch-search tasks with model-diverse candidates, or live-provider calibration when credentials and budget are explicitly available.
+The context broker boundary, retrieval eval runner, repair eval runner, scaffold comparison runner, patch-search evaluator, public issue corpus validation/preflight/context preview/task materialization, validation, run-readiness, focused-test planning, focused-test execution, focused-test diagnosis, focused-test setup planning, setup-readiness checks, setup-execution dry-run and executed Docker evidence, and passing setup-validation execution evidence, static artifact index/dashboard with normalized metrics and generated run-detail trace pages, failure review report, demo readiness report, executable quality-gate report, consolidated project-status report with evidence freshness, environment readiness report, evidence-refresh orchestration report with opt-in Docker smoke refresh, live calibration readiness report and execution plan, delivery audit, launch blocker backlog with dependency-chain remediation commands, generated demo script, final evaluation report, release hygiene report, deterministic heuristic runtime, LangGraph orchestration runtime, DeepAgents adapter compatibility mode plus package-backed smoke evidence, OpenAI Agents SDK adapter compatibility mode, offline model-planner seam, credential-gated OpenAI Responses client, and Python Code Context Graph v0 now exist. The current seeded suite has 10 tasks and compares `native`, `native_hybrid`, `native_graph`, and `ctxhelm_cli` for retrieval, including aggregate context packing metadata. Scaffold comparison now includes trace complexity and debuggability metrics. The next useful development step is resolving the live-provider warning, harder patch-search tasks with model-diverse candidates, or public issue repair attempts once reproduction criteria are explicit.
 
 The current LangGraph repair skeleton is:
 

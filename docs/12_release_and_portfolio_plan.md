@@ -152,7 +152,7 @@ PYTHONPATH=src python3 -m patchsmith.cli launch-blockers \
   --json
 ```
 
-Current launch blocker output is `ready_with_warnings`: Docker smoke is ready and focused public issue setup-readiness is warning-class rather than blocked. Live-provider calibration, release hygiene, and public issue setup-validation failures remain caveats. The generated backlog includes dependency-chain and remediation-command sections so the blocker order and next runnable commands are preserved with the evidence.
+Current launch blocker output is `ready_with_warnings`: Docker smoke is ready, focused public issue setup-readiness is warning-class rather than blocked, and setup validation passes after approved Docker setup. Live-provider calibration and release hygiene remain caveats. The generated backlog includes dependency-chain and remediation-command sections so the blocker order and next runnable commands are preserved with the evidence.
 
 Generate the MVP progress report:
 
@@ -218,7 +218,7 @@ PYTHONPATH=src python3 -m patchsmith.cli delivery-audit \
   --json
 ```
 
-Current delivery audit output is `in_progress_with_blockers`: requirements, roadmaps, sprint plans, process docs, development commits, executable quality-gate evidence, saved evaluation artifacts, Docker smoke evidence, and the live-calibration execution plan are present, while public issue setup validation and live LLM calibration remain blocker-class evidence gaps.
+Current delivery audit output is `in_progress_with_blockers`: requirements, roadmaps, sprint plans, process docs, development commits, executable quality-gate evidence, saved evaluation artifacts, Docker smoke evidence, public issue setup validation, and the live-calibration execution plan are present, while live LLM calibration remains the blocker-class evidence gap.
 
 Generate the Docker smoke report:
 
@@ -382,7 +382,7 @@ PYTHONPATH=src python3 -m patchsmith.cli validate-focused-test-setups \
   --json
 ```
 
-Current setup-validation output executes all three validation commands and records structured failure categories: one `pytest_in_tree_version_metadata` failure and two `missing_httpbin_fixture_provider` failures. This is setup/reproduction evidence, not repair-quality evidence.
+Current setup-validation output executes all three validation commands successfully after Docker setup. This is setup/reproduction evidence, not repair-quality evidence.
 
 Generate the release hygiene report:
 

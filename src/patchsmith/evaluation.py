@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import tempfile
 import time
+import tomllib
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any
@@ -5778,7 +5779,7 @@ def _plan_focused_test_setup(
         status = "planned"
         requires_network = True
         setup_commands = [
-            'python3 -m pip install -e ".[test]"',
+            _focused_test_dependency_install_command(repo_path),
             _fixture_listing_command(focused_files),
         ]
         risk_notes.append("fixture setup may require optional test dependencies or local services")
@@ -5799,7 +5800,7 @@ def _plan_focused_test_setup(
         setup_profile = "pytest_setup_environment"
         status = "planned"
         requires_network = True
-        setup_commands = ['python3 -m pip install -e ".[test]"']
+        setup_commands = [_focused_test_dependency_install_command(repo_path)]
         suggested_next_actions = [
             "inspect fixture and service requirements before automated repair",
             "rerun focused validation after setup changes",
@@ -6457,6 +6458,19 @@ def _fixture_listing_command(focused_files: list[str]) -> str:
     if focused_files:
         return f"python3 -m pytest --fixtures {focused_files[0]}"
     return "python3 -m pytest --fixtures"
+
+
+def _focused_test_dependency_install_command(repo_path: str | None) -> str:
+    pyproject_path = Path(repo_path) / "pyproject.toml" if repo_path else None
+    if pyproject_path is not None and pyproject_path.exists():
+        try:
+            parsed = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
+        except tomllib.TOMLDecodeError:
+            parsed = {}
+        dependency_groups = parsed.get("dependency-groups")
+        if isinstance(dependency_groups, dict) and "test" in dependency_groups:
+            return "python3 -m pip install -e . --group test"
+    return 'python3 -m pip install -e ".[test]"'
 
 
 def _focused_test_log_text(*, stdout_path: str | None, stderr_path: str | None) -> str:

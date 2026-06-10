@@ -888,6 +888,18 @@ def test_diagnose_focused_test_runs_classifies_readiness_failures(
 def test_plan_focused_test_setups_writes_setup_backlog(
     tmp_path: Path,
 ) -> None:
+    requests_repo = tmp_path / "requests_repo"
+    requests_repo.mkdir()
+    (requests_repo / "pyproject.toml").write_text(
+        """
+[project]
+name = "requests"
+
+[dependency-groups]
+test = ["pytest-httpbin==2.1.0"]
+""",
+        encoding="utf-8",
+    )
     diagnosis_path = tmp_path / "focused_test_diagnosis_results.json"
     diagnosis_path.write_text(
         json.dumps(
@@ -910,6 +922,7 @@ def test_plan_focused_test_setups_writes_setup_backlog(
                     "issue_url": "https://github.com/psf/requests/issues/7223",
                     "run_status": "failed",
                     "command": "python3 -m pytest tests/test_requests.py",
+                    "repo_path": str(requests_repo),
                     "focused_files": ["tests/test_requests.py"],
                     "category": "pytest_fixture_dependency_error",
                     "severity": "environment",
@@ -935,6 +948,10 @@ def test_plan_focused_test_setups_writes_setup_backlog(
     assert by_task["pytest_task"].setup_profile == "python_editable_install_build_metadata"
     assert "python3 -m pip install -e ." in by_task["pytest_task"].setup_commands
     assert by_task["requests_task"].setup_profile == "pytest_fixture_environment"
+    assert (
+        "python3 -m pip install -e . --group test"
+        in by_task["requests_task"].setup_commands
+    )
     assert by_task["requests_task"].validation_command == "python3 -m pytest tests/test_requests.py"
     assert (output_dir / "focused_test_setup_plan_report.md").exists()
     assert (output_dir / "focused_test_setup_plan_results.csv").exists()

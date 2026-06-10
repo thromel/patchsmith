@@ -287,7 +287,7 @@ PYTHONPATH=src python3 -m patchsmith.cli validate-focused-test-setups \
   --json
 ```
 
-Setup validation now executes after setup completion and records structured failure categories for the current public issue corpus: one `pytest_in_tree_version_metadata` failure and two `missing_httpbin_fixture_provider` failures. Passing setup validation proves only that the focused validation command runs after setup, not that PatchSmith repaired the issue.
+Setup validation now executes after setup completion and passes for all three current public issue corpus tasks. Passing setup validation proves only that the focused validation command runs after setup, not that PatchSmith repaired the issue.
 
 The corpus, preflight, context-preview, materialization, validation, run-readiness, focused-test planning, focused-test run, focused-test diagnosis, focused-test setup-plan, setup-readiness, setup-execution, and setup-validation reports are planning and plumbing evidence. They are not repair-quality evidence until the issues are reproduced, patched, tested, and saved as normal PatchSmith run artifacts.
 

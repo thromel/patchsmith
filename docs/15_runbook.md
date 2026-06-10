@@ -265,7 +265,7 @@ PYTHONPATH=src python3 -m patchsmith.cli execute-focused-test-setups \
 
 The setup-execution report defaults to dry-run and records readiness, command-policy, sandbox, and next-action evidence. Add `--execute` only after setup-readiness is not blocked and the selected sandbox/network policy is approved. Blocked execution rows are stop conditions, not reproduction or repair-quality evidence.
 
-Dependency installs are not part of the default command policy. The setup executor can dry-run the narrow editable-install policy with `--allow-dependency-installs --sandbox-mode docker --sandbox-network bridge`; focused setup execution and validation default to `patchsmith-seeded-smoke:py312`. Combine that with `--execute` only after Docker smoke passes and the network-enabled sandbox decision is approved.
+Dependency installs are not part of the default command policy. The setup executor can dry-run the narrow editable-install policy with `--allow-dependency-installs --sandbox-mode docker --sandbox-network bridge`; focused setup execution and validation default to `patchsmith-seeded-smoke:py312`. The focused setup policy allows editable project installs and the project `test` dependency group only inside this explicit setup path. Combine that with `--execute` only after Docker smoke passes and the network-enabled sandbox decision is approved.
 
 Public issue focused test setup validation:
 
@@ -342,7 +342,7 @@ PYTHONPATH=src python3 -m patchsmith.cli eval-repair \
   --json
 ```
 
-`run`, `eval-repair`, `eval-scaffold`, and `eval-patch-search` all accept `--sandbox-mode local|docker` plus `--sandbox-image`. Local mode remains the default for fast deterministic development runs. Docker mode wraps the same command-policy decision in `docker run` with implicit image pulls disabled, network disabled, dropped capabilities, a `/workspace` bind mount, resource limits, and sanitized host environment. Use a prebuilt image containing the test runner and task dependencies; otherwise the Docker run can fail even when the patch is correct. The provided `patchsmith-seeded-smoke:py312` image includes `pytest` and `git`.
+`run`, `eval-repair`, `eval-scaffold`, and `eval-patch-search` all accept `--sandbox-mode local|docker` plus `--sandbox-image`. Local mode remains the default for fast deterministic development runs. Docker mode wraps the same command-policy decision in `docker run` with implicit image pulls disabled, network disabled, dropped capabilities, a `/workspace` bind mount, resource limits, and sanitized host environment. Use a prebuilt image containing the test runner and task dependencies; otherwise the Docker run can fail even when the patch is correct. The provided `patchsmith-seeded-smoke:py312` image includes current `pip`, `pytest`, and `git`.
 
 Docker smoke report:
 

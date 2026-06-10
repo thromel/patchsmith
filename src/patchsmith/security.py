@@ -100,12 +100,20 @@ class FocusedSetupCommandPolicy(CommandPolicy):
 
 
 def _is_allowed_editable_setup_install(tokens: tuple[str, ...]) -> bool:
-    return (
+    editable_project_install = (
         len(tokens) == 6
         and tokens[0] in {"python", "python3"}
         and tokens[1:5] == ("-m", "pip", "install", "-e")
         and tokens[5] in {".", ".[test]"}
     )
+    editable_project_dependency_group_install = (
+        len(tokens) == 8
+        and tokens[0] in {"python", "python3"}
+        and tokens[1:5] == ("-m", "pip", "install", "-e")
+        and tokens[5] == "."
+        and tokens[6:] == ("--group", "test")
+    )
+    return editable_project_install or editable_project_dependency_group_install
 
 
 def _has_allowed_prefix(tokens: tuple[str, ...]) -> bool:

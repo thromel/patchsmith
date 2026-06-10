@@ -193,6 +193,8 @@ class DockerSandboxRunner:
             "HOME=/workspace",
             "--env",
             "PYTHONPATH=/workspace/src",
+            "--env",
+            "SETUPTOOLS_SCM_PRETEND_VERSION_FOR_PYTEST=9.0.0",
             *user_args,
             self.image,
             *command_tokens,
@@ -218,6 +220,7 @@ def _sanitized_env(workspace: Path) -> dict[str, str]:
         "HOME": str(workspace),
         "PATH": os.environ.get("PATH", ""),
         "PYTHONPATH": str(workspace / "src"),
+        "SETUPTOOLS_SCM_PRETEND_VERSION_FOR_PYTEST": "9.0.0",
     }
     if "SYSTEMROOT" in os.environ:
         env["SYSTEMROOT"] = os.environ["SYSTEMROOT"]

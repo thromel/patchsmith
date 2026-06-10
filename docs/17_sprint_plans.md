@@ -135,7 +135,7 @@ Acceptance criteria:
 
 Current status:
 
-Implemented as the first development slice. The default runner remains the local command-policy sandbox for fast deterministic development. An opt-in Docker runner now exists for `run`, `eval-repair`, `eval-scaffold`, and `eval-patch-search`; it disables implicit image pulls and container networking, drops capabilities, applies resource limits, mounts the task workspace at `/workspace`, and records the selected sandbox mode in traces. The `docker-smoke` command now records daemon, image, seeded-run evidence, Docker-related environment/socket diagnostics, host-side Docker Desktop/Colima hints, and remediation commands. The provided `patchsmith-seeded-smoke:py312` image includes `pytest` and `git` for seeded smoke and focused setup work. A passing live Docker daemon/image smoke is still separate evidence because Docker mode requires a reachable daemon and an image with task dependencies installed.
+Implemented as the first development slice. The default runner remains the local command-policy sandbox for fast deterministic development. An opt-in Docker runner now exists for `run`, `eval-repair`, `eval-scaffold`, and `eval-patch-search`; it disables implicit image pulls and container networking, drops capabilities, applies resource limits, mounts the task workspace at `/workspace`, and records the selected sandbox mode in traces. The `docker-smoke` command now records daemon, image, seeded-run evidence, Docker-related environment/socket diagnostics, host-side Docker Desktop/Colima hints, and remediation commands. The provided `patchsmith-seeded-smoke:py312` image includes current `pip`, `pytest`, and `git` for seeded smoke and focused setup work. A passing live Docker daemon/image smoke is still separate evidence because Docker mode requires a reachable daemon and an image with task dependencies installed.
 
 ### Sprint 2: Context Broker and Retrieval Evaluation
 
@@ -437,9 +437,10 @@ Latest expected evidence:
 - focused public issue setup-execution blocked tasks: 0,
 - focused public issue setup dependency installs: blocked by default policy unless explicitly enabled with Docker mode,
 - focused public issue setup-validation attempted tasks: 3,
-- focused public issue setup-validation failed tasks: 3,
+- focused public issue setup-validation passed tasks: 3,
+- focused public issue setup-validation failed tasks: 0,
 - focused public issue setup-validation blocked tasks: 0,
-- focused public issue setup-validation failure categories: `pytest_in_tree_version_metadata` 1, `missing_httpbin_fixture_provider` 2,
+- focused public issue setup-validation failure categories: none,
 - invalid entries: 0,
 - repositories: `psf/requests`, `pytest-dev/pytest`.
 
@@ -901,7 +902,7 @@ Reason:
 
 - Sprints 1 through 9 now have working code paths and saved evidence artifacts.
 - Static review surfaces now cover aggregate metrics, run details, and failure cases without adding a web stack.
-- The remaining gap is launch execution: resolve categorized public issue setup-validation failures and run live-provider calibration only when credentials and budget are available.
+- The remaining gap is launch execution: run live-provider calibration only when credentials and budget are available, and start public issue repair attempts only after reproduction criteria are explicit.
 
 ## Sprint 10 task breakdown
 
