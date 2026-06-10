@@ -914,6 +914,7 @@ Reason:
 | S10-T13 | Quality gate | PatchSmith | `quality-gate` command plus compile, diff, pytest, package-build, and log evidence |
 | S10-T14 | Status briefing | PatchSmith | `project-status` command plus consolidated progress, verification, launch, model, and adapter evidence |
 | S10-T15 | Evidence refresh | PatchSmith | `refresh-evidence` command plus ordered review-artifact regeneration audit |
+| S10-T16 | Evidence freshness | PatchSmith | `project-status` freshness table plus stale/undated source counters |
 
 ## Completed Sprint 9 task breakdown
 
@@ -937,6 +938,7 @@ Reason:
 - Report added test runs and latency next to success@k.
 - Keep artifact indexes local and avoid copying source-bearing raw context into summary reports.
 - Treat the artifact index as a navigation surface; reports remain the source of truth for metrics and decisions.
+- Treat project-status freshness warnings as process evidence; rerun the underlying generator before sprint review when a source is stale, undated, or missing.
 - Keep eval tasks small and deterministic.
 - Record generated reports under `artifacts/`, not tracked docs.
 

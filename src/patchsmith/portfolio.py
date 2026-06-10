@@ -26,6 +26,8 @@ from patchsmith.observability import (
     write_failure_report,
 )
 
+PROJECT_STATUS_FRESHNESS_THRESHOLD_SECONDS = 24 * 60 * 60
+
 
 @dataclass(frozen=True)
 class DemoReadinessGate:
@@ -560,6 +562,19 @@ class ProjectStatusSurface:
 
 
 @dataclass(frozen=True)
+class ProjectEvidenceFreshness:
+    source: str
+    status: str
+    generated_at: str | None
+    age_seconds: int | None
+    threshold_seconds: int
+    detail: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class ProjectStatusReport:
     project_root: str
     artifacts_dir: str
@@ -584,8 +599,12 @@ class ProjectStatusReport:
     metric_count: int
     blocker_count: int
     warning_count: int
+    evidence_freshness_status: str
+    stale_source_count: int
+    undated_source_count: int
     missing_sources: list[str]
     surfaces: list[ProjectStatusSurface]
+    evidence_freshness: list[ProjectEvidenceFreshness]
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -612,8 +631,14 @@ class ProjectStatusReport:
             "metric_count": self.metric_count,
             "blocker_count": self.blocker_count,
             "warning_count": self.warning_count,
+            "evidence_freshness_status": self.evidence_freshness_status,
+            "stale_source_count": self.stale_source_count,
+            "undated_source_count": self.undated_source_count,
             "missing_sources": self.missing_sources,
             "surfaces": [surface.to_dict() for surface in self.surfaces],
+            "evidence_freshness": [
+                freshness.to_dict() for freshness in self.evidence_freshness
+            ],
         }
 
 
@@ -892,6 +917,8 @@ def build_project_status_report(
 ) -> ProjectStatusReport:
     project_root = project_root.resolve()
     artifacts_dir = artifacts_dir.resolve()
+    generated_at_dt = datetime.now(timezone.utc).replace(microsecond=0)
+    generated_at = _format_utc(generated_at_dt)
     sources = {
         "mvp": "experiments/mvp_progress.json",
         "delivery": "experiments/delivery_audit.json",
@@ -910,6 +937,17 @@ def build_project_status_report(
     missing_sources = [
         source for name, source in sources.items() if payloads[name] is None
     ]
+    evidence_freshness = _project_evidence_freshness(
+        sources=sources,
+        payloads=payloads,
+        as_of=generated_at_dt,
+    )
+    stale_source_count = sum(
+        1 for freshness in evidence_freshness if freshness.status == "stale"
+    )
+    undated_source_count = sum(
+        1 for freshness in evidence_freshness if freshness.status == "undated"
+    )
     mvp = payloads["mvp"] or {}
     delivery = payloads["delivery"] or {}
     quality = payloads["quality"] or {}
@@ -1035,7 +1073,7 @@ def build_project_status_report(
     return ProjectStatusReport(
         project_root=str(project_root),
         artifacts_dir=str(artifacts_dir),
-        generated_at=_utc_now(),
+        generated_at=generated_at,
         overall_status=_project_overall_status(
             missing_sources=missing_sources,
             delivery_status=delivery_status,
@@ -1072,8 +1110,14 @@ def build_project_status_report(
         metric_count=metric_count,
         blocker_count=blocker_count,
         warning_count=warning_count,
+        evidence_freshness_status=_project_evidence_freshness_status(
+            evidence_freshness
+        ),
+        stale_source_count=stale_source_count,
+        undated_source_count=undated_source_count,
         missing_sources=missing_sources,
         surfaces=surfaces,
+        evidence_freshness=evidence_freshness,
     )
 
 
@@ -1127,6 +1171,11 @@ def render_project_status_report(report: ProjectStatusReport) -> str:
         f"- Metric rows: `{report.metric_count}`",
         f"- Launch blockers: `{report.blocker_count}`",
         f"- Launch warnings: `{report.warning_count}`",
+        (
+            f"- Evidence freshness: `{report.evidence_freshness_status}` "
+            f"(`{report.stale_source_count}` stale, "
+            f"`{report.undated_source_count}` undated)"
+        ),
         "",
         "## Status Surfaces",
         "",
@@ -1146,6 +1195,24 @@ def render_project_status_report(report: ProjectStatusReport) -> str:
         lines.extend(f"- `{source}`" for source in report.missing_sources)
     else:
         lines.append("- None.")
+    lines.extend(
+        [
+            "",
+            "## Evidence Freshness",
+            "",
+            "| Source | Status | Generated At | Age | Detail |",
+            "|---|---|---|---|---|",
+        ]
+    )
+    for freshness in report.evidence_freshness:
+        lines.append(
+            "| "
+            f"`{freshness.source}` | "
+            f"{freshness.status} | "
+            f"{_project_freshness_generated_at(freshness)} | "
+            f"{_project_freshness_age(freshness)} | "
+            f"{_markdown_cell(freshness.detail)} |"
+        )
     lines.extend(
         [
             "",
@@ -5071,6 +5138,98 @@ def _project_overall_status(
     return "ready"
 
 
+def _project_evidence_freshness(
+    *,
+    sources: dict[str, str],
+    payloads: dict[str, dict[str, Any] | None],
+    as_of: datetime,
+    threshold_seconds: int = PROJECT_STATUS_FRESHNESS_THRESHOLD_SECONDS,
+) -> list[ProjectEvidenceFreshness]:
+    return [
+        _project_source_freshness(
+            source=source,
+            payload=payloads.get(name),
+            as_of=as_of,
+            threshold_seconds=threshold_seconds,
+        )
+        for name, source in sources.items()
+    ]
+
+
+def _project_source_freshness(
+    *,
+    source: str,
+    payload: dict[str, Any] | None,
+    as_of: datetime,
+    threshold_seconds: int,
+) -> ProjectEvidenceFreshness:
+    if payload is None:
+        return ProjectEvidenceFreshness(
+            source=source,
+            status="missing",
+            generated_at=None,
+            age_seconds=None,
+            threshold_seconds=threshold_seconds,
+            detail="Artifact is missing or could not be parsed as JSON.",
+        )
+    generated_at = _payload_string(payload, "generated_at")
+    generated_at_dt = _parse_utc_datetime(generated_at)
+    if generated_at_dt is None:
+        return ProjectEvidenceFreshness(
+            source=source,
+            status="undated",
+            generated_at=generated_at or None,
+            age_seconds=None,
+            threshold_seconds=threshold_seconds,
+            detail="Artifact has no parseable generated_at timestamp.",
+        )
+    age_seconds = max(0, int((as_of - generated_at_dt).total_seconds()))
+    threshold_label = _format_age_seconds(threshold_seconds)
+    age_label = _format_age_seconds(age_seconds)
+    if age_seconds > threshold_seconds:
+        return ProjectEvidenceFreshness(
+            source=source,
+            status="stale",
+            generated_at=_format_utc(generated_at_dt),
+            age_seconds=age_seconds,
+            threshold_seconds=threshold_seconds,
+            detail=f"Generated {age_label} ago; exceeds {threshold_label} threshold.",
+        )
+    return ProjectEvidenceFreshness(
+        source=source,
+        status="fresh",
+        generated_at=_format_utc(generated_at_dt),
+        age_seconds=age_seconds,
+        threshold_seconds=threshold_seconds,
+        detail=f"Generated {age_label} ago; within {threshold_label} threshold.",
+    )
+
+
+def _project_evidence_freshness_status(
+    freshness: list[ProjectEvidenceFreshness],
+) -> str:
+    statuses = {item.status for item in freshness}
+    if "missing" in statuses:
+        return "missing"
+    if "stale" in statuses:
+        return "stale"
+    if "undated" in statuses:
+        return "undated"
+    return "fresh"
+
+
+def _project_freshness_generated_at(freshness: ProjectEvidenceFreshness) -> str:
+    if freshness.generated_at is None:
+        return ""
+    return f"`{freshness.generated_at}`"
+
+
+def _project_freshness_age(freshness: ProjectEvidenceFreshness) -> str:
+    if freshness.age_seconds is None:
+        return ""
+    return _format_age_seconds(freshness.age_seconds)
+
+
 def _payload_string_list(payload: dict[str, Any], key: str) -> list[str]:
     value = payload.get(key)
     if not isinstance(value, list):
@@ -6081,9 +6240,38 @@ def _markdown_cell(value: str) -> str:
 
 
 def _utc_now() -> str:
+    return _format_utc(datetime.now(timezone.utc).replace(microsecond=0))
+
+
+def _format_utc(value: datetime) -> str:
     return (
-        datetime.now(timezone.utc)
+        value.astimezone(timezone.utc)
         .replace(microsecond=0)
         .isoformat()
         .replace("+00:00", "Z")
     )
+
+
+def _parse_utc_datetime(value: str) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc).replace(microsecond=0)
+
+
+def _format_age_seconds(seconds: int) -> str:
+    if seconds < 60:
+        return f"{seconds}s"
+    minutes = seconds // 60
+    if minutes < 60:
+        return f"{minutes}m"
+    hours = minutes // 60
+    if hours < 48:
+        return f"{hours}h"
+    days = hours // 24
+    return f"{days}d"

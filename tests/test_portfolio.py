@@ -1,5 +1,6 @@
 import json
 import subprocess
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from patchsmith.cli import main
@@ -1290,6 +1291,18 @@ def test_project_status_report_summarizes_saved_evidence(
     artifacts_dir = tmp_path / "artifacts"
     experiments_dir = artifacts_dir / "experiments"
     experiments_dir.mkdir(parents=True)
+    fresh_generated_at = (
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+    stale_generated_at = (
+        (datetime.now(timezone.utc) - timedelta(days=2))
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
     payloads = {
         "mvp_progress.json": {
             "status": "ready_with_caveats",
@@ -1350,6 +1363,9 @@ def test_project_status_report_summarizes_saved_evidence(
             "metric_count": 29,
         },
     }
+    for payload in payloads.values():
+        payload["generated_at"] = fresh_generated_at
+    payloads["docker_smoke.json"]["generated_at"] = stale_generated_at
     for name, payload in payloads.items():
         (experiments_dir / name).write_text(
             json.dumps(payload) + "\n",
@@ -1373,12 +1389,18 @@ def test_project_status_report_summarizes_saved_evidence(
     assert report.docker_smoke_status == "not_available"
     assert report.saved_live_provider_count == 0
     assert report.deepagents_package_run_count == 10
+    assert report.evidence_freshness_status == "stale"
+    assert report.stale_source_count == 1
+    assert report.undated_source_count == 0
     assert report.missing_sources == []
     rendered = output_path.read_text(encoding="utf-8")
     assert "# PatchSmith Project Status Report" in rendered
     assert "Live LLM Calibration" in rendered
+    assert "## Evidence Freshness" in rendered
+    assert "experiments/docker_smoke.json" in rendered
     payload = json.loads(json_output_path.read_text(encoding="utf-8"))
     assert payload["overall_status"] == "in_progress_with_blockers"
+    assert payload["evidence_freshness_status"] == "stale"
 
     cli_output = tmp_path / "cli_project_status.md"
     cli_json_output = tmp_path / "cli_project_status.json"
@@ -1399,6 +1421,8 @@ def test_project_status_report_summarizes_saved_evidence(
     assert exit_code == 0
     cli_payload = json.loads(capsys.readouterr().out)
     assert cli_payload["overall_status"] == "in_progress_with_blockers"
+    assert cli_payload["evidence_freshness_status"] == "stale"
+    assert cli_payload["stale_source_count"] == 1
     assert cli_payload["missing_source_count"] == 0
     assert cli_output.exists()
 

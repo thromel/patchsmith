@@ -434,7 +434,7 @@ PYTHONPATH=src python3 -m patchsmith.cli project-status \
   --json
 ```
 
-The project-status report is the concise briefing surface for progress percentage, delivery percentage, quality gate, launch blockers, Docker smoke, live calibration, adapter evidence, release hygiene, and saved-evidence counts. It summarizes saved artifacts; rerun the underlying gates when evidence needs to be refreshed.
+The project-status report is the concise briefing surface for progress percentage, delivery percentage, quality gate, launch blockers, Docker smoke, live calibration, adapter evidence, release hygiene, and saved-evidence counts. It summarizes saved artifacts and includes a 24-hour evidence-freshness table for each upstream JSON source; rerun the underlying gates when evidence is stale, undated, or missing.
 
 Evidence refresh:
 

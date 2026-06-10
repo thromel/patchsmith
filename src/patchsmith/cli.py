@@ -1256,6 +1256,9 @@ def main(argv: list[str] | None = None) -> int:
                         "saved_live_provider_count": report.saved_live_provider_count,
                         "blocker_count": report.blocker_count,
                         "warning_count": report.warning_count,
+                        "evidence_freshness_status": report.evidence_freshness_status,
+                        "stale_source_count": report.stale_source_count,
+                        "undated_source_count": report.undated_source_count,
                         "missing_source_count": len(report.missing_sources),
                         "report_path": str(Path(args.output)),
                         "json_path": str(json_output_path) if json_output_path else None,
@@ -1272,7 +1275,8 @@ def main(argv: list[str] | None = None) -> int:
                 f"MVP: {report.mvp_completion_percent:.1f}% "
                 f"Delivery: {report.delivery_completion_percent:.1f}% "
                 f"Launch: {report.launch_status} "
-                f"Quality: {report.quality_status}"
+                f"Quality: {report.quality_status} "
+                f"Freshness: {report.evidence_freshness_status}"
             )
         return 0
 
