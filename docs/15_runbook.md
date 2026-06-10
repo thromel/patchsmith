@@ -174,6 +174,17 @@ PYTHONPATH=src python3 -m patchsmith.cli materialize-issue-corpus-tasks \
 
 The materializer writes per-issue task manifests, issue files, and runbooks from the context preview. Treat these as setup artifacts for an external evaluation lane, not solved-run artifacts.
 
+Public issue task validation:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli validate-materialized-issue-tasks \
+  --tasks-dir artifacts/experiments/public_issue_corpus_v1/materialized_tasks \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+The validator checks manifest shape, source-free context summaries, task files, local repository snapshots, and suggested run commands before those manifests are used in external evaluation.
+
 Scaffold comparison:
 
 ```bash

@@ -212,6 +212,41 @@ class IssueCorpusMaterializedTaskSummary:
 
 
 @dataclass(frozen=True)
+class IssueCorpusMaterializedTaskValidationResult:
+    task_id: str | None
+    task_dir: str
+    status: str
+    errors: list[str]
+    warnings: list[str]
+    manifest_path: str | None
+    issue_path: str | None
+    runbook_path: str | None
+    repository: str | None
+    issue_url: str | None
+    repo_path: str | None
+    retrieved_files: list[str]
+    suggested_commands: list[str]
+    source_free: bool
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class IssueCorpusMaterializedTaskValidationSummary:
+    tasks_dir: str
+    task_count: int
+    valid_tasks: int
+    invalid_tasks: int
+    warning_count: int
+    error_count: int
+    source_free: bool
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class RetrievalEvalResult:
     task_id: str
     context_provider: str
@@ -1135,6 +1170,96 @@ def write_issue_corpus_materialized_task_outputs(
         render_issue_corpus_materialized_task_report(
             corpus_path=corpus_path,
             context_preview_path=context_preview_path,
+            results=results,
+            summary=summary,
+        ),
+        encoding="utf-8",
+    )
+
+
+def validate_materialized_issue_tasks(
+    *,
+    tasks_dir: Path,
+    output_dir: Path,
+) -> tuple[
+    list[IssueCorpusMaterializedTaskValidationResult],
+    IssueCorpusMaterializedTaskValidationSummary,
+]:
+    if not tasks_dir.exists():
+        raise FileNotFoundError(f"materialized tasks directory does not exist: {tasks_dir}")
+    if not tasks_dir.is_dir():
+        raise ValueError(f"materialized tasks path is not a directory: {tasks_dir}")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    task_dirs = sorted(path for path in tasks_dir.iterdir() if path.is_dir())
+    results = [_validate_materialized_issue_task_dir(task_dir) for task_dir in task_dirs]
+    duplicate_task_ids = _duplicate_materialized_task_ids(results)
+    if duplicate_task_ids:
+        duplicate_set = set(duplicate_task_ids)
+        results = [
+            _with_materialized_validation_error(result, "duplicate task_id")
+            if result.task_id in duplicate_set
+            else result
+            for result in results
+        ]
+    summary = summarize_materialized_issue_task_validation(
+        tasks_dir=tasks_dir,
+        results=results,
+    )
+    write_materialized_issue_task_validation_outputs(
+        output_dir=output_dir,
+        tasks_dir=tasks_dir,
+        results=results,
+        summary=summary,
+    )
+    return results, summary
+
+
+def summarize_materialized_issue_task_validation(
+    *,
+    tasks_dir: Path,
+    results: list[IssueCorpusMaterializedTaskValidationResult],
+) -> IssueCorpusMaterializedTaskValidationSummary:
+    return IssueCorpusMaterializedTaskValidationSummary(
+        tasks_dir=str(tasks_dir),
+        task_count=len(results),
+        valid_tasks=sum(1 for result in results if result.status == "valid"),
+        invalid_tasks=sum(1 for result in results if result.status == "invalid"),
+        warning_count=sum(len(result.warnings) for result in results),
+        error_count=sum(len(result.errors) for result in results),
+        source_free=all(result.source_free for result in results),
+    )
+
+
+def write_materialized_issue_task_validation_outputs(
+    *,
+    output_dir: Path,
+    tasks_dir: Path,
+    results: list[IssueCorpusMaterializedTaskValidationResult],
+    summary: IssueCorpusMaterializedTaskValidationSummary,
+) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "materialized_task_validation_results.json").write_text(
+        json.dumps([result.to_dict() for result in results], indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (output_dir / "materialized_task_validation_summary.json").write_text(
+        json.dumps(summary.to_dict(), indent=2) + "\n",
+        encoding="utf-8",
+    )
+    with (output_dir / "materialized_task_validation_results.csv").open(
+        "w",
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        fieldnames = list(results[0].to_dict()) if results else []
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        if results:
+            writer.writeheader()
+            for result in results:
+                writer.writerow(result.to_dict())
+    (output_dir / "materialized_task_validation_report.md").write_text(
+        render_materialized_issue_task_validation_report(
+            tasks_dir=tasks_dir,
             results=results,
             summary=summary,
         ),
@@ -2299,6 +2424,53 @@ def render_issue_corpus_materialized_task_report(
     return "\n".join(lines)
 
 
+def render_materialized_issue_task_validation_report(
+    *,
+    tasks_dir: Path,
+    results: list[IssueCorpusMaterializedTaskValidationResult],
+    summary: IssueCorpusMaterializedTaskValidationSummary,
+) -> str:
+    lines = [
+        "# Public Issue Materialized Task Validation",
+        "",
+        f"- Tasks directory: `{tasks_dir}`",
+        f"- Task count: `{summary.task_count}`",
+        f"- Valid tasks: `{summary.valid_tasks}`",
+        f"- Invalid tasks: `{summary.invalid_tasks}`",
+        f"- Error count: `{summary.error_count}`",
+        f"- Warning count: `{summary.warning_count}`",
+        f"- Source-free manifests: `{str(summary.source_free).lower()}`",
+        "",
+        "## Results",
+        "",
+        "| Task | Status | Repository | Issue | Retrieved Files | Errors | Warnings |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    for result in results:
+        lines.append(
+            "| "
+            f"{result.task_id or result.task_dir} | "
+            f"{result.status} | "
+            f"{result.repository or 'unknown'} | "
+            f"{result.issue_url or 'unknown'} | "
+            f"{', '.join(result.retrieved_files) or 'none'} | "
+            f"{'; '.join(result.errors) or 'none'} | "
+            f"{'; '.join(result.warnings) or 'none'} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Gate Notes",
+            "",
+            "- This gate validates manifest shape, source-free context summaries, task files, local repository snapshots, and suggested run commands.",
+            "- A valid manifest set is external-evaluation setup evidence, not repair-quality evidence.",
+            "- Public issue reproduction and repair claims still require normal PatchSmith run artifacts.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def render_repair_eval_report(
     *,
     dataset_dir: Path,
@@ -2879,6 +3051,146 @@ def _validate_issue_corpus_entry(
     )
 
 
+def _validate_materialized_issue_task_dir(
+    task_dir: Path,
+) -> IssueCorpusMaterializedTaskValidationResult:
+    errors: list[str] = []
+    warnings: list[str] = []
+    manifest_path = task_dir / "task_manifest.json"
+    issue_path = task_dir / "issue.md"
+    runbook_path = task_dir / "RUNBOOK.md"
+    manifest: dict[str, Any] = {}
+
+    if not manifest_path.exists():
+        errors.append("missing task_manifest.json")
+    else:
+        try:
+            parsed = json.loads(manifest_path.read_text(encoding="utf-8"))
+            if not isinstance(parsed, dict):
+                errors.append("task_manifest.json must contain a JSON object")
+            else:
+                manifest = parsed
+        except json.JSONDecodeError as error:
+            errors.append(f"task_manifest.json is invalid JSON: {error.msg}")
+
+    if not issue_path.exists():
+        errors.append("missing issue.md")
+    elif not issue_path.read_text(encoding="utf-8").strip():
+        errors.append("issue.md is empty")
+    elif "Claim Boundary" not in issue_path.read_text(encoding="utf-8"):
+        warnings.append("issue.md does not include a Claim Boundary section")
+
+    if not runbook_path.exists():
+        errors.append("missing RUNBOOK.md")
+    elif not runbook_path.read_text(encoding="utf-8").strip():
+        errors.append("RUNBOOK.md is empty")
+    elif "Suggested Commands" not in runbook_path.read_text(encoding="utf-8"):
+        warnings.append("RUNBOOK.md does not include suggested commands")
+
+    task_id = _manifest_string(manifest, "task_id", errors)
+    version = manifest.get("task_manifest_version")
+    if version != 1:
+        errors.append(f"unsupported task_manifest_version: {version}")
+    if task_id and task_id != task_dir.name:
+        warnings.append(f"task_id does not match directory name: {task_id} != {task_dir.name}")
+
+    issue = _manifest_object(manifest, "issue", errors)
+    repository = _manifest_string(issue, "repository", errors, field_name="issue.repository")
+    repo_url = _manifest_string(issue, "repo_url", errors, field_name="issue.repo_url")
+    issue_url = _manifest_string(issue, "issue_url", errors, field_name="issue.issue_url")
+    language = _manifest_string(issue, "language", errors, field_name="issue.language")
+    expected_workflow = _string_list(issue.get("expected_workflow"))
+
+    if repository and "/" not in repository:
+        errors.append(f"issue.repository must use owner/name format: {repository}")
+    if repo_url and not repo_url.startswith("https://github.com/") and not Path(repo_url).exists():
+        errors.append(f"issue.repo_url must be a GitHub URL or local fixture path: {repo_url}")
+    if issue_url and not issue_url.startswith("https://github.com/"):
+        errors.append(f"issue.issue_url must be a GitHub URL: {issue_url}")
+    if repository and issue_url and repository.count("/") == 1:
+        expected_prefix = f"https://github.com/{repository}/issues/"
+        if not issue_url.startswith(expected_prefix) and not repository.startswith("local/"):
+            errors.append(f"issue.issue_url does not match repository: {issue_url}")
+    if language and language.lower() != "python":
+        warnings.append(f"non-python materialized task language: {language}")
+    if not expected_workflow:
+        warnings.append("issue.expected_workflow is empty")
+
+    snapshot = _manifest_object(manifest, "repository_snapshot", errors)
+    repo_path_value = _manifest_string(
+        snapshot, "repo_path", errors, field_name="repository_snapshot.repo_path"
+    )
+    commit_hash = _manifest_string(
+        snapshot, "commit_hash", errors, field_name="repository_snapshot.commit_hash"
+    )
+    test_commands = _string_list(snapshot.get("test_commands"))
+    file_count = snapshot.get("file_count")
+    if repo_path_value:
+        repo_path = Path(repo_path_value)
+        if not repo_path.exists():
+            errors.append(f"repository_snapshot.repo_path does not exist: {repo_path_value}")
+        elif not repo_path.is_dir():
+            errors.append(f"repository_snapshot.repo_path is not a directory: {repo_path_value}")
+    if commit_hash and len(commit_hash) < 8:
+        warnings.append("repository_snapshot.commit_hash is unusually short")
+    if not isinstance(file_count, int) or file_count <= 0:
+        errors.append("repository_snapshot.file_count must be a positive integer")
+    if not test_commands:
+        errors.append("repository_snapshot.test_commands must contain at least one command")
+    elif not any("pytest" in command for command in test_commands):
+        warnings.append("repository_snapshot.test_commands does not include pytest")
+
+    retrieval = _manifest_object(manifest, "retrieval_preview", errors)
+    context_provider = _manifest_string(
+        retrieval, "context_provider", errors, field_name="retrieval_preview.context_provider"
+    )
+    context_count = retrieval.get("context_count")
+    retrieved_files = _string_list(retrieval.get("retrieved_files"))
+    top_contexts = retrieval.get("top_contexts")
+    if context_provider not in {"native", "native_hybrid", "native_graph"}:
+        errors.append(f"unsupported retrieval_preview.context_provider: {context_provider}")
+    if not isinstance(context_count, int) or context_count <= 0:
+        errors.append("retrieval_preview.context_count must be a positive integer")
+    if not retrieved_files:
+        errors.append("retrieval_preview.retrieved_files must not be empty")
+    if not isinstance(top_contexts, list):
+        errors.append("retrieval_preview.top_contexts must be a list")
+    elif any(isinstance(context, dict) and "excerpt" in context for context in top_contexts):
+        errors.append("retrieval_preview.top_contexts must be source-free")
+
+    suggested_commands = _string_list(manifest.get("suggested_commands"))
+    if not suggested_commands:
+        errors.append("suggested_commands must contain at least one command")
+    elif not any("patchsmith.cli run" in command for command in suggested_commands):
+        errors.append("suggested_commands must include a patchsmith.cli run command")
+    claim_boundary = _string_list(manifest.get("claim_boundary"))
+    if not claim_boundary:
+        errors.append("claim_boundary must not be empty")
+
+    source_free = _manifest_is_source_free(manifest)
+    if manifest.get("source_free") is not True:
+        errors.append("source_free must be true")
+    if not source_free:
+        errors.append("manifest contains non-source-free excerpt fields")
+
+    return IssueCorpusMaterializedTaskValidationResult(
+        task_id=task_id,
+        task_dir=str(task_dir),
+        status="invalid" if errors else "valid",
+        errors=errors,
+        warnings=warnings,
+        manifest_path=str(manifest_path) if manifest_path.exists() else None,
+        issue_path=str(issue_path) if issue_path.exists() else None,
+        runbook_path=str(runbook_path) if runbook_path.exists() else None,
+        repository=repository,
+        issue_url=issue_url,
+        repo_path=repo_path_value,
+        retrieved_files=retrieved_files,
+        suggested_commands=suggested_commands,
+        source_free=source_free,
+    )
+
+
 def _issue_corpus_repositories(issues: list[Any]) -> list[tuple[str, str, int]]:
     repo_urls: dict[str, str] = {}
     issue_counts: dict[str, int] = {}
@@ -3374,6 +3686,33 @@ def _expected_string_list(
     return paths
 
 
+def _manifest_string(
+    manifest: dict[str, Any],
+    key: str,
+    errors: list[str],
+    *,
+    field_name: str | None = None,
+) -> str | None:
+    value = manifest.get(key)
+    name = field_name or key
+    if not isinstance(value, str) or not value.strip():
+        errors.append(f"{name} must be a non-empty string")
+        return None
+    return value.strip()
+
+
+def _manifest_object(
+    manifest: dict[str, Any],
+    key: str,
+    errors: list[str],
+) -> dict[str, Any]:
+    value = manifest.get(key)
+    if not isinstance(value, dict):
+        errors.append(f"{key} must be an object")
+        return {}
+    return value
+
+
 def _validate_expected_repo_file(
     repo_path: Path,
     relative_path: str,
@@ -3394,6 +3733,20 @@ def _validate_expected_repo_file(
 
 
 def _duplicate_task_ids(results: list[SeededTaskValidationResult]) -> list[str]:
+    seen: set[str] = set()
+    duplicates: set[str] = set()
+    for result in results:
+        if result.task_id is None:
+            continue
+        if result.task_id in seen:
+            duplicates.add(result.task_id)
+        seen.add(result.task_id)
+    return sorted(duplicates)
+
+
+def _duplicate_materialized_task_ids(
+    results: list[IssueCorpusMaterializedTaskValidationResult],
+) -> list[str]:
     seen: set[str] = set()
     duplicates: set[str] = set()
     for result in results:
@@ -3434,6 +3787,28 @@ def _with_validation_error(
         expected_path=result.expected_path,
         expected_touched_files=result.expected_touched_files,
         expected_related_tests=result.expected_related_tests,
+    )
+
+
+def _with_materialized_validation_error(
+    result: IssueCorpusMaterializedTaskValidationResult,
+    error: str,
+) -> IssueCorpusMaterializedTaskValidationResult:
+    return IssueCorpusMaterializedTaskValidationResult(
+        task_id=result.task_id,
+        task_dir=result.task_dir,
+        status="invalid",
+        errors=[*result.errors, error],
+        warnings=result.warnings,
+        manifest_path=result.manifest_path,
+        issue_path=result.issue_path,
+        runbook_path=result.runbook_path,
+        repository=result.repository,
+        issue_url=result.issue_url,
+        repo_path=result.repo_path,
+        retrieved_files=result.retrieved_files,
+        suggested_commands=result.suggested_commands,
+        source_free=result.source_free,
     )
 
 

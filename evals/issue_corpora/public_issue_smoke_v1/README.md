@@ -48,6 +48,18 @@ PYTHONPATH=src python3 -m patchsmith.cli materialize-issue-corpus-tasks \
 Materialized task manifests and runbooks are source-free setup artifacts. They
 do not prove issue reproduction, patch generation, or test success.
 
+Materialized task validation command:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli validate-materialized-issue-tasks \
+  --tasks-dir artifacts/experiments/public_issue_corpus_v1/materialized_tasks \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+Validation checks manifest shape, source-free context summaries, task files,
+local repository snapshots, and suggested run commands.
+
 Selection criteria:
 
 - public GitHub issue URL,

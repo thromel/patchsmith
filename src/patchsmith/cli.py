@@ -14,6 +14,7 @@ from patchsmith.evaluation import (
     run_scaffold_comparison,
     run_retrieval_evaluation,
     validate_issue_corpus,
+    validate_materialized_issue_tasks,
     validate_seeded_dataset,
 )
 from patchsmith.ingest import clone_or_copy_repository, index_repository
@@ -277,6 +278,34 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f"materialized={summary.materialized_tasks}/{summary.attempted_issues} "
                 f"source_free={str(summary.source_free).lower()}"
+            )
+        return 0
+
+    if args.command == "validate-materialized-issue-tasks":
+        results, summary = validate_materialized_issue_tasks(
+            tasks_dir=Path(args.tasks_dir),
+            output_dir=Path(args.output),
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "result_count": len(results),
+                        "report_path": str(
+                            Path(args.output) / "materialized_task_validation_report.md"
+                        ),
+                        "summary": summary.to_dict(),
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(
+                f"Report: {Path(args.output) / 'materialized_task_validation_report.md'}"
+            )
+            print(
+                f"valid={summary.valid_tasks}/{summary.task_count} "
+                f"errors={summary.error_count} warnings={summary.warning_count}"
             )
         return 0
 
@@ -998,6 +1027,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="Maximum issue entries to materialize. Use 0 for all entries.",
     )
     materialize_issue_corpus_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print JSON summary.",
+    )
+
+    validate_materialized_issue_tasks_parser = subparsers.add_parser(
+        "validate-materialized-issue-tasks",
+        help="Validate source-free public issue task manifests and runbooks.",
+    )
+    validate_materialized_issue_tasks_parser.add_argument(
+        "--tasks-dir",
+        default="artifacts/experiments/public_issue_corpus_v1/materialized_tasks",
+        help="Directory containing materialized task subdirectories.",
+    )
+    validate_materialized_issue_tasks_parser.add_argument(
+        "--output",
+        default="artifacts/experiments/public_issue_corpus_v1",
+        help="Materialized task validation output directory.",
+    )
+    validate_materialized_issue_tasks_parser.add_argument(
         "--json",
         action="store_true",
         help="Print JSON summary.",
