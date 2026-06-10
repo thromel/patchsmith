@@ -27,6 +27,7 @@ from patchsmith.evaluation import (
     validate_focused_test_setups,
     validate_issue_corpus,
     validate_materialized_issue_tasks,
+    validate_public_issue_reproduction_specs,
     validate_seeded_dataset,
 )
 from patchsmith.ingest import clone_or_copy_repository, index_repository
@@ -588,6 +589,39 @@ def main(argv: list[str] | None = None) -> int:
             )
             print(
                 f"planned={summary.planned_tasks} warning={summary.warning_tasks} "
+                f"blocked={summary.blocked_tasks}"
+            )
+        return 0
+
+    if args.command == "validate-public-issue-reproduction-specs":
+        focused_plan = Path(args.focused_plan) if args.focused_plan else None
+        results, summary = validate_public_issue_reproduction_specs(
+            specs_path=Path(args.specs),
+            tasks_dir=Path(args.tasks_dir),
+            focused_plan_path=focused_plan,
+            output_dir=Path(args.output),
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "result_count": len(results),
+                        "report_path": str(
+                            Path(args.output)
+                            / "public_issue_reproduction_spec_validation_report.md"
+                        ),
+                        "summary": summary.to_dict(),
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(
+                "Report: "
+                f"{Path(args.output) / 'public_issue_reproduction_spec_validation_report.md'}"
+            )
+            print(
+                f"ready={summary.ready_tasks} warning={summary.warning_tasks} "
                 f"blocked={summary.blocked_tasks}"
             )
         return 0
@@ -2062,6 +2096,42 @@ def build_parser() -> argparse.ArgumentParser:
         help="Public issue reproduction-plan output directory.",
     )
     public_reproduction_plan_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print JSON summary.",
+    )
+
+    public_reproduction_spec_validation_parser = subparsers.add_parser(
+        "validate-public-issue-reproduction-specs",
+        help="Validate reviewed public issue reproduction specs before execution.",
+    )
+    public_reproduction_spec_validation_parser.add_argument(
+        "--specs",
+        default=(
+            "artifacts/experiments/public_issue_corpus_v1/"
+            "public_issue_reproduction_specs_template.json"
+        ),
+        help="Reviewed public issue reproduction specs JSON.",
+    )
+    public_reproduction_spec_validation_parser.add_argument(
+        "--tasks-dir",
+        default="artifacts/experiments/public_issue_corpus_v1/materialized_tasks",
+        help="Directory containing materialized public issue task manifests.",
+    )
+    public_reproduction_spec_validation_parser.add_argument(
+        "--focused-plan",
+        default=(
+            "artifacts/experiments/public_issue_corpus_v1/"
+            "focused_test_plan_results.json"
+        ),
+        help="Focused public issue test-plan results JSON.",
+    )
+    public_reproduction_spec_validation_parser.add_argument(
+        "--output",
+        default="artifacts/experiments/public_issue_corpus_v1",
+        help="Public issue reproduction-spec validation output directory.",
+    )
+    public_reproduction_spec_validation_parser.add_argument(
         "--json",
         action="store_true",
         help="Print JSON summary.",

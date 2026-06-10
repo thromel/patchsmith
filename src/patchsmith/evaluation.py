@@ -643,6 +643,49 @@ class IssueCorpusPublicReproductionPlanSummary:
 
 
 @dataclass(frozen=True)
+class IssueCorpusPublicReproductionSpecValidationResult:
+    task_id: str | None
+    repository: str | None
+    issue_url: str | None
+    status: str
+    spec_present: bool
+    repo_path: str | None
+    repo_exists: bool
+    reproduction_command: str | None
+    command_source: str
+    policy_allowed: bool
+    policy_reason: str | None
+    expected_failure_signals: list[str]
+    errors: list[str]
+    warnings: list[str]
+    evidence: list[str]
+    next_actions: list[str]
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class IssueCorpusPublicReproductionSpecValidationSummary:
+    generated_at: str
+    specs_path: str
+    tasks_dir: str
+    focused_plan_path: str | None
+    task_count: int
+    spec_count: int
+    ready_tasks: int
+    warning_tasks: int
+    blocked_tasks: int
+    missing_spec_tasks: int
+    empty_signal_tasks: int
+    policy_blocked_tasks: int
+    extra_spec_tasks: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class IssueCorpusPublicReproductionExecutionResult:
     task_id: str | None
     repository: str | None
@@ -3186,6 +3229,203 @@ def write_public_issue_reproduction_plan_outputs(
     )
 
 
+def validate_public_issue_reproduction_specs(
+    *,
+    specs_path: Path,
+    tasks_dir: Path,
+    output_dir: Path,
+    focused_plan_path: Path | None = None,
+) -> tuple[
+    list[IssueCorpusPublicReproductionSpecValidationResult],
+    IssueCorpusPublicReproductionSpecValidationSummary,
+]:
+    if not tasks_dir.exists():
+        raise FileNotFoundError(f"materialized tasks directory does not exist: {tasks_dir}")
+    if not tasks_dir.is_dir():
+        raise ValueError(f"materialized tasks path is not a directory: {tasks_dir}")
+    focused_records = (
+        _load_json_record_list(focused_plan_path, label="focused test plan results")
+        if focused_plan_path is not None and focused_plan_path.exists()
+        else []
+    )
+    focused_by_task = _records_by_task_id(focused_records)
+    specs_by_task = _load_public_issue_reproduction_specs(specs_path)
+    policy = CommandPolicy()
+    task_dirs = sorted(path for path in tasks_dir.iterdir() if path.is_dir())
+    task_ids = {task_dir.name for task_dir in task_dirs}
+    results = [
+        _validate_public_issue_reproduction_spec_record(
+            task_dir=task_dir,
+            focused_record=focused_by_task.get(task_dir.name),
+            reproduction_spec=specs_by_task.get(task_dir.name),
+            policy=policy,
+        )
+        for task_dir in task_dirs
+    ]
+    for extra_task_id in sorted(set(specs_by_task) - task_ids):
+        results.append(
+            IssueCorpusPublicReproductionSpecValidationResult(
+                task_id=extra_task_id,
+                repository=_optional_string(
+                    specs_by_task[extra_task_id].get("repository")
+                ),
+                issue_url=_optional_string(specs_by_task[extra_task_id].get("issue_url")),
+                status="blocked",
+                spec_present=True,
+                repo_path=None,
+                repo_exists=False,
+                reproduction_command=_optional_string(
+                    specs_by_task[extra_task_id].get("command")
+                ),
+                command_source="reproduction_spec",
+                policy_allowed=False,
+                policy_reason=None,
+                expected_failure_signals=_string_list(
+                    specs_by_task[extra_task_id].get("expected_failure_signals")
+                ),
+                errors=["reproduction spec task_id has no materialized task"],
+                warnings=[],
+                evidence=["reviewed reproduction spec found"],
+                next_actions=[
+                    "remove the extra spec or materialize the matching public issue task"
+                ],
+            )
+        )
+    summary = summarize_public_issue_reproduction_spec_validation(
+        specs_path=specs_path,
+        tasks_dir=tasks_dir,
+        focused_plan_path=focused_plan_path,
+        spec_count=len(specs_by_task),
+        results=results,
+    )
+    write_public_issue_reproduction_spec_validation_outputs(
+        output_dir=output_dir,
+        specs_path=specs_path,
+        tasks_dir=tasks_dir,
+        focused_plan_path=focused_plan_path,
+        results=results,
+        summary=summary,
+    )
+    return results, summary
+
+
+def summarize_public_issue_reproduction_spec_validation(
+    *,
+    specs_path: Path,
+    tasks_dir: Path,
+    focused_plan_path: Path | None,
+    spec_count: int,
+    results: list[IssueCorpusPublicReproductionSpecValidationResult],
+) -> IssueCorpusPublicReproductionSpecValidationSummary:
+    return IssueCorpusPublicReproductionSpecValidationSummary(
+        generated_at=datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace(
+            "+00:00", "Z"
+        ),
+        specs_path=str(specs_path),
+        tasks_dir=str(tasks_dir),
+        focused_plan_path=str(focused_plan_path) if focused_plan_path is not None else None,
+        task_count=len(results),
+        spec_count=spec_count,
+        ready_tasks=sum(1 for result in results if result.status == "ready"),
+        warning_tasks=sum(1 for result in results if result.status == "warning"),
+        blocked_tasks=sum(1 for result in results if result.status == "blocked"),
+        missing_spec_tasks=sum(1 for result in results if not result.spec_present),
+        empty_signal_tasks=sum(
+            1 for result in results if not result.expected_failure_signals
+        ),
+        policy_blocked_tasks=sum(
+            1
+            for result in results
+            if result.reproduction_command and not result.policy_allowed
+        ),
+        extra_spec_tasks=sum(
+            1
+            for result in results
+            if "reproduction spec task_id has no materialized task" in result.errors
+        ),
+    )
+
+
+def write_public_issue_reproduction_spec_validation_outputs(
+    *,
+    output_dir: Path,
+    specs_path: Path,
+    tasks_dir: Path,
+    focused_plan_path: Path | None,
+    results: list[IssueCorpusPublicReproductionSpecValidationResult],
+    summary: IssueCorpusPublicReproductionSpecValidationSummary,
+) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "public_issue_reproduction_spec_validation_results.json").write_text(
+        json.dumps([result.to_dict() for result in results], indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (output_dir / "public_issue_reproduction_spec_validation_summary.json").write_text(
+        json.dumps(summary.to_dict(), indent=2) + "\n",
+        encoding="utf-8",
+    )
+    with (output_dir / "public_issue_reproduction_spec_validation_results.csv").open(
+        "w",
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=[
+                "task_id",
+                "repository",
+                "issue_url",
+                "status",
+                "spec_present",
+                "repo_path",
+                "repo_exists",
+                "reproduction_command",
+                "command_source",
+                "policy_allowed",
+                "policy_reason",
+                "expected_failure_signals",
+                "errors",
+                "warnings",
+                "evidence",
+                "next_actions",
+            ],
+        )
+        writer.writeheader()
+        for result in results:
+            writer.writerow(
+                {
+                    "task_id": result.task_id,
+                    "repository": result.repository,
+                    "issue_url": result.issue_url,
+                    "status": result.status,
+                    "spec_present": result.spec_present,
+                    "repo_path": result.repo_path,
+                    "repo_exists": result.repo_exists,
+                    "reproduction_command": result.reproduction_command,
+                    "command_source": result.command_source,
+                    "policy_allowed": result.policy_allowed,
+                    "policy_reason": result.policy_reason,
+                    "expected_failure_signals": ";".join(
+                        result.expected_failure_signals
+                    ),
+                    "errors": ";".join(result.errors),
+                    "warnings": ";".join(result.warnings),
+                    "evidence": ";".join(result.evidence),
+                    "next_actions": ";".join(result.next_actions),
+                }
+            )
+    (output_dir / "public_issue_reproduction_spec_validation_report.md").write_text(
+        render_public_issue_reproduction_spec_validation_report(
+            specs_path=specs_path,
+            tasks_dir=tasks_dir,
+            focused_plan_path=focused_plan_path,
+            results=results,
+            summary=summary,
+        ),
+        encoding="utf-8",
+    )
+
+
 def _public_issue_reproduction_specs_template(
     results: list[IssueCorpusPublicReproductionPlanResult],
 ) -> dict[str, Any]:
@@ -5582,6 +5822,69 @@ def render_public_issue_reproduction_plan_report(
     return "\n".join(lines)
 
 
+def render_public_issue_reproduction_spec_validation_report(
+    *,
+    specs_path: Path,
+    tasks_dir: Path,
+    focused_plan_path: Path | None,
+    results: list[IssueCorpusPublicReproductionSpecValidationResult],
+    summary: IssueCorpusPublicReproductionSpecValidationSummary,
+) -> str:
+    lines = [
+        "# Public Issue Reproduction Spec Validation",
+        "",
+        f"- Generated at: `{summary.generated_at}`",
+        f"- Specs path: `{specs_path}`",
+        f"- Tasks directory: `{tasks_dir}`",
+        f"- Focused plan path: `{focused_plan_path or 'not provided'}`",
+        f"- Task rows: `{summary.task_count}`",
+        f"- Spec count: `{summary.spec_count}`",
+        f"- Ready tasks: `{summary.ready_tasks}`",
+        f"- Warning tasks: `{summary.warning_tasks}`",
+        f"- Blocked tasks: `{summary.blocked_tasks}`",
+        f"- Missing-spec tasks: `{summary.missing_spec_tasks}`",
+        f"- Empty-signal tasks: `{summary.empty_signal_tasks}`",
+        f"- Policy-blocked tasks: `{summary.policy_blocked_tasks}`",
+        f"- Extra-spec tasks: `{summary.extra_spec_tasks}`",
+        "",
+        "## Results",
+        "",
+        (
+            "| Task | Status | Spec | Repository | Command Source | Command | "
+            "Expected Failure Signals | Notes | Next Actions |"
+        ),
+        "|---|---|---|---|---|---|---|---|---|",
+    ]
+    for result in results:
+        notes = [*result.errors, *result.warnings]
+        lines.append(
+            "| "
+            f"{_markdown_table_text(result.task_id or 'unknown')} | "
+            f"{_markdown_table_text(result.status)} | "
+            f"{_markdown_table_text('present' if result.spec_present else 'missing')} | "
+            f"{_markdown_table_text(result.repository or 'unknown')} | "
+            f"{_markdown_table_text(result.command_source)} | "
+            f"{_markdown_table_text(result.reproduction_command or 'missing')} | "
+            f"{_markdown_table_text('; '.join(result.expected_failure_signals) or 'missing')} | "
+            f"{_markdown_table_text('; '.join(notes) or 'none')} | "
+            f"{_markdown_table_text('; '.join(result.next_actions) or 'none')} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Claim Boundary",
+            "",
+            "- This report validates reviewed reproduction criteria before execution.",
+            "- `ready` means a spec exists, the merged command is policy-allowed, and expected failure signals are non-empty.",
+            "- `warning` means the spec can be reviewed further before execution.",
+            "- `blocked` means the spec should not be used for reproduction execution until fixed.",
+            "- This report does not execute reproduction commands or prove public issue repair quality.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def render_public_issue_reproduction_execution_report(
     *,
     plan_path: Path,
@@ -7901,6 +8204,72 @@ def _plan_public_issue_reproduction_record(
         evidence=_dedupe_preserve_order(evidence),
         blockers=_dedupe_preserve_order(blockers),
         warnings=_dedupe_preserve_order(warnings),
+        next_actions=_dedupe_preserve_order(next_actions),
+    )
+
+
+def _validate_public_issue_reproduction_spec_record(
+    *,
+    task_dir: Path,
+    focused_record: dict[str, Any] | None,
+    reproduction_spec: dict[str, Any] | None,
+    policy: CommandPolicy,
+) -> IssueCorpusPublicReproductionSpecValidationResult:
+    planned = _plan_public_issue_reproduction_record(
+        task_dir=task_dir,
+        focused_record=focused_record,
+        reproduction_spec=reproduction_spec,
+        policy=policy,
+    )
+    errors = list(planned.blockers)
+    warnings = list(planned.warnings)
+    evidence = list(planned.evidence)
+    next_actions = list(planned.next_actions)
+    spec_present = reproduction_spec is not None
+
+    if spec_present:
+        evidence.append("reviewed reproduction spec found")
+    else:
+        errors.append("reviewed reproduction spec is missing")
+        next_actions.append(
+            "fill public_issue_reproduction_specs_template.json and rerun validation"
+        )
+
+    if not planned.expected_failure_signals:
+        errors.append("expected_failure_signals is empty")
+        next_actions.append(
+            "encode at least one exact failing assertion, traceback, or behavior signal"
+        )
+
+    if not planned.reproduction_command:
+        errors.append("reproduction command is missing")
+    elif not planned.policy_allowed:
+        errors.append(
+            f"reproduction command rejected by policy: {planned.policy_reason or 'unknown'}"
+        )
+
+    if planned.command_source != "reproduction_spec":
+        warnings.append(
+            "reproduction spec does not override the command; using planned fallback command"
+        )
+
+    status = "blocked" if errors else "warning" if warnings else "ready"
+    return IssueCorpusPublicReproductionSpecValidationResult(
+        task_id=planned.task_id,
+        repository=planned.repository,
+        issue_url=planned.issue_url,
+        status=status,
+        spec_present=spec_present,
+        repo_path=planned.repo_path,
+        repo_exists=planned.repo_exists,
+        reproduction_command=planned.reproduction_command,
+        command_source=planned.command_source,
+        policy_allowed=planned.policy_allowed,
+        policy_reason=planned.policy_reason,
+        expected_failure_signals=planned.expected_failure_signals,
+        errors=_dedupe_preserve_order(errors),
+        warnings=_dedupe_preserve_order(warnings),
+        evidence=_dedupe_preserve_order(evidence),
         next_actions=_dedupe_preserve_order(next_actions),
     )
 

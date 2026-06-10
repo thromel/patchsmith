@@ -28,6 +28,7 @@ from patchsmith.evaluation import (
     top_k_recall,
     validate_issue_corpus,
     validate_materialized_issue_tasks,
+    validate_public_issue_reproduction_specs,
     validate_seeded_dataset,
 )
 
@@ -1809,6 +1810,139 @@ def test_plan_public_issue_reproductions_merges_reviewed_spec_file(
         )
     )
     assert cli_results[0]["command_source"] == "reproduction_spec"
+
+
+def test_validate_public_issue_reproduction_specs_blocks_unfilled_template(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    tests_dir = repo_dir / "tests"
+    tests_dir.mkdir(parents=True)
+    (tests_dir / "test_bug.py").write_text("def test_bug():\n    assert True\n", encoding="utf-8")
+    tasks_dir = tmp_path / "materialized_tasks"
+    task_dir = tasks_dir / "public_task"
+    task_dir.mkdir(parents=True)
+    (task_dir / "task_manifest.json").write_text(
+        json.dumps(
+            {
+                "task_id": "public_task",
+                "issue": {
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/12",
+                },
+                "repository_snapshot": {
+                    "repo_path": str(repo_dir),
+                    "test_commands": ["python3 -m pytest"],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    specs_path = tmp_path / "public_issue_reproduction_specs_template.json"
+    specs_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "specs": [
+                    {
+                        "task_id": "public_task",
+                        "command": "python3 -m pytest tests/test_bug.py",
+                        "expected_failure_signals": [],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    output_dir = tmp_path / "spec_validation"
+    results, summary = validate_public_issue_reproduction_specs(
+        specs_path=specs_path,
+        tasks_dir=tasks_dir,
+        output_dir=output_dir,
+    )
+
+    assert summary.blocked_tasks == 1
+    assert summary.empty_signal_tasks == 1
+    assert summary.missing_spec_tasks == 0
+    assert results[0].status == "blocked"
+    assert results[0].spec_present
+    assert "expected_failure_signals is empty" in ";".join(results[0].errors)
+    assert (
+        output_dir / "public_issue_reproduction_spec_validation_report.md"
+    ).exists()
+    assert (
+        output_dir / "public_issue_reproduction_spec_validation_results.csv"
+    ).exists()
+
+    cli_output = tmp_path / "cli_spec_validation"
+    exit_code = main(
+        [
+            "validate-public-issue-reproduction-specs",
+            "--specs",
+            str(specs_path),
+            "--tasks-dir",
+            str(tasks_dir),
+            "--output",
+            str(cli_output),
+            "--json",
+        ]
+    )
+    assert exit_code == 0
+    assert (
+        cli_output / "public_issue_reproduction_spec_validation_report.md"
+    ).exists()
+
+
+def test_validate_public_issue_reproduction_specs_accepts_reviewed_spec(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    tests_dir = repo_dir / "tests"
+    tests_dir.mkdir(parents=True)
+    (tests_dir / "test_bug.py").write_text("def test_bug():\n    assert True\n", encoding="utf-8")
+    tasks_dir = tmp_path / "materialized_tasks"
+    task_dir = tasks_dir / "public_task"
+    task_dir.mkdir(parents=True)
+    (task_dir / "task_manifest.json").write_text(
+        json.dumps(
+            {
+                "task_id": "public_task",
+                "issue": {
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/12",
+                },
+                "repository_snapshot": {"repo_path": str(repo_dir)},
+            }
+        ),
+        encoding="utf-8",
+    )
+    specs_path = tmp_path / "reviewed_specs.json"
+    specs_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "public_task",
+                    "command": "python3 -m pytest tests/test_bug.py",
+                    "expected_failure_signals": ["AssertionError: reviewed signal"],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    results, summary = validate_public_issue_reproduction_specs(
+        specs_path=specs_path,
+        tasks_dir=tasks_dir,
+        output_dir=tmp_path / "spec_validation",
+    )
+
+    assert summary.ready_tasks == 1
+    assert summary.blocked_tasks == 0
+    assert summary.empty_signal_tasks == 0
+    assert results[0].status == "ready"
+    assert results[0].command_source == "reproduction_spec"
+    assert results[0].expected_failure_signals == ["AssertionError: reviewed signal"]
 
 
 def test_execute_public_issue_reproductions_blocks_missing_failure_spec(

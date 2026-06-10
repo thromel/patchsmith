@@ -22,6 +22,7 @@ from patchsmith.evaluation import (
     execute_public_issue_reproductions,
     execute_public_issue_repairs,
     plan_public_issue_reproductions,
+    validate_public_issue_reproduction_specs,
 )
 from patchsmith.observability import (
     ArtifactIndex,
@@ -985,6 +986,10 @@ def build_project_status_report(
             "experiments/public_issue_corpus_v1/"
             "public_issue_reproduction_plan_summary.json"
         ),
+        "public_reproduction_spec_validation": (
+            "experiments/public_issue_corpus_v1/"
+            "public_issue_reproduction_spec_validation_summary.json"
+        ),
         "public_reproduction_execution": (
             "experiments/public_issue_corpus_v1/"
             "public_issue_reproduction_execution_summary.json"
@@ -1496,6 +1501,9 @@ def build_evidence_refresh_report(
     public_reproduction_plan_path = experiment_path(
         "public_issue_corpus_v1/public_issue_reproduction_plan_results.json"
     )
+    public_reproduction_specs_path = experiment_path(
+        "public_issue_corpus_v1/public_issue_reproduction_specs_template.json"
+    )
     if public_tasks_dir.exists() and public_tasks_dir.is_dir():
         steps.append(
             _run_evidence_refresh_step(
@@ -1515,6 +1523,51 @@ def build_evidence_refresh_report(
                 )[1],
             )
         )
+        if public_reproduction_specs_path.exists():
+            steps.append(
+                _run_evidence_refresh_step(
+                    name="Public issue reproduction spec validation",
+                    artifact_paths=output_paths(
+                        (
+                            "public_issue_corpus_v1/"
+                            "public_issue_reproduction_spec_validation_report.md"
+                        ),
+                        (
+                            "public_issue_corpus_v1/"
+                            "public_issue_reproduction_spec_validation_summary.json"
+                        ),
+                    ),
+                    action=lambda: validate_public_issue_reproduction_specs(
+                        specs_path=public_reproduction_specs_path,
+                        tasks_dir=public_tasks_dir,
+                        focused_plan_path=(
+                            public_focused_plan_path
+                            if public_focused_plan_path.exists()
+                            else None
+                        ),
+                        output_dir=experiment_path("public_issue_corpus_v1"),
+                    )[1],
+                )
+            )
+        else:
+            steps.append(
+                EvidenceRefreshStep(
+                    name="Public issue reproduction spec validation",
+                    status="skipped",
+                    duration_ms=0,
+                    artifact_paths=output_paths(
+                        (
+                            "public_issue_corpus_v1/"
+                            "public_issue_reproduction_spec_validation_report.md"
+                        ),
+                        (
+                            "public_issue_corpus_v1/"
+                            "public_issue_reproduction_spec_validation_summary.json"
+                        ),
+                    ),
+                    summary="Skipped because the reproduction specs template is missing.",
+                )
+            )
         steps.append(
             _run_evidence_refresh_step(
                 name="Public issue reproduction execution",
@@ -1549,6 +1602,24 @@ def build_evidence_refresh_report(
                 artifact_paths=output_paths(
                     "public_issue_corpus_v1/public_issue_reproduction_execution_report.md",
                     "public_issue_corpus_v1/public_issue_reproduction_execution_summary.json",
+                ),
+                summary="Skipped because materialized public issue tasks are missing.",
+            )
+        )
+        steps.append(
+            EvidenceRefreshStep(
+                name="Public issue reproduction spec validation",
+                status="skipped",
+                duration_ms=0,
+                artifact_paths=output_paths(
+                    (
+                        "public_issue_corpus_v1/"
+                        "public_issue_reproduction_spec_validation_report.md"
+                    ),
+                    (
+                        "public_issue_corpus_v1/"
+                        "public_issue_reproduction_spec_validation_summary.json"
+                    ),
                 ),
                 summary="Skipped because materialized public issue tasks are missing.",
             )
@@ -3447,6 +3518,12 @@ def _delivery_audit_items(
         / "public_issue_corpus_v1"
         / "public_issue_reproduction_plan_summary.json"
     )
+    reproduction_spec_validation_payload = _load_json_artifact(
+        artifacts_dir
+        / "experiments"
+        / "public_issue_corpus_v1"
+        / "public_issue_reproduction_spec_validation_summary.json"
+    )
     reproduction_execution_payload = _load_json_artifact(
         artifacts_dir
         / "experiments"
@@ -3575,6 +3652,9 @@ def _delivery_audit_items(
         ),
         _delivery_setup_validation_item(setup_validation_payload),
         _delivery_public_reproduction_plan_item(reproduction_plan_payload),
+        _delivery_public_reproduction_spec_validation_item(
+            reproduction_spec_validation_payload
+        ),
         _delivery_public_reproduction_execution_item(reproduction_execution_payload),
         _delivery_public_repair_readiness_item(public_repair_readiness_payload),
         _delivery_public_repair_attempt_item(public_repair_attempt_payload),
@@ -3841,6 +3921,55 @@ def _delivery_public_reproduction_plan_item(
         evidence=(
             f"planned_tasks={planned}, warning_tasks={warning}, blocked_tasks={blocked}, "
             f"manual_spec_required_tasks={manual_specs}, command_count={commands}"
+        ),
+        source=source,
+        next_action=next_action,
+    )
+
+
+def _delivery_public_reproduction_spec_validation_item(
+    payload: dict[str, Any] | None,
+) -> DeliveryAuditItem:
+    source = (
+        "artifacts/experiments/public_issue_corpus_v1/"
+        "public_issue_reproduction_spec_validation_summary.json"
+    )
+    if payload is None:
+        return _delivery_item(
+            requirement="Public issue reproduction specs are validated.",
+            status="missing",
+            evidence="Public reproduction-spec validation summary artifact is missing.",
+            source=source,
+            next_action=(
+                "Run `validate-public-issue-reproduction-specs` after reproduction planning."
+            ),
+        )
+    ready = _payload_int(payload, "ready_tasks")
+    warning = _payload_int(payload, "warning_tasks")
+    blocked = _payload_int(payload, "blocked_tasks")
+    missing_specs = _payload_int(payload, "missing_spec_tasks")
+    empty_signals = _payload_int(payload, "empty_signal_tasks")
+    policy_blocked = _payload_int(payload, "policy_blocked_tasks")
+    extra_specs = _payload_int(payload, "extra_spec_tasks")
+    if blocked or missing_specs or empty_signals or policy_blocked or extra_specs:
+        status = "blocked"
+        next_action = (
+            "Fill reviewed expected failure signals and resolve spec validation blockers "
+            "before reproduction execution."
+        )
+    elif warning:
+        status = "warning"
+        next_action = "Review warnings before executing reproduction commands."
+    else:
+        status = "passed"
+        next_action = "Use validated specs to regenerate the reproduction plan."
+    return _delivery_item(
+        requirement="Public issue reproduction specs are validated.",
+        status=status,
+        evidence=(
+            f"ready_tasks={ready}, warning_tasks={warning}, blocked_tasks={blocked}, "
+            f"missing_spec_tasks={missing_specs}, empty_signal_tasks={empty_signals}, "
+            f"policy_blocked_tasks={policy_blocked}, extra_spec_tasks={extra_specs}"
         ),
         source=source,
         next_action=next_action,
@@ -5452,6 +5581,8 @@ def _release_hygiene_checks(
         "experiments/public_issue_corpus_v1/focused_test_setup_validation_summary.json",
         "experiments/public_issue_corpus_v1/public_issue_reproduction_plan_report.md",
         "experiments/public_issue_corpus_v1/public_issue_reproduction_plan_summary.json",
+        "experiments/public_issue_corpus_v1/public_issue_reproduction_spec_validation_report.md",
+        "experiments/public_issue_corpus_v1/public_issue_reproduction_spec_validation_summary.json",
         "experiments/public_issue_corpus_v1/public_issue_reproduction_execution_report.md",
         "experiments/public_issue_corpus_v1/public_issue_reproduction_execution_summary.json",
         "experiments/public_issue_corpus_v1/public_issue_repair_readiness_report.md",

@@ -399,6 +399,19 @@ PYTHONPATH=src python3 -m patchsmith.cli plan-public-issue-reproductions \
 
 The planner emits `public_issue_reproduction_specs_template.json` with task-specific candidate commands for review. Add `--reproduction-specs <reviewed-specs.json>` when reviewed criteria are available. The specs file accepts `task_id`, optional `command`, and `expected_failure_signals`, and the corpus includes `evals/issue_corpora/public_issue_smoke_v1/reproduction_specs.template.json` as the source-controlled authoring template.
 
+Validate reviewed public issue reproduction specs:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli validate-public-issue-reproduction-specs \
+  --specs artifacts/experiments/public_issue_corpus_v1/public_issue_reproduction_specs_template.json \
+  --tasks-dir artifacts/experiments/public_issue_corpus_v1/materialized_tasks \
+  --focused-plan artifacts/experiments/public_issue_corpus_v1/focused_test_plan_results.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+The spec-validation report blocks missing specs, empty `expected_failure_signals`, extra task IDs, and policy-rejected commands before reproduction execution.
+
 Dry-run or execute public issue reproductions:
 
 ```bash
@@ -446,7 +459,7 @@ PYTHONPATH=src python3 -m patchsmith.cli release-hygiene \
   --json
 ```
 
-Current release hygiene output is `ready_with_warnings`: generated review artifacts now include quality-gate, project-status, project-status freshness, environment-readiness, calibration-readiness, live-calibration plan, delivery audit, launch-blocker, and public issue context-preview/materialization validation/readiness/focused-test plan/run/diagnosis/setup-plan/setup-readiness/setup-execution/setup-validation/reproduction-plan/reproduction-execution/repair-readiness/repair-attempt evidence, package build metadata exists, local Git metadata exists, and the remaining release caveats are unproven live LLM calibration plus warning-class environment/setup/reproduction evidence.
+Current release hygiene output is `ready_with_warnings`: generated review artifacts now include quality-gate, project-status, project-status freshness, environment-readiness, calibration-readiness, live-calibration plan, delivery audit, launch-blocker, and public issue context-preview/materialization validation/readiness/focused-test plan/run/diagnosis/setup-plan/setup-readiness/setup-execution/setup-validation/reproduction-plan/reproduction-spec-validation/reproduction-execution/repair-readiness/repair-attempt evidence, package build metadata exists, local Git metadata exists, and the remaining release caveats are unproven live LLM calibration plus warning-class environment/setup/reproduction evidence.
 
 ## Example flagship demo scenario
 
