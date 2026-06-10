@@ -4354,13 +4354,35 @@ def _environment_docker_smoke_check(
         status = "blocked"
         next_action = "Resolve Docker daemon/image availability and rerun Docker smoke."
     generated_at = _payload_string(docker_payload, "generated_at", "unknown")
+    host_summary = _docker_environment_evidence(docker_payload.get("environment"))
+    evidence = f"Docker smoke is `{smoke_status}` from `{generated_at}`."
+    if host_summary:
+        evidence = f"{evidence} {host_summary}"
     return _environment_check(
         area="Docker",
         name="Saved Docker Smoke Evidence",
         status=status,
-        evidence=f"Docker smoke is `{smoke_status}` from `{generated_at}`.",
+        evidence=evidence,
         next_action=next_action,
     )
+
+
+def _docker_environment_evidence(environment: Any) -> str:
+    if not isinstance(environment, dict):
+        return ""
+    details = []
+    for key in [
+        "docker_cli_path",
+        "DOCKER_HOST",
+        "docker_desktop_application",
+        "colima_binary",
+    ]:
+        value = environment.get(key)
+        if value:
+            details.append(f"{key}=`{value}`")
+    if not details:
+        return ""
+    return "Host hints: " + ", ".join(details) + "."
 
 
 def _environment_live_calibration_check(

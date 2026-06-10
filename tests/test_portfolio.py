@@ -1628,6 +1628,12 @@ def test_environment_readiness_report_summarizes_external_prerequisites(
             {
                 "generated_at": "2026-06-10T00:00:00Z",
                 "smoke_status": "not_available",
+                "environment": {
+                    "docker_cli_path": "/usr/local/bin/docker",
+                    "DOCKER_HOST": "unset",
+                    "docker_desktop_application": "exists",
+                    "colima_binary": "missing",
+                },
                 "remediation_commands": ["docker version"],
             }
         )
@@ -1651,6 +1657,13 @@ def test_environment_readiness_report_summarizes_external_prerequisites(
     assert report.warning_count > 0
     checks = {(check.area, check.name): check.status for check in report.checks}
     assert checks[("Docker", "Saved Docker Smoke Evidence")] == "blocked"
+    docker_check = next(
+        check
+        for check in report.checks
+        if check.area == "Docker" and check.name == "Saved Docker Smoke Evidence"
+    )
+    assert "docker_desktop_application=`exists`" in docker_check.evidence
+    assert "colima_binary=`missing`" in docker_check.evidence
     assert checks[("Model Providers", "OpenAI SDK")] == "passed"
     assert checks[("Model Providers", "OpenAI Credentials")] == "warning"
     assert "docker version" in report.remediation_commands

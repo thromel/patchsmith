@@ -447,7 +447,7 @@ PYTHONPATH=src python3 -m patchsmith.cli environment-readiness \
   --json
 ```
 
-The environment-readiness report consolidates saved Docker smoke evidence, current OpenAI credential/package readiness, optional DeepAgents/OpenAI Agents package importability, saved adapter evidence, and remediation commands. It does not execute Docker smoke or call live model providers.
+The environment-readiness report consolidates saved Docker smoke evidence with host Docker hints, current OpenAI credential/package readiness, optional DeepAgents/OpenAI Agents package importability, saved adapter evidence, and remediation commands. It does not execute Docker smoke or call live model providers.
 
 Evidence refresh:
 

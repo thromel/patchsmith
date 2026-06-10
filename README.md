@@ -559,7 +559,7 @@ PYTHONPATH=src python3 -m patchsmith.cli environment-readiness \
   --json
 ```
 
-Latest environment readiness evidence is saved in `artifacts/experiments/environment_readiness.md` and `artifacts/experiments/environment_readiness.json`. It consolidates saved Docker smoke evidence, current OpenAI credential/package readiness, optional DeepAgents/OpenAI Agents package importability, and saved adapter/live-provider evidence without executing Docker smoke or calling live model providers.
+Latest environment readiness evidence is saved in `artifacts/experiments/environment_readiness.md` and `artifacts/experiments/environment_readiness.json`. It consolidates saved Docker smoke evidence with host Docker hints, current OpenAI credential/package readiness, optional DeepAgents/OpenAI Agents package importability, and saved adapter/live-provider evidence without executing Docker smoke or calling live model providers.
 
 Refresh the lightweight review evidence bundle:
 
