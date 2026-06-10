@@ -315,6 +315,18 @@ PYTHONPATH=src python3 -m patchsmith.cli check-materialized-run-readiness \
 
 The readiness report checks policy allowlist status and public-repo execution risk without running tests. Current public issue tasks are policy-runnable but warning-classified because they use full pytest suites on medium or large repositories.
 
+Plan focused public issue tests:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli plan-materialized-focused-tests \
+  --tasks-dir artifacts/experiments/public_issue_corpus_v1/materialized_tasks \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --max-paths 2 \
+  --json
+```
+
+The focused test plan derives narrower pytest commands from retrieved test-like files and checks them against the command policy. Current public issue tasks have three planned focused commands, zero fallbacks, and zero blocked commands.
+
 Run the seeded repair evaluation:
 
 ```bash
@@ -528,7 +540,7 @@ PYTHONPATH=src python3 -m patchsmith.cli release-hygiene \
   --json
 ```
 
-Latest release hygiene evidence is saved in `artifacts/experiments/release_hygiene.md` and `artifacts/experiments/release_hygiene.json`. Current status is `ready_with_warnings`: CI, packaging metadata, architecture-diagram, demo-media, calibration-readiness, public issue corpus/context-preview/materialized-task validation/readiness evidence, and local Git metadata checks pass, while live LLM calibration remains unproven and must stay visible in release claims.
+Latest release hygiene evidence is saved in `artifacts/experiments/release_hygiene.md` and `artifacts/experiments/release_hygiene.json`. Current status is `ready_with_warnings`: CI, packaging metadata, architecture-diagram, demo-media, calibration-readiness, public issue corpus/context-preview/materialized-task validation/readiness/focused-test evidence, and local Git metadata checks pass, while live LLM calibration remains unproven and must stay visible in release claims.
 
 Build package artifacts:
 
@@ -563,7 +575,7 @@ When those rates are set, reports estimate model cost from provider token usage.
 
 ## Next engineering wedges
 
-The context broker boundary, retrieval eval runner, repair eval runner, scaffold comparison runner, patch-search evaluator, public issue corpus validation/preflight/context preview/task materialization, validation, and run-readiness checks, static artifact index/dashboard with normalized metrics and generated run-detail trace pages, failure review report, demo readiness report, live calibration readiness report, generated demo script, final evaluation report, release hygiene report, deterministic heuristic runtime, LangGraph orchestration runtime, DeepAgents adapter compatibility mode plus package-backed smoke evidence, OpenAI Agents SDK adapter compatibility mode, offline model-planner seam, credential-gated OpenAI Responses client, and Python Code Context Graph v0 now exist. The current seeded suite has 10 tasks and compares `native`, `native_hybrid`, `native_graph`, and `ctxhelm_cli` for retrieval, including aggregate context packing metadata. Scaffold comparison now includes trace complexity and debuggability metrics. The next useful development step is resolving the remaining live-provider warning, harder patch-search tasks with model-diverse candidates, or live-provider calibration when credentials and budget are explicitly available.
+The context broker boundary, retrieval eval runner, repair eval runner, scaffold comparison runner, patch-search evaluator, public issue corpus validation/preflight/context preview/task materialization, validation, run-readiness, and focused-test planning checks, static artifact index/dashboard with normalized metrics and generated run-detail trace pages, failure review report, demo readiness report, live calibration readiness report, generated demo script, final evaluation report, release hygiene report, deterministic heuristic runtime, LangGraph orchestration runtime, DeepAgents adapter compatibility mode plus package-backed smoke evidence, OpenAI Agents SDK adapter compatibility mode, offline model-planner seam, credential-gated OpenAI Responses client, and Python Code Context Graph v0 now exist. The current seeded suite has 10 tasks and compares `native`, `native_hybrid`, `native_graph`, and `ctxhelm_cli` for retrieval, including aggregate context packing metadata. Scaffold comparison now includes trace complexity and debuggability metrics. The next useful development step is resolving the remaining live-provider warning, harder patch-search tasks with model-diverse candidates, or live-provider calibration when credentials and budget are explicitly available.
 
 The current LangGraph repair skeleton is:
 

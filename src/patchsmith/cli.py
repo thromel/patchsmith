@@ -8,6 +8,7 @@ from pathlib import Path
 from patchsmith.evaluation import (
     check_materialized_issue_run_readiness,
     materialize_issue_corpus_tasks,
+    plan_materialized_issue_focused_tests,
     preflight_issue_corpus_repositories,
     preview_issue_corpus_context,
     run_patch_search_evaluation,
@@ -334,6 +335,31 @@ def main(argv: list[str] | None = None) -> int:
             )
             print(
                 f"ready={summary.ready_tasks} warning={summary.warning_tasks} "
+                f"blocked={summary.blocked_tasks}"
+            )
+        return 0
+
+    if args.command == "plan-materialized-focused-tests":
+        results, summary = plan_materialized_issue_focused_tests(
+            tasks_dir=Path(args.tasks_dir),
+            output_dir=Path(args.output),
+            max_paths=args.max_paths,
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "result_count": len(results),
+                        "report_path": str(Path(args.output) / "focused_test_plan_report.md"),
+                        "summary": summary.to_dict(),
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(f"Report: {Path(args.output) / 'focused_test_plan_report.md'}")
+            print(
+                f"planned={summary.planned_tasks} fallback={summary.fallback_tasks} "
                 f"blocked={summary.blocked_tasks}"
             )
         return 0
@@ -1096,6 +1122,32 @@ def build_parser() -> argparse.ArgumentParser:
         help="Materialized run readiness output directory.",
     )
     materialized_run_readiness_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print JSON summary.",
+    )
+
+    focused_test_plan_parser = subparsers.add_parser(
+        "plan-materialized-focused-tests",
+        help="Plan focused pytest commands from materialized public issue retrieval hints.",
+    )
+    focused_test_plan_parser.add_argument(
+        "--tasks-dir",
+        default="artifacts/experiments/public_issue_corpus_v1/materialized_tasks",
+        help="Directory containing materialized task subdirectories.",
+    )
+    focused_test_plan_parser.add_argument(
+        "--output",
+        default="artifacts/experiments/public_issue_corpus_v1",
+        help="Focused test plan output directory.",
+    )
+    focused_test_plan_parser.add_argument(
+        "--max-paths",
+        type=int,
+        default=2,
+        help="Maximum retrieved test-like paths to include in each focused command.",
+    )
+    focused_test_plan_parser.add_argument(
         "--json",
         action="store_true",
         help="Print JSON summary.",

@@ -211,7 +211,17 @@ PYTHONPATH=src python3 -m patchsmith.cli check-materialized-run-readiness \
   --json
 ```
 
-The corpus, preflight, context-preview, materialization, validation, and run-readiness reports are planning and plumbing evidence. They are not repair-quality evidence until the issues are reproduced, patched, tested, and saved as normal PatchSmith run artifacts.
+Plan focused test commands from retrieved test-like files:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli plan-materialized-focused-tests \
+  --tasks-dir artifacts/experiments/public_issue_corpus_v1/materialized_tasks \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --max-paths 2 \
+  --json
+```
+
+The corpus, preflight, context-preview, materialization, validation, run-readiness, and focused-test reports are planning and plumbing evidence. They are not repair-quality evidence until the issues are reproduced, patched, tested, and saved as normal PatchSmith run artifacts.
 
 ## Definition of test completion
 

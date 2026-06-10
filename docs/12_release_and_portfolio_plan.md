@@ -225,6 +225,18 @@ PYTHONPATH=src python3 -m patchsmith.cli check-materialized-run-readiness \
 
 Current run-readiness output should show zero blocked tasks and three warning-classified tasks because the suggested public-repo test commands are policy-allowed but run full pytest suites on medium or large repositories.
 
+Plan focused public issue tests:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli plan-materialized-focused-tests \
+  --tasks-dir artifacts/experiments/public_issue_corpus_v1/materialized_tasks \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --max-paths 2 \
+  --json
+```
+
+Current focused-test output should plan three policy-allowed scoped pytest commands, with zero fallbacks and zero blocked commands. Use it to reduce full-suite execution risk before attempting public issue repairs.
+
 Generate the release hygiene report:
 
 ```bash
@@ -236,7 +248,7 @@ PYTHONPATH=src python3 -m patchsmith.cli release-hygiene \
   --json
 ```
 
-Current release hygiene output is `ready_with_warnings`: generated review artifacts now include calibration-readiness and public issue context-preview/materialization validation/readiness evidence, package build metadata exists, local Git metadata exists, and the remaining release caveat is live LLM calibration.
+Current release hygiene output is `ready_with_warnings`: generated review artifacts now include calibration-readiness and public issue context-preview/materialization validation/readiness/focused-test evidence, package build metadata exists, local Git metadata exists, and the remaining release caveat is live LLM calibration.
 
 ## Example flagship demo scenario
 

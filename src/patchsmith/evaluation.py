@@ -287,6 +287,40 @@ class IssueCorpusMaterializedRunReadinessSummary:
 
 
 @dataclass(frozen=True)
+class IssueCorpusFocusedTestPlanResult:
+    task_id: str | None
+    task_dir: str
+    status: str
+    repository: str | None
+    issue_url: str | None
+    repo_path: str | None
+    focused_files: list[str]
+    command: str | None
+    policy_allowed: bool
+    policy_reason: str | None
+    fallback_command: str | None
+    risk_notes: list[str]
+    errors: list[str]
+    warnings: list[str]
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class IssueCorpusFocusedTestPlanSummary:
+    tasks_dir: str
+    task_count: int
+    planned_tasks: int
+    fallback_tasks: int
+    blocked_tasks: int
+    policy_allowed_commands: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class RetrievalEvalResult:
     task_id: str
     context_provider: str
@@ -1415,6 +1449,121 @@ def write_materialized_issue_run_readiness_outputs(
             )
     (output_dir / "materialized_run_readiness_report.md").write_text(
         render_materialized_issue_run_readiness_report(
+            tasks_dir=tasks_dir,
+            results=results,
+            summary=summary,
+        ),
+        encoding="utf-8",
+    )
+
+
+def plan_materialized_issue_focused_tests(
+    *,
+    tasks_dir: Path,
+    output_dir: Path,
+    max_paths: int = 2,
+) -> tuple[list[IssueCorpusFocusedTestPlanResult], IssueCorpusFocusedTestPlanSummary]:
+    if not tasks_dir.exists():
+        raise FileNotFoundError(f"materialized tasks directory does not exist: {tasks_dir}")
+    if not tasks_dir.is_dir():
+        raise ValueError(f"materialized tasks path is not a directory: {tasks_dir}")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    policy = CommandPolicy()
+    task_dirs = sorted(path for path in tasks_dir.iterdir() if path.is_dir())
+    results = [
+        _plan_materialized_issue_focused_test(
+            task_dir=task_dir,
+            policy=policy,
+            max_paths=max_paths,
+        )
+        for task_dir in task_dirs
+    ]
+    summary = summarize_materialized_issue_focused_test_plan(
+        tasks_dir=tasks_dir,
+        results=results,
+    )
+    write_materialized_issue_focused_test_plan_outputs(
+        output_dir=output_dir,
+        tasks_dir=tasks_dir,
+        results=results,
+        summary=summary,
+    )
+    return results, summary
+
+
+def summarize_materialized_issue_focused_test_plan(
+    *,
+    tasks_dir: Path,
+    results: list[IssueCorpusFocusedTestPlanResult],
+) -> IssueCorpusFocusedTestPlanSummary:
+    return IssueCorpusFocusedTestPlanSummary(
+        tasks_dir=str(tasks_dir),
+        task_count=len(results),
+        planned_tasks=sum(1 for result in results if result.status == "planned"),
+        fallback_tasks=sum(1 for result in results if result.status == "fallback"),
+        blocked_tasks=sum(1 for result in results if result.status == "blocked"),
+        policy_allowed_commands=sum(1 for result in results if result.policy_allowed),
+    )
+
+
+def write_materialized_issue_focused_test_plan_outputs(
+    *,
+    output_dir: Path,
+    tasks_dir: Path,
+    results: list[IssueCorpusFocusedTestPlanResult],
+    summary: IssueCorpusFocusedTestPlanSummary,
+) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "focused_test_plan_results.json").write_text(
+        json.dumps([result.to_dict() for result in results], indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (output_dir / "focused_test_plan_summary.json").write_text(
+        json.dumps(summary.to_dict(), indent=2) + "\n",
+        encoding="utf-8",
+    )
+    with (output_dir / "focused_test_plan_results.csv").open(
+        "w",
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=[
+                "task_id",
+                "repository",
+                "issue_url",
+                "status",
+                "focused_files",
+                "command",
+                "policy_allowed",
+                "policy_reason",
+                "fallback_command",
+                "risk_notes",
+                "errors",
+                "warnings",
+            ],
+        )
+        writer.writeheader()
+        for result in results:
+            writer.writerow(
+                {
+                    "task_id": result.task_id,
+                    "repository": result.repository,
+                    "issue_url": result.issue_url,
+                    "status": result.status,
+                    "focused_files": ";".join(result.focused_files),
+                    "command": result.command,
+                    "policy_allowed": result.policy_allowed,
+                    "policy_reason": result.policy_reason,
+                    "fallback_command": result.fallback_command,
+                    "risk_notes": ";".join(result.risk_notes),
+                    "errors": ";".join(result.errors),
+                    "warnings": ";".join(result.warnings),
+                }
+            )
+    (output_dir / "focused_test_plan_report.md").write_text(
+        render_materialized_issue_focused_test_plan_report(
             tasks_dir=tasks_dir,
             results=results,
             summary=summary,
@@ -2676,6 +2825,53 @@ def render_materialized_issue_run_readiness_report(
     return "\n".join(lines)
 
 
+def render_materialized_issue_focused_test_plan_report(
+    *,
+    tasks_dir: Path,
+    results: list[IssueCorpusFocusedTestPlanResult],
+    summary: IssueCorpusFocusedTestPlanSummary,
+) -> str:
+    lines = [
+        "# Public Issue Focused Test Plan",
+        "",
+        f"- Tasks directory: `{tasks_dir}`",
+        f"- Task count: `{summary.task_count}`",
+        f"- Planned focused tasks: `{summary.planned_tasks}`",
+        f"- Fallback tasks: `{summary.fallback_tasks}`",
+        f"- Blocked tasks: `{summary.blocked_tasks}`",
+        f"- Policy-allowed commands: `{summary.policy_allowed_commands}`",
+        "",
+        "## Results",
+        "",
+        "| Task | Status | Repository | Focused Files | Command | Policy | Notes |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    for result in results:
+        notes = [*result.risk_notes, *result.errors, *result.warnings]
+        lines.append(
+            "| "
+            f"{result.task_id or result.task_dir} | "
+            f"{result.status} | "
+            f"{result.repository or 'unknown'} | "
+            f"{', '.join(result.focused_files) or 'none'} | "
+            f"`{result.command or 'none'}` | "
+            f"{'allowed' if result.policy_allowed else result.policy_reason or 'not checked'} | "
+            f"{'; '.join(notes) or 'none'} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Claim Boundary",
+            "",
+            "- This report plans narrower pytest commands from retrieved test-like files.",
+            "- Commands are policy-checked but not executed.",
+            "- Passing these commands would still be targeted evidence, not full public issue repair quality.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def render_repair_eval_report(
     *,
     dataset_dir: Path,
@@ -3498,6 +3694,117 @@ def _check_materialized_issue_task_run_readiness(
     )
 
 
+def _plan_materialized_issue_focused_test(
+    *,
+    task_dir: Path,
+    policy: CommandPolicy,
+    max_paths: int,
+) -> IssueCorpusFocusedTestPlanResult:
+    errors: list[str] = []
+    warnings: list[str] = []
+    risk_notes: list[str] = []
+    manifest_path = task_dir / "task_manifest.json"
+    manifest: dict[str, Any] = {}
+    if not manifest_path.exists():
+        errors.append("missing task_manifest.json")
+    else:
+        try:
+            parsed = json.loads(manifest_path.read_text(encoding="utf-8"))
+            if isinstance(parsed, dict):
+                manifest = parsed
+            else:
+                errors.append("task_manifest.json must contain a JSON object")
+        except json.JSONDecodeError as error:
+            errors.append(f"task_manifest.json is invalid JSON: {error.msg}")
+
+    task_id = manifest.get("task_id") if isinstance(manifest.get("task_id"), str) else None
+    issue = manifest.get("issue") if isinstance(manifest.get("issue"), dict) else {}
+    snapshot = (
+        manifest.get("repository_snapshot")
+        if isinstance(manifest.get("repository_snapshot"), dict)
+        else {}
+    )
+    retrieval = (
+        manifest.get("retrieval_preview")
+        if isinstance(manifest.get("retrieval_preview"), dict)
+        else {}
+    )
+    repository = issue.get("repository") if isinstance(issue.get("repository"), str) else None
+    issue_url = issue.get("issue_url") if isinstance(issue.get("issue_url"), str) else None
+    repo_path_value = (
+        snapshot.get("repo_path") if isinstance(snapshot.get("repo_path"), str) else None
+    )
+    test_commands = _string_list(snapshot.get("test_commands"))
+    fallback_command = test_commands[0] if test_commands else None
+    retrieved_files = _string_list(retrieval.get("retrieved_files"))
+    focused_files = [
+        path
+        for path in retrieved_files
+        if _is_materialized_test_candidate_path(path)
+    ][: max(max_paths, 0)]
+
+    repo_exists = False
+    workspace = Path.cwd()
+    if repo_path_value:
+        repo_path = Path(repo_path_value)
+        repo_exists = repo_path.exists() and repo_path.is_dir()
+        if repo_exists:
+            workspace = repo_path
+        else:
+            errors.append(f"repository snapshot is not available: {repo_path_value}")
+    else:
+        errors.append("repository_snapshot.repo_path is missing")
+
+    if focused_files:
+        missing_focused = [
+            path for path in focused_files if repo_exists and not (workspace / path).is_file()
+        ]
+        if missing_focused:
+            errors.append(f"focused test files do not exist: {', '.join(missing_focused)}")
+        command = "python3 -m pytest " + " ".join(focused_files)
+        status = "planned"
+    elif fallback_command:
+        command = fallback_command
+        status = "fallback"
+        warnings.append("no retrieved test-like file was available; using fallback test command")
+    else:
+        command = None
+        status = "blocked"
+        errors.append("no focused or fallback test command available")
+
+    policy_allowed = False
+    policy_reason: str | None = None
+    if command:
+        decision = policy.evaluate(command, workspace=workspace)
+        policy_allowed = decision.allowed
+        policy_reason = decision.reason
+        if not decision.allowed:
+            errors.append(f"focused test command rejected by policy: {decision.reason}")
+
+    if focused_files:
+        risk_notes.append("focused command is derived from retrieved test-like files")
+    if fallback_command and command == fallback_command:
+        risk_notes.append("fallback command may run a broader test scope")
+    if errors:
+        status = "blocked"
+    return IssueCorpusFocusedTestPlanResult(
+        task_id=task_id,
+        task_dir=str(task_dir),
+        status=status,
+        repository=repository,
+        issue_url=issue_url,
+        repo_path=repo_path_value,
+        focused_files=focused_files,
+        command=command,
+        policy_allowed=policy_allowed,
+        policy_reason=policy_reason,
+        fallback_command=fallback_command,
+        risk_notes=risk_notes,
+        errors=errors,
+        warnings=warnings,
+    )
+
+
 def _issue_corpus_repositories(issues: list[Any]) -> list[tuple[str, str, int]]:
     repo_urls: dict[str, str] = {}
     issue_counts: dict[str, int] = {}
@@ -3952,6 +4259,18 @@ def _is_issue_corpus_test_path(path: str) -> bool:
     return (
         "tests" in parts
         or "test" in parts
+        or name.startswith("test_")
+        or name.endswith("_test.py")
+    )
+
+
+def _is_materialized_test_candidate_path(path: str) -> bool:
+    path_obj = Path(path)
+    parts = path_obj.parts
+    name = path_obj.name
+    return (
+        bool(parts)
+        and parts[0] in {"tests", "test", "testing"}
         or name.startswith("test_")
         or name.endswith("_test.py")
     )

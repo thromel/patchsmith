@@ -196,6 +196,18 @@ PYTHONPATH=src python3 -m patchsmith.cli check-materialized-run-readiness \
 
 The readiness report checks command-policy allowlist status and execution risk without running public-repo tests. Treat warning-classified tasks as runnable only after choosing a scoped test command or accepting full-suite cost.
 
+Public issue focused test plan:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli plan-materialized-focused-tests \
+  --tasks-dir artifacts/experiments/public_issue_corpus_v1/materialized_tasks \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --max-paths 2 \
+  --json
+```
+
+The focused test plan derives scoped pytest commands from retrieved test-like files and validates them through the command policy without executing them.
+
 Scaffold comparison:
 
 ```bash

@@ -339,6 +339,14 @@ PYTHONPATH=src python3 -m patchsmith.cli check-materialized-run-readiness \
   --json
 ```
 
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli plan-materialized-focused-tests \
+  --tasks-dir artifacts/experiments/public_issue_corpus_v1/materialized_tasks \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --max-paths 2 \
+  --json
+```
+
 Latest expected evidence:
 
 - `artifacts/experiments/public_issue_corpus_v1/corpus_report.md`,
@@ -347,6 +355,7 @@ Latest expected evidence:
 - `artifacts/experiments/public_issue_corpus_v1/materialized_task_report.md`,
 - `artifacts/experiments/public_issue_corpus_v1/materialized_task_validation_report.md`,
 - `artifacts/experiments/public_issue_corpus_v1/materialized_run_readiness_report.md`,
+- `artifacts/experiments/public_issue_corpus_v1/focused_test_plan_report.md`,
 - valid public issue candidates: 3,
 - reachable public repositories: 2,
 - context preview completed issues: 3,
@@ -358,6 +367,9 @@ Latest expected evidence:
 - run-readiness blocked tasks: 0,
 - run-readiness warning tasks: 3,
 - policy-allowed materialized test commands: 3,
+- focused public issue test plans: 3,
+- focused test fallbacks: 0,
+- policy-allowed focused test commands: 3,
 - invalid entries: 0,
 - repositories: `psf/requests`, `pytest-dev/pytest`.
 
@@ -725,7 +737,7 @@ Latest evidence:
 - readiness status: `ready_with_caveats`,
 - live calibration readiness: `not_configured`,
 - release hygiene status: `ready_with_warnings`,
-- release hygiene checks: generated review artifacts include public issue context preview and task materialization validation/readiness evidence; live LLM calibration remains the only warning,
+- release hygiene checks: generated review artifacts include public issue context preview, task materialization validation/readiness, and focused-test planning evidence; live LLM calibration remains the only warning,
 - indexed experiments: 16,
 - indexed saved runs: 443,
 - normalized metric rows: 29,

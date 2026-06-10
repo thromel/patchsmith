@@ -72,6 +72,19 @@ PYTHONPATH=src python3 -m patchsmith.cli check-materialized-run-readiness \
 Run readiness checks command-policy allowlist status and execution risk without
 running public-repo tests.
 
+Focused test planning command:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli plan-materialized-focused-tests \
+  --tasks-dir artifacts/experiments/public_issue_corpus_v1/materialized_tasks \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --max-paths 2 \
+  --json
+```
+
+Focused test planning derives scoped pytest commands from retrieved test-like
+files and checks those commands through the same command policy.
+
 Selection criteria:
 
 - public GitHub issue URL,
