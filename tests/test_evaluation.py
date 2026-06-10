@@ -13,6 +13,7 @@ from patchsmith.evaluation import (
     materialize_issue_corpus_tasks,
     plan_focused_test_setups,
     plan_materialized_issue_focused_tests,
+    plan_public_issue_reproductions,
     preflight_issue_corpus_repositories,
     preview_issue_corpus_context,
     recall,
@@ -1590,6 +1591,122 @@ def test_validate_focused_test_setups_classifies_httpbin_fixture_failure(
     assert results[0].failure_summary is not None
     assert "httpbin" in ";".join(results[0].failure_evidence)
     assert "controlled httpbin fixture provider" in ";".join(results[0].next_actions)
+
+
+def test_plan_public_issue_reproductions_warns_without_expected_failure_spec(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    tests_dir = repo_dir / "tests"
+    tests_dir.mkdir(parents=True)
+    (tests_dir / "test_bug.py").write_text("def test_bug():\n    assert True\n", encoding="utf-8")
+    tasks_dir = tmp_path / "materialized_tasks"
+    task_dir = tasks_dir / "public_task"
+    task_dir.mkdir(parents=True)
+    (task_dir / "task_manifest.json").write_text(
+        json.dumps(
+            {
+                "task_id": "public_task",
+                "issue": {
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/12",
+                },
+                "repository_snapshot": {
+                    "repo_path": str(repo_dir),
+                    "test_commands": ["python3 -m pytest"],
+                },
+                "retrieval_preview": {"retrieved_files": ["tests/test_bug.py"]},
+            }
+        ),
+        encoding="utf-8",
+    )
+    focused_plan_path = tmp_path / "focused_test_plan_results.json"
+    focused_plan_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "public_task",
+                    "command": "python3 -m pytest tests/test_bug.py",
+                    "repo_path": str(repo_dir),
+                    "focused_files": ["tests/test_bug.py"],
+                    "policy_allowed": True,
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    output_dir = tmp_path / "reproduction_plan"
+    results, summary = plan_public_issue_reproductions(
+        tasks_dir=tasks_dir,
+        focused_plan_path=focused_plan_path,
+        output_dir=output_dir,
+    )
+
+    assert summary.warning_tasks == 1
+    assert summary.manual_spec_required_tasks == 1
+    assert summary.command_count == 1
+    assert results[0].status == "warning"
+    assert results[0].command_source == "focused_test_plan"
+    assert results[0].policy_allowed
+    assert results[0].manual_spec_required
+    assert "expected failing signal is not encoded" in ";".join(results[0].warnings)
+    assert (output_dir / "public_issue_reproduction_plan_report.md").exists()
+    assert (output_dir / "public_issue_reproduction_plan_results.csv").exists()
+
+    cli_output = tmp_path / "cli_reproduction_plan"
+    exit_code = main(
+        [
+            "plan-public-issue-reproductions",
+            "--tasks-dir",
+            str(tasks_dir),
+            "--focused-plan",
+            str(focused_plan_path),
+            "--output",
+            str(cli_output),
+            "--json",
+        ]
+    )
+    assert exit_code == 0
+    assert (cli_output / "public_issue_reproduction_plan_report.md").exists()
+
+
+def test_plan_public_issue_reproductions_plans_explicit_failure_spec(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    tests_dir = repo_dir / "tests"
+    tests_dir.mkdir(parents=True)
+    (tests_dir / "test_bug.py").write_text("def test_bug():\n    assert True\n", encoding="utf-8")
+    tasks_dir = tmp_path / "materialized_tasks"
+    task_dir = tasks_dir / "public_task"
+    task_dir.mkdir(parents=True)
+    (task_dir / "task_manifest.json").write_text(
+        json.dumps(
+            {
+                "task_id": "public_task",
+                "issue": {"repository": "owner/repo"},
+                "repository_snapshot": {"repo_path": str(repo_dir)},
+                "reproduction": {
+                    "command": "python3 -m pytest tests/test_bug.py",
+                    "expected_failure_signals": ["AssertionError: expected public bug"],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    results, summary = plan_public_issue_reproductions(
+        tasks_dir=tasks_dir,
+        output_dir=tmp_path / "reproduction_plan",
+    )
+
+    assert summary.planned_tasks == 1
+    assert summary.warning_tasks == 0
+    assert results[0].status == "planned"
+    assert not results[0].manual_spec_required
+    assert results[0].expected_failure_signals == ["AssertionError: expected public bug"]
+    assert results[0].command_source == "manifest_reproduction"
 
 
 def test_check_public_issue_repair_readiness_warns_without_reproduction(

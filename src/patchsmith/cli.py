@@ -14,6 +14,7 @@ from patchsmith.evaluation import (
     materialize_issue_corpus_tasks,
     plan_focused_test_setups,
     plan_materialized_issue_focused_tests,
+    plan_public_issue_reproductions,
     preflight_issue_corpus_repositories,
     preview_issue_corpus_context,
     run_materialized_issue_focused_tests,
@@ -552,6 +553,36 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f"dry_run={summary.dry_run_tasks} attempted={summary.attempted_tasks} "
                 f"passed={summary.passed_tasks} blocked={summary.blocked_tasks}"
+            )
+        return 0
+
+    if args.command == "plan-public-issue-reproductions":
+        focused_plan = Path(args.focused_plan) if args.focused_plan else None
+        results, summary = plan_public_issue_reproductions(
+            tasks_dir=Path(args.tasks_dir),
+            focused_plan_path=focused_plan,
+            output_dir=Path(args.output),
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "result_count": len(results),
+                        "report_path": str(
+                            Path(args.output) / "public_issue_reproduction_plan_report.md"
+                        ),
+                        "summary": summary.to_dict(),
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(
+                f"Report: {Path(args.output) / 'public_issue_reproduction_plan_report.md'}"
+            )
+            print(
+                f"planned={summary.planned_tasks} warning={summary.warning_tasks} "
+                f"blocked={summary.blocked_tasks}"
             )
         return 0
 
@@ -1912,6 +1943,34 @@ def build_parser() -> argparse.ArgumentParser:
         help="Execute validation commands instead of writing dry-run evidence.",
     )
     focused_test_setup_validation_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print JSON summary.",
+    )
+
+    public_reproduction_plan_parser = subparsers.add_parser(
+        "plan-public-issue-reproductions",
+        help="Plan issue-specific failing reproduction checks before public issue repairs.",
+    )
+    public_reproduction_plan_parser.add_argument(
+        "--tasks-dir",
+        default="artifacts/experiments/public_issue_corpus_v1/materialized_tasks",
+        help="Directory containing materialized public issue task manifests.",
+    )
+    public_reproduction_plan_parser.add_argument(
+        "--focused-plan",
+        default=(
+            "artifacts/experiments/public_issue_corpus_v1/"
+            "focused_test_plan_results.json"
+        ),
+        help="Focused public issue test-plan results JSON.",
+    )
+    public_reproduction_plan_parser.add_argument(
+        "--output",
+        default="artifacts/experiments/public_issue_corpus_v1",
+        help="Public issue reproduction-plan output directory.",
+    )
+    public_reproduction_plan_parser.add_argument(
         "--json",
         action="store_true",
         help="Print JSON summary.",

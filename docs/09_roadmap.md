@@ -217,6 +217,7 @@ Publish the project as a recruiter-grade artifact.
 - architecture diagram,
 - final evaluation report,
 - launch blocker backlog,
+- public issue reproduction-plan gate,
 - public issue repair-readiness gate,
 - failure analysis report,
 - blog post series,

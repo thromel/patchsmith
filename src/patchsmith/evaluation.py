@@ -602,6 +602,47 @@ class IssueCorpusFocusedTestSetupValidationSummary:
 
 
 @dataclass(frozen=True)
+class IssueCorpusPublicReproductionPlanResult:
+    task_id: str | None
+    repository: str | None
+    issue_url: str | None
+    status: str
+    repo_path: str | None
+    repo_exists: bool
+    reproduction_command: str | None
+    command_source: str
+    policy_allowed: bool
+    policy_reason: str | None
+    focused_files: list[str]
+    expected_failure_signals: list[str]
+    manual_spec_required: bool
+    evidence: list[str]
+    blockers: list[str]
+    warnings: list[str]
+    next_actions: list[str]
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class IssueCorpusPublicReproductionPlanSummary:
+    generated_at: str
+    tasks_dir: str
+    focused_plan_path: str | None
+    task_count: int
+    planned_tasks: int
+    warning_tasks: int
+    blocked_tasks: int
+    manual_spec_required_tasks: int
+    command_count: int
+    policy_allowed_commands: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class IssueCorpusPublicRepairReadinessResult:
     task_id: str | None
     repository: str | None
@@ -2865,6 +2906,150 @@ def write_focused_test_setup_validation_outputs(
     )
 
 
+def plan_public_issue_reproductions(
+    *,
+    tasks_dir: Path,
+    output_dir: Path,
+    focused_plan_path: Path | None = None,
+) -> tuple[
+    list[IssueCorpusPublicReproductionPlanResult],
+    IssueCorpusPublicReproductionPlanSummary,
+]:
+    if not tasks_dir.exists():
+        raise FileNotFoundError(f"materialized tasks directory does not exist: {tasks_dir}")
+    if not tasks_dir.is_dir():
+        raise ValueError(f"materialized tasks path is not a directory: {tasks_dir}")
+    focused_records = (
+        _load_json_record_list(focused_plan_path, label="focused test plan results")
+        if focused_plan_path is not None and focused_plan_path.exists()
+        else []
+    )
+    focused_by_task = _records_by_task_id(focused_records)
+    policy = CommandPolicy()
+    task_dirs = sorted(path for path in tasks_dir.iterdir() if path.is_dir())
+    results = [
+        _plan_public_issue_reproduction_record(
+            task_dir=task_dir,
+            focused_record=focused_by_task.get(task_dir.name),
+            policy=policy,
+        )
+        for task_dir in task_dirs
+    ]
+    summary = summarize_public_issue_reproduction_plan(
+        tasks_dir=tasks_dir,
+        focused_plan_path=focused_plan_path,
+        results=results,
+    )
+    write_public_issue_reproduction_plan_outputs(
+        output_dir=output_dir,
+        tasks_dir=tasks_dir,
+        focused_plan_path=focused_plan_path,
+        results=results,
+        summary=summary,
+    )
+    return results, summary
+
+
+def summarize_public_issue_reproduction_plan(
+    *,
+    tasks_dir: Path,
+    focused_plan_path: Path | None,
+    results: list[IssueCorpusPublicReproductionPlanResult],
+) -> IssueCorpusPublicReproductionPlanSummary:
+    return IssueCorpusPublicReproductionPlanSummary(
+        generated_at=datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace(
+            "+00:00", "Z"
+        ),
+        tasks_dir=str(tasks_dir),
+        focused_plan_path=str(focused_plan_path) if focused_plan_path is not None else None,
+        task_count=len(results),
+        planned_tasks=sum(1 for result in results if result.status == "planned"),
+        warning_tasks=sum(1 for result in results if result.status == "warning"),
+        blocked_tasks=sum(1 for result in results if result.status == "blocked"),
+        manual_spec_required_tasks=sum(1 for result in results if result.manual_spec_required),
+        command_count=sum(1 for result in results if result.reproduction_command),
+        policy_allowed_commands=sum(1 for result in results if result.policy_allowed),
+    )
+
+
+def write_public_issue_reproduction_plan_outputs(
+    *,
+    output_dir: Path,
+    tasks_dir: Path,
+    focused_plan_path: Path | None,
+    results: list[IssueCorpusPublicReproductionPlanResult],
+    summary: IssueCorpusPublicReproductionPlanSummary,
+) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "public_issue_reproduction_plan_results.json").write_text(
+        json.dumps([result.to_dict() for result in results], indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (output_dir / "public_issue_reproduction_plan_summary.json").write_text(
+        json.dumps(summary.to_dict(), indent=2) + "\n",
+        encoding="utf-8",
+    )
+    with (output_dir / "public_issue_reproduction_plan_results.csv").open(
+        "w",
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=[
+                "task_id",
+                "repository",
+                "issue_url",
+                "status",
+                "repo_path",
+                "repo_exists",
+                "reproduction_command",
+                "command_source",
+                "policy_allowed",
+                "policy_reason",
+                "focused_files",
+                "expected_failure_signals",
+                "manual_spec_required",
+                "evidence",
+                "blockers",
+                "warnings",
+                "next_actions",
+            ],
+        )
+        writer.writeheader()
+        for result in results:
+            writer.writerow(
+                {
+                    "task_id": result.task_id,
+                    "repository": result.repository,
+                    "issue_url": result.issue_url,
+                    "status": result.status,
+                    "repo_path": result.repo_path,
+                    "repo_exists": result.repo_exists,
+                    "reproduction_command": result.reproduction_command,
+                    "command_source": result.command_source,
+                    "policy_allowed": result.policy_allowed,
+                    "policy_reason": result.policy_reason,
+                    "focused_files": ";".join(result.focused_files),
+                    "expected_failure_signals": ";".join(result.expected_failure_signals),
+                    "manual_spec_required": result.manual_spec_required,
+                    "evidence": ";".join(result.evidence),
+                    "blockers": ";".join(result.blockers),
+                    "warnings": ";".join(result.warnings),
+                    "next_actions": ";".join(result.next_actions),
+                }
+            )
+    (output_dir / "public_issue_reproduction_plan_report.md").write_text(
+        render_public_issue_reproduction_plan_report(
+            tasks_dir=tasks_dir,
+            focused_plan_path=focused_plan_path,
+            results=results,
+            summary=summary,
+        ),
+        encoding="utf-8",
+    )
+
+
 def check_public_issue_repair_readiness(
     *,
     focused_run_path: Path,
@@ -4706,6 +4891,64 @@ def render_focused_test_setup_validation_report(
             "- Blocked rows mean setup has not reached a state where validation can run.",
             "- Passed validation proves the focused validation command runs after setup, not that a PatchSmith repair succeeded.",
             "- Repair-quality claims still require issue reproduction, patch generation, and saved normal PatchSmith run artifacts.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def render_public_issue_reproduction_plan_report(
+    *,
+    tasks_dir: Path,
+    focused_plan_path: Path | None,
+    results: list[IssueCorpusPublicReproductionPlanResult],
+    summary: IssueCorpusPublicReproductionPlanSummary,
+) -> str:
+    lines = [
+        "# Public Issue Reproduction Plan",
+        "",
+        f"- Generated at: `{summary.generated_at}`",
+        f"- Tasks directory: `{tasks_dir}`",
+        f"- Focused plan path: `{focused_plan_path or 'not provided'}`",
+        f"- Task count: `{summary.task_count}`",
+        f"- Planned tasks: `{summary.planned_tasks}`",
+        f"- Warning tasks: `{summary.warning_tasks}`",
+        f"- Blocked tasks: `{summary.blocked_tasks}`",
+        f"- Manual-spec-required tasks: `{summary.manual_spec_required_tasks}`",
+        f"- Candidate commands: `{summary.command_count}`",
+        f"- Policy-allowed commands: `{summary.policy_allowed_commands}`",
+        "",
+        "## Results",
+        "",
+        (
+            "| Task | Status | Repository | Command Source | Command | Expected Failure "
+            "Signals | Notes | Next Actions |"
+        ),
+        "|---|---|---|---|---|---|---|---|",
+    ]
+    for result in results:
+        notes = [*result.blockers, *result.warnings]
+        lines.append(
+            "| "
+            f"{_markdown_table_text(result.task_id or 'unknown')} | "
+            f"{_markdown_table_text(result.status)} | "
+            f"{_markdown_table_text(result.repository or 'unknown')} | "
+            f"{_markdown_table_text(result.command_source)} | "
+            f"{_markdown_table_text(result.reproduction_command or 'missing')} | "
+            f"{_markdown_table_text('; '.join(result.expected_failure_signals) or 'manual spec required')} | "
+            f"{_markdown_table_text('; '.join(notes) or 'none')} | "
+            f"{_markdown_table_text('; '.join(result.next_actions) or 'none')} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Claim Boundary",
+            "",
+            "- This report plans public issue reproduction checks before repair attempts.",
+            "- `planned` means an explicit expected failing signal is encoded and the command is policy-allowed.",
+            "- `warning` means a candidate command exists but a reviewer still needs to encode the expected failing signal.",
+            "- `blocked` means the reproduction command should not be run until the listed prerequisite is fixed.",
+            "- This report does not run tests, prove issue reproduction, generate patches, or call a live model provider.",
             "",
         ]
     )
@@ -6720,6 +6963,149 @@ def _validate_focused_test_setup_record(
                 "use validation result as setup-readiness evidence only",
             ]
         ),
+    )
+
+
+def _plan_public_issue_reproduction_record(
+    *,
+    task_dir: Path,
+    focused_record: dict[str, Any] | None,
+    policy: CommandPolicy,
+) -> IssueCorpusPublicReproductionPlanResult:
+    manifest_path = task_dir / "task_manifest.json"
+    manifest: dict[str, Any] = {}
+    blockers: list[str] = []
+    warnings: list[str] = []
+    evidence: list[str] = []
+    next_actions: list[str] = []
+
+    if not manifest_path.exists():
+        blockers.append("missing task_manifest.json")
+    else:
+        try:
+            parsed = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as error:
+            blockers.append(f"task_manifest.json is invalid JSON: {error.msg}")
+        else:
+            if isinstance(parsed, dict):
+                manifest = parsed
+            else:
+                blockers.append("task_manifest.json must contain a JSON object")
+
+    task_id = _optional_string(manifest.get("task_id")) or task_dir.name
+    issue = manifest.get("issue") if isinstance(manifest.get("issue"), dict) else {}
+    snapshot = (
+        manifest.get("repository_snapshot")
+        if isinstance(manifest.get("repository_snapshot"), dict)
+        else {}
+    )
+    retrieval = (
+        manifest.get("retrieval_preview")
+        if isinstance(manifest.get("retrieval_preview"), dict)
+        else {}
+    )
+    reproduction = (
+        manifest.get("reproduction")
+        if isinstance(manifest.get("reproduction"), dict)
+        else {}
+    )
+    repository = _optional_string(issue.get("repository"))
+    issue_url = _optional_string(issue.get("issue_url"))
+    repo_path = _optional_string(snapshot.get("repo_path")) or (
+        _optional_string(focused_record.get("repo_path")) if focused_record else None
+    )
+    focused_files = (
+        _string_list(focused_record.get("focused_files")) if focused_record else []
+    )
+    if not focused_files:
+        focused_files = [
+            path
+            for path in _string_list(retrieval.get("retrieved_files"))
+            if _is_materialized_test_candidate_path(path)
+        ][:2]
+    explicit_command = _optional_string(reproduction.get("command"))
+    focused_command = (
+        _optional_string(focused_record.get("command")) if focused_record else None
+    )
+    test_commands = _string_list(snapshot.get("test_commands"))
+    if explicit_command:
+        command = explicit_command
+        command_source = "manifest_reproduction"
+        evidence.append("manifest contains an explicit reproduction command")
+    elif focused_command:
+        command = focused_command
+        command_source = "focused_test_plan"
+        evidence.append("focused test plan provides the reproduction candidate command")
+    elif test_commands:
+        command = test_commands[0]
+        command_source = "repository_test_command"
+        warnings.append("using broad repository test command as reproduction candidate")
+    else:
+        command = None
+        command_source = "missing"
+        blockers.append("no reproduction or focused test command is available")
+
+    expected_failure_signals = _string_list(reproduction.get("expected_failure_signals"))
+    manual_spec_required = not expected_failure_signals
+    if expected_failure_signals:
+        evidence.append("expected failing signal is encoded in the task manifest")
+    else:
+        warnings.append("expected failing signal is not encoded")
+        next_actions.append(
+            "add issue-specific expected failure text, assertion, traceback, or exit criteria"
+        )
+
+    workspace = Path.cwd()
+    repo_exists = False
+    if repo_path:
+        repo = Path(repo_path)
+        repo_exists = repo.exists() and repo.is_dir()
+        if repo_exists:
+            workspace = repo
+            evidence.append("repository snapshot exists")
+        else:
+            blockers.append(f"repository snapshot is missing: {repo_path}")
+    else:
+        blockers.append("repository_snapshot.repo_path is missing")
+
+    policy_allowed = False
+    policy_reason: str | None = None
+    if command:
+        decision = policy.evaluate(command, workspace=workspace)
+        policy_allowed = decision.allowed
+        policy_reason = decision.reason
+        if decision.allowed:
+            evidence.append("reproduction command is allowed by command policy")
+        else:
+            blockers.append(f"reproduction command rejected by policy: {decision.reason}")
+
+    if focused_record is None and command_source != "manifest_reproduction":
+        warnings.append("focused test plan record is missing")
+        next_actions.append("regenerate `plan-materialized-focused-tests` before execution")
+    if command and not blockers and not manual_spec_required:
+        next_actions.append("execute reproduction command and save failing stdout/stderr evidence")
+    elif command and not blockers:
+        next_actions.append("review and encode the expected failing signal before execution")
+
+    status = "blocked" if blockers else "warning" if warnings else "planned"
+    return IssueCorpusPublicReproductionPlanResult(
+        task_id=task_id,
+        repository=repository,
+        issue_url=issue_url,
+        status=status,
+        repo_path=repo_path,
+        repo_exists=repo_exists,
+        reproduction_command=command,
+        command_source=command_source,
+        policy_allowed=policy_allowed,
+        policy_reason=policy_reason,
+        focused_files=focused_files,
+        expected_failure_signals=expected_failure_signals,
+        manual_spec_required=manual_spec_required,
+        evidence=_dedupe_preserve_order(evidence),
+        blockers=_dedupe_preserve_order(blockers),
+        warnings=_dedupe_preserve_order(warnings),
+        next_actions=_dedupe_preserve_order(next_actions),
     )
 
 

@@ -281,6 +281,18 @@ PYTHONPATH=src python3 -m patchsmith.cli validate-focused-test-setups \
 
 The setup-validation report defaults to dry-run and records whether validation commands can run after setup execution. Blocked rows mean setup did not complete and must not be counted as issue reproduction or repair evidence.
 
+Public issue reproduction plan:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli plan-public-issue-reproductions \
+  --tasks-dir artifacts/experiments/public_issue_corpus_v1/materialized_tasks \
+  --focused-plan artifacts/experiments/public_issue_corpus_v1/focused_test_plan_results.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+The reproduction-plan report records candidate commands and expected-failure signal gaps before public issue repairs. Treat `warning` rows as planning work, not reproduction evidence; encode the failing assertion, traceback, or behavior mismatch before running repair attempts.
+
 Public issue repair readiness:
 
 ```bash
@@ -293,7 +305,7 @@ PYTHONPATH=src python3 -m patchsmith.cli check-public-issue-repair-readiness \
   --json
 ```
 
-The repair-readiness report joins focused-run, diagnosis, setup-validation, and materialized-task command evidence before a public issue repair attempt. Treat `warning` rows as runnable only with explicit caveats; a pre-repair passing focused command means validation is runnable, not that the issue has been reproduced as a failing test.
+The repair-readiness report joins focused-run, diagnosis, setup-validation, reproduction-plan, and materialized-task command evidence before a public issue repair attempt. Treat `warning` rows as runnable only with explicit caveats; a pre-repair passing focused command means validation is runnable, not that the issue has been reproduced as a failing test.
 
 Scaffold comparison:
 
@@ -592,7 +604,7 @@ PYTHONPATH=src python3 -m patchsmith.cli release-hygiene \
   --json
 ```
 
-The release hygiene report checks required docs, generated review artifacts, public issue repair-readiness evidence, project-status freshness, environment readiness, demo readiness, failure visibility, live-provider caveats, Git metadata, packaging metadata, CI, demo media, architecture diagram evidence, and README caveat markers. Treat `blocked` as a hard stop for tagged/public release claims.
+The release hygiene report checks required docs, generated review artifacts, public issue reproduction-plan and repair-readiness evidence, project-status freshness, environment readiness, demo readiness, failure visibility, live-provider caveats, Git metadata, packaging metadata, CI, demo media, architecture diagram evidence, and README caveat markers. Treat `blocked` as a hard stop for tagged/public release claims.
 
 Package build:
 
@@ -776,6 +788,7 @@ Run:
 - live calibration plan regeneration,
 - focused public issue setup-execution regeneration,
 - focused public issue setup-validation regeneration,
+- public issue reproduction-plan regeneration,
 - public issue repair-readiness regeneration,
 - release hygiene report regeneration,
 - README quickstart validation,

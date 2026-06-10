@@ -17,7 +17,10 @@ from importlib.util import find_spec
 from pathlib import Path
 from typing import Any
 
-from patchsmith.evaluation import check_public_issue_repair_readiness
+from patchsmith.evaluation import (
+    check_public_issue_repair_readiness,
+    plan_public_issue_reproductions,
+)
 from patchsmith.observability import (
     ArtifactIndex,
     ExperimentMetricIndexEntry,
@@ -976,6 +979,10 @@ def build_project_status_report(
         "environment": "experiments/environment_readiness.json",
         "release": "experiments/release_hygiene.json",
         "calibration": "experiments/calibration_readiness.json",
+        "public_reproduction": (
+            "experiments/public_issue_corpus_v1/"
+            "public_issue_reproduction_plan_summary.json"
+        ),
         "public_repair": (
             "experiments/public_issue_corpus_v1/"
             "public_issue_repair_readiness_summary.json"
@@ -1472,6 +1479,42 @@ def build_evidence_refresh_report(
             ),
         )
     )
+    public_tasks_dir = experiment_path("public_issue_corpus_v1/materialized_tasks")
+    public_focused_plan_path = experiment_path(
+        "public_issue_corpus_v1/focused_test_plan_results.json"
+    )
+    if public_tasks_dir.exists() and public_tasks_dir.is_dir():
+        steps.append(
+            _run_evidence_refresh_step(
+                name="Public issue reproduction plan",
+                artifact_paths=output_paths(
+                    "public_issue_corpus_v1/public_issue_reproduction_plan_report.md",
+                    "public_issue_corpus_v1/public_issue_reproduction_plan_summary.json",
+                ),
+                action=lambda: plan_public_issue_reproductions(
+                    tasks_dir=public_tasks_dir,
+                    focused_plan_path=(
+                        public_focused_plan_path
+                        if public_focused_plan_path.exists()
+                        else None
+                    ),
+                    output_dir=experiment_path("public_issue_corpus_v1"),
+                )[1],
+            )
+        )
+    else:
+        steps.append(
+            EvidenceRefreshStep(
+                name="Public issue reproduction plan",
+                status="skipped",
+                duration_ms=0,
+                artifact_paths=output_paths(
+                    "public_issue_corpus_v1/public_issue_reproduction_plan_report.md",
+                    "public_issue_corpus_v1/public_issue_reproduction_plan_summary.json",
+                ),
+                summary="Skipped because materialized public issue tasks are missing.",
+            )
+        )
     public_repair_inputs = [
         experiment_path("public_issue_corpus_v1/focused_test_run_results.json"),
         experiment_path("public_issue_corpus_v1/focused_test_diagnosis_results.json"),
@@ -3321,6 +3364,12 @@ def _delivery_audit_items(
         / "public_issue_corpus_v1"
         / "focused_test_setup_validation_summary.json"
     )
+    reproduction_plan_payload = _load_json_artifact(
+        artifacts_dir
+        / "experiments"
+        / "public_issue_corpus_v1"
+        / "public_issue_reproduction_plan_summary.json"
+    )
     public_repair_readiness_payload = _load_json_artifact(
         artifacts_dir
         / "experiments"
@@ -3436,6 +3485,7 @@ def _delivery_audit_items(
             missing_action="Start Docker, build the smoke image, and rerun `docker-smoke`.",
         ),
         _delivery_setup_validation_item(setup_validation_payload),
+        _delivery_public_reproduction_plan_item(reproduction_plan_payload),
         _delivery_public_repair_readiness_item(public_repair_readiness_payload),
         _delivery_payload_status_item(
             requirement="Live LLM calibration has provider evidence.",
@@ -3662,6 +3712,47 @@ def _delivery_setup_validation_item(payload: dict[str, Any] | None) -> DeliveryA
             if status == "passed"
             else "Resolve Docker/setup blockers before claiming public issue reproduction."
         ),
+    )
+
+
+def _delivery_public_reproduction_plan_item(
+    payload: dict[str, Any] | None,
+) -> DeliveryAuditItem:
+    source = (
+        "artifacts/experiments/public_issue_corpus_v1/"
+        "public_issue_reproduction_plan_summary.json"
+    )
+    if payload is None:
+        return _delivery_item(
+            requirement="Public issue reproduction criteria are planned.",
+            status="missing",
+            evidence="Public reproduction-plan summary artifact is missing.",
+            source=source,
+            next_action="Run `plan-public-issue-reproductions` from materialized tasks.",
+        )
+    blocked = _payload_int(payload, "blocked_tasks")
+    warning = _payload_int(payload, "warning_tasks")
+    planned = _payload_int(payload, "planned_tasks")
+    manual_specs = _payload_int(payload, "manual_spec_required_tasks")
+    commands = _payload_int(payload, "command_count")
+    if blocked:
+        status = "blocked"
+        next_action = "Resolve blocked reproduction-plan prerequisites."
+    elif warning or manual_specs:
+        status = "warning"
+        next_action = "Encode expected failing signals before claiming issue reproduction."
+    else:
+        status = "passed"
+        next_action = "Execute reproduction commands and save failing evidence."
+    return _delivery_item(
+        requirement="Public issue reproduction criteria are planned.",
+        status=status,
+        evidence=(
+            f"planned_tasks={planned}, warning_tasks={warning}, blocked_tasks={blocked}, "
+            f"manual_spec_required_tasks={manual_specs}, command_count={commands}"
+        ),
+        source=source,
+        next_action=next_action,
     )
 
 
@@ -5158,6 +5249,8 @@ def _release_hygiene_checks(
         "experiments/public_issue_corpus_v1/focused_test_setup_execution_summary.json",
         "experiments/public_issue_corpus_v1/focused_test_setup_validation_report.md",
         "experiments/public_issue_corpus_v1/focused_test_setup_validation_summary.json",
+        "experiments/public_issue_corpus_v1/public_issue_reproduction_plan_report.md",
+        "experiments/public_issue_corpus_v1/public_issue_reproduction_plan_summary.json",
         "experiments/public_issue_corpus_v1/public_issue_repair_readiness_report.md",
         "experiments/public_issue_corpus_v1/public_issue_repair_readiness_summary.json",
         "experiments/demo_script.md",
@@ -5922,6 +6015,11 @@ def _evidence_refresh_summary(result: Any) -> str:
         return (
             f"ready={result.ready_tasks}, warning={result.warning_tasks}, "
             f"blocked={result.blocked_tasks}, commands={result.repair_command_tasks}"
+        )
+    if hasattr(result, "manual_spec_required_tasks"):
+        return (
+            f"planned={result.planned_tasks}, warning={result.warning_tasks}, "
+            f"blocked={result.blocked_tasks}, manual_specs={result.manual_spec_required_tasks}"
         )
     if hasattr(result, "experiment_count"):
         return (
