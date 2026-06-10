@@ -11,6 +11,7 @@ from patchsmith.evaluation import (
     plan_materialized_issue_focused_tests,
     preflight_issue_corpus_repositories,
     preview_issue_corpus_context,
+    run_materialized_issue_focused_tests,
     run_patch_search_evaluation,
     run_repair_evaluation,
     run_scaffold_comparison,
@@ -361,6 +362,34 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f"planned={summary.planned_tasks} fallback={summary.fallback_tasks} "
                 f"blocked={summary.blocked_tasks}"
+            )
+        return 0
+
+    if args.command == "run-materialized-focused-tests":
+        results, summary = run_materialized_issue_focused_tests(
+            plan_path=Path(args.plan),
+            output_dir=Path(args.output),
+            sandbox_mode=args.sandbox_mode,
+            sandbox_image=args.sandbox_image,
+            timeout_seconds=args.timeout_seconds,
+            max_tasks=args.max_tasks,
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "result_count": len(results),
+                        "report_path": str(Path(args.output) / "focused_test_run_report.md"),
+                        "summary": summary.to_dict(),
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(f"Report: {Path(args.output) / 'focused_test_run_report.md'}")
+            print(
+                f"passed={summary.passed_tasks} failed={summary.failed_tasks} "
+                f"timed_out={summary.timed_out_tasks} blocked={summary.blocked_tasks}"
             )
         return 0
 
@@ -1148,6 +1177,49 @@ def build_parser() -> argparse.ArgumentParser:
         help="Maximum retrieved test-like paths to include in each focused command.",
     )
     focused_test_plan_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print JSON summary.",
+    )
+
+    focused_test_run_parser = subparsers.add_parser(
+        "run-materialized-focused-tests",
+        help="Execute focused pytest commands planned for materialized public issue tasks.",
+    )
+    focused_test_run_parser.add_argument(
+        "--plan",
+        default="artifacts/experiments/public_issue_corpus_v1/focused_test_plan_results.json",
+        help="Focused test plan results JSON.",
+    )
+    focused_test_run_parser.add_argument(
+        "--output",
+        default="artifacts/experiments/public_issue_corpus_v1",
+        help="Focused test run output directory.",
+    )
+    focused_test_run_parser.add_argument(
+        "--sandbox-mode",
+        choices=["local", "docker"],
+        default="local",
+        help="Sandbox runner to use for focused test commands.",
+    )
+    focused_test_run_parser.add_argument(
+        "--sandbox-image",
+        default="python:3.12-slim",
+        help="Docker image used when --sandbox-mode docker is selected.",
+    )
+    focused_test_run_parser.add_argument(
+        "--timeout-seconds",
+        type=int,
+        default=60,
+        help="Per-task focused test timeout.",
+    )
+    focused_test_run_parser.add_argument(
+        "--max-tasks",
+        type=int,
+        default=0,
+        help="Maximum planned tasks to execute. Use 0 for all planned tasks.",
+    )
+    focused_test_run_parser.add_argument(
         "--json",
         action="store_true",
         help="Print JSON summary.",

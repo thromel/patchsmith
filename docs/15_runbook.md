@@ -208,6 +208,18 @@ PYTHONPATH=src python3 -m patchsmith.cli plan-materialized-focused-tests \
 
 The focused test plan derives scoped pytest commands from retrieved test-like files and validates them through the command policy without executing them.
 
+Public issue focused test run:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli run-materialized-focused-tests \
+  --plan artifacts/experiments/public_issue_corpus_v1/focused_test_plan_results.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --timeout-seconds 60 \
+  --json
+```
+
+The focused test run executes the planned scoped commands and writes `focused_test_run_report.md`, `focused_test_run_summary.json`, result CSV/JSON, and per-task stdout/stderr files. Treat failed commands as environment or upstream-suite readiness evidence unless the run also captures issue reproduction and a PatchSmith-generated repair.
+
 Scaffold comparison:
 
 ```bash

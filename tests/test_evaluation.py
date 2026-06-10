@@ -11,6 +11,7 @@ from patchsmith.evaluation import (
     preflight_issue_corpus_repositories,
     preview_issue_corpus_context,
     recall,
+    run_materialized_issue_focused_tests,
     run_patch_search_evaluation,
     run_repair_evaluation,
     run_scaffold_comparison,
@@ -701,6 +702,105 @@ def test_plan_materialized_issue_focused_tests_falls_back_without_retrieved_test
     assert results[0].focused_files == []
     assert results[0].policy_allowed
     assert "fallback" in ";".join(results[0].risk_notes)
+
+
+def test_run_materialized_issue_focused_tests_executes_planned_command(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    tests_dir = repo_dir / "tests"
+    tests_dir.mkdir(parents=True)
+    (tests_dir / "test_ok.py").write_text(
+        "def test_ok():\n    assert 2 + 2 == 4\n",
+        encoding="utf-8",
+    )
+    plan_path = tmp_path / "focused_test_plan_results.json"
+    plan_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "passing_task",
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/1",
+                    "repo_path": str(repo_dir),
+                    "focused_files": ["tests/test_ok.py"],
+                    "command": "python3 -m pytest tests/test_ok.py",
+                    "policy_allowed": True,
+                    "policy_reason": "allowed",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    output_dir = tmp_path / "focused_run"
+    results, summary = run_materialized_issue_focused_tests(
+        plan_path=plan_path,
+        output_dir=output_dir,
+        timeout_seconds=30,
+    )
+
+    assert summary.attempted_tasks == 1
+    assert summary.passed_tasks == 1
+    assert summary.blocked_tasks == 0
+    assert results[0].status == "passed"
+    assert results[0].exit_code == 0
+    assert results[0].stdout_path is not None
+    assert Path(results[0].stdout_path).exists()
+    assert (output_dir / "focused_test_run_report.md").exists()
+    assert (output_dir / "focused_test_run_results.csv").exists()
+
+    cli_output = tmp_path / "cli_focused_run"
+    exit_code = main(
+        [
+            "run-materialized-focused-tests",
+            "--plan",
+            str(plan_path),
+            "--output",
+            str(cli_output),
+            "--timeout-seconds",
+            "30",
+            "--json",
+        ]
+    )
+    assert exit_code == 0
+    assert (cli_output / "focused_test_run_report.md").exists()
+
+
+def test_run_materialized_issue_focused_tests_blocks_policy_mismatch(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    plan_path = tmp_path / "focused_test_plan_results.json"
+    plan_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "unsafe_task",
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/2",
+                    "repo_path": str(repo_dir),
+                    "focused_files": [],
+                    "command": "python3 -m pytest && printenv",
+                    "policy_allowed": True,
+                    "policy_reason": "allowed",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    results, summary = run_materialized_issue_focused_tests(
+        plan_path=plan_path,
+        output_dir=tmp_path / "focused_run",
+    )
+
+    assert summary.attempted_tasks == 0
+    assert summary.blocked_tasks == 1
+    assert results[0].status == "blocked"
+    assert not results[0].policy_allowed
+    assert "rejected by policy" in ";".join(results[0].errors)
 
 
 def test_graph_retrieval_dataset_validates(tmp_path: Path) -> None:

@@ -85,6 +85,21 @@ PYTHONPATH=src python3 -m patchsmith.cli plan-materialized-focused-tests \
 Focused test planning derives scoped pytest commands from retrieved test-like
 files and checks those commands through the same command policy.
 
+Focused test execution command:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli run-materialized-focused-tests \
+  --plan artifacts/experiments/public_issue_corpus_v1/focused_test_plan_results.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --timeout-seconds 60 \
+  --json
+```
+
+Focused test execution records whether the scoped commands run in the captured
+public repository snapshots. The current lane is readiness evidence only; it is
+not solved-run evidence until issue reproduction, patch generation, and passing
+validation are added.
+
 Selection criteria:
 
 - public GitHub issue URL,
