@@ -333,11 +333,14 @@ Run focused public issue tests:
 PYTHONPATH=src python3 -m patchsmith.cli run-materialized-focused-tests \
   --plan artifacts/experiments/public_issue_corpus_v1/focused_test_plan_results.json \
   --output artifacts/experiments/public_issue_corpus_v1 \
-  --timeout-seconds 60 \
+  --sandbox-mode docker \
+  --sandbox-image patchsmith-seeded-smoke:py312 \
+  --sandbox-network bridge \
+  --timeout-seconds 300 \
   --json
 ```
 
-The focused test run executes only the planned scoped pytest commands and saves per-task stdout/stderr logs. Current public issue evidence attempted three commands; all three failed in the current local snapshots due to upstream test-environment readiness issues, not PatchSmith repair quality.
+The focused test run executes only the planned scoped pytest commands and saves per-task stdout/stderr logs. Current public issue evidence uses the Docker setup image with explicit bridge networking because the requests upstream suite exercises local service fixtures and network timeout behavior. Treat passing focused commands as runnable-validation evidence, not PatchSmith repair quality.
 
 Diagnose focused public issue test failures:
 
@@ -348,7 +351,7 @@ PYTHONPATH=src python3 -m patchsmith.cli diagnose-focused-test-runs \
   --json
 ```
 
-The diagnosis report classifies saved focused-run logs without executing repository code. Current diagnosis reports one dependency issue for the pytest snapshot missing generated `_pytest._version` metadata and two environment issues for requests `httpbin` fixture setup.
+The diagnosis report classifies saved focused-run logs without executing repository code. Current post-setup diagnosis reports three `focused_test_passed` tasks and no dependency, environment, timeout, blocked, or unknown failures.
 
 Plan focused public issue test setup:
 
@@ -359,7 +362,7 @@ PYTHONPATH=src python3 -m patchsmith.cli plan-focused-test-setups \
   --json
 ```
 
-The setup plan converts diagnosis categories into sandbox-only setup profiles and validation commands. Current setup evidence has three planned setup tasks: one dependency setup, two environment fixture setups, and all three require disposable sandbox execution before public issue repair attempts.
+The setup plan converts diagnosis categories into sandbox-only setup profiles and validation commands. Saved setup evidence preserves the remediation recipe used to prepare the current public issue snapshots: one dependency setup, two environment fixture setups, and disposable Docker execution before public issue repair attempts.
 
 Check focused public issue setup readiness:
 

@@ -227,11 +227,14 @@ Run the planned focused test commands:
 PYTHONPATH=src python3 -m patchsmith.cli run-materialized-focused-tests \
   --plan artifacts/experiments/public_issue_corpus_v1/focused_test_plan_results.json \
   --output artifacts/experiments/public_issue_corpus_v1 \
-  --timeout-seconds 60 \
+  --sandbox-mode docker \
+  --sandbox-image patchsmith-seeded-smoke:py312 \
+  --sandbox-network bridge \
+  --timeout-seconds 300 \
   --json
 ```
 
-The current focused run attempted all three planned public issue commands and all three failed in the local snapshots. Treat that as public-repo dependency and suite-readiness evidence until a later run adds issue reproduction, a patch, and passing validation.
+The current focused run uses Docker bridge networking for the public issue commands because the requests upstream suite exercises local service fixtures and network timeout behavior. Treat passed commands as runnable-validation evidence until a later run adds issue reproduction, a patch, and passing validation.
 
 Diagnose focused test run failures:
 
@@ -242,7 +245,7 @@ PYTHONPATH=src python3 -m patchsmith.cli diagnose-focused-test-runs \
   --json
 ```
 
-The current diagnosis classifies the three failures as one dependency setup issue and two environment fixture issues, with no unknown failures. Treat these as setup backlog items before public issue repair attempts.
+The current post-setup diagnosis classifies all three focused public issue commands as `focused_test_passed`, with no dependency, environment, timeout, blocked, or unknown failures. Treat this as runnable focused-command evidence, not repair-quality evidence.
 
 Plan setup work from focused test diagnoses:
 

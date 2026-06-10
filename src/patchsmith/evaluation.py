@@ -354,6 +354,7 @@ class IssueCorpusFocusedTestRunSummary:
     timed_out_tasks: int
     blocked_tasks: int
     sandbox_mode: str
+    sandbox_network: str
     timeout_seconds: int
 
     def to_dict(self) -> dict[str, Any]:
@@ -1857,6 +1858,7 @@ def run_materialized_issue_focused_tests(
     output_dir: Path,
     sandbox_mode: str = "local",
     sandbox_image: str = "python:3.12-slim",
+    sandbox_network: str = "none",
     timeout_seconds: int = 60,
     max_tasks: int | None = None,
 ) -> tuple[list[IssueCorpusFocusedTestRunResult], IssueCorpusFocusedTestRunSummary]:
@@ -1877,7 +1879,11 @@ def run_materialized_issue_focused_tests(
     output_dir.mkdir(parents=True, exist_ok=True)
     run_logs_dir = output_dir / "focused_test_runs"
     run_logs_dir.mkdir(parents=True, exist_ok=True)
-    runner = create_sandbox_runner(mode=sandbox_mode, image=sandbox_image)
+    runner = create_sandbox_runner(
+        mode=sandbox_mode,
+        image=sandbox_image,
+        network=sandbox_network,
+    )
     results = [
         _run_materialized_issue_focused_test_record(
             record=record,
@@ -1891,6 +1897,7 @@ def run_materialized_issue_focused_tests(
         plan_path=plan_path,
         results=results,
         sandbox_mode=sandbox_mode,
+        sandbox_network=sandbox_network,
         timeout_seconds=timeout_seconds,
     )
     write_materialized_issue_focused_test_run_outputs(
@@ -1907,6 +1914,7 @@ def summarize_materialized_issue_focused_test_runs(
     plan_path: Path,
     results: list[IssueCorpusFocusedTestRunResult],
     sandbox_mode: str,
+    sandbox_network: str,
     timeout_seconds: int,
 ) -> IssueCorpusFocusedTestRunSummary:
     return IssueCorpusFocusedTestRunSummary(
@@ -1920,6 +1928,7 @@ def summarize_materialized_issue_focused_test_runs(
         timed_out_tasks=sum(1 for result in results if result.status == "timed_out"),
         blocked_tasks=sum(1 for result in results if result.status == "blocked"),
         sandbox_mode=sandbox_mode,
+        sandbox_network=sandbox_network,
         timeout_seconds=timeout_seconds,
     )
 
@@ -4127,6 +4136,7 @@ def render_materialized_issue_focused_test_run_report(
         f"- Timed out tasks: `{summary.timed_out_tasks}`",
         f"- Blocked tasks: `{summary.blocked_tasks}`",
         f"- Sandbox mode: `{summary.sandbox_mode}`",
+        f"- Sandbox network: `{summary.sandbox_network}`",
         f"- Timeout seconds: `{summary.timeout_seconds}`",
         "",
         "## Results",

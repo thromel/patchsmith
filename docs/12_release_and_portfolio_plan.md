@@ -320,11 +320,14 @@ Run focused public issue tests:
 PYTHONPATH=src python3 -m patchsmith.cli run-materialized-focused-tests \
   --plan artifacts/experiments/public_issue_corpus_v1/focused_test_plan_results.json \
   --output artifacts/experiments/public_issue_corpus_v1 \
-  --timeout-seconds 60 \
+  --sandbox-mode docker \
+  --sandbox-image patchsmith-seeded-smoke:py312 \
+  --sandbox-network bridge \
+  --timeout-seconds 300 \
   --json
 ```
 
-Current focused-run output attempts three scoped public-repo commands, with zero blocked commands and three failures. The pytest task currently fails before collection because the checked-out snapshot lacks generated `_pytest._version`; the requests tasks currently collect 341 tests but fail setup around the `httpbin` fixture. Use this as environment-readiness evidence, not repair success evidence.
+Current focused-run output attempts three scoped public-repo commands with Docker bridge networking, because the requests upstream suite exercises local service fixtures and network timeout behavior. Use this as environment-readiness evidence, not repair success evidence.
 
 Diagnose focused public issue test failures:
 
@@ -335,7 +338,7 @@ PYTHONPATH=src python3 -m patchsmith.cli diagnose-focused-test-runs \
   --json
 ```
 
-Current diagnosis output classifies one dependency issue, two environment issues, zero timeouts, zero blocked tasks, and zero unknown failures. Use it as a dependency/setup backlog before making public issue repair claims.
+Current post-setup diagnosis output classifies all three focused public issue commands as `focused_test_passed`, with zero dependency, environment, timeout, blocked, or unknown failures. Use it as runnable focused-command evidence, not repair-quality evidence.
 
 Plan focused public issue setup:
 
@@ -346,7 +349,7 @@ PYTHONPATH=src python3 -m patchsmith.cli plan-focused-test-setups \
   --json
 ```
 
-Current setup-plan output has three planned setup tasks, one dependency setup, two environment fixture setups, and three network/sandbox-required tasks. Use this to gate future public issue reproduction attempts.
+Saved setup-plan output preserves the remediation recipe used to prepare the current public issue snapshots: three planned setup tasks, one dependency setup, two environment fixture setups, and three network/sandbox-required tasks. Use this to gate future public issue reproduction attempts from a fresh snapshot.
 
 Check focused public issue setup readiness:
 

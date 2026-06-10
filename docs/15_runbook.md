@@ -214,11 +214,14 @@ Public issue focused test run:
 PYTHONPATH=src python3 -m patchsmith.cli run-materialized-focused-tests \
   --plan artifacts/experiments/public_issue_corpus_v1/focused_test_plan_results.json \
   --output artifacts/experiments/public_issue_corpus_v1 \
-  --timeout-seconds 60 \
+  --sandbox-mode docker \
+  --sandbox-image patchsmith-seeded-smoke:py312 \
+  --sandbox-network bridge \
+  --timeout-seconds 300 \
   --json
 ```
 
-The focused test run executes the planned scoped commands and writes `focused_test_run_report.md`, `focused_test_run_summary.json`, result CSV/JSON, and per-task stdout/stderr files. Treat failed commands as environment or upstream-suite readiness evidence unless the run also captures issue reproduction and a PatchSmith-generated repair.
+The focused test run executes the planned scoped commands and writes `focused_test_run_report.md`, `focused_test_run_summary.json`, result CSV/JSON, and per-task stdout/stderr files. Use explicit Docker bridge networking only after reviewing that the upstream suite requires local service fixtures or network timeout behavior. Treat focused-command results as environment or upstream-suite readiness evidence unless the run also captures issue reproduction and a PatchSmith-generated repair.
 
 Public issue focused test diagnosis:
 

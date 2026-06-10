@@ -742,12 +742,14 @@ def test_run_materialized_issue_focused_tests_executes_planned_command(
     results, summary = run_materialized_issue_focused_tests(
         plan_path=plan_path,
         output_dir=output_dir,
+        sandbox_network="bridge",
         timeout_seconds=30,
     )
 
     assert summary.attempted_tasks == 1
     assert summary.passed_tasks == 1
     assert summary.blocked_tasks == 0
+    assert summary.sandbox_network == "bridge"
     assert results[0].status == "passed"
     assert results[0].exit_code == 0
     assert results[0].stdout_path is not None
@@ -765,11 +767,15 @@ def test_run_materialized_issue_focused_tests_executes_planned_command(
             str(cli_output),
             "--timeout-seconds",
             "30",
+            "--sandbox-network",
+            "bridge",
             "--json",
         ]
     )
     assert exit_code == 0
-    assert (cli_output / "focused_test_run_report.md").exists()
+    report = (cli_output / "focused_test_run_report.md")
+    assert report.exists()
+    assert "Sandbox network: `bridge`" in report.read_text(encoding="utf-8")
 
 
 def test_run_materialized_issue_focused_tests_blocks_policy_mismatch(

@@ -383,6 +383,7 @@ def main(argv: list[str] | None = None) -> int:
             output_dir=Path(args.output),
             sandbox_mode=args.sandbox_mode,
             sandbox_image=args.sandbox_image,
+            sandbox_network=args.sandbox_network,
             timeout_seconds=args.timeout_seconds,
             max_tasks=args.max_tasks,
         )
@@ -1670,6 +1671,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--sandbox-image",
         default="python:3.12-slim",
         help="Docker image used when --sandbox-mode docker is selected.",
+    )
+    focused_test_run_parser.add_argument(
+        "--sandbox-network",
+        default="none",
+        help="Docker network mode for focused test commands when --sandbox-mode docker is selected.",
     )
     focused_test_run_parser.add_argument(
         "--timeout-seconds",

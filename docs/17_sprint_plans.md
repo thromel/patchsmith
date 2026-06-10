@@ -351,7 +351,10 @@ PYTHONPATH=src python3 -m patchsmith.cli plan-materialized-focused-tests \
 PYTHONPATH=src python3 -m patchsmith.cli run-materialized-focused-tests \
   --plan artifacts/experiments/public_issue_corpus_v1/focused_test_plan_results.json \
   --output artifacts/experiments/public_issue_corpus_v1 \
-  --timeout-seconds 60 \
+  --sandbox-mode docker \
+  --sandbox-image patchsmith-seeded-smoke:py312 \
+  --sandbox-network bridge \
+  --timeout-seconds 300 \
   --json
 ```
 
@@ -421,10 +424,11 @@ Latest expected evidence:
 - focused test fallbacks: 0,
 - policy-allowed focused test commands: 3,
 - focused public issue test runs attempted: 3,
-- focused public issue test runs passed: 0,
-- focused public issue test runs failed: 3,
-- focused public issue diagnosis dependency issues: 1,
-- focused public issue diagnosis environment issues: 2,
+- focused public issue test runs passed: 3,
+- focused public issue test runs failed: 0,
+- focused public issue diagnosis passed tasks: 3,
+- focused public issue diagnosis dependency issues: 0,
+- focused public issue diagnosis environment issues: 0,
 - focused public issue diagnosis unknown failures: 0,
 - focused public issue setup plans: 3,
 - focused public issue setup dependency plans: 1,
