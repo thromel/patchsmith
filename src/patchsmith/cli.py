@@ -9,6 +9,7 @@ from patchsmith.evaluation import (
     check_materialized_issue_run_readiness,
     check_focused_test_setup_readiness,
     diagnose_focused_test_runs,
+    execute_focused_test_setups,
     materialize_issue_corpus_tasks,
     plan_focused_test_setups,
     plan_materialized_issue_focused_tests,
@@ -474,6 +475,39 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f"ready={summary.ready_tasks} warning={summary.warning_tasks} "
                 f"blocked={summary.blocked_tasks}"
+            )
+        return 0
+
+    if args.command == "execute-focused-test-setups":
+        max_tasks = None if args.max_tasks == 0 else args.max_tasks
+        results, summary = execute_focused_test_setups(
+            readiness_path=Path(args.readiness),
+            output_dir=Path(args.output),
+            sandbox_mode=args.sandbox_mode,
+            sandbox_image=args.sandbox_image,
+            timeout_seconds=args.timeout_seconds,
+            max_tasks=max_tasks,
+            dry_run=not args.execute,
+            allow_warnings=args.allow_warnings,
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "result_count": len(results),
+                        "report_path": str(
+                            Path(args.output) / "focused_test_setup_execution_report.md"
+                        ),
+                        "summary": summary.to_dict(),
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(f"Report: {Path(args.output) / 'focused_test_setup_execution_report.md'}")
+            print(
+                f"dry_run={summary.dry_run_tasks} attempted={summary.attempted_tasks} "
+                f"passed={summary.completed_tasks} blocked={summary.blocked_tasks}"
             )
         return 0
 
@@ -1405,6 +1439,62 @@ def build_parser() -> argparse.ArgumentParser:
         help="Focused test setup-readiness output directory.",
     )
     focused_test_setup_readiness_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print JSON summary.",
+    )
+
+    focused_test_setup_execution_parser = subparsers.add_parser(
+        "execute-focused-test-setups",
+        help="Dry-run or execute focused public issue setup commands after readiness checks.",
+    )
+    focused_test_setup_execution_parser.add_argument(
+        "--readiness",
+        default=(
+            "artifacts/experiments/public_issue_corpus_v1/"
+            "focused_test_setup_readiness_results.json"
+        ),
+        help="Focused test setup-readiness results JSON.",
+    )
+    focused_test_setup_execution_parser.add_argument(
+        "--output",
+        default="artifacts/experiments/public_issue_corpus_v1",
+        help="Focused test setup-execution output directory.",
+    )
+    focused_test_setup_execution_parser.add_argument(
+        "--sandbox-mode",
+        choices=["local", "docker"],
+        default="docker",
+        help="Sandbox runner to use when --execute is set.",
+    )
+    focused_test_setup_execution_parser.add_argument(
+        "--sandbox-image",
+        default="python:3.12-slim",
+        help="Docker image used when --sandbox-mode docker is selected.",
+    )
+    focused_test_setup_execution_parser.add_argument(
+        "--timeout-seconds",
+        type=int,
+        default=300,
+        help="Per-setup-command timeout when --execute is set.",
+    )
+    focused_test_setup_execution_parser.add_argument(
+        "--max-tasks",
+        type=int,
+        default=0,
+        help="Maximum readiness records to process. Use 0 for all records.",
+    )
+    focused_test_setup_execution_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Execute commands instead of writing dry-run evidence.",
+    )
+    focused_test_setup_execution_parser.add_argument(
+        "--allow-warnings",
+        action="store_true",
+        help="Permit readiness-warning tasks to proceed after review.",
+    )
+    focused_test_setup_execution_parser.add_argument(
         "--json",
         action="store_true",
         help="Print JSON summary.",

@@ -475,6 +475,72 @@ class IssueCorpusFocusedTestSetupReadinessSummary:
 
 
 @dataclass(frozen=True)
+class IssueCorpusFocusedTestSetupCommandResult:
+    command: str
+    status: str
+    exit_code: int | None
+    timed_out: bool
+    duration_ms: int
+    policy_allowed: bool
+    policy_reason: str | None
+    stdout_path: str | None
+    stderr_path: str | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class IssueCorpusFocusedTestSetupExecutionResult:
+    task_id: str | None
+    repository: str | None
+    issue_url: str | None
+    status: str
+    readiness_status: str
+    setup_profile: str
+    repo_path: str | None
+    setup_commands: list[str]
+    validation_command: str | None
+    requires_network: bool
+    sandbox_required: bool
+    sandbox_mode: str
+    dry_run: bool
+    command_results: list[IssueCorpusFocusedTestSetupCommandResult]
+    errors: list[str]
+    warnings: list[str]
+    next_actions: list[str]
+
+    def to_dict(self) -> dict[str, Any]:
+        payload = asdict(self)
+        payload["command_results"] = [
+            command_result.to_dict() for command_result in self.command_results
+        ]
+        return payload
+
+
+@dataclass(frozen=True)
+class IssueCorpusFocusedTestSetupExecutionSummary:
+    readiness_path: str
+    task_count: int
+    dry_run: bool
+    allow_warnings: bool
+    sandbox_mode: str
+    timeout_seconds: int
+    dry_run_tasks: int
+    attempted_tasks: int
+    completed_tasks: int
+    failed_tasks: int
+    timed_out_tasks: int
+    blocked_tasks: int
+    skipped_tasks: int
+    command_count: int
+    attempted_commands: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class RetrievalEvalResult:
     task_id: str
     context_provider: str
@@ -2270,6 +2336,187 @@ def write_focused_test_setup_readiness_outputs(
     )
 
 
+def execute_focused_test_setups(
+    *,
+    readiness_path: Path,
+    output_dir: Path,
+    sandbox_mode: str = "docker",
+    sandbox_image: str = "python:3.12-slim",
+    timeout_seconds: int = 300,
+    max_tasks: int | None = None,
+    dry_run: bool = True,
+    allow_warnings: bool = False,
+) -> tuple[
+    list[IssueCorpusFocusedTestSetupExecutionResult],
+    IssueCorpusFocusedTestSetupExecutionSummary,
+]:
+    if not readiness_path.exists():
+        raise FileNotFoundError(
+            f"focused test setup readiness does not exist: {readiness_path}"
+        )
+    if not readiness_path.is_file():
+        raise ValueError(
+            f"focused test setup readiness path is not a file: {readiness_path}"
+        )
+    parsed = json.loads(readiness_path.read_text(encoding="utf-8"))
+    if not isinstance(parsed, list):
+        raise ValueError("focused test setup readiness must contain a JSON list")
+    records = [record for record in parsed if isinstance(record, dict)]
+    if len(records) != len(parsed):
+        raise ValueError("focused test setup readiness records must be JSON objects")
+    selected_records = records
+    if max_tasks is not None and max_tasks > 0:
+        selected_records = records[:max_tasks]
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    run_logs_dir = output_dir / "focused_test_setup_execution"
+    run_logs_dir.mkdir(parents=True, exist_ok=True)
+    runner = None if dry_run else create_sandbox_runner(mode=sandbox_mode, image=sandbox_image)
+    policy = CommandPolicy()
+    results = [
+        _execute_focused_test_setup_record(
+            record=record,
+            run_logs_dir=run_logs_dir,
+            runner=runner,
+            policy=policy,
+            sandbox_mode=sandbox_mode,
+            timeout_seconds=timeout_seconds,
+            dry_run=dry_run,
+            allow_warnings=allow_warnings,
+        )
+        for record in selected_records
+    ]
+    summary = summarize_focused_test_setup_execution(
+        readiness_path=readiness_path,
+        results=results,
+        dry_run=dry_run,
+        allow_warnings=allow_warnings,
+        sandbox_mode=sandbox_mode,
+        timeout_seconds=timeout_seconds,
+    )
+    write_focused_test_setup_execution_outputs(
+        output_dir=output_dir,
+        readiness_path=readiness_path,
+        results=results,
+        summary=summary,
+    )
+    return results, summary
+
+
+def summarize_focused_test_setup_execution(
+    *,
+    readiness_path: Path,
+    results: list[IssueCorpusFocusedTestSetupExecutionResult],
+    dry_run: bool,
+    allow_warnings: bool,
+    sandbox_mode: str,
+    timeout_seconds: int,
+) -> IssueCorpusFocusedTestSetupExecutionSummary:
+    return IssueCorpusFocusedTestSetupExecutionSummary(
+        readiness_path=str(readiness_path),
+        task_count=len(results),
+        dry_run=dry_run,
+        allow_warnings=allow_warnings,
+        sandbox_mode=sandbox_mode,
+        timeout_seconds=timeout_seconds,
+        dry_run_tasks=sum(1 for result in results if result.status == "dry_run"),
+        attempted_tasks=sum(
+            1 for result in results if result.status in {"passed", "failed", "timed_out"}
+        ),
+        completed_tasks=sum(1 for result in results if result.status == "passed"),
+        failed_tasks=sum(1 for result in results if result.status == "failed"),
+        timed_out_tasks=sum(1 for result in results if result.status == "timed_out"),
+        blocked_tasks=sum(1 for result in results if result.status == "blocked"),
+        skipped_tasks=sum(1 for result in results if result.status == "skipped"),
+        command_count=sum(len(result.setup_commands) for result in results),
+        attempted_commands=sum(
+            1
+            for result in results
+            for command_result in result.command_results
+            if command_result.status in {"passed", "failed", "timed_out"}
+        ),
+    )
+
+
+def write_focused_test_setup_execution_outputs(
+    *,
+    output_dir: Path,
+    readiness_path: Path,
+    results: list[IssueCorpusFocusedTestSetupExecutionResult],
+    summary: IssueCorpusFocusedTestSetupExecutionSummary,
+) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "focused_test_setup_execution_results.json").write_text(
+        json.dumps([result.to_dict() for result in results], indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (output_dir / "focused_test_setup_execution_summary.json").write_text(
+        json.dumps(summary.to_dict(), indent=2) + "\n",
+        encoding="utf-8",
+    )
+    with (output_dir / "focused_test_setup_execution_results.csv").open(
+        "w",
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=[
+                "task_id",
+                "repository",
+                "issue_url",
+                "status",
+                "readiness_status",
+                "setup_profile",
+                "repo_path",
+                "setup_commands",
+                "validation_command",
+                "requires_network",
+                "sandbox_required",
+                "sandbox_mode",
+                "dry_run",
+                "command_results",
+                "errors",
+                "warnings",
+                "next_actions",
+            ],
+        )
+        writer.writeheader()
+        for result in results:
+            writer.writerow(
+                {
+                    "task_id": result.task_id,
+                    "repository": result.repository,
+                    "issue_url": result.issue_url,
+                    "status": result.status,
+                    "readiness_status": result.readiness_status,
+                    "setup_profile": result.setup_profile,
+                    "repo_path": result.repo_path,
+                    "setup_commands": ";".join(result.setup_commands),
+                    "validation_command": result.validation_command,
+                    "requires_network": result.requires_network,
+                    "sandbox_required": result.sandbox_required,
+                    "sandbox_mode": result.sandbox_mode,
+                    "dry_run": result.dry_run,
+                    "command_results": json.dumps(
+                        [command.to_dict() for command in result.command_results],
+                        sort_keys=True,
+                    ),
+                    "errors": ";".join(result.errors),
+                    "warnings": ";".join(result.warnings),
+                    "next_actions": ";".join(result.next_actions),
+                }
+            )
+    (output_dir / "focused_test_setup_execution_report.md").write_text(
+        render_focused_test_setup_execution_report(
+            readiness_path=readiness_path,
+            results=results,
+            summary=summary,
+        ),
+        encoding="utf-8",
+    )
+
+
 def run_retrieval_evaluation(
     *,
     dataset_dir: Path,
@@ -3805,6 +4052,68 @@ def render_focused_test_setup_readiness_report(
     return "\n".join(lines)
 
 
+def render_focused_test_setup_execution_report(
+    *,
+    readiness_path: Path,
+    results: list[IssueCorpusFocusedTestSetupExecutionResult],
+    summary: IssueCorpusFocusedTestSetupExecutionSummary,
+) -> str:
+    lines = [
+        "# Public Issue Focused Test Setup Execution",
+        "",
+        f"- Readiness path: `{readiness_path}`",
+        f"- Task count: `{summary.task_count}`",
+        f"- Dry run: `{str(summary.dry_run).lower()}`",
+        f"- Allow warnings: `{str(summary.allow_warnings).lower()}`",
+        f"- Sandbox mode: `{summary.sandbox_mode}`",
+        f"- Timeout seconds: `{summary.timeout_seconds}`",
+        f"- Dry-run tasks: `{summary.dry_run_tasks}`",
+        f"- Attempted tasks: `{summary.attempted_tasks}`",
+        f"- Completed tasks: `{summary.completed_tasks}`",
+        f"- Failed tasks: `{summary.failed_tasks}`",
+        f"- Timed-out tasks: `{summary.timed_out_tasks}`",
+        f"- Blocked tasks: `{summary.blocked_tasks}`",
+        f"- Skipped tasks: `{summary.skipped_tasks}`",
+        f"- Setup commands: `{summary.command_count}`",
+        f"- Attempted commands: `{summary.attempted_commands}`",
+        "",
+        "## Results",
+        "",
+        "| Task | Status | Readiness | Profile | Commands | Command Statuses | Notes | Next Actions |",
+        "|---|---|---|---|---|---|---|---|",
+    ]
+    for result in results:
+        notes = [*result.errors, *result.warnings]
+        command_statuses = [
+            f"{command.status}:{command.policy_reason or command.exit_code or 'n/a'}"
+            for command in result.command_results
+        ]
+        lines.append(
+            "| "
+            f"{_markdown_table_text(result.task_id or 'unknown')} | "
+            f"{_markdown_table_text(result.status)} | "
+            f"{_markdown_table_text(result.readiness_status)} | "
+            f"{_markdown_table_text(result.setup_profile)} | "
+            f"{_markdown_table_text('; '.join(result.setup_commands) or 'none')} | "
+            f"{_markdown_table_text('; '.join(command_statuses) or 'none')} | "
+            f"{_markdown_table_text('; '.join(notes) or 'none')} | "
+            f"{_markdown_table_text('; '.join(result.next_actions) or 'none')} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Claim Boundary",
+            "",
+            "- Dry-run rows prove setup orchestration and command-policy checks, not dependency installation.",
+            "- Blocked rows are stop conditions and must not be counted as public issue reproduction evidence.",
+            "- Executed rows prove only setup command outcomes; repair quality still requires focused validation and normal run artifacts.",
+            "- Commands must run only in disposable, policy-approved sandboxes with no host secrets.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def render_repair_eval_report(
     *,
     dataset_dir: Path,
@@ -5235,6 +5544,221 @@ def _check_focused_test_setup_record(
         errors=_dedupe_preserve_order(errors),
         warnings=_dedupe_preserve_order(warnings),
         next_actions=_dedupe_preserve_order(next_actions),
+    )
+
+
+def _execute_focused_test_setup_record(
+    *,
+    record: dict[str, Any],
+    run_logs_dir: Path,
+    runner: Any | None,
+    policy: CommandPolicy,
+    sandbox_mode: str,
+    timeout_seconds: int,
+    dry_run: bool,
+    allow_warnings: bool,
+) -> IssueCorpusFocusedTestSetupExecutionResult:
+    task_id = _optional_string(record.get("task_id"))
+    repository = _optional_string(record.get("repository"))
+    issue_url = _optional_string(record.get("issue_url"))
+    readiness_status = _optional_string(record.get("status")) or "unknown"
+    setup_profile = _optional_string(record.get("setup_profile")) or "unknown"
+    repo_path_value = _optional_string(record.get("repo_path"))
+    setup_commands = _string_list(record.get("setup_commands"))
+    validation_command = _optional_string(record.get("validation_command"))
+    requires_network = bool(record.get("requires_network"))
+    sandbox_required = bool(record.get("sandbox_required"))
+    errors = _string_list(record.get("errors"))
+    warnings = _string_list(record.get("warnings"))
+    next_actions = _string_list(record.get("next_actions"))
+    command_results: list[IssueCorpusFocusedTestSetupCommandResult] = []
+
+    workspace: Path | None = None
+    if readiness_status == "blocked":
+        errors.append("setup readiness is blocked")
+    elif readiness_status == "warning" and not allow_warnings:
+        errors.append("setup readiness is warning and --allow-warnings was not set")
+    elif readiness_status not in {"ready", "warning"}:
+        warnings.append(f"setup readiness status is {readiness_status}")
+
+    if repo_path_value:
+        repo_path = Path(repo_path_value)
+        if repo_path.exists() and repo_path.is_dir():
+            workspace = repo_path
+        else:
+            errors.append(f"repository snapshot is not available: {repo_path_value}")
+    else:
+        errors.append("setup readiness record has no repo_path")
+
+    if sandbox_required and sandbox_mode != "docker":
+        warnings.append("setup requested Docker isolation but a non-Docker sandbox was selected")
+    if requires_network and sandbox_mode == "docker":
+        warnings.append(
+            "setup requires network access; current Docker sandbox command runner uses network=none"
+        )
+
+    if not setup_commands:
+        status = "blocked" if errors else "skipped"
+        if status == "skipped":
+            next_actions.append("no setup commands were required; rerun focused validation")
+        return IssueCorpusFocusedTestSetupExecutionResult(
+            task_id=task_id,
+            repository=repository,
+            issue_url=issue_url,
+            status=status,
+            readiness_status=readiness_status,
+            setup_profile=setup_profile,
+            repo_path=repo_path_value,
+            setup_commands=setup_commands,
+            validation_command=validation_command,
+            requires_network=requires_network,
+            sandbox_required=sandbox_required,
+            sandbox_mode=sandbox_mode,
+            dry_run=dry_run,
+            command_results=command_results,
+            errors=_dedupe_preserve_order(errors),
+            warnings=_dedupe_preserve_order(warnings),
+            next_actions=_dedupe_preserve_order(next_actions),
+        )
+
+    if workspace is not None:
+        for command in setup_commands:
+            decision = policy.evaluate(command, workspace=workspace)
+            command_results.append(
+                IssueCorpusFocusedTestSetupCommandResult(
+                    command=command,
+                    status="dry_run" if decision.allowed else "policy_blocked",
+                    exit_code=None,
+                    timed_out=False,
+                    duration_ms=0,
+                    policy_allowed=decision.allowed,
+                    policy_reason=decision.reason,
+                    stdout_path=None,
+                    stderr_path=None,
+                )
+            )
+            if not decision.allowed:
+                errors.append(f"setup command rejected by policy: {decision.reason}")
+
+    if errors:
+        return IssueCorpusFocusedTestSetupExecutionResult(
+            task_id=task_id,
+            repository=repository,
+            issue_url=issue_url,
+            status="blocked",
+            readiness_status=readiness_status,
+            setup_profile=setup_profile,
+            repo_path=repo_path_value,
+            setup_commands=setup_commands,
+            validation_command=validation_command,
+            requires_network=requires_network,
+            sandbox_required=sandbox_required,
+            sandbox_mode=sandbox_mode,
+            dry_run=dry_run,
+            command_results=command_results,
+            errors=_dedupe_preserve_order(errors),
+            warnings=_dedupe_preserve_order(warnings),
+            next_actions=_dedupe_preserve_order(
+                [
+                    *next_actions,
+                    "resolve setup-readiness and command-policy blockers before execution",
+                ]
+            ),
+        )
+
+    if dry_run:
+        return IssueCorpusFocusedTestSetupExecutionResult(
+            task_id=task_id,
+            repository=repository,
+            issue_url=issue_url,
+            status="dry_run",
+            readiness_status=readiness_status,
+            setup_profile=setup_profile,
+            repo_path=repo_path_value,
+            setup_commands=setup_commands,
+            validation_command=validation_command,
+            requires_network=requires_network,
+            sandbox_required=sandbox_required,
+            sandbox_mode=sandbox_mode,
+            dry_run=dry_run,
+            command_results=command_results,
+            errors=[],
+            warnings=_dedupe_preserve_order(warnings),
+            next_actions=_dedupe_preserve_order(
+                [*next_actions, "rerun with --execute after reviewing dry-run evidence"]
+            ),
+        )
+
+    assert runner is not None
+    assert workspace is not None
+    command_results = []
+    status = "passed"
+    run_dir = run_logs_dir / _safe_artifact_name(task_id or repository or "task")
+    run_dir.mkdir(parents=True, exist_ok=True)
+    for index, command in enumerate(setup_commands, start=1):
+        command_result = runner.run(
+            command=command,
+            workspace=workspace,
+            timeout_seconds=timeout_seconds,
+        )
+        command_dir = run_dir / f"command_{index:02d}"
+        command_dir.mkdir(parents=True, exist_ok=True)
+        stdout_path = command_dir / "stdout.txt"
+        stderr_path = command_dir / "stderr.txt"
+        stdout_path.write_text(command_result.stdout, encoding="utf-8")
+        stderr_path.write_text(command_result.stderr, encoding="utf-8")
+        if not command_result.policy_decision.allowed:
+            command_status = "policy_blocked"
+            status = "blocked"
+            errors.append(
+                f"setup command rejected by policy: {command_result.policy_decision.reason}"
+            )
+        elif command_result.timed_out:
+            command_status = "timed_out"
+            status = "timed_out"
+            warnings.append(f"setup command timed out after {timeout_seconds}s")
+        elif command_result.exit_code == 0:
+            command_status = "passed"
+        else:
+            command_status = "failed"
+            status = "failed"
+            warnings.append(f"setup command exited {command_result.exit_code}")
+        command_results.append(
+            IssueCorpusFocusedTestSetupCommandResult(
+                command=command,
+                status=command_status,
+                exit_code=command_result.exit_code,
+                timed_out=command_result.timed_out,
+                duration_ms=command_result.duration_ms,
+                policy_allowed=command_result.policy_decision.allowed,
+                policy_reason=command_result.policy_decision.reason,
+                stdout_path=str(stdout_path),
+                stderr_path=str(stderr_path),
+            )
+        )
+        if command_status != "passed":
+            break
+
+    return IssueCorpusFocusedTestSetupExecutionResult(
+        task_id=task_id,
+        repository=repository,
+        issue_url=issue_url,
+        status=status,
+        readiness_status=readiness_status,
+        setup_profile=setup_profile,
+        repo_path=repo_path_value,
+        setup_commands=setup_commands,
+        validation_command=validation_command,
+        requires_network=requires_network,
+        sandbox_required=sandbox_required,
+        sandbox_mode=sandbox_mode,
+        dry_run=dry_run,
+        command_results=command_results,
+        errors=_dedupe_preserve_order(errors),
+        warnings=_dedupe_preserve_order(warnings),
+        next_actions=_dedupe_preserve_order(
+            [*next_actions, "rerun focused validation command after successful setup"]
+        ),
     )
 
 

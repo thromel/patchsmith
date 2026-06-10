@@ -7,6 +7,7 @@ from patchsmith.evaluation import (
     check_focused_test_setup_readiness,
     check_materialized_issue_run_readiness,
     diagnose_focused_test_runs,
+    execute_focused_test_setups,
     load_seeded_tasks,
     materialize_issue_corpus_tasks,
     plan_focused_test_setups,
@@ -1053,6 +1054,152 @@ def test_check_focused_test_setup_readiness_ready_without_network(
     assert summary.ready_tasks == 1
     assert summary.blocked_tasks == 0
     assert results[0].status == "ready"
+
+
+def test_execute_focused_test_setups_blocks_unready_tasks(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    readiness_path = tmp_path / "focused_test_setup_readiness_results.json"
+    readiness_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "blocked_setup",
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/1",
+                    "status": "blocked",
+                    "setup_profile": "python_dependency_install",
+                    "repo_path": str(repo_dir),
+                    "setup_commands": ["python3 -m pytest --version"],
+                    "validation_command": "python3 -m pytest tests/test_ok.py",
+                    "requires_network": False,
+                    "sandbox_required": True,
+                    "errors": ["Docker sandbox smoke is not_available"],
+                    "warnings": [],
+                    "next_actions": ["start Docker"],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    output_dir = tmp_path / "execution"
+    results, summary = execute_focused_test_setups(
+        readiness_path=readiness_path,
+        output_dir=output_dir,
+    )
+
+    assert summary.blocked_tasks == 1
+    assert summary.dry_run_tasks == 0
+    assert summary.attempted_tasks == 0
+    assert results[0].status == "blocked"
+    assert "setup readiness is blocked" in ";".join(results[0].errors)
+    assert (output_dir / "focused_test_setup_execution_report.md").exists()
+    assert (output_dir / "focused_test_setup_execution_results.csv").exists()
+
+    cli_output = tmp_path / "cli_execution"
+    exit_code = main(
+        [
+            "execute-focused-test-setups",
+            "--readiness",
+            str(readiness_path),
+            "--output",
+            str(cli_output),
+            "--json",
+        ]
+    )
+    assert exit_code == 0
+    assert (cli_output / "focused_test_setup_execution_report.md").exists()
+
+
+def test_execute_focused_test_setups_dry_runs_policy_allowed_commands(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    readiness_path = tmp_path / "focused_test_setup_readiness_results.json"
+    readiness_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "ready_setup",
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/2",
+                    "status": "ready",
+                    "setup_profile": "metadata_check",
+                    "repo_path": str(repo_dir),
+                    "setup_commands": ["python3 -m pytest --version"],
+                    "validation_command": "python3 -m pytest tests/test_ok.py",
+                    "requires_network": False,
+                    "sandbox_required": False,
+                    "errors": [],
+                    "warnings": [],
+                    "next_actions": [],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    results, summary = execute_focused_test_setups(
+        readiness_path=readiness_path,
+        output_dir=tmp_path / "execution",
+        sandbox_mode="local",
+    )
+
+    assert summary.dry_run_tasks == 1
+    assert summary.blocked_tasks == 0
+    assert results[0].status == "dry_run"
+    assert results[0].command_results[0].status == "dry_run"
+    assert results[0].command_results[0].policy_allowed
+
+
+def test_execute_focused_test_setups_runs_policy_allowed_local_command(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    readiness_path = tmp_path / "focused_test_setup_readiness_results.json"
+    readiness_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "ready_setup",
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/3",
+                    "status": "ready",
+                    "setup_profile": "metadata_check",
+                    "repo_path": str(repo_dir),
+                    "setup_commands": ["python3 -m pytest --version"],
+                    "validation_command": "python3 -m pytest tests/test_ok.py",
+                    "requires_network": False,
+                    "sandbox_required": False,
+                    "errors": [],
+                    "warnings": [],
+                    "next_actions": [],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    output_dir = tmp_path / "execution"
+    results, summary = execute_focused_test_setups(
+        readiness_path=readiness_path,
+        output_dir=output_dir,
+        sandbox_mode="local",
+        dry_run=False,
+        timeout_seconds=30,
+    )
+
+    assert summary.attempted_tasks == 1
+    assert summary.completed_tasks == 1
+    assert results[0].status == "passed"
+    assert results[0].command_results[0].exit_code == 0
+    assert results[0].command_results[0].stdout_path is not None
+    assert Path(results[0].command_results[0].stdout_path).exists()
 
 
 def test_graph_retrieval_dataset_validates(tmp_path: Path) -> None:

@@ -254,6 +254,17 @@ PYTHONPATH=src python3 -m patchsmith.cli check-focused-test-setup-readiness \
 
 The setup-readiness report checks local repository snapshots, validation commands, network flags, and Docker smoke evidence before setup execution. `blocked` means setup must not run yet.
 
+Public issue focused test setup execution:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli execute-focused-test-setups \
+  --readiness artifacts/experiments/public_issue_corpus_v1/focused_test_setup_readiness_results.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+The setup-execution report defaults to dry-run and records readiness, command-policy, sandbox, and next-action evidence. Add `--execute` only after setup-readiness is not blocked and the selected sandbox/network policy is approved. Blocked execution rows are stop conditions, not reproduction or repair-quality evidence.
+
 Scaffold comparison:
 
 ```bash
@@ -643,6 +654,7 @@ Run:
 - demo media regeneration,
 - final evaluation report regeneration,
 - launch blocker backlog regeneration,
+- focused public issue setup-execution regeneration,
 - release hygiene report regeneration,
 - README quickstart validation,
 - final report review.

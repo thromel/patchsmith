@@ -295,6 +295,17 @@ PYTHONPATH=src python3 -m patchsmith.cli check-focused-test-setup-readiness \
 
 Current setup-readiness output has zero ready tasks and three blocked tasks because Docker smoke is `not_available`. Use this as the stop condition before any public issue dependency setup is executed.
 
+Dry-run focused public issue setup execution:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli execute-focused-test-setups \
+  --readiness artifacts/experiments/public_issue_corpus_v1/focused_test_setup_readiness_results.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+Current setup-execution output remains blocked for all three tasks because setup-readiness is blocked. This artifact is still useful launch evidence because it proves the setup executor refuses unsafe execution instead of silently running dependency installation commands.
+
 Generate the release hygiene report:
 
 ```bash
@@ -306,7 +317,7 @@ PYTHONPATH=src python3 -m patchsmith.cli release-hygiene \
   --json
 ```
 
-Current release hygiene output is `ready_with_warnings`: generated review artifacts now include calibration-readiness, launch-blocker, and public issue context-preview/materialization validation/readiness/focused-test plan/run/diagnosis/setup-plan/setup-readiness evidence, package build metadata exists, local Git metadata exists, and the remaining release caveat is live LLM calibration.
+Current release hygiene output is `ready_with_warnings`: generated review artifacts now include calibration-readiness, launch-blocker, and public issue context-preview/materialization validation/readiness/focused-test plan/run/diagnosis/setup-plan/setup-readiness/setup-execution evidence, package build metadata exists, local Git metadata exists, and the remaining release caveat is live LLM calibration.
 
 ## Example flagship demo scenario
 

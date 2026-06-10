@@ -225,6 +225,7 @@ The MVP must record:
 - generated demo media assets for README or presentation use,
 - final evaluation report with decisions, limitations, metric rows, and claim boundaries,
 - launch blocker backlog with prioritized Docker, setup-readiness, live-calibration, and release actions,
+- focused setup-execution report with dry-run, command-policy, sandbox, and blocked-execution evidence,
 - release hygiene report with blockers, warnings, and launch checklist status.
 
 ## Portfolio screenshots to capture
@@ -241,4 +242,5 @@ The MVP must record:
 - demo media.
 - final evaluation report.
 - launch blocker backlog.
+- focused setup-execution report.
 - release hygiene report.
