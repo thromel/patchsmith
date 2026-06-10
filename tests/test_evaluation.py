@@ -8,6 +8,7 @@ from patchsmith.evaluation import (
     check_materialized_issue_run_readiness,
     check_public_issue_repair_readiness,
     diagnose_focused_test_runs,
+    discover_public_issue_failure_signals,
     execute_focused_test_setups,
     execute_public_issue_reproductions,
     execute_public_issue_repairs,
@@ -1943,6 +1944,123 @@ def test_validate_public_issue_reproduction_specs_accepts_reviewed_spec(
     assert results[0].status == "ready"
     assert results[0].command_source == "reproduction_spec"
     assert results[0].expected_failure_signals == ["AssertionError: reviewed signal"]
+
+
+def test_discover_public_issue_failure_signals_dry_runs_without_expected_spec(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    plan_path = tmp_path / "public_issue_reproduction_plan_results.json"
+    plan_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "public_task",
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/12",
+                    "status": "warning",
+                    "repo_path": str(repo_dir),
+                    "reproduction_command": "python3 -m pytest tests/test_bug.py",
+                    "expected_failure_signals": [],
+                    "manual_spec_required": True,
+                    "blockers": [],
+                    "warnings": ["expected failing signal is not encoded"],
+                    "next_actions": [],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    output_dir = tmp_path / "discovery"
+    results, summary = discover_public_issue_failure_signals(
+        plan_path=plan_path,
+        output_dir=output_dir,
+        sandbox_mode="local",
+    )
+
+    assert summary.dry_run_tasks == 1
+    assert summary.blocked_tasks == 0
+    assert results[0].status == "dry_run"
+    assert results[0].candidate_failure_signals == []
+    assert (
+        output_dir / "public_issue_failure_signal_discovery_report.md"
+    ).exists()
+    assert (
+        output_dir / "public_issue_failure_signal_discovery_results.csv"
+    ).exists()
+
+    cli_output = tmp_path / "cli_discovery"
+    exit_code = main(
+        [
+            "discover-public-issue-failure-signals",
+            "--plan",
+            str(plan_path),
+            "--output",
+            str(cli_output),
+            "--sandbox-mode",
+            "local",
+            "--json",
+        ]
+    )
+    assert exit_code == 0
+    assert (
+        cli_output / "public_issue_failure_signal_discovery_report.md"
+    ).exists()
+
+
+def test_discover_public_issue_failure_signals_extracts_local_failure(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    tests_dir = repo_dir / "tests"
+    tests_dir.mkdir(parents=True)
+    (tests_dir / "test_bug.py").write_text(
+        "def test_bug():\n    raise AssertionError('expected public bug')\n",
+        encoding="utf-8",
+    )
+    plan_path = tmp_path / "public_issue_reproduction_plan_results.json"
+    plan_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "public_task",
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/12",
+                    "status": "warning",
+                    "repo_path": str(repo_dir),
+                    "reproduction_command": "python3 -m pytest tests/test_bug.py",
+                    "expected_failure_signals": [],
+                    "manual_spec_required": True,
+                    "blockers": [],
+                    "warnings": [],
+                    "next_actions": [],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    results, summary = discover_public_issue_failure_signals(
+        plan_path=plan_path,
+        output_dir=tmp_path / "discovery",
+        sandbox_mode="local",
+        dry_run=False,
+        timeout_seconds=30,
+    )
+
+    assert summary.attempted_tasks == 1
+    assert summary.observed_failure_tasks == 1
+    assert summary.candidate_signal_tasks == 1
+    assert results[0].status == "observed_failure"
+    assert results[0].exit_code == 1
+    assert any(
+        "AssertionError" in signal
+        for signal in results[0].candidate_failure_signals
+    )
+    assert results[0].stdout_path is not None
+    assert results[0].stderr_path is not None
 
 
 def test_execute_public_issue_reproductions_blocks_missing_failure_spec(

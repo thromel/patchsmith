@@ -10,6 +10,7 @@ from patchsmith.evaluation import (
     check_focused_test_setup_readiness,
     check_public_issue_repair_readiness,
     diagnose_focused_test_runs,
+    discover_public_issue_failure_signals,
     execute_focused_test_setups,
     execute_public_issue_reproductions,
     execute_public_issue_repairs,
@@ -623,6 +624,44 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f"ready={summary.ready_tasks} warning={summary.warning_tasks} "
                 f"blocked={summary.blocked_tasks}"
+            )
+        return 0
+
+    if args.command == "discover-public-issue-failure-signals":
+        max_tasks = None if args.max_tasks == 0 else args.max_tasks
+        results, summary = discover_public_issue_failure_signals(
+            plan_path=Path(args.plan),
+            output_dir=Path(args.output),
+            sandbox_mode=args.sandbox_mode,
+            sandbox_image=args.sandbox_image,
+            sandbox_network=args.sandbox_network,
+            timeout_seconds=args.timeout_seconds,
+            max_tasks=max_tasks,
+            dry_run=not args.execute,
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "result_count": len(results),
+                        "report_path": str(
+                            Path(args.output)
+                            / "public_issue_failure_signal_discovery_report.md"
+                        ),
+                        "summary": summary.to_dict(),
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(
+                "Report: "
+                f"{Path(args.output) / 'public_issue_failure_signal_discovery_report.md'}"
+            )
+            print(
+                f"dry_run={summary.dry_run_tasks} attempted={summary.attempted_tasks} "
+                f"observed_failure={summary.observed_failure_tasks} "
+                f"candidate_signal={summary.candidate_signal_tasks}"
             )
         return 0
 
@@ -2132,6 +2171,63 @@ def build_parser() -> argparse.ArgumentParser:
         help="Public issue reproduction-spec validation output directory.",
     )
     public_reproduction_spec_validation_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print JSON summary.",
+    )
+
+    public_failure_signal_discovery_parser = subparsers.add_parser(
+        "discover-public-issue-failure-signals",
+        help="Dry-run or execute candidate public issue commands to collect failure-signal hints.",
+    )
+    public_failure_signal_discovery_parser.add_argument(
+        "--plan",
+        default=(
+            "artifacts/experiments/public_issue_corpus_v1/"
+            "public_issue_reproduction_plan_results.json"
+        ),
+        help="Public issue reproduction-plan results JSON.",
+    )
+    public_failure_signal_discovery_parser.add_argument(
+        "--output",
+        default="artifacts/experiments/public_issue_corpus_v1",
+        help="Public issue failure-signal discovery output directory.",
+    )
+    public_failure_signal_discovery_parser.add_argument(
+        "--sandbox-mode",
+        choices=["local", "docker"],
+        default="docker",
+        help="Sandbox runner to use when --execute is set.",
+    )
+    public_failure_signal_discovery_parser.add_argument(
+        "--sandbox-image",
+        default="patchsmith-seeded-smoke:py312",
+        help="Docker image used when --sandbox-mode docker is selected.",
+    )
+    public_failure_signal_discovery_parser.add_argument(
+        "--sandbox-network",
+        choices=["none", "bridge"],
+        default="none",
+        help="Docker network mode used when --execute and --sandbox-mode docker are selected.",
+    )
+    public_failure_signal_discovery_parser.add_argument(
+        "--timeout-seconds",
+        type=int,
+        default=300,
+        help="Per-discovery-command timeout when --execute is set.",
+    )
+    public_failure_signal_discovery_parser.add_argument(
+        "--max-tasks",
+        type=int,
+        default=0,
+        help="Maximum reproduction-plan records to process. Use 0 for all records.",
+    )
+    public_failure_signal_discovery_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Execute candidate commands instead of writing dry-run evidence.",
+    )
+    public_failure_signal_discovery_parser.add_argument(
         "--json",
         action="store_true",
         help="Print JSON summary.",

@@ -686,6 +686,58 @@ class IssueCorpusPublicReproductionSpecValidationSummary:
 
 
 @dataclass(frozen=True)
+class IssueCorpusPublicFailureSignalDiscoveryResult:
+    task_id: str | None
+    repository: str | None
+    issue_url: str | None
+    status: str
+    reproduction_plan_status: str
+    repo_path: str | None
+    reproduction_command: str | None
+    sandbox_mode: str
+    sandbox_image: str
+    sandbox_network: str
+    dry_run: bool
+    exit_code: int | None
+    timed_out: bool
+    duration_ms: int
+    policy_allowed: bool
+    policy_reason: str | None
+    stdout_path: str | None
+    stderr_path: str | None
+    candidate_failure_signals: list[str]
+    errors: list[str]
+    warnings: list[str]
+    next_actions: list[str]
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class IssueCorpusPublicFailureSignalDiscoverySummary:
+    generated_at: str
+    reproduction_plan_path: str
+    task_count: int
+    dry_run: bool
+    sandbox_mode: str
+    sandbox_image: str
+    sandbox_network: str
+    timeout_seconds: int
+    dry_run_tasks: int
+    attempted_tasks: int
+    observed_failure_tasks: int
+    passed_tasks: int
+    timed_out_tasks: int
+    blocked_tasks: int
+    policy_allowed_commands: int
+    candidate_signal_tasks: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class IssueCorpusPublicReproductionExecutionResult:
     task_id: str | None
     repository: str | None
@@ -3426,6 +3478,196 @@ def write_public_issue_reproduction_spec_validation_outputs(
     )
 
 
+def discover_public_issue_failure_signals(
+    *,
+    plan_path: Path,
+    output_dir: Path,
+    sandbox_mode: str = "docker",
+    sandbox_image: str = "patchsmith-seeded-smoke:py312",
+    sandbox_network: str = "none",
+    timeout_seconds: int = 300,
+    max_tasks: int | None = None,
+    dry_run: bool = True,
+) -> tuple[
+    list[IssueCorpusPublicFailureSignalDiscoveryResult],
+    IssueCorpusPublicFailureSignalDiscoverySummary,
+]:
+    records = _load_json_record_list(path=plan_path, label="public issue reproduction plan")
+    selected_records = records
+    if max_tasks is not None and max_tasks > 0:
+        selected_records = records[:max_tasks]
+    output_dir.mkdir(parents=True, exist_ok=True)
+    runner = (
+        None
+        if dry_run
+        else create_sandbox_runner(
+            mode=sandbox_mode,
+            image=sandbox_image,
+            network=sandbox_network,
+        )
+    )
+    policy = CommandPolicy()
+    run_logs_dir = output_dir / "public_issue_failure_signal_discovery_logs"
+    results = [
+        _discover_public_issue_failure_signal_record(
+            record=record,
+            run_logs_dir=run_logs_dir,
+            runner=runner,
+            policy=policy,
+            sandbox_mode=sandbox_mode,
+            sandbox_image=sandbox_image,
+            sandbox_network=sandbox_network,
+            timeout_seconds=timeout_seconds,
+            dry_run=dry_run,
+        )
+        for record in selected_records
+    ]
+    summary = summarize_public_issue_failure_signal_discovery(
+        plan_path=plan_path,
+        results=results,
+        dry_run=dry_run,
+        sandbox_mode=sandbox_mode,
+        sandbox_image=sandbox_image,
+        sandbox_network=sandbox_network,
+        timeout_seconds=timeout_seconds,
+    )
+    write_public_issue_failure_signal_discovery_outputs(
+        output_dir=output_dir,
+        plan_path=plan_path,
+        results=results,
+        summary=summary,
+    )
+    return results, summary
+
+
+def summarize_public_issue_failure_signal_discovery(
+    *,
+    plan_path: Path,
+    results: list[IssueCorpusPublicFailureSignalDiscoveryResult],
+    dry_run: bool,
+    sandbox_mode: str,
+    sandbox_image: str,
+    sandbox_network: str,
+    timeout_seconds: int,
+) -> IssueCorpusPublicFailureSignalDiscoverySummary:
+    return IssueCorpusPublicFailureSignalDiscoverySummary(
+        generated_at=datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace(
+            "+00:00", "Z"
+        ),
+        reproduction_plan_path=str(plan_path),
+        task_count=len(results),
+        dry_run=dry_run,
+        sandbox_mode=sandbox_mode,
+        sandbox_image=sandbox_image,
+        sandbox_network=sandbox_network,
+        timeout_seconds=timeout_seconds,
+        dry_run_tasks=sum(1 for result in results if result.status == "dry_run"),
+        attempted_tasks=sum(
+            1
+            for result in results
+            if result.status in {"observed_failure", "passed", "timed_out", "failed"}
+        ),
+        observed_failure_tasks=sum(
+            1 for result in results if result.status == "observed_failure"
+        ),
+        passed_tasks=sum(1 for result in results if result.status == "passed"),
+        timed_out_tasks=sum(1 for result in results if result.status == "timed_out"),
+        blocked_tasks=sum(1 for result in results if result.status == "blocked"),
+        policy_allowed_commands=sum(1 for result in results if result.policy_allowed),
+        candidate_signal_tasks=sum(
+            1 for result in results if result.candidate_failure_signals
+        ),
+    )
+
+
+def write_public_issue_failure_signal_discovery_outputs(
+    *,
+    output_dir: Path,
+    plan_path: Path,
+    results: list[IssueCorpusPublicFailureSignalDiscoveryResult],
+    summary: IssueCorpusPublicFailureSignalDiscoverySummary,
+) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "public_issue_failure_signal_discovery_results.json").write_text(
+        json.dumps([result.to_dict() for result in results], indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (output_dir / "public_issue_failure_signal_discovery_summary.json").write_text(
+        json.dumps(summary.to_dict(), indent=2) + "\n",
+        encoding="utf-8",
+    )
+    with (output_dir / "public_issue_failure_signal_discovery_results.csv").open(
+        "w",
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=[
+                "task_id",
+                "repository",
+                "issue_url",
+                "status",
+                "reproduction_plan_status",
+                "repo_path",
+                "reproduction_command",
+                "sandbox_mode",
+                "sandbox_image",
+                "sandbox_network",
+                "dry_run",
+                "exit_code",
+                "timed_out",
+                "duration_ms",
+                "policy_allowed",
+                "policy_reason",
+                "stdout_path",
+                "stderr_path",
+                "candidate_failure_signals",
+                "errors",
+                "warnings",
+                "next_actions",
+            ],
+        )
+        writer.writeheader()
+        for result in results:
+            writer.writerow(
+                {
+                    "task_id": result.task_id,
+                    "repository": result.repository,
+                    "issue_url": result.issue_url,
+                    "status": result.status,
+                    "reproduction_plan_status": result.reproduction_plan_status,
+                    "repo_path": result.repo_path,
+                    "reproduction_command": result.reproduction_command,
+                    "sandbox_mode": result.sandbox_mode,
+                    "sandbox_image": result.sandbox_image,
+                    "sandbox_network": result.sandbox_network,
+                    "dry_run": result.dry_run,
+                    "exit_code": result.exit_code,
+                    "timed_out": result.timed_out,
+                    "duration_ms": result.duration_ms,
+                    "policy_allowed": result.policy_allowed,
+                    "policy_reason": result.policy_reason,
+                    "stdout_path": result.stdout_path,
+                    "stderr_path": result.stderr_path,
+                    "candidate_failure_signals": ";".join(
+                        result.candidate_failure_signals
+                    ),
+                    "errors": ";".join(result.errors),
+                    "warnings": ";".join(result.warnings),
+                    "next_actions": ";".join(result.next_actions),
+                }
+            )
+    (output_dir / "public_issue_failure_signal_discovery_report.md").write_text(
+        render_public_issue_failure_signal_discovery_report(
+            plan_path=plan_path,
+            results=results,
+            summary=summary,
+        ),
+        encoding="utf-8",
+    )
+
+
 def _public_issue_reproduction_specs_template(
     results: list[IssueCorpusPublicReproductionPlanResult],
 ) -> dict[str, Any]:
@@ -5885,6 +6127,73 @@ def render_public_issue_reproduction_spec_validation_report(
     return "\n".join(lines)
 
 
+def render_public_issue_failure_signal_discovery_report(
+    *,
+    plan_path: Path,
+    results: list[IssueCorpusPublicFailureSignalDiscoveryResult],
+    summary: IssueCorpusPublicFailureSignalDiscoverySummary,
+) -> str:
+    lines = [
+        "# Public Issue Failure Signal Discovery",
+        "",
+        f"- Generated at: `{summary.generated_at}`",
+        f"- Reproduction plan path: `{plan_path}`",
+        f"- Dry run: `{str(summary.dry_run).lower()}`",
+        f"- Sandbox: `{summary.sandbox_mode}`",
+        f"- Sandbox image: `{summary.sandbox_image}`",
+        f"- Sandbox network: `{summary.sandbox_network}`",
+        f"- Timeout seconds: `{summary.timeout_seconds}`",
+        f"- Task count: `{summary.task_count}`",
+        f"- Dry-run tasks: `{summary.dry_run_tasks}`",
+        f"- Attempted tasks: `{summary.attempted_tasks}`",
+        f"- Observed-failure tasks: `{summary.observed_failure_tasks}`",
+        f"- Passed tasks: `{summary.passed_tasks}`",
+        f"- Timed-out tasks: `{summary.timed_out_tasks}`",
+        f"- Blocked tasks: `{summary.blocked_tasks}`",
+        f"- Candidate-signal tasks: `{summary.candidate_signal_tasks}`",
+        "",
+        "## Results",
+        "",
+        (
+            "| Task | Status | Repository | Command | Exit Code | Candidate "
+            "Signals | Logs | Notes | Next Actions |"
+        ),
+        "|---|---|---|---|---|---|---|---|---|",
+    ]
+    for result in results:
+        notes = [*result.errors, *result.warnings]
+        log_paths = "; ".join(
+            path
+            for path in [result.stdout_path, result.stderr_path]
+            if path
+        )
+        lines.append(
+            "| "
+            f"{_markdown_table_text(result.task_id or 'unknown')} | "
+            f"{_markdown_table_text(result.status)} | "
+            f"{_markdown_table_text(result.repository or 'unknown')} | "
+            f"{_markdown_table_text(result.reproduction_command or 'missing')} | "
+            f"{_markdown_table_text(str(result.exit_code) if result.exit_code is not None else 'not run')} | "
+            f"{_markdown_table_text('; '.join(result.candidate_failure_signals) or 'none')} | "
+            f"{_markdown_table_text(log_paths or 'none')} | "
+            f"{_markdown_table_text('; '.join(notes) or 'none')} | "
+            f"{_markdown_table_text('; '.join(result.next_actions) or 'none')} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Claim Boundary",
+            "",
+            "- This report discovers candidate failure text for human review.",
+            "- `observed_failure` means the candidate command failed and logs were saved; it does not prove issue reproduction.",
+            "- Only `execute-public-issue-reproductions` with reviewed expected failure signals can count a task as reproduced.",
+            "- `passed` means the candidate command did not expose a pre-repair failure and likely needs a more specific reproduction.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def render_public_issue_reproduction_execution_report(
     *,
     plan_path: Path,
@@ -8274,6 +8583,184 @@ def _validate_public_issue_reproduction_spec_record(
     )
 
 
+def _discover_public_issue_failure_signal_record(
+    *,
+    record: dict[str, Any],
+    run_logs_dir: Path,
+    runner: Any | None,
+    policy: CommandPolicy,
+    sandbox_mode: str,
+    sandbox_image: str,
+    sandbox_network: str,
+    timeout_seconds: int,
+    dry_run: bool,
+) -> IssueCorpusPublicFailureSignalDiscoveryResult:
+    task_id = _optional_string(record.get("task_id"))
+    repository = _optional_string(record.get("repository"))
+    issue_url = _optional_string(record.get("issue_url"))
+    plan_status = _optional_string(record.get("status")) or "unknown"
+    repo_path_value = _optional_string(record.get("repo_path"))
+    command = _optional_string(record.get("reproduction_command"))
+    errors = _string_list(record.get("blockers"))
+    warnings = _string_list(record.get("warnings"))
+    next_actions = _string_list(record.get("next_actions"))
+    policy_allowed = False
+    policy_reason: str | None = None
+    workspace: Path | None = None
+
+    if plan_status == "blocked":
+        errors.append("reproduction plan is blocked")
+    elif plan_status not in {"planned", "warning"}:
+        warnings.append(f"reproduction plan status is {plan_status}")
+
+    if repo_path_value:
+        repo_path = Path(repo_path_value)
+        if repo_path.exists() and repo_path.is_dir():
+            workspace = repo_path
+        else:
+            errors.append(f"repository snapshot is not available: {repo_path_value}")
+    else:
+        errors.append("reproduction plan record has no repo_path")
+
+    if not command:
+        errors.append("reproduction command is missing")
+    elif workspace is not None:
+        decision = policy.evaluate(command, workspace=workspace)
+        policy_allowed = decision.allowed
+        policy_reason = decision.reason
+        if not decision.allowed:
+            errors.append(f"reproduction command rejected by policy: {decision.reason}")
+
+    if errors:
+        return IssueCorpusPublicFailureSignalDiscoveryResult(
+            task_id=task_id,
+            repository=repository,
+            issue_url=issue_url,
+            status="blocked",
+            reproduction_plan_status=plan_status,
+            repo_path=repo_path_value,
+            reproduction_command=command,
+            sandbox_mode=sandbox_mode,
+            sandbox_image=sandbox_image,
+            sandbox_network=sandbox_network,
+            dry_run=dry_run,
+            exit_code=None,
+            timed_out=False,
+            duration_ms=0,
+            policy_allowed=policy_allowed,
+            policy_reason=policy_reason,
+            stdout_path=None,
+            stderr_path=None,
+            candidate_failure_signals=[],
+            errors=_dedupe_preserve_order(errors),
+            warnings=_dedupe_preserve_order(warnings),
+            next_actions=_dedupe_preserve_order(
+                [*next_actions, "resolve discovery blockers before execution"]
+            ),
+        )
+
+    if dry_run:
+        return IssueCorpusPublicFailureSignalDiscoveryResult(
+            task_id=task_id,
+            repository=repository,
+            issue_url=issue_url,
+            status="dry_run",
+            reproduction_plan_status=plan_status,
+            repo_path=repo_path_value,
+            reproduction_command=command,
+            sandbox_mode=sandbox_mode,
+            sandbox_image=sandbox_image,
+            sandbox_network=sandbox_network,
+            dry_run=dry_run,
+            exit_code=None,
+            timed_out=False,
+            duration_ms=0,
+            policy_allowed=policy_allowed,
+            policy_reason=policy_reason,
+            stdout_path=None,
+            stderr_path=None,
+            candidate_failure_signals=[],
+            errors=[],
+            warnings=_dedupe_preserve_order(warnings),
+            next_actions=_dedupe_preserve_order(
+                [
+                    *next_actions,
+                    "rerun with --execute to observe candidate failure logs",
+                ]
+            ),
+        )
+
+    assert runner is not None
+    assert workspace is not None
+    assert command is not None
+    run_dir = run_logs_dir / _safe_artifact_name(task_id or repository or "task")
+    run_dir.mkdir(parents=True, exist_ok=True)
+    command_result = runner.run(
+        command=command,
+        workspace=workspace,
+        timeout_seconds=timeout_seconds,
+    )
+    stdout_file = run_dir / "stdout.txt"
+    stderr_file = run_dir / "stderr.txt"
+    stdout_file.write_text(command_result.stdout, encoding="utf-8")
+    stderr_file.write_text(command_result.stderr, encoding="utf-8")
+    combined_logs = "\n".join([command_result.stdout, command_result.stderr])
+    candidate_failure_signals = _candidate_failure_signals_from_logs(combined_logs)
+    policy_allowed = command_result.policy_decision.allowed
+    policy_reason = command_result.policy_decision.reason
+
+    if not policy_allowed:
+        status = "blocked"
+        errors.append(
+            f"reproduction command rejected by policy: {policy_reason or 'unknown'}"
+        )
+        next_actions.append("resolve command-policy blockers before discovery")
+    elif command_result.timed_out:
+        status = "timed_out"
+        warnings.append(f"candidate command timed out after {timeout_seconds}s")
+        next_actions.append("inspect saved logs and narrow or raise the timeout")
+    elif command_result.exit_code == 0:
+        status = "passed"
+        warnings.append("candidate command passed; no failure signal was observed")
+        next_actions.append(
+            "write or select a more specific issue reproduction before repair attempts"
+        )
+    elif candidate_failure_signals:
+        status = "observed_failure"
+        next_actions.append(
+            "review candidate_failure_signals and copy exact issue-specific signals into reviewed specs"
+        )
+    else:
+        status = "failed"
+        warnings.append("candidate command failed but no concise failure signal was extracted")
+        next_actions.append("inspect saved stdout/stderr and choose reviewed failure signals")
+
+    return IssueCorpusPublicFailureSignalDiscoveryResult(
+        task_id=task_id,
+        repository=repository,
+        issue_url=issue_url,
+        status=status,
+        reproduction_plan_status=plan_status,
+        repo_path=repo_path_value,
+        reproduction_command=command,
+        sandbox_mode=sandbox_mode,
+        sandbox_image=sandbox_image,
+        sandbox_network=sandbox_network,
+        dry_run=dry_run,
+        exit_code=command_result.exit_code,
+        timed_out=command_result.timed_out,
+        duration_ms=command_result.duration_ms,
+        policy_allowed=policy_allowed,
+        policy_reason=policy_reason,
+        stdout_path=str(stdout_file),
+        stderr_path=str(stderr_file),
+        candidate_failure_signals=candidate_failure_signals,
+        errors=_dedupe_preserve_order(errors),
+        warnings=_dedupe_preserve_order(warnings),
+        next_actions=_dedupe_preserve_order(next_actions),
+    )
+
+
 def _execute_public_issue_reproduction_record(
     *,
     record: dict[str, Any],
@@ -9120,6 +9607,25 @@ def _matched_expected_failure_signals(text: str, patterns: list[str]) -> list[st
         if pattern.lower() in lowered_text:
             matched.append(pattern)
     return matched
+
+
+def _candidate_failure_signals_from_logs(text: str, *, limit: int = 8) -> list[str]:
+    markers = [
+        "AssertionError",
+        "ModuleNotFoundError",
+        "ImportError",
+        "Traceback",
+        "FAILED ",
+        "Failed:",
+        "ERROR ",
+        "E   ",
+        "error:",
+        "No such file or directory",
+        "NameError",
+        "TypeError",
+        "ValueError",
+    ]
+    return _matching_lines(text, markers, limit=limit)
 
 
 def _last_nonempty_lines(text: str, *, limit: int) -> list[str]:

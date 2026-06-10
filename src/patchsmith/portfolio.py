@@ -19,6 +19,7 @@ from typing import Any
 
 from patchsmith.evaluation import (
     check_public_issue_repair_readiness,
+    discover_public_issue_failure_signals,
     execute_public_issue_reproductions,
     execute_public_issue_repairs,
     plan_public_issue_reproductions,
@@ -990,6 +991,10 @@ def build_project_status_report(
             "experiments/public_issue_corpus_v1/"
             "public_issue_reproduction_spec_validation_summary.json"
         ),
+        "public_failure_signal_discovery": (
+            "experiments/public_issue_corpus_v1/"
+            "public_issue_failure_signal_discovery_summary.json"
+        ),
         "public_reproduction_execution": (
             "experiments/public_issue_corpus_v1/"
             "public_issue_reproduction_execution_summary.json"
@@ -1523,6 +1528,19 @@ def build_evidence_refresh_report(
                 )[1],
             )
         )
+        steps.append(
+            _run_evidence_refresh_step(
+                name="Public issue failure-signal discovery",
+                artifact_paths=output_paths(
+                    "public_issue_corpus_v1/public_issue_failure_signal_discovery_report.md",
+                    "public_issue_corpus_v1/public_issue_failure_signal_discovery_summary.json",
+                ),
+                action=lambda: discover_public_issue_failure_signals(
+                    plan_path=public_reproduction_plan_path,
+                    output_dir=experiment_path("public_issue_corpus_v1"),
+                )[1],
+            )
+        )
         if public_reproduction_specs_path.exists():
             steps.append(
                 _run_evidence_refresh_step(
@@ -1602,6 +1620,18 @@ def build_evidence_refresh_report(
                 artifact_paths=output_paths(
                     "public_issue_corpus_v1/public_issue_reproduction_execution_report.md",
                     "public_issue_corpus_v1/public_issue_reproduction_execution_summary.json",
+                ),
+                summary="Skipped because materialized public issue tasks are missing.",
+            )
+        )
+        steps.append(
+            EvidenceRefreshStep(
+                name="Public issue failure-signal discovery",
+                status="skipped",
+                duration_ms=0,
+                artifact_paths=output_paths(
+                    "public_issue_corpus_v1/public_issue_failure_signal_discovery_report.md",
+                    "public_issue_corpus_v1/public_issue_failure_signal_discovery_summary.json",
                 ),
                 summary="Skipped because materialized public issue tasks are missing.",
             )
@@ -3524,6 +3554,12 @@ def _delivery_audit_items(
         / "public_issue_corpus_v1"
         / "public_issue_reproduction_spec_validation_summary.json"
     )
+    failure_signal_discovery_payload = _load_json_artifact(
+        artifacts_dir
+        / "experiments"
+        / "public_issue_corpus_v1"
+        / "public_issue_failure_signal_discovery_summary.json"
+    )
     reproduction_execution_payload = _load_json_artifact(
         artifacts_dir
         / "experiments"
@@ -3652,6 +3688,9 @@ def _delivery_audit_items(
         ),
         _delivery_setup_validation_item(setup_validation_payload),
         _delivery_public_reproduction_plan_item(reproduction_plan_payload),
+        _delivery_public_failure_signal_discovery_item(
+            failure_signal_discovery_payload
+        ),
         _delivery_public_reproduction_spec_validation_item(
             reproduction_spec_validation_payload
         ),
@@ -3921,6 +3960,55 @@ def _delivery_public_reproduction_plan_item(
         evidence=(
             f"planned_tasks={planned}, warning_tasks={warning}, blocked_tasks={blocked}, "
             f"manual_spec_required_tasks={manual_specs}, command_count={commands}"
+        ),
+        source=source,
+        next_action=next_action,
+    )
+
+
+def _delivery_public_failure_signal_discovery_item(
+    payload: dict[str, Any] | None,
+) -> DeliveryAuditItem:
+    source = (
+        "artifacts/experiments/public_issue_corpus_v1/"
+        "public_issue_failure_signal_discovery_summary.json"
+    )
+    if payload is None:
+        return _delivery_item(
+            requirement="Public issue failure-signal discovery is available.",
+            status="missing",
+            evidence="Public failure-signal discovery summary artifact is missing.",
+            source=source,
+            next_action=(
+                "Run `discover-public-issue-failure-signals` after reproduction planning."
+            ),
+        )
+    dry_run = _payload_int(payload, "dry_run_tasks")
+    attempted = _payload_int(payload, "attempted_tasks")
+    observed = _payload_int(payload, "observed_failure_tasks")
+    passed = _payload_int(payload, "passed_tasks")
+    timed_out = _payload_int(payload, "timed_out_tasks")
+    blocked = _payload_int(payload, "blocked_tasks")
+    candidate_signals = _payload_int(payload, "candidate_signal_tasks")
+    if timed_out or blocked:
+        status = "blocked"
+        next_action = "Resolve discovery blockers or inspect timed-out command logs."
+    elif candidate_signals:
+        status = "passed"
+        next_action = "Review candidate signals and copy exact issue-specific lines into specs."
+    else:
+        status = "warning"
+        next_action = (
+            "Execute discovery or author a more specific reproduction command to obtain "
+            "failure-signal candidates."
+        )
+    return _delivery_item(
+        requirement="Public issue failure-signal discovery is available.",
+        status=status,
+        evidence=(
+            f"dry_run_tasks={dry_run}, attempted_tasks={attempted}, "
+            f"observed_failure_tasks={observed}, passed_tasks={passed}, "
+            f"blocked_tasks={blocked}, candidate_signal_tasks={candidate_signals}"
         ),
         source=source,
         next_action=next_action,
@@ -5581,6 +5669,8 @@ def _release_hygiene_checks(
         "experiments/public_issue_corpus_v1/focused_test_setup_validation_summary.json",
         "experiments/public_issue_corpus_v1/public_issue_reproduction_plan_report.md",
         "experiments/public_issue_corpus_v1/public_issue_reproduction_plan_summary.json",
+        "experiments/public_issue_corpus_v1/public_issue_failure_signal_discovery_report.md",
+        "experiments/public_issue_corpus_v1/public_issue_failure_signal_discovery_summary.json",
         "experiments/public_issue_corpus_v1/public_issue_reproduction_spec_validation_report.md",
         "experiments/public_issue_corpus_v1/public_issue_reproduction_spec_validation_summary.json",
         "experiments/public_issue_corpus_v1/public_issue_reproduction_execution_report.md",

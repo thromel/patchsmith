@@ -218,6 +218,7 @@ Publish the project as a recruiter-grade artifact.
 - final evaluation report,
 - launch blocker backlog,
 - public issue reproduction-plan gate,
+- public issue failure-signal discovery gate,
 - public issue reproduction-spec validation gate,
 - public issue reproduction-execution gate,
 - public issue repair-readiness gate,

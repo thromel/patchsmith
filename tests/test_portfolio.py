@@ -93,6 +93,8 @@ def _write_release_hygiene_fixture(project_root: Path, artifacts_dir: Path) -> N
         "experiments/public_issue_corpus_v1/focused_test_setup_validation_summary.json",
         "experiments/public_issue_corpus_v1/public_issue_reproduction_plan_report.md",
         "experiments/public_issue_corpus_v1/public_issue_reproduction_plan_summary.json",
+        "experiments/public_issue_corpus_v1/public_issue_failure_signal_discovery_report.md",
+        "experiments/public_issue_corpus_v1/public_issue_failure_signal_discovery_summary.json",
         "experiments/public_issue_corpus_v1/public_issue_reproduction_spec_validation_report.md",
         "experiments/public_issue_corpus_v1/public_issue_reproduction_spec_validation_summary.json",
         "experiments/public_issue_corpus_v1/public_issue_reproduction_execution_report.md",
@@ -728,6 +730,8 @@ def test_demo_readiness_report_summarizes_launch_evidence(
         "experiments/public_issue_corpus_v1/focused_test_setup_validation_summary.json",
         "experiments/public_issue_corpus_v1/public_issue_reproduction_plan_report.md",
         "experiments/public_issue_corpus_v1/public_issue_reproduction_plan_summary.json",
+        "experiments/public_issue_corpus_v1/public_issue_failure_signal_discovery_report.md",
+        "experiments/public_issue_corpus_v1/public_issue_failure_signal_discovery_summary.json",
         "experiments/public_issue_corpus_v1/public_issue_reproduction_spec_validation_report.md",
         "experiments/public_issue_corpus_v1/public_issue_reproduction_spec_validation_summary.json",
         "experiments/public_issue_corpus_v1/public_issue_reproduction_execution_report.md",
@@ -1269,6 +1273,20 @@ def test_delivery_audit_maps_objective_to_current_evidence(
         ),
         encoding="utf-8",
     )
+    (public_dir / "public_issue_failure_signal_discovery_summary.json").write_text(
+        json.dumps(
+            {
+                "dry_run_tasks": 3,
+                "attempted_tasks": 0,
+                "observed_failure_tasks": 0,
+                "passed_tasks": 0,
+                "timed_out_tasks": 0,
+                "blocked_tasks": 0,
+                "candidate_signal_tasks": 0,
+            }
+        ),
+        encoding="utf-8",
+    )
     (public_dir / "public_issue_reproduction_spec_validation_summary.json").write_text(
         json.dumps(
             {
@@ -1341,6 +1359,10 @@ def test_delivery_audit_maps_objective_to_current_evidence(
     assert item_statuses["Docker sandbox smoke has executable evidence."] == "blocked"
     assert (
         item_statuses["Public issue reproduction execution is safely gated."]
+        == "warning"
+    )
+    assert (
+        item_statuses["Public issue failure-signal discovery is available."]
         == "warning"
     )
     assert item_statuses["Public issue reproduction specs are validated."] == "blocked"
@@ -1528,6 +1550,16 @@ def test_project_status_report_summarizes_saved_evidence(
             "manual_spec_required_tasks": 3,
             "command_count": 3,
         },
+        "public_issue_corpus_v1/public_issue_failure_signal_discovery_summary.json": {
+            "task_count": 3,
+            "dry_run_tasks": 3,
+            "attempted_tasks": 0,
+            "observed_failure_tasks": 0,
+            "passed_tasks": 0,
+            "timed_out_tasks": 0,
+            "blocked_tasks": 0,
+            "candidate_signal_tasks": 0,
+        },
         "public_issue_corpus_v1/public_issue_reproduction_spec_validation_summary.json": {
             "task_count": 3,
             "ready_tasks": 0,
@@ -1648,7 +1680,7 @@ def test_evidence_refresh_report_runs_lightweight_status_refresh(
 
     assert report.refresh_status == "passed_with_skips"
     assert report.failed_count == 0
-    assert report.skipped_count == 7
+    assert report.skipped_count == 8
     assert report.docker_smoke_refreshed is False
     assert any(step.name == "Docker smoke" and step.status == "skipped" for step in report.steps)
     assert any(step.name == "Quality gate" and step.status == "skipped" for step in report.steps)
@@ -1662,6 +1694,11 @@ def test_evidence_refresh_report_runs_lightweight_status_refresh(
     )
     assert any(
         step.name == "Public issue reproduction plan" and step.status == "skipped"
+        for step in report.steps
+    )
+    assert any(
+        step.name == "Public issue failure-signal discovery"
+        and step.status == "skipped"
         for step in report.steps
     )
     assert any(
@@ -1706,7 +1743,7 @@ def test_evidence_refresh_report_runs_lightweight_status_refresh(
     assert exit_code == 0
     cli_payload = json.loads(capsys.readouterr().out)
     assert cli_payload["refresh_status"] == "passed_with_skips"
-    assert cli_payload["skipped_count"] == 7
+    assert cli_payload["skipped_count"] == 8
     assert cli_payload["docker_smoke_refreshed"] is False
     assert cli_output.exists()
 
@@ -1741,7 +1778,7 @@ def test_evidence_refresh_can_refresh_docker_smoke(
 
     assert report.refresh_status == "passed_with_skips"
     assert report.failed_count == 0
-    assert report.skipped_count == 6
+    assert report.skipped_count == 7
     assert report.docker_smoke_refreshed is True
     docker_step = next(step for step in report.steps if step.name == "Docker smoke")
     assert docker_step.status == "passed"
@@ -1776,7 +1813,7 @@ def test_evidence_refresh_can_refresh_docker_smoke(
     assert exit_code == 0
     cli_payload = json.loads(capsys.readouterr().out)
     assert cli_payload["docker_smoke_refreshed"] is True
-    assert cli_payload["skipped_count"] == 6
+    assert cli_payload["skipped_count"] == 7
     assert cli_output.exists()
 
 

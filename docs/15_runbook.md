@@ -293,6 +293,17 @@ PYTHONPATH=src python3 -m patchsmith.cli plan-public-issue-reproductions \
 
 The reproduction-plan report records candidate commands and expected-failure signal gaps before public issue repairs. It also emits `public_issue_reproduction_specs_template.json` with task-specific candidate commands for review. Add `--reproduction-specs <reviewed-specs.json>` when reviewed criteria are available; the specs file accepts `task_id`, optional `command`, and `expected_failure_signals`, and `evals/issue_corpora/public_issue_smoke_v1/reproduction_specs.template.json` is the authoring template. Treat `warning` rows as planning work, not reproduction evidence; encode the failing assertion, traceback, or behavior mismatch before running repair attempts.
 
+Public issue failure-signal discovery:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli discover-public-issue-failure-signals \
+  --plan artifacts/experiments/public_issue_corpus_v1/public_issue_reproduction_plan_results.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+The failure-signal discovery report writes `public_issue_failure_signal_discovery_*` artifacts and is dry-run by default. It can be executed to save candidate command logs and extract review hints, but those hints do not count as reproduction evidence until copied into reviewed specs and matched by reproduction execution.
+
 Public issue reproduction spec validation:
 
 ```bash
@@ -641,7 +652,7 @@ PYTHONPATH=src python3 -m patchsmith.cli release-hygiene \
   --json
 ```
 
-The release hygiene report checks required docs, generated review artifacts, public issue reproduction-plan, reproduction-spec-validation, reproduction-execution, repair-readiness, and repair-attempt evidence, project-status freshness, environment readiness, demo readiness, failure visibility, live-provider caveats, Git metadata, packaging metadata, CI, demo media, architecture diagram evidence, and README caveat markers. Treat `blocked` as a hard stop for tagged/public release claims.
+The release hygiene report checks required docs, generated review artifacts, public issue reproduction-plan, failure-signal-discovery, reproduction-spec-validation, reproduction-execution, repair-readiness, and repair-attempt evidence, project-status freshness, environment readiness, demo readiness, failure visibility, live-provider caveats, Git metadata, packaging metadata, CI, demo media, architecture diagram evidence, and README caveat markers. Treat `blocked` as a hard stop for tagged/public release claims.
 
 Package build:
 
@@ -826,6 +837,7 @@ Run:
 - focused public issue setup-execution regeneration,
 - focused public issue setup-validation regeneration,
 - public issue reproduction-plan regeneration,
+- public issue failure-signal discovery regeneration,
 - public issue reproduction-spec validation regeneration,
 - public issue reproduction-execution regeneration,
 - public issue repair-readiness regeneration,
