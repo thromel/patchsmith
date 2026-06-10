@@ -1748,6 +1748,108 @@ def test_evidence_refresh_report_runs_lightweight_status_refresh(
     assert cli_output.exists()
 
 
+def test_evidence_refresh_prefers_reviewed_public_reproduction_specs(
+    tmp_path: Path,
+) -> None:
+    project_root = tmp_path / "project"
+    artifacts_dir = project_root / "artifacts"
+    public_dir = artifacts_dir / "experiments" / "public_issue_corpus_v1"
+    tasks_dir = public_dir / "materialized_tasks"
+    task_dir = tasks_dir / "public_task"
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir(parents=True)
+    task_dir.mkdir(parents=True)
+    (task_dir / "task_manifest.json").write_text(
+        json.dumps(
+            {
+                "task_id": "public_task",
+                "issue": {"repository": "owner/repo"},
+                "repository_snapshot": {"repo_path": str(repo_dir)},
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    public_dir.mkdir(parents=True, exist_ok=True)
+    (public_dir / "focused_test_plan_results.json").write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "public_task",
+                    "command": "python3 -m pytest tests/test_bug.py",
+                    "repo_path": str(repo_dir),
+                    "focused_files": ["tests/test_bug.py"],
+                    "policy_allowed": True,
+                }
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    reviewed_specs_path = (
+        project_root
+        / "evals"
+        / "issue_corpora"
+        / "public_issue_smoke_v1"
+        / "reproduction_specs.reviewed.json"
+    )
+    reviewed_specs_path.parent.mkdir(parents=True)
+    reviewed_specs_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "specs": [
+                    {
+                        "task_id": "public_task",
+                        "command": "python3 -m pytest tests/test_bug.py",
+                        "fixture_files": [
+                            {
+                                "path": "tests/test_bug.py",
+                                "content": "def test_bug():\n    assert False\n",
+                            }
+                        ],
+                        "expected_failure_signals": ["AssertionError"],
+                    }
+                ],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    report = write_evidence_refresh_report(
+        project_root=project_root,
+        artifacts_dir=artifacts_dir,
+        output_path=tmp_path / "evidence_refresh.md",
+        json_output_path=tmp_path / "evidence_refresh.json",
+        max_failure_runs=5,
+        include_quality_gate=False,
+    )
+
+    assert report.failed_count == 0
+    plan_summary = json.loads(
+        (public_dir / "public_issue_reproduction_plan_summary.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    validation_summary = json.loads(
+        (
+            public_dir / "public_issue_reproduction_spec_validation_summary.json"
+        ).read_text(encoding="utf-8")
+    )
+    execution_summary = json.loads(
+        (public_dir / "public_issue_reproduction_execution_summary.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert plan_summary["planned_tasks"] == 1
+    assert plan_summary["fixture_file_tasks"] == 1
+    assert validation_summary["ready_tasks"] == 1
+    assert validation_summary["fixture_file_tasks"] == 1
+    assert execution_summary["dry_run_tasks"] == 1
+    assert execution_summary["fixture_file_tasks"] == 1
+
+
 def test_evidence_refresh_can_refresh_docker_smoke(
     tmp_path: Path,
     monkeypatch,

@@ -1506,8 +1506,20 @@ def build_evidence_refresh_report(
     public_reproduction_plan_path = experiment_path(
         "public_issue_corpus_v1/public_issue_reproduction_plan_results.json"
     )
-    public_reproduction_specs_path = experiment_path(
+    public_reproduction_template_path = experiment_path(
         "public_issue_corpus_v1/public_issue_reproduction_specs_template.json"
+    )
+    public_reviewed_reproduction_specs_path = (
+        project_root
+        / "evals"
+        / "issue_corpora"
+        / "public_issue_smoke_v1"
+        / "reproduction_specs.reviewed.json"
+    )
+    public_reproduction_specs_path = (
+        public_reviewed_reproduction_specs_path
+        if public_reviewed_reproduction_specs_path.exists()
+        else public_reproduction_template_path
     )
     if public_tasks_dir.exists() and public_tasks_dir.is_dir():
         steps.append(
@@ -1522,6 +1534,11 @@ def build_evidence_refresh_report(
                     focused_plan_path=(
                         public_focused_plan_path
                         if public_focused_plan_path.exists()
+                        else None
+                    ),
+                    reproduction_specs_path=(
+                        public_reviewed_reproduction_specs_path
+                        if public_reviewed_reproduction_specs_path.exists()
                         else None
                     ),
                     output_dir=experiment_path("public_issue_corpus_v1"),

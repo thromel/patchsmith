@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "claim_boundary": [
+    "This file contains reviewed public issue reproduction criteria that have enough issue-specific detail to run through PatchSmith's reproduction gate.",
+    "A task still counts as reproduced only after execute-public-issue-reproductions records a nonzero exit and matches every expected failure signal.",
+    "Specs may be partial; omitted public issue tasks remain unreviewed until their exact failure criteria are encoded."
+  ],
+  "specs": [
+    {
+      "task_id": "pytest_14552_moved_file_filename",
+      "repository": "pytest-dev/pytest",
+      "issue_url": "https://github.com/pytest-dev/pytest/issues/14552",
+      "command": "python3 -m pytest testing/test_issue_14552_repro.py",
+      "fixture_files": [
+        {
+          "path": "testing/test_issue_14552_repro.py",
+          "content": "from __future__ import annotations\n\nimport textwrap\nfrom _pytest.pytester import Pytester\n\n\ndef test_moved_test_file_updates_code_filename(pytester: Pytester) -> None:\n    test1 = pytester.path / \"test1\"\n    test1.mkdir()\n    test_file = test1 / \"test_a.py\"\n    test_file.write_text(\n        textwrap.dedent(\n            \"\"\"\n            from inspect import currentframe, getfile\n\n            def test_a():\n                assert getfile(test_a) == __file__\n                assert currentframe().f_code.co_filename == __file__\n            \"\"\"\n        ),\n        encoding=\"utf-8\",\n    )\n    first = pytester.runpytest(\"-s\", str(test_file))\n    first.assert_outcomes(passed=1)\n    test2 = pytester.path / \"test2\"\n    test1.rename(test2)\n    moved_test = test2 / \"test_a.py\"\n    second = pytester.runpytest(\"-s\", str(moved_test))\n    second.assert_outcomes(passed=1)\n"
+        }
+      ],
+      "expected_failure_signals": [
+        "AssertionError"
+      ],
+      "review_notes": "Reviewed against pytest-dev/pytest#14552: the second run after moving test1 to test2 should pass, but the current snapshot reports the old test1 co_filename."
+    }
+  ]
+}
