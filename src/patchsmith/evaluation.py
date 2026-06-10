@@ -9610,22 +9610,30 @@ def _matched_expected_failure_signals(text: str, patterns: list[str]) -> list[st
 
 
 def _candidate_failure_signals_from_logs(text: str, *, limit: int = 8) -> list[str]:
-    markers = [
-        "AssertionError",
-        "ModuleNotFoundError",
-        "ImportError",
-        "Traceback",
-        "FAILED ",
-        "Failed:",
-        "ERROR ",
-        "E   ",
-        "error:",
-        "No such file or directory",
-        "NameError",
-        "TypeError",
-        "ValueError",
-    ]
-    return _matching_lines(text, markers, limit=limit)
+    exception_markers = (
+        "assertionerror",
+        "modulenotfounderror",
+        "importerror",
+        "nameerror",
+        "typeerror",
+        "valueerror",
+        "no such file or directory",
+    )
+    matches: list[str] = []
+    for raw_line in text.splitlines():
+        stripped = raw_line.strip()
+        if not stripped:
+            continue
+        lowered = stripped.lower()
+        if (
+            lowered.startswith(("failed ", "error ", "e   ", "traceback"))
+            or "error:" in lowered
+            or any(marker in lowered for marker in exception_markers)
+        ):
+            matches.append(stripped[:240])
+            if len(matches) >= limit:
+                break
+    return _dedupe_preserve_order(matches)
 
 
 def _last_nonempty_lines(text: str, *, limit: int) -> list[str]:

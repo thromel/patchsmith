@@ -2063,6 +2063,55 @@ def test_discover_public_issue_failure_signals_extracts_local_failure(
     assert results[0].stderr_path is not None
 
 
+def test_discover_public_issue_failure_signals_ignores_xfailed_summary(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    tests_dir = repo_dir / "tests"
+    tests_dir.mkdir(parents=True)
+    (tests_dir / "test_xfail.py").write_text(
+        "import pytest\n\n"
+        "@pytest.mark.xfail(reason='known')\n"
+        "def test_xfail():\n"
+        "    assert False\n",
+        encoding="utf-8",
+    )
+    plan_path = tmp_path / "public_issue_reproduction_plan_results.json"
+    plan_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "public_task",
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/12",
+                    "status": "warning",
+                    "repo_path": str(repo_dir),
+                    "reproduction_command": "python3 -m pytest tests/test_xfail.py",
+                    "expected_failure_signals": [],
+                    "manual_spec_required": True,
+                    "blockers": [],
+                    "warnings": [],
+                    "next_actions": [],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    results, summary = discover_public_issue_failure_signals(
+        plan_path=plan_path,
+        output_dir=tmp_path / "discovery",
+        sandbox_mode="local",
+        dry_run=False,
+        timeout_seconds=30,
+    )
+
+    assert summary.passed_tasks == 1
+    assert summary.candidate_signal_tasks == 0
+    assert results[0].status == "passed"
+    assert results[0].candidate_failure_signals == []
+
+
 def test_execute_public_issue_reproductions_blocks_missing_failure_spec(
     tmp_path: Path,
 ) -> None:
