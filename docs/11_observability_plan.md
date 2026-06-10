@@ -225,6 +225,7 @@ The MVP must record:
 - generated demo script with timed segments and artifact review path,
 - generated demo media assets for README or presentation use,
 - final evaluation report with decisions, limitations, metric rows, and claim boundaries,
+- delivery audit report mapping the original objective to concrete evidence and blockers,
 - launch blocker backlog with prioritized Docker, setup-readiness, live-calibration, and release actions,
 - focused setup-execution report with dry-run, command-policy, sandbox, and blocked-execution evidence,
 - focused setup-validation report with post-setup validation dry-run/execution evidence,
@@ -244,6 +245,7 @@ The MVP must record:
 - demo script.
 - demo media.
 - final evaluation report.
+- delivery audit report.
 - launch blocker backlog.
 - focused setup-execution report.
 - focused setup-validation report.

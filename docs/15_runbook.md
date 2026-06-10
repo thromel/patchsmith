@@ -410,6 +410,19 @@ PYTHONPATH=src python3 -m patchsmith.cli mvp-progress \
 
 The MVP progress report turns the implementation, docs, test, and artifact checklist into an evidence-weighted percentage. `ready_with_caveats` means the core MVP evidence is present, but warning items must still be named in status updates.
 
+Delivery audit:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli delivery-audit \
+  --project-root . \
+  --artifacts-dir artifacts \
+  --output artifacts/experiments/delivery_audit.md \
+  --json-output artifacts/experiments/delivery_audit.json \
+  --json
+```
+
+The delivery audit maps the original planning/development objective to concrete evidence across docs, sprint plans, Git, tests, saved artifacts, release hygiene, Docker, public issue setup validation, and live calibration. `in_progress_with_blockers` means delivery has evidence-backed progress but still has blocker-class gaps.
+
 Live calibration readiness:
 
 ```bash
@@ -678,6 +691,7 @@ Run:
 - demo script regeneration,
 - demo media regeneration,
 - final evaluation report regeneration,
+- delivery audit regeneration,
 - launch blocker backlog regeneration,
 - live calibration plan regeneration,
 - focused public issue setup-execution regeneration,

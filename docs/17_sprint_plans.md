@@ -781,6 +781,13 @@ PYTHONPATH=src python3 -m patchsmith.cli final-evaluation \
   --json-output artifacts/experiments/final_evaluation.json \
   --json
 
+PYTHONPATH=src python3 -m patchsmith.cli delivery-audit \
+  --project-root . \
+  --artifacts-dir artifacts \
+  --output artifacts/experiments/delivery_audit.md \
+  --json-output artifacts/experiments/delivery_audit.json \
+  --json
+
 PYTHONPATH=src python3 -m patchsmith.cli release-hygiene \
   --project-root . \
   --artifacts-dir artifacts \
@@ -805,6 +812,8 @@ Latest evidence:
 - `artifacts/experiments/demo_media.png`,
 - `artifacts/experiments/final_evaluation.md`,
 - `artifacts/experiments/final_evaluation.json`,
+- `artifacts/experiments/delivery_audit.md`,
+- `artifacts/experiments/delivery_audit.json`,
 - `artifacts/experiments/launch_blockers.md`,
 - `artifacts/experiments/launch_blockers.json`,
 - `artifacts/experiments/public_issue_corpus_v1/focused_test_setup_execution_report.md`,
@@ -816,6 +825,7 @@ Latest evidence:
 - readiness status: `ready_with_caveats`,
 - live calibration readiness: `not_configured`,
 - live calibration plan: `blocked`,
+- delivery audit: `in_progress_with_blockers`,
 - launch blocker status: `blocked`,
 - launch blockers: 2,
 - launch warnings: 2,
@@ -868,6 +878,7 @@ Reason:
 | S10-T9 | Setup policy | PatchSmith | Docker-only editable-install policy behind explicit dependency-install and network flags |
 | S10-T10 | Setup validation | PatchSmith | `validate-focused-test-setups` command plus post-setup validation dry-run/execution evidence |
 | S10-T11 | Live calibration planning | PatchSmith | `live-calibration-plan` command plus credential-gated live-run matrix and claim boundaries |
+| S10-T12 | Delivery audit | PatchSmith | `delivery-audit` command plus objective-to-evidence status report |
 
 ## Completed Sprint 9 task breakdown
 

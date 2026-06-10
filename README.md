@@ -535,6 +535,19 @@ PYTHONPATH=src python3 -m patchsmith.cli mvp-progress \
 
 Latest MVP progress evidence is saved in `artifacts/experiments/mvp_progress.md` and `artifacts/experiments/mvp_progress.json`. Current status is `ready_with_caveats` at `96.7%`: 28 checklist items pass, two remain warnings, and no item is blocked or missing. The remaining warnings are intentionally evidence-based: live LLM calibration and Docker daemon/image smoke are still not proven.
 
+Generate the delivery audit:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli delivery-audit \
+  --project-root . \
+  --artifacts-dir artifacts \
+  --output artifacts/experiments/delivery_audit.md \
+  --json-output artifacts/experiments/delivery_audit.json \
+  --json
+```
+
+Latest delivery-audit evidence is saved in `artifacts/experiments/delivery_audit.md` and `artifacts/experiments/delivery_audit.json`. It maps the original planning/development objective to concrete evidence and keeps Docker smoke, public issue setup validation, and live LLM calibration as blockers until those artifacts pass.
+
 Generate the live calibration readiness report:
 
 ```bash
@@ -634,7 +647,7 @@ PYTHONPATH=src python3 -m patchsmith.cli release-hygiene \
   --json
 ```
 
-Latest release hygiene evidence is saved in `artifacts/experiments/release_hygiene.md` and `artifacts/experiments/release_hygiene.json`. Current status is `ready_with_warnings`: CI, packaging metadata, architecture-diagram, demo-media, calibration-readiness, live-calibration plan, launch-blocker, public issue corpus/context-preview/materialized-task validation/readiness/focused-test plan/run/diagnosis/setup-plan/setup-readiness/setup-execution/setup-validation evidence, and local Git metadata checks pass, while live LLM calibration remains unproven and must stay visible in release claims.
+Latest release hygiene evidence is saved in `artifacts/experiments/release_hygiene.md` and `artifacts/experiments/release_hygiene.json`. Current status is `ready_with_warnings`: CI, packaging metadata, architecture-diagram, demo-media, calibration-readiness, live-calibration plan, delivery audit, launch-blocker, public issue corpus/context-preview/materialized-task validation/readiness/focused-test plan/run/diagnosis/setup-plan/setup-readiness/setup-execution/setup-validation evidence, and local Git metadata checks pass, while live LLM calibration remains unproven and must stay visible in release claims.
 
 Build package artifacts:
 
@@ -669,7 +682,7 @@ When those rates are set, reports estimate model cost from provider token usage.
 
 ## Next engineering wedges
 
-The context broker boundary, retrieval eval runner, repair eval runner, scaffold comparison runner, patch-search evaluator, public issue corpus validation/preflight/context preview/task materialization, validation, run-readiness, focused-test planning, focused-test execution, focused-test diagnosis, focused-test setup planning, focused-test setup-readiness checks, focused-test setup-execution dry-run gate, and focused-test setup-validation gate, static artifact index/dashboard with normalized metrics and generated run-detail trace pages, failure review report, demo readiness report, live calibration readiness report and execution plan, launch blocker backlog, generated demo script, final evaluation report, release hygiene report, deterministic heuristic runtime, LangGraph orchestration runtime, DeepAgents adapter compatibility mode plus package-backed smoke evidence, OpenAI Agents SDK adapter compatibility mode, offline model-planner seam, credential-gated OpenAI Responses client, and Python Code Context Graph v0 now exist. The current seeded suite has 10 tasks and compares `native`, `native_hybrid`, `native_graph`, and `ctxhelm_cli` for retrieval, including aggregate context packing metadata. Scaffold comparison now includes trace complexity and debuggability metrics. The next useful development step is resolving Docker smoke availability before executing public-repo dependency setup, resolving the remaining live-provider warning, harder patch-search tasks with model-diverse candidates, or live-provider calibration when credentials and budget are explicitly available.
+The context broker boundary, retrieval eval runner, repair eval runner, scaffold comparison runner, patch-search evaluator, public issue corpus validation/preflight/context preview/task materialization, validation, run-readiness, focused-test planning, focused-test execution, focused-test diagnosis, focused-test setup planning, focused-test setup-readiness checks, focused-test setup-execution dry-run gate, and focused-test setup-validation gate, static artifact index/dashboard with normalized metrics and generated run-detail trace pages, failure review report, demo readiness report, live calibration readiness report and execution plan, delivery audit, launch blocker backlog, generated demo script, final evaluation report, release hygiene report, deterministic heuristic runtime, LangGraph orchestration runtime, DeepAgents adapter compatibility mode plus package-backed smoke evidence, OpenAI Agents SDK adapter compatibility mode, offline model-planner seam, credential-gated OpenAI Responses client, and Python Code Context Graph v0 now exist. The current seeded suite has 10 tasks and compares `native`, `native_hybrid`, `native_graph`, and `ctxhelm_cli` for retrieval, including aggregate context packing metadata. Scaffold comparison now includes trace complexity and debuggability metrics. The next useful development step is resolving Docker smoke availability before executing public-repo dependency setup, resolving the remaining live-provider warning, harder patch-search tasks with model-diverse candidates, or live-provider calibration when credentials and budget are explicitly available.
 
 The current LangGraph repair skeleton is:
 

@@ -32,6 +32,7 @@ from patchsmith.portfolio import (
     write_demo_readiness_report,
     write_demo_media_assets,
     write_demo_script_report,
+    write_delivery_audit_report,
     write_docker_smoke_report,
     write_final_evaluation_report,
     write_launch_blocker_report,
@@ -1140,6 +1141,48 @@ def main(argv: list[str] | None = None) -> int:
             )
         return 0
 
+    if args.command == "delivery-audit":
+        json_output_path = Path(args.json_output) if args.json_output else None
+        report = write_delivery_audit_report(
+            project_root=Path(args.project_root),
+            artifacts_dir=Path(args.artifacts_dir),
+            output_path=Path(args.output),
+            json_output_path=json_output_path,
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "project_root": report.project_root,
+                        "artifacts_dir": report.artifacts_dir,
+                        "generated_at": report.generated_at,
+                        "delivery_status": report.delivery_status,
+                        "completion_percent": report.completion_percent,
+                        "item_count": report.item_count,
+                        "passed_count": report.passed_count,
+                        "warning_count": report.warning_count,
+                        "blocked_count": report.blocked_count,
+                        "missing_count": report.missing_count,
+                        "report_path": str(Path(args.output)),
+                        "json_path": str(json_output_path) if json_output_path else None,
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(f"Delivery audit report: {Path(args.output)}")
+            if json_output_path:
+                print(f"JSON: {json_output_path}")
+            print(
+                f"Status: {report.delivery_status} "
+                f"Completion: {report.completion_percent:.1f}% "
+                f"Passed: {report.passed_count} "
+                f"Warnings: {report.warning_count} "
+                f"Missing: {report.missing_count} "
+                f"Blocked: {report.blocked_count}"
+            )
+        return 0
+
     parser.print_help()
     return 2
 
@@ -2108,6 +2151,32 @@ def build_parser() -> argparse.ArgumentParser:
         help="Maximum recent runs to scan for failure visibility. Use 0 to scan all runs.",
     )
     mvp_progress.add_argument("--json", action="store_true", help="Print JSON summary.")
+
+    delivery_audit = subparsers.add_parser(
+        "delivery-audit",
+        help="Generate an objective-to-evidence delivery audit report.",
+    )
+    delivery_audit.add_argument(
+        "--project-root",
+        default=".",
+        help="Project root to inspect for docs, tests, and Git metadata.",
+    )
+    delivery_audit.add_argument(
+        "--artifacts-dir",
+        default="artifacts",
+        help="Root artifact directory to scan.",
+    )
+    delivery_audit.add_argument(
+        "--output",
+        default="artifacts/experiments/delivery_audit.md",
+        help="Markdown delivery audit output path.",
+    )
+    delivery_audit.add_argument(
+        "--json-output",
+        default="artifacts/experiments/delivery_audit.json",
+        help="Optional JSON delivery audit output path.",
+    )
+    delivery_audit.add_argument("--json", action="store_true", help="Print JSON summary.")
 
     return parser
 

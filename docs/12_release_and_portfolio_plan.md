@@ -167,6 +167,19 @@ PYTHONPATH=src python3 -m patchsmith.cli mvp-progress \
 
 Current MVP progress output is `ready_with_caveats` at `96.7%`: 28 evidence-backed checklist items pass, two are warnings, and no item is blocked or missing. Use it as the snapshot answer for "how far are we?" while keeping the live-calibration warning explicit.
 
+Generate the delivery audit:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli delivery-audit \
+  --project-root . \
+  --artifacts-dir artifacts \
+  --output artifacts/experiments/delivery_audit.md \
+  --json-output artifacts/experiments/delivery_audit.json \
+  --json
+```
+
+Current delivery audit output is `in_progress_with_blockers`: requirements, roadmaps, sprint plans, process docs, development commits, and saved evaluation artifacts are present, while Docker smoke, public issue setup validation, and live LLM calibration remain blocker-class evidence gaps.
+
 Generate the Docker smoke report:
 
 ```bash
@@ -342,7 +355,7 @@ PYTHONPATH=src python3 -m patchsmith.cli release-hygiene \
   --json
 ```
 
-Current release hygiene output is `ready_with_warnings`: generated review artifacts now include calibration-readiness, live-calibration plan, launch-blocker, and public issue context-preview/materialization validation/readiness/focused-test plan/run/diagnosis/setup-plan/setup-readiness/setup-execution/setup-validation evidence, package build metadata exists, local Git metadata exists, and the remaining release caveat is live LLM calibration.
+Current release hygiene output is `ready_with_warnings`: generated review artifacts now include calibration-readiness, live-calibration plan, delivery audit, launch-blocker, and public issue context-preview/materialization validation/readiness/focused-test plan/run/diagnosis/setup-plan/setup-readiness/setup-execution/setup-validation evidence, package build metadata exists, local Git metadata exists, and the remaining release caveat is live LLM calibration.
 
 ## Example flagship demo scenario
 

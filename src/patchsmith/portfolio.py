@@ -385,6 +385,48 @@ class MvpProgressReport:
 
 
 @dataclass(frozen=True)
+class DeliveryAuditItem:
+    requirement: str
+    status: str
+    evidence: str
+    source: str
+    next_action: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class DeliveryAuditReport:
+    project_root: str
+    artifacts_dir: str
+    generated_at: str
+    delivery_status: str
+    completion_percent: float
+    item_count: int
+    passed_count: int
+    warning_count: int
+    blocked_count: int
+    missing_count: int
+    items: list[DeliveryAuditItem]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "project_root": self.project_root,
+            "artifacts_dir": self.artifacts_dir,
+            "generated_at": self.generated_at,
+            "delivery_status": self.delivery_status,
+            "completion_percent": self.completion_percent,
+            "item_count": self.item_count,
+            "passed_count": self.passed_count,
+            "warning_count": self.warning_count,
+            "blocked_count": self.blocked_count,
+            "missing_count": self.missing_count,
+            "items": [item.to_dict() for item in self.items],
+        }
+
+
+@dataclass(frozen=True)
 class ReleaseHygieneCheck:
     name: str
     status: str
@@ -531,6 +573,7 @@ def build_release_hygiene_report(
             "artifacts/experiments/demo_media.svg",
             "artifacts/experiments/demo_media.png",
             "artifacts/experiments/final_evaluation.md",
+            "artifacts/experiments/delivery_audit.md",
             "artifacts/experiments/release_hygiene.md",
         ],
     )
@@ -1347,6 +1390,100 @@ def render_mvp_progress_report(report: MvpProgressReport) -> str:
     return "\n".join(lines) + "\n"
 
 
+def build_delivery_audit_report(
+    *,
+    project_root: Path,
+    artifacts_dir: Path,
+) -> DeliveryAuditReport:
+    project_root = project_root.resolve()
+    artifacts_dir = artifacts_dir.resolve()
+    index = build_artifact_index(artifacts_dir=artifacts_dir)
+    items = _delivery_audit_items(
+        project_root=project_root,
+        artifacts_dir=artifacts_dir,
+        index=index,
+    )
+    status_counts = Counter(item.status for item in items)
+    return DeliveryAuditReport(
+        project_root=str(project_root),
+        artifacts_dir=str(artifacts_dir),
+        generated_at=_utc_now(),
+        delivery_status=_delivery_status(items),
+        completion_percent=_delivery_completion_percent(items),
+        item_count=len(items),
+        passed_count=status_counts.get("passed", 0),
+        warning_count=status_counts.get("warning", 0),
+        blocked_count=status_counts.get("blocked", 0),
+        missing_count=status_counts.get("missing", 0),
+        items=items,
+    )
+
+
+def write_delivery_audit_report(
+    *,
+    project_root: Path,
+    artifacts_dir: Path,
+    output_path: Path,
+    json_output_path: Path | None = None,
+) -> DeliveryAuditReport:
+    report = build_delivery_audit_report(
+        project_root=project_root,
+        artifacts_dir=artifacts_dir,
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(render_delivery_audit_report(report), encoding="utf-8")
+    if json_output_path is not None:
+        json_output_path.parent.mkdir(parents=True, exist_ok=True)
+        json_output_path.write_text(
+            json.dumps(report.to_dict(), indent=2) + "\n",
+            encoding="utf-8",
+        )
+    return report
+
+
+def render_delivery_audit_report(report: DeliveryAuditReport) -> str:
+    lines = [
+        "# PatchSmith Delivery Audit",
+        "",
+        f"- Generated at: `{report.generated_at}`",
+        f"- Project root: `{report.project_root}`",
+        f"- Artifacts directory: `{report.artifacts_dir}`",
+        f"- Delivery status: `{report.delivery_status}`",
+        f"- Evidence-weighted completion: `{report.completion_percent:.1f}%`",
+        f"- Items: `{report.item_count}`",
+        f"- Passed: `{report.passed_count}`",
+        f"- Warnings: `{report.warning_count}`",
+        f"- Blockers: `{report.blocked_count}`",
+        f"- Missing: `{report.missing_count}`",
+        "",
+        "## Requirement Evidence",
+        "",
+        "| Requirement | Status | Evidence | Source | Next Action |",
+        "|---|---|---|---|---|",
+    ]
+    for item in report.items:
+        lines.append(
+            "| "
+            f"{item.requirement} | "
+            f"{item.status} | "
+            f"{_markdown_cell(item.evidence)} | "
+            f"{_markdown_cell(item.source)} | "
+            f"{_markdown_cell(item.next_action)} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Scoring",
+            "",
+            "- Passed items count as 1.0.",
+            "- Warning items count as 0.5 because evidence exists but is incomplete.",
+            "- Blocked and missing items count as 0.0.",
+            "- This audit is a delivery status artifact; it does not replace rerunning tests or live calibration.",
+        ]
+    )
+    return "\n".join(lines) + "\n"
+
+
 def render_final_evaluation_report(report: FinalEvaluationReport) -> str:
     lines = [
         "# PatchSmith Final Evaluation Report",
@@ -1874,6 +2011,363 @@ def _readiness_status(gates: list[DemoReadinessGate]) -> str:
     if "warning" in statuses:
         return "ready_with_caveats"
     return "ready"
+
+
+def _delivery_audit_items(
+    *,
+    project_root: Path,
+    artifacts_dir: Path,
+    index: ArtifactIndex,
+) -> list[DeliveryAuditItem]:
+    mvp_payload = _load_json_artifact(artifacts_dir / "experiments" / "mvp_progress.json")
+    release_payload = _load_json_artifact(artifacts_dir / "experiments" / "release_hygiene.json")
+    docker_payload = _load_json_artifact(artifacts_dir / "experiments" / "docker_smoke.json")
+    launch_payload = _load_json_artifact(artifacts_dir / "experiments" / "launch_blockers.json")
+    calibration_payload = _load_json_artifact(
+        artifacts_dir / "experiments" / "calibration_readiness.json"
+    )
+    calibration_plan_payload = _load_json_artifact(
+        artifacts_dir / "experiments" / "live_calibration_plan.json"
+    )
+    setup_validation_payload = _load_json_artifact(
+        artifacts_dir
+        / "experiments"
+        / "public_issue_corpus_v1"
+        / "focused_test_setup_validation_summary.json"
+    )
+
+    return [
+        _delivery_path_item(
+            project_root=project_root,
+            requirement="Requirements and roadmaps are saved.",
+            source="README.md, docs/01_product_requirements.md, docs/09_roadmap.md, docs/12_release_and_portfolio_plan.md",
+            paths=[
+                "README.md",
+                "docs/01_product_requirements.md",
+                "docs/09_roadmap.md",
+                "docs/12_release_and_portfolio_plan.md",
+            ],
+            next_action="Restore missing source planning docs before claiming delivery continuity.",
+        ),
+        _delivery_sprint_plan_item(project_root),
+        _delivery_path_item(
+            project_root=project_root,
+            requirement="Industry process docs are saved.",
+            source="docs/10_testing_strategy.md, docs/14_risk_register.md, docs/18_delivery_process.md, docs/06_safety_and_sandboxing.md",
+            paths=[
+                "docs/10_testing_strategy.md",
+                "docs/14_risk_register.md",
+                "docs/18_delivery_process.md",
+                "docs/06_safety_and_sandboxing.md",
+            ],
+            next_action="Restore missing testing, risk, safety, or delivery-process docs.",
+        ),
+        _delivery_git_item(project_root),
+        _delivery_path_item(
+            project_root=project_root,
+            requirement="Automated verification surfaces exist.",
+            source="tests/, pyproject.toml, .github/workflows",
+            paths=["tests", "pyproject.toml", ".github/workflows"],
+            next_action="Keep pytest, packaging, and CI workflow surfaces available.",
+        ),
+        _delivery_item(
+            requirement="Saved evaluation artifacts exist.",
+            status="passed" if index.experiment_count and index.run_count and index.metrics else "missing",
+            evidence=(
+                f"{index.experiment_count} experiments, {index.run_count} runs, "
+                f"{len(index.metrics)} normalized metric rows."
+            ),
+            source="artifacts/experiments/index.json",
+            next_action=(
+                "Regenerate `index-artifacts` before review."
+                if not (index.experiment_count and index.run_count and index.metrics)
+                else "Keep artifact index current after new evals."
+            ),
+        ),
+        _delivery_payload_status_item(
+            requirement="MVP checklist progress is evidence-backed.",
+            payload=mvp_payload,
+            status_key="status",
+            pass_values={"ready"},
+            warning_values={"ready_with_caveats"},
+            blocked_values={"blocked"},
+            evidence_keys=["completion_percent", "blocked_count", "warning_count"],
+            source="artifacts/experiments/mvp_progress.json",
+            missing_action="Regenerate `mvp-progress`.",
+        ),
+        _delivery_payload_status_item(
+            requirement="Release hygiene gate is current.",
+            payload=release_payload,
+            status_key="release_status",
+            pass_values={"ready"},
+            warning_values={"ready_with_warnings"},
+            blocked_values={"blocked"},
+            evidence_keys=["blocked_count", "warning_count"],
+            source="artifacts/experiments/release_hygiene.json",
+            missing_action="Regenerate `release-hygiene` from a clean worktree.",
+        ),
+        _delivery_launch_blockers_item(launch_payload),
+        _delivery_payload_status_item(
+            requirement="Docker sandbox smoke has executable evidence.",
+            payload=docker_payload,
+            status_key="smoke_status",
+            pass_values={"passed"},
+            warning_values={"skipped"},
+            blocked_values={"failed", "not_available"},
+            evidence_keys=["smoke_status"],
+            source="artifacts/experiments/docker_smoke.json",
+            missing_action="Start Docker, build the smoke image, and rerun `docker-smoke`.",
+        ),
+        _delivery_setup_validation_item(setup_validation_payload),
+        _delivery_payload_status_item(
+            requirement="Live LLM calibration has provider evidence.",
+            payload=calibration_payload,
+            status_key="calibration_status",
+            pass_values={"calibrated"},
+            warning_values={"ready_to_run", "needs_review"},
+            blocked_values={"not_configured"},
+            evidence_keys=["saved_live_provider_count", "deepagents_package_run_count", "openai_agents_package_run_count"],
+            source="artifacts/experiments/calibration_readiness.json",
+            missing_action="Configure credentials and run the required live-provider smoke.",
+        ),
+        _delivery_calibration_plan_item(calibration_plan_payload),
+    ]
+
+
+def _delivery_path_item(
+    *,
+    project_root: Path,
+    requirement: str,
+    source: str,
+    paths: list[str],
+    next_action: str,
+) -> DeliveryAuditItem:
+    missing = [path for path in paths if not (project_root / path).exists()]
+    return _delivery_item(
+        requirement=requirement,
+        status="passed" if not missing else "missing",
+        evidence=(
+            f"All {len(paths)} required paths exist."
+            if not missing
+            else f"Missing: {', '.join(missing)}."
+        ),
+        source=source,
+        next_action="No action needed." if not missing else next_action,
+    )
+
+
+def _delivery_sprint_plan_item(project_root: Path) -> DeliveryAuditItem:
+    path = project_root / "docs" / "17_sprint_plans.md"
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        text = ""
+    sprint_count = text.count("### Sprint ")
+    task_marker_count = text.count("| S")
+    passed = sprint_count >= 10 and task_marker_count >= 10
+    return _delivery_item(
+        requirement="Roadmap is decomposed into sprint plans.",
+        status="passed" if passed else "missing",
+        evidence=f"{sprint_count} sprint sections and {task_marker_count} sprint-task rows found.",
+        source="docs/17_sprint_plans.md",
+        next_action=(
+            "No action needed."
+            if passed
+            else "Restore sprint sections and task breakdown rows in docs/17_sprint_plans.md."
+        ),
+    )
+
+
+def _delivery_git_item(project_root: Path) -> DeliveryAuditItem:
+    if not (project_root / ".git").exists():
+        return _delivery_item(
+            requirement="Development is versioned in Git.",
+            status="missing",
+            evidence="No .git directory found.",
+            source="git",
+            next_action="Initialize or restore Git metadata.",
+        )
+    head = _run_git(project_root, "rev-parse", "--short", "HEAD")
+    status = _run_git(project_root, "status", "--porcelain", "--untracked-files=all")
+    if head.returncode != 0:
+        return _delivery_item(
+            requirement="Development is versioned in Git.",
+            status="missing",
+            evidence="Git repository has no readable HEAD.",
+            source="git",
+            next_action="Create a verified baseline commit.",
+        )
+    dirty = bool(status.stdout.strip()) if status.returncode == 0 else True
+    return _delivery_item(
+        requirement="Development is versioned in Git.",
+        status="warning" if dirty else "passed",
+        evidence=(
+            f"Current commit {head.stdout.strip()}; worktree {'dirty' if dirty else 'clean'}."
+        ),
+        source="git status",
+        next_action=(
+            "Commit or intentionally discard pending changes before release audit."
+            if dirty
+            else "No action needed."
+        ),
+    )
+
+
+def _delivery_payload_status_item(
+    *,
+    requirement: str,
+    payload: dict[str, Any] | None,
+    status_key: str,
+    pass_values: set[str],
+    warning_values: set[str],
+    blocked_values: set[str],
+    evidence_keys: list[str],
+    source: str,
+    missing_action: str,
+) -> DeliveryAuditItem:
+    if payload is None:
+        return _delivery_item(
+            requirement=requirement,
+            status="missing",
+            evidence="Saved JSON artifact is missing or invalid.",
+            source=source,
+            next_action=missing_action,
+        )
+    raw_status = str(payload.get(status_key) or "unknown")
+    if raw_status in pass_values:
+        status = "passed"
+    elif raw_status in warning_values:
+        status = "warning"
+    elif raw_status in blocked_values:
+        status = "blocked"
+    else:
+        status = "warning"
+    details = [f"{status_key}={raw_status}"]
+    for key in evidence_keys:
+        if key in payload and key != status_key:
+            details.append(f"{key}={payload[key]}")
+    return _delivery_item(
+        requirement=requirement,
+        status=status,
+        evidence=", ".join(details),
+        source=source,
+        next_action="No action needed." if status == "passed" else missing_action,
+    )
+
+
+def _delivery_launch_blockers_item(payload: dict[str, Any] | None) -> DeliveryAuditItem:
+    if payload is None:
+        return _delivery_item(
+            requirement="Launch blockers are tracked.",
+            status="missing",
+            evidence="Launch blocker artifact is missing.",
+            source="artifacts/experiments/launch_blockers.json",
+            next_action="Regenerate `launch-blockers`.",
+        )
+    launch_status = str(payload.get("launch_status") or "unknown")
+    return _delivery_item(
+        requirement="Launch blockers are tracked.",
+        status="passed",
+        evidence=(
+            f"launch_status={launch_status}, "
+            f"blocked_count={_payload_int(payload, 'blocked_count')}, "
+            f"warning_count={_payload_int(payload, 'warning_count')}"
+        ),
+        source="artifacts/experiments/launch_blockers.json",
+        next_action="Work the listed blocker next actions before public launch claims.",
+    )
+
+
+def _delivery_calibration_plan_item(payload: dict[str, Any] | None) -> DeliveryAuditItem:
+    if payload is None:
+        return _delivery_item(
+            requirement="Live calibration execution plan is saved.",
+            status="missing",
+            evidence="Live calibration plan artifact is missing.",
+            source="artifacts/experiments/live_calibration_plan.json",
+            next_action="Regenerate `live-calibration-plan`.",
+        )
+    plan_status = str(payload.get("plan_status") or "unknown")
+    return _delivery_item(
+        requirement="Live calibration execution plan is saved.",
+        status="passed",
+        evidence=(
+            f"plan_status={plan_status}, "
+            f"run_count={_payload_int(payload, 'run_count')}, "
+            f"ready_runs={_payload_int(payload, 'ready_runs')}, "
+            f"blocked_runs={_payload_int(payload, 'blocked_runs')}"
+        ),
+        source="artifacts/experiments/live_calibration_plan.json",
+        next_action="Run the required live smoke only after credentials and budget are available.",
+    )
+
+
+def _delivery_setup_validation_item(payload: dict[str, Any] | None) -> DeliveryAuditItem:
+    if payload is None:
+        return _delivery_item(
+            requirement="Public issue setup validation has a safe gate.",
+            status="missing",
+            evidence="Setup-validation summary artifact is missing.",
+            source="artifacts/experiments/public_issue_corpus_v1/focused_test_setup_validation_summary.json",
+            next_action="Regenerate `validate-focused-test-setups`.",
+        )
+    blocked = _payload_int(payload, "blocked_tasks")
+    attempted = _payload_int(payload, "attempted_tasks")
+    passed = _payload_int(payload, "passed_tasks")
+    status = "passed" if passed else "warning" if attempted else "blocked"
+    return _delivery_item(
+        requirement="Public issue setup validation has a safe gate.",
+        status=status,
+        evidence=(
+            f"blocked_tasks={blocked}, attempted_tasks={attempted}, passed_tasks={passed}"
+        ),
+        source="artifacts/experiments/public_issue_corpus_v1/focused_test_setup_validation_summary.json",
+        next_action=(
+            "No action needed."
+            if status == "passed"
+            else "Resolve Docker/setup blockers before claiming public issue reproduction."
+        ),
+    )
+
+
+def _delivery_item(
+    *,
+    requirement: str,
+    status: str,
+    evidence: str,
+    source: str,
+    next_action: str,
+) -> DeliveryAuditItem:
+    return DeliveryAuditItem(
+        requirement=requirement,
+        status=status,
+        evidence=evidence,
+        source=source,
+        next_action=next_action,
+    )
+
+
+def _delivery_status(items: list[DeliveryAuditItem]) -> str:
+    statuses = {item.status for item in items}
+    if "blocked" in statuses:
+        return "in_progress_with_blockers"
+    if "missing" in statuses:
+        return "in_progress_missing_evidence"
+    if "warning" in statuses:
+        return "in_progress_with_caveats"
+    return "ready_for_completion_review"
+
+
+def _delivery_completion_percent(items: list[DeliveryAuditItem]) -> float:
+    if not items:
+        return 0.0
+    score = 0.0
+    for item in items:
+        if item.status == "passed":
+            score += 1.0
+        elif item.status == "warning":
+            score += 0.5
+    return round(score / len(items) * 100.0, 1)
 
 
 def _mvp_progress_items(
@@ -2873,6 +3367,7 @@ def _discover_model_providers(artifacts_dir: Path) -> dict[str, int]:
             "demo_script.json",
             "demo_media.json",
             "final_evaluation.json",
+            "delivery_audit.json",
             "release_hygiene.json",
         }:
             continue
@@ -3063,6 +3558,8 @@ def _release_hygiene_checks(
         "experiments/demo_script.json",
         "experiments/final_evaluation.md",
         "experiments/final_evaluation.json",
+        "experiments/delivery_audit.md",
+        "experiments/delivery_audit.json",
     ]
     checks = [
         _path_check(
@@ -3926,6 +4423,7 @@ def _final_review_artifacts() -> list[str]:
         "artifacts/experiments/demo_media.md",
         "artifacts/experiments/demo_media.svg",
         "artifacts/experiments/demo_media.png",
+        "artifacts/experiments/delivery_audit.md",
         "artifacts/experiments/scaffold_comparison_v1/scaffold_report.md",
         "artifacts/experiments/patch_search_eval_v1/patch_search_report.md",
         "artifacts/experiments/retrieval_eval_v1/report.md",
