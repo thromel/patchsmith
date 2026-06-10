@@ -425,6 +425,7 @@ Latest expected evidence:
 - focused public issue setup-readiness ready tasks: 0,
 - focused public issue setup-readiness blocked tasks: 3,
 - focused public issue setup-execution blocked tasks: 3,
+- focused public issue setup dependency installs: blocked by default policy unless explicitly enabled with Docker mode,
 - invalid entries: 0,
 - repositories: `psf/requests`, `pytest-dev/pytest`.
 
@@ -844,6 +845,7 @@ Reason:
 | S10-T5 | Readiness | PatchSmith | `demo-readiness` command plus Markdown/JSON launch review report |
 | S10-T7 | Blockers | PatchSmith | `launch-blockers` command plus prioritized Docker/setup/calibration/release action backlog |
 | S10-T8 | Setup execution | PatchSmith | `execute-focused-test-setups` command plus readiness-gated dry-run/execution evidence |
+| S10-T9 | Setup policy | PatchSmith | Docker-only editable-install policy behind explicit dependency-install and network flags |
 
 ## Completed Sprint 9 task breakdown
 

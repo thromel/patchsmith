@@ -77,6 +77,7 @@ Current implementation:
 - `docker` mode is opt-in through `--sandbox-mode docker`,
 - Docker mode runs policy-checked commands with implicit image pulls disabled, network disabled, dropped capabilities, resource limits, a `/workspace` bind mount, and a sanitized host environment,
 - Docker mode requires an image that already contains the task test dependencies.
+- focused public-issue setup execution defaults to dry-run and keeps dependency installs blocked unless `--allow-dependency-installs` is explicitly set with Docker mode.
 
 ### Network policy
 
@@ -91,6 +92,7 @@ Exceptions:
 - dependency installation may require network,
 - exceptions require explicit config,
 - network-enabled runs must be labeled in reports.
+- setup dependency installs require Docker mode, explicit dependency-install opt-in, and an explicit network mode such as `--sandbox-network bridge`.
 
 ### Filesystem policy
 
@@ -123,6 +125,15 @@ mypy
 npm test
 pnpm test
 ```
+
+Focused setup allowlist:
+
+```text
+python -m pip install -e .
+python -m pip install -e ".[test]"
+```
+
+This focused setup allowlist is separate from the default test-command allowlist. It is only intended for disposable Docker setup execution after readiness checks and explicit dependency-install approval.
 
 Blocked command patterns:
 

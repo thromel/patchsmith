@@ -71,6 +71,43 @@ class CommandPolicy:
         return CommandPolicyDecision(True, "allowed", tokens)
 
 
+class FocusedSetupCommandPolicy(CommandPolicy):
+    """Command policy for dependency setup inside explicit disposable sandboxes."""
+
+    def evaluate(self, command: str, *, workspace: Path) -> CommandPolicyDecision:
+        stripped = command.strip()
+        if not stripped:
+            return CommandPolicyDecision(False, "empty command")
+
+        lower_command = stripped.lower()
+        for fragment in BLOCKED_FRAGMENTS:
+            if fragment in lower_command:
+                return CommandPolicyDecision(False, f"blocked command fragment: {fragment}")
+
+        try:
+            tokens = tuple(shlex.split(stripped))
+        except ValueError as error:
+            return CommandPolicyDecision(False, f"could not parse command: {error}")
+
+        if _is_allowed_editable_setup_install(tokens):
+            return CommandPolicyDecision(
+                True,
+                "allowed focused setup editable install",
+                tokens,
+            )
+
+        return super().evaluate(command, workspace=workspace)
+
+
+def _is_allowed_editable_setup_install(tokens: tuple[str, ...]) -> bool:
+    return (
+        len(tokens) == 6
+        and tokens[0] in {"python", "python3"}
+        and tokens[1:5] == ("-m", "pip", "install", "-e")
+        and tokens[5] in {".", ".[test]"}
+    )
+
+
 def _has_allowed_prefix(tokens: tuple[str, ...]) -> bool:
     for prefix in ALLOWED_PREFIXES:
         if len(tokens) >= len(prefix) and tokens[: len(prefix)] == prefix:
@@ -91,4 +128,3 @@ def _validate_path_token(token: str, workspace: Path) -> CommandPolicyDecision |
         except ValueError:
             return CommandPolicyDecision(False, f"absolute path outside workspace: {token}")
     return None
-

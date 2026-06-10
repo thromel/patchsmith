@@ -384,6 +384,8 @@ PYTHONPATH=src python3 -m patchsmith.cli execute-focused-test-setups \
 
 The setup-execution report records readiness-gated dry-run or explicit execution evidence for setup commands. It defaults to dry-run; use `--execute` only after setup-readiness is no longer blocked and the selected sandbox is approved. Current setup execution remains blocked for all three tasks because Docker smoke is `not_available`.
 
+Dependency installation remains blocked by the default command policy. To dry-run or execute the narrow editable-install setup policy, use Docker mode with explicit opt-in flags such as `--allow-dependency-installs --sandbox-network bridge`; use `--execute` only after reviewing the dry-run report.
+
 Run the seeded repair evaluation:
 
 ```bash

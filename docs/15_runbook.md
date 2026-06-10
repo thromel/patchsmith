@@ -265,6 +265,8 @@ PYTHONPATH=src python3 -m patchsmith.cli execute-focused-test-setups \
 
 The setup-execution report defaults to dry-run and records readiness, command-policy, sandbox, and next-action evidence. Add `--execute` only after setup-readiness is not blocked and the selected sandbox/network policy is approved. Blocked execution rows are stop conditions, not reproduction or repair-quality evidence.
 
+Dependency installs are not part of the default command policy. The setup executor can dry-run the narrow editable-install policy with `--allow-dependency-installs --sandbox-mode docker --sandbox-network bridge`; combine that with `--execute` only after Docker smoke passes and the network-enabled sandbox decision is approved.
+
 Scaffold comparison:
 
 ```bash

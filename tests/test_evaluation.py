@@ -1156,6 +1156,113 @@ def test_execute_focused_test_setups_dry_runs_policy_allowed_commands(
     assert results[0].command_results[0].policy_allowed
 
 
+def test_execute_focused_test_setups_blocks_dependency_installs_without_opt_in(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    readiness_path = tmp_path / "focused_test_setup_readiness_results.json"
+    readiness_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "dependency_setup",
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/4",
+                    "status": "ready",
+                    "setup_profile": "python_dependency_install",
+                    "repo_path": str(repo_dir),
+                    "setup_commands": ["python3 -m pip install -e ."],
+                    "validation_command": "python3 -m pytest tests/test_ok.py",
+                    "requires_network": True,
+                    "sandbox_required": True,
+                    "errors": [],
+                    "warnings": [],
+                    "next_actions": [],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    results, summary = execute_focused_test_setups(
+        readiness_path=readiness_path,
+        output_dir=tmp_path / "execution",
+        sandbox_mode="docker",
+    )
+
+    assert summary.blocked_tasks == 1
+    assert not summary.allow_dependency_installs
+    assert results[0].status == "blocked"
+    assert results[0].command_results[0].status == "policy_blocked"
+    assert not results[0].command_results[0].policy_allowed
+
+
+def test_execute_focused_test_setups_allows_dependency_install_dry_run_with_opt_in(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    readiness_path = tmp_path / "focused_test_setup_readiness_results.json"
+    readiness_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "dependency_setup",
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/5",
+                    "status": "ready",
+                    "setup_profile": "python_dependency_install",
+                    "repo_path": str(repo_dir),
+                    "setup_commands": ['python3 -m pip install -e ".[test]"'],
+                    "validation_command": "python3 -m pytest tests/test_ok.py",
+                    "requires_network": True,
+                    "sandbox_required": True,
+                    "errors": [],
+                    "warnings": [],
+                    "next_actions": [],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    results, summary = execute_focused_test_setups(
+        readiness_path=readiness_path,
+        output_dir=tmp_path / "execution",
+        sandbox_mode="docker",
+        sandbox_network="bridge",
+        allow_dependency_installs=True,
+    )
+
+    assert summary.dry_run_tasks == 1
+    assert summary.allow_dependency_installs
+    assert summary.sandbox_network == "bridge"
+    assert results[0].status == "dry_run"
+    assert results[0].allow_dependency_installs
+    assert results[0].command_results[0].status == "dry_run"
+    assert results[0].command_results[0].policy_allowed
+
+
+def test_execute_focused_test_setups_requires_docker_for_dependency_installs(
+    tmp_path: Path,
+) -> None:
+    readiness_path = tmp_path / "focused_test_setup_readiness_results.json"
+    readiness_path.write_text("[]", encoding="utf-8")
+
+    try:
+        execute_focused_test_setups(
+            readiness_path=readiness_path,
+            output_dir=tmp_path / "execution",
+            sandbox_mode="local",
+            allow_dependency_installs=True,
+        )
+    except ValueError as error:
+        assert "--allow-dependency-installs requires --sandbox-mode docker" in str(error)
+    else:
+        raise AssertionError("expected dependency install opt-in to require Docker")
+
+
 def test_execute_focused_test_setups_runs_policy_allowed_local_command(
     tmp_path: Path,
 ) -> None:

@@ -1,7 +1,7 @@
 import subprocess
 from pathlib import Path
 
-from patchsmith.security import CommandPolicy
+from patchsmith.security import CommandPolicy, FocusedSetupCommandPolicy
 from patchsmith.sandbox import DockerSandboxRunner
 
 
@@ -18,6 +18,30 @@ def test_command_policy_rejects_shell_chaining() -> None:
 
     assert not decision.allowed
     assert "blocked command fragment" in decision.reason
+
+
+def test_command_policy_rejects_dependency_install_by_default() -> None:
+    decision = CommandPolicy().evaluate("python3 -m pip install -e .", workspace=Path.cwd())
+
+    assert not decision.allowed
+    assert "not allowlisted" in decision.reason
+
+
+def test_focused_setup_policy_allows_only_editable_project_installs() -> None:
+    workspace = Path.cwd()
+    policy = FocusedSetupCommandPolicy()
+
+    project_install = policy.evaluate("python3 -m pip install -e .", workspace=workspace)
+    test_extra_install = policy.evaluate(
+        'python3 -m pip install -e ".[test]"',
+        workspace=workspace,
+    )
+    external_install = policy.evaluate("python3 -m pip install requests", workspace=workspace)
+
+    assert project_install.allowed
+    assert project_install.reason == "allowed focused setup editable install"
+    assert test_extra_install.allowed
+    assert not external_install.allowed
 
 
 def test_command_policy_rejects_absolute_host_path() -> None:

@@ -306,6 +306,8 @@ PYTHONPATH=src python3 -m patchsmith.cli execute-focused-test-setups \
 
 Current setup-execution output remains blocked for all three tasks because setup-readiness is blocked. This artifact is still useful launch evidence because it proves the setup executor refuses unsafe execution instead of silently running dependency installation commands.
 
+The default command policy still blocks dependency installation. Setup execution only permits the narrow editable-install setup policy when `--allow-dependency-installs` is set with Docker mode; networked dependency setup must also use an explicit sandbox network such as `--sandbox-network bridge` and remain labeled in reports.
+
 Generate the release hygiene report:
 
 ```bash

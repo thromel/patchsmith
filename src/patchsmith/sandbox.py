@@ -204,11 +204,12 @@ def create_sandbox_runner(
     mode: str,
     image: str = "python:3.12-slim",
     policy: CommandPolicy | None = None,
+    network: str = "none",
 ) -> SandboxRunner:
     if mode == "local":
         return LocalSandboxRunner(policy=policy)
     if mode == "docker":
-        return DockerSandboxRunner(image=image, policy=policy)
+        return DockerSandboxRunner(image=image, policy=policy, network=network)
     raise ValueError(f"unsupported sandbox mode: {mode}")
 
 

@@ -25,7 +25,7 @@ from patchsmith.patching import PatchSafetyError, apply_text_replacement
 from patchsmith.planning import HeuristicRepairPlanner, RepairPlan
 from patchsmith.retrieval import GraphRetriever, HybridRetriever, KeywordRetriever
 from patchsmith.sandbox import create_sandbox_runner
-from patchsmith.security import CommandPolicy
+from patchsmith.security import CommandPolicy, FocusedSetupCommandPolicy
 from patchsmith.workflow import RepairRunner
 
 
@@ -504,7 +504,9 @@ class IssueCorpusFocusedTestSetupExecutionResult:
     requires_network: bool
     sandbox_required: bool
     sandbox_mode: str
+    sandbox_network: str
     dry_run: bool
+    allow_dependency_installs: bool
     command_results: list[IssueCorpusFocusedTestSetupCommandResult]
     errors: list[str]
     warnings: list[str]
@@ -524,7 +526,9 @@ class IssueCorpusFocusedTestSetupExecutionSummary:
     task_count: int
     dry_run: bool
     allow_warnings: bool
+    allow_dependency_installs: bool
     sandbox_mode: str
+    sandbox_network: str
     timeout_seconds: int
     dry_run_tasks: int
     attempted_tasks: int
@@ -2342,10 +2346,12 @@ def execute_focused_test_setups(
     output_dir: Path,
     sandbox_mode: str = "docker",
     sandbox_image: str = "python:3.12-slim",
+    sandbox_network: str = "none",
     timeout_seconds: int = 300,
     max_tasks: int | None = None,
     dry_run: bool = True,
     allow_warnings: bool = False,
+    allow_dependency_installs: bool = False,
 ) -> tuple[
     list[IssueCorpusFocusedTestSetupExecutionResult],
     IssueCorpusFocusedTestSetupExecutionSummary,
@@ -2364,6 +2370,8 @@ def execute_focused_test_setups(
     records = [record for record in parsed if isinstance(record, dict)]
     if len(records) != len(parsed):
         raise ValueError("focused test setup readiness records must be JSON objects")
+    if allow_dependency_installs and sandbox_mode != "docker":
+        raise ValueError("--allow-dependency-installs requires --sandbox-mode docker")
     selected_records = records
     if max_tasks is not None and max_tasks > 0:
         selected_records = records[:max_tasks]
@@ -2371,8 +2379,21 @@ def execute_focused_test_setups(
     output_dir.mkdir(parents=True, exist_ok=True)
     run_logs_dir = output_dir / "focused_test_setup_execution"
     run_logs_dir.mkdir(parents=True, exist_ok=True)
-    runner = None if dry_run else create_sandbox_runner(mode=sandbox_mode, image=sandbox_image)
-    policy = CommandPolicy()
+    policy = (
+        FocusedSetupCommandPolicy()
+        if allow_dependency_installs
+        else CommandPolicy()
+    )
+    runner = (
+        None
+        if dry_run
+        else create_sandbox_runner(
+            mode=sandbox_mode,
+            image=sandbox_image,
+            policy=policy,
+            network=sandbox_network,
+        )
+    )
     results = [
         _execute_focused_test_setup_record(
             record=record,
@@ -2380,9 +2401,11 @@ def execute_focused_test_setups(
             runner=runner,
             policy=policy,
             sandbox_mode=sandbox_mode,
+            sandbox_network=sandbox_network,
             timeout_seconds=timeout_seconds,
             dry_run=dry_run,
             allow_warnings=allow_warnings,
+            allow_dependency_installs=allow_dependency_installs,
         )
         for record in selected_records
     ]
@@ -2391,7 +2414,9 @@ def execute_focused_test_setups(
         results=results,
         dry_run=dry_run,
         allow_warnings=allow_warnings,
+        allow_dependency_installs=allow_dependency_installs,
         sandbox_mode=sandbox_mode,
+        sandbox_network=sandbox_network,
         timeout_seconds=timeout_seconds,
     )
     write_focused_test_setup_execution_outputs(
@@ -2409,7 +2434,9 @@ def summarize_focused_test_setup_execution(
     results: list[IssueCorpusFocusedTestSetupExecutionResult],
     dry_run: bool,
     allow_warnings: bool,
+    allow_dependency_installs: bool,
     sandbox_mode: str,
+    sandbox_network: str,
     timeout_seconds: int,
 ) -> IssueCorpusFocusedTestSetupExecutionSummary:
     return IssueCorpusFocusedTestSetupExecutionSummary(
@@ -2417,7 +2444,9 @@ def summarize_focused_test_setup_execution(
         task_count=len(results),
         dry_run=dry_run,
         allow_warnings=allow_warnings,
+        allow_dependency_installs=allow_dependency_installs,
         sandbox_mode=sandbox_mode,
+        sandbox_network=sandbox_network,
         timeout_seconds=timeout_seconds,
         dry_run_tasks=sum(1 for result in results if result.status == "dry_run"),
         attempted_tasks=sum(
@@ -2474,7 +2503,9 @@ def write_focused_test_setup_execution_outputs(
                 "requires_network",
                 "sandbox_required",
                 "sandbox_mode",
+                "sandbox_network",
                 "dry_run",
+                "allow_dependency_installs",
                 "command_results",
                 "errors",
                 "warnings",
@@ -2497,7 +2528,9 @@ def write_focused_test_setup_execution_outputs(
                     "requires_network": result.requires_network,
                     "sandbox_required": result.sandbox_required,
                     "sandbox_mode": result.sandbox_mode,
+                    "sandbox_network": result.sandbox_network,
                     "dry_run": result.dry_run,
+                    "allow_dependency_installs": result.allow_dependency_installs,
                     "command_results": json.dumps(
                         [command.to_dict() for command in result.command_results],
                         sort_keys=True,
@@ -4065,7 +4098,12 @@ def render_focused_test_setup_execution_report(
         f"- Task count: `{summary.task_count}`",
         f"- Dry run: `{str(summary.dry_run).lower()}`",
         f"- Allow warnings: `{str(summary.allow_warnings).lower()}`",
+        (
+            "- Allow dependency installs: "
+            f"`{str(summary.allow_dependency_installs).lower()}`"
+        ),
         f"- Sandbox mode: `{summary.sandbox_mode}`",
+        f"- Sandbox network: `{summary.sandbox_network}`",
         f"- Timeout seconds: `{summary.timeout_seconds}`",
         f"- Dry-run tasks: `{summary.dry_run_tasks}`",
         f"- Attempted tasks: `{summary.attempted_tasks}`",
@@ -4079,8 +4117,11 @@ def render_focused_test_setup_execution_report(
         "",
         "## Results",
         "",
-        "| Task | Status | Readiness | Profile | Commands | Command Statuses | Notes | Next Actions |",
-        "|---|---|---|---|---|---|---|---|",
+        (
+            "| Task | Status | Readiness | Profile | Network | Dependency Installs | "
+            "Commands | Command Statuses | Notes | Next Actions |"
+        ),
+        "|---|---|---|---|---|---|---|---|---|---|",
     ]
     for result in results:
         notes = [*result.errors, *result.warnings]
@@ -4094,6 +4135,8 @@ def render_focused_test_setup_execution_report(
             f"{_markdown_table_text(result.status)} | "
             f"{_markdown_table_text(result.readiness_status)} | "
             f"{_markdown_table_text(result.setup_profile)} | "
+            f"{_markdown_table_text(result.sandbox_network)} | "
+            f"{_markdown_table_text(str(result.allow_dependency_installs).lower())} | "
             f"{_markdown_table_text('; '.join(result.setup_commands) or 'none')} | "
             f"{_markdown_table_text('; '.join(command_statuses) or 'none')} | "
             f"{_markdown_table_text('; '.join(notes) or 'none')} | "
@@ -5554,9 +5597,11 @@ def _execute_focused_test_setup_record(
     runner: Any | None,
     policy: CommandPolicy,
     sandbox_mode: str,
+    sandbox_network: str,
     timeout_seconds: int,
     dry_run: bool,
     allow_warnings: bool,
+    allow_dependency_installs: bool,
 ) -> IssueCorpusFocusedTestSetupExecutionResult:
     task_id = _optional_string(record.get("task_id"))
     repository = _optional_string(record.get("repository"))
@@ -5594,8 +5639,10 @@ def _execute_focused_test_setup_record(
         warnings.append("setup requested Docker isolation but a non-Docker sandbox was selected")
     if requires_network and sandbox_mode == "docker":
         warnings.append(
-            "setup requires network access; current Docker sandbox command runner uses network=none"
+            f"setup requires network access; Docker sandbox network is {sandbox_network}"
         )
+        if not dry_run and sandbox_network == "none":
+            errors.append("setup requires network but Docker sandbox network is none")
 
     if not setup_commands:
         status = "blocked" if errors else "skipped"
@@ -5614,7 +5661,9 @@ def _execute_focused_test_setup_record(
             requires_network=requires_network,
             sandbox_required=sandbox_required,
             sandbox_mode=sandbox_mode,
+            sandbox_network=sandbox_network,
             dry_run=dry_run,
+            allow_dependency_installs=allow_dependency_installs,
             command_results=command_results,
             errors=_dedupe_preserve_order(errors),
             warnings=_dedupe_preserve_order(warnings),
@@ -5654,7 +5703,9 @@ def _execute_focused_test_setup_record(
             requires_network=requires_network,
             sandbox_required=sandbox_required,
             sandbox_mode=sandbox_mode,
+            sandbox_network=sandbox_network,
             dry_run=dry_run,
+            allow_dependency_installs=allow_dependency_installs,
             command_results=command_results,
             errors=_dedupe_preserve_order(errors),
             warnings=_dedupe_preserve_order(warnings),
@@ -5680,7 +5731,9 @@ def _execute_focused_test_setup_record(
             requires_network=requires_network,
             sandbox_required=sandbox_required,
             sandbox_mode=sandbox_mode,
+            sandbox_network=sandbox_network,
             dry_run=dry_run,
+            allow_dependency_installs=allow_dependency_installs,
             command_results=command_results,
             errors=[],
             warnings=_dedupe_preserve_order(warnings),
@@ -5752,7 +5805,9 @@ def _execute_focused_test_setup_record(
         requires_network=requires_network,
         sandbox_required=sandbox_required,
         sandbox_mode=sandbox_mode,
+        sandbox_network=sandbox_network,
         dry_run=dry_run,
+        allow_dependency_installs=allow_dependency_installs,
         command_results=command_results,
         errors=_dedupe_preserve_order(errors),
         warnings=_dedupe_preserve_order(warnings),

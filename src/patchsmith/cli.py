@@ -485,10 +485,12 @@ def main(argv: list[str] | None = None) -> int:
             output_dir=Path(args.output),
             sandbox_mode=args.sandbox_mode,
             sandbox_image=args.sandbox_image,
+            sandbox_network=args.sandbox_network,
             timeout_seconds=args.timeout_seconds,
             max_tasks=max_tasks,
             dry_run=not args.execute,
             allow_warnings=args.allow_warnings,
+            allow_dependency_installs=args.allow_dependency_installs,
         )
         if args.json:
             print(
@@ -1473,6 +1475,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Docker image used when --sandbox-mode docker is selected.",
     )
     focused_test_setup_execution_parser.add_argument(
+        "--sandbox-network",
+        choices=["none", "bridge"],
+        default="none",
+        help="Docker network mode used when --execute and --sandbox-mode docker are selected.",
+    )
+    focused_test_setup_execution_parser.add_argument(
         "--timeout-seconds",
         type=int,
         default=300,
@@ -1493,6 +1501,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--allow-warnings",
         action="store_true",
         help="Permit readiness-warning tasks to proceed after review.",
+    )
+    focused_test_setup_execution_parser.add_argument(
+        "--allow-dependency-installs",
+        action="store_true",
+        help="Permit the narrow editable-install setup policy; requires --sandbox-mode docker.",
     )
     focused_test_setup_execution_parser.add_argument(
         "--json",
