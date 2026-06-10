@@ -3254,6 +3254,9 @@ def _delivery_audit_items(
 ) -> list[DeliveryAuditItem]:
     mvp_payload = _load_json_artifact(artifacts_dir / "experiments" / "mvp_progress.json")
     release_payload = _load_json_artifact(artifacts_dir / "experiments" / "release_hygiene.json")
+    environment_payload = _load_json_artifact(
+        artifacts_dir / "experiments" / "environment_readiness.json"
+    )
     docker_payload = _load_json_artifact(artifacts_dir / "experiments" / "docker_smoke.json")
     launch_payload = _load_json_artifact(artifacts_dir / "experiments" / "launch_blockers.json")
     calibration_payload = _load_json_artifact(
@@ -3350,6 +3353,19 @@ def _delivery_audit_items(
             evidence_keys=["blocked_count", "warning_count"],
             source="artifacts/experiments/release_hygiene.json",
             missing_action="Regenerate `release-hygiene` from a clean worktree.",
+        ),
+        _delivery_payload_status_item(
+            requirement="Environment readiness prerequisites are captured.",
+            payload=environment_payload,
+            status_key="readiness_status",
+            pass_values={"ready"},
+            warning_values={"ready_with_warnings"},
+            blocked_values={"blocked"},
+            evidence_keys=["passed_count", "warning_count", "blocked_count"],
+            source="artifacts/experiments/environment_readiness.json",
+            missing_action=(
+                "Regenerate `environment-readiness` and resolve blocked external prerequisites."
+            ),
         ),
         _delivery_launch_blockers_item(launch_payload),
         _delivery_payload_status_item(

@@ -1170,6 +1170,17 @@ def test_delivery_audit_maps_objective_to_current_evidence(
         ),
         encoding="utf-8",
     )
+    (experiments_dir / "environment_readiness.json").write_text(
+        json.dumps(
+            {
+                "readiness_status": "blocked",
+                "passed_count": 3,
+                "warning_count": 6,
+                "blocked_count": 1,
+            }
+        ),
+        encoding="utf-8",
+    )
     (experiments_dir / "launch_blockers.json").write_text(
         json.dumps(
             {
@@ -1230,6 +1241,7 @@ def test_delivery_audit_maps_objective_to_current_evidence(
     assert report.completion_percent > 50.0
     item_statuses = {item.requirement: item.status for item in report.items}
     assert item_statuses["Roadmap is decomposed into sprint plans."] == "passed"
+    assert item_statuses["Environment readiness prerequisites are captured."] == "blocked"
     assert item_statuses["Docker sandbox smoke has executable evidence."] == "blocked"
     assert item_statuses["Live LLM calibration has provider evidence."] == "blocked"
     rendered = output_path.read_text(encoding="utf-8")

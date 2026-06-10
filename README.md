@@ -599,7 +599,7 @@ PYTHONPATH=src python3 -m patchsmith.cli delivery-audit \
   --json
 ```
 
-Latest delivery-audit evidence is saved in `artifacts/experiments/delivery_audit.md` and `artifacts/experiments/delivery_audit.json`. It maps the original planning/development objective to concrete evidence and keeps Docker smoke, public issue setup validation, and live LLM calibration as blockers until those artifacts pass. Quality-gate evidence is included as an executable verification item.
+Latest delivery-audit evidence is saved in `artifacts/experiments/delivery_audit.md` and `artifacts/experiments/delivery_audit.json`. It maps the original planning/development objective to concrete evidence and keeps environment readiness, Docker smoke, public issue setup validation, and live LLM calibration as blockers until those artifacts pass. Quality-gate evidence is included as an executable verification item.
 
 Generate the live calibration readiness report:
 
