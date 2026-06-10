@@ -355,6 +355,13 @@ PYTHONPATH=src python3 -m patchsmith.cli run-materialized-focused-tests \
   --json
 ```
 
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli diagnose-focused-test-runs \
+  --results artifacts/experiments/public_issue_corpus_v1/focused_test_run_results.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
 Latest expected evidence:
 
 - `artifacts/experiments/public_issue_corpus_v1/corpus_report.md`,
@@ -365,6 +372,7 @@ Latest expected evidence:
 - `artifacts/experiments/public_issue_corpus_v1/materialized_run_readiness_report.md`,
 - `artifacts/experiments/public_issue_corpus_v1/focused_test_plan_report.md`,
 - `artifacts/experiments/public_issue_corpus_v1/focused_test_run_report.md`,
+- `artifacts/experiments/public_issue_corpus_v1/focused_test_diagnosis_report.md`,
 - valid public issue candidates: 3,
 - reachable public repositories: 2,
 - context preview completed issues: 3,
@@ -382,6 +390,9 @@ Latest expected evidence:
 - focused public issue test runs attempted: 3,
 - focused public issue test runs passed: 0,
 - focused public issue test runs failed: 3,
+- focused public issue diagnosis dependency issues: 1,
+- focused public issue diagnosis environment issues: 2,
+- focused public issue diagnosis unknown failures: 0,
 - invalid entries: 0,
 - repositories: `psf/requests`, `pytest-dev/pytest`.
 
@@ -749,7 +760,7 @@ Latest evidence:
 - readiness status: `ready_with_caveats`,
 - live calibration readiness: `not_configured`,
 - release hygiene status: `ready_with_warnings`,
-- release hygiene checks: generated review artifacts include public issue context preview, task materialization validation/readiness, focused-test planning, and focused-test run evidence; live LLM calibration remains the only warning,
+- release hygiene checks: generated review artifacts include public issue context preview, task materialization validation/readiness, focused-test planning, focused-test run, and focused-test diagnosis evidence; live LLM calibration remains the only warning,
 - indexed experiments: 16,
 - indexed saved runs: 443,
 - normalized metric rows: 29,

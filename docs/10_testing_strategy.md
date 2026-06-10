@@ -233,7 +233,18 @@ PYTHONPATH=src python3 -m patchsmith.cli run-materialized-focused-tests \
 
 The current focused run attempted all three planned public issue commands and all three failed in the local snapshots. Treat that as public-repo dependency and suite-readiness evidence until a later run adds issue reproduction, a patch, and passing validation.
 
-The corpus, preflight, context-preview, materialization, validation, run-readiness, focused-test planning, and focused-test run reports are planning and plumbing evidence. They are not repair-quality evidence until the issues are reproduced, patched, tested, and saved as normal PatchSmith run artifacts.
+Diagnose focused test run failures:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli diagnose-focused-test-runs \
+  --results artifacts/experiments/public_issue_corpus_v1/focused_test_run_results.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+The current diagnosis classifies the three failures as one dependency setup issue and two environment fixture issues, with no unknown failures. Treat these as setup backlog items before public issue repair attempts.
+
+The corpus, preflight, context-preview, materialization, validation, run-readiness, focused-test planning, focused-test run, and focused-test diagnosis reports are planning and plumbing evidence. They are not repair-quality evidence until the issues are reproduced, patched, tested, and saved as normal PatchSmith run artifacts.
 
 ## Definition of test completion
 

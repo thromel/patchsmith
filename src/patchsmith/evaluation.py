@@ -360,6 +360,40 @@ class IssueCorpusFocusedTestRunSummary:
 
 
 @dataclass(frozen=True)
+class IssueCorpusFocusedTestDiagnosisResult:
+    task_id: str | None
+    repository: str | None
+    issue_url: str | None
+    run_status: str | None
+    category: str
+    severity: str
+    summary: str
+    evidence: list[str]
+    suggested_next_actions: list[str]
+    stdout_path: str | None
+    stderr_path: str | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class IssueCorpusFocusedTestDiagnosisSummary:
+    run_results_path: str
+    task_count: int
+    passed_tasks: int
+    environment_issue_tasks: int
+    dependency_issue_tasks: int
+    timeout_tasks: int
+    blocked_tasks: int
+    unknown_failure_tasks: int
+    category_counts: dict[str, int]
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class RetrievalEvalResult:
     task_id: str
     context_provider: str
@@ -1758,6 +1792,128 @@ def write_materialized_issue_focused_test_run_outputs(
     )
 
 
+def diagnose_focused_test_runs(
+    *,
+    results_path: Path,
+    output_dir: Path,
+) -> tuple[
+    list[IssueCorpusFocusedTestDiagnosisResult],
+    IssueCorpusFocusedTestDiagnosisSummary,
+]:
+    if not results_path.exists():
+        raise FileNotFoundError(f"focused test run results do not exist: {results_path}")
+    if not results_path.is_file():
+        raise ValueError(f"focused test run results path is not a file: {results_path}")
+    parsed = json.loads(results_path.read_text(encoding="utf-8"))
+    if not isinstance(parsed, list):
+        raise ValueError("focused test run results must contain a JSON list")
+    records = [record for record in parsed if isinstance(record, dict)]
+    if len(records) != len(parsed):
+        raise ValueError("focused test run result records must be JSON objects")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    results = [
+        _diagnose_focused_test_run_record(record=record)
+        for record in records
+    ]
+    summary = summarize_focused_test_diagnosis(
+        results_path=results_path,
+        results=results,
+    )
+    write_focused_test_diagnosis_outputs(
+        output_dir=output_dir,
+        results_path=results_path,
+        results=results,
+        summary=summary,
+    )
+    return results, summary
+
+
+def summarize_focused_test_diagnosis(
+    *,
+    results_path: Path,
+    results: list[IssueCorpusFocusedTestDiagnosisResult],
+) -> IssueCorpusFocusedTestDiagnosisSummary:
+    category_counts: dict[str, int] = {}
+    for result in results:
+        category_counts[result.category] = category_counts.get(result.category, 0) + 1
+    return IssueCorpusFocusedTestDiagnosisSummary(
+        run_results_path=str(results_path),
+        task_count=len(results),
+        passed_tasks=sum(1 for result in results if result.category == "focused_test_passed"),
+        environment_issue_tasks=sum(1 for result in results if result.severity == "environment"),
+        dependency_issue_tasks=sum(1 for result in results if result.severity == "dependency"),
+        timeout_tasks=sum(1 for result in results if result.category == "timeout"),
+        blocked_tasks=sum(1 for result in results if result.severity == "blocked"),
+        unknown_failure_tasks=sum(1 for result in results if result.category == "nonzero_exit"),
+        category_counts=dict(sorted(category_counts.items())),
+    )
+
+
+def write_focused_test_diagnosis_outputs(
+    *,
+    output_dir: Path,
+    results_path: Path,
+    results: list[IssueCorpusFocusedTestDiagnosisResult],
+    summary: IssueCorpusFocusedTestDiagnosisSummary,
+) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "focused_test_diagnosis_results.json").write_text(
+        json.dumps([result.to_dict() for result in results], indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (output_dir / "focused_test_diagnosis_summary.json").write_text(
+        json.dumps(summary.to_dict(), indent=2) + "\n",
+        encoding="utf-8",
+    )
+    with (output_dir / "focused_test_diagnosis_results.csv").open(
+        "w",
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=[
+                "task_id",
+                "repository",
+                "issue_url",
+                "run_status",
+                "category",
+                "severity",
+                "summary",
+                "evidence",
+                "suggested_next_actions",
+                "stdout_path",
+                "stderr_path",
+            ],
+        )
+        writer.writeheader()
+        for result in results:
+            writer.writerow(
+                {
+                    "task_id": result.task_id,
+                    "repository": result.repository,
+                    "issue_url": result.issue_url,
+                    "run_status": result.run_status,
+                    "category": result.category,
+                    "severity": result.severity,
+                    "summary": result.summary,
+                    "evidence": ";".join(result.evidence),
+                    "suggested_next_actions": ";".join(result.suggested_next_actions),
+                    "stdout_path": result.stdout_path,
+                    "stderr_path": result.stderr_path,
+                }
+            )
+    (output_dir / "focused_test_diagnosis_report.md").write_text(
+        render_focused_test_diagnosis_report(
+            results_path=results_path,
+            results=results,
+            summary=summary,
+        ),
+        encoding="utf-8",
+    )
+
+
 def run_retrieval_evaluation(
     *,
     dataset_dir: Path,
@@ -3118,6 +3274,67 @@ def render_materialized_issue_focused_test_run_report(
     return "\n".join(lines)
 
 
+def render_focused_test_diagnosis_report(
+    *,
+    results_path: Path,
+    results: list[IssueCorpusFocusedTestDiagnosisResult],
+    summary: IssueCorpusFocusedTestDiagnosisSummary,
+) -> str:
+    lines = [
+        "# Public Issue Focused Test Diagnosis",
+        "",
+        f"- Run results path: `{results_path}`",
+        f"- Task count: `{summary.task_count}`",
+        f"- Passed tasks: `{summary.passed_tasks}`",
+        f"- Environment issue tasks: `{summary.environment_issue_tasks}`",
+        f"- Dependency issue tasks: `{summary.dependency_issue_tasks}`",
+        f"- Timeout tasks: `{summary.timeout_tasks}`",
+        f"- Blocked tasks: `{summary.blocked_tasks}`",
+        f"- Unknown failure tasks: `{summary.unknown_failure_tasks}`",
+        "",
+        "## Category Counts",
+        "",
+    ]
+    if summary.category_counts:
+        for category, count in summary.category_counts.items():
+            lines.append(f"- `{category}`: `{count}`")
+    else:
+        lines.append("- none")
+    lines.extend(
+        [
+            "",
+            "## Results",
+            "",
+            "| Task | Run Status | Category | Severity | Summary | Evidence | Next Actions |",
+            "|---|---|---|---|---|---|---|",
+        ]
+    )
+    for result in results:
+        lines.append(
+            "| "
+            f"{_markdown_table_text(result.task_id or 'unknown')} | "
+            f"{_markdown_table_text(result.run_status or 'unknown')} | "
+            f"{_markdown_table_text(result.category)} | "
+            f"{_markdown_table_text(result.severity)} | "
+            f"{_markdown_table_text(result.summary)} | "
+            f"{_markdown_table_text('; '.join(result.evidence) or 'none')} | "
+            f"{_markdown_table_text('; '.join(result.suggested_next_actions) or 'none')} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Claim Boundary",
+            "",
+            "- This report classifies focused test execution failures from saved stdout/stderr logs.",
+            "- It is a dependency and environment readiness aid, not a patch-quality score.",
+            "- Suggested actions must be executed only inside an approved sandbox and should not bypass command policy.",
+            "- Public issue repair quality remains unproven until issue reproduction, patch generation, and passing validation are saved.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def render_repair_eval_report(
     *,
     dataset_dir: Path,
@@ -4156,6 +4373,211 @@ def _run_materialized_issue_focused_test_record(
     )
 
 
+def _diagnose_focused_test_run_record(
+    *,
+    record: dict[str, Any],
+) -> IssueCorpusFocusedTestDiagnosisResult:
+    task_id = _optional_string(record.get("task_id"))
+    repository = _optional_string(record.get("repository"))
+    issue_url = _optional_string(record.get("issue_url"))
+    run_status = _optional_string(record.get("status"))
+    stdout_path = _optional_string(record.get("stdout_path"))
+    stderr_path = _optional_string(record.get("stderr_path"))
+    logs = _focused_test_log_text(stdout_path=stdout_path, stderr_path=stderr_path)
+
+    if run_status == "passed":
+        return IssueCorpusFocusedTestDiagnosisResult(
+            task_id=task_id,
+            repository=repository,
+            issue_url=issue_url,
+            run_status=run_status,
+            category="focused_test_passed",
+            severity="info",
+            summary="Focused test command passed in the saved run.",
+            evidence=[],
+            suggested_next_actions=[
+                "Use the focused command as targeted validation input for a later repair attempt.",
+            ],
+            stdout_path=stdout_path,
+            stderr_path=stderr_path,
+        )
+    if run_status == "timed_out":
+        return IssueCorpusFocusedTestDiagnosisResult(
+            task_id=task_id,
+            repository=repository,
+            issue_url=issue_url,
+            run_status=run_status,
+            category="timeout",
+            severity="environment",
+            summary="Focused test command timed out in the saved run.",
+            evidence=_matching_lines(logs, ["timed out", "timeout"], limit=2),
+            suggested_next_actions=[
+                "Run the focused command in a stricter isolated environment with an explicit timeout budget.",
+                "Reduce the command to issue-specific tests before using it as repair validation.",
+            ],
+            stdout_path=stdout_path,
+            stderr_path=stderr_path,
+        )
+    if run_status == "blocked":
+        return IssueCorpusFocusedTestDiagnosisResult(
+            task_id=task_id,
+            repository=repository,
+            issue_url=issue_url,
+            run_status=run_status,
+            category="execution_blocked",
+            severity="blocked",
+            summary="Focused test command was blocked before meaningful test execution.",
+            evidence=_string_list(record.get("errors")) or _matching_lines(
+                logs, ["blocked", "policy", "exit code"], limit=3
+            ),
+            suggested_next_actions=[
+                "Fix the focused test plan or sandbox availability before running public issue repairs.",
+            ],
+            stdout_path=stdout_path,
+            stderr_path=stderr_path,
+        )
+    if "_pytest._version" in logs:
+        return IssueCorpusFocusedTestDiagnosisResult(
+            task_id=task_id,
+            repository=repository,
+            issue_url=issue_url,
+            run_status=run_status,
+            category="missing_generated_version_metadata",
+            severity="dependency",
+            summary="Pytest snapshot failed before collection because generated version metadata is missing.",
+            evidence=_matching_lines(logs, ["_pytest._version", "ModuleNotFoundError"], limit=3),
+            suggested_next_actions=[
+                "Prepare the repository in an isolated environment using its documented build step before running tests.",
+                "Record the setup command separately from repair validation; do not treat this as a patch failure.",
+            ],
+            stdout_path=stdout_path,
+            stderr_path=stderr_path,
+        )
+    if "recursive dependency involving fixture" in logs:
+        return IssueCorpusFocusedTestDiagnosisResult(
+            task_id=task_id,
+            repository=repository,
+            issue_url=issue_url,
+            run_status=run_status,
+            category="pytest_fixture_dependency_error",
+            severity="environment",
+            summary="Pytest fixture setup failed before issue-specific assertions could run.",
+            evidence=_matching_lines(
+                logs,
+                ["recursive dependency involving fixture", "ERROR at setup"],
+                limit=4,
+            ),
+            suggested_next_actions=[
+                "Install or configure upstream test fixtures in an isolated environment.",
+                "Prefer narrower issue-specific tests that avoid service fixtures when possible.",
+            ],
+            stdout_path=stdout_path,
+            stderr_path=stderr_path,
+        )
+    if "ModuleNotFoundError" in logs:
+        return IssueCorpusFocusedTestDiagnosisResult(
+            task_id=task_id,
+            repository=repository,
+            issue_url=issue_url,
+            run_status=run_status,
+            category="missing_python_module",
+            severity="dependency",
+            summary="Focused test command failed because Python import dependencies are missing.",
+            evidence=_matching_lines(logs, ["ModuleNotFoundError"], limit=3),
+            suggested_next_actions=[
+                "Resolve repository test dependencies in a sandbox before interpreting repair quality.",
+            ],
+            stdout_path=stdout_path,
+            stderr_path=stderr_path,
+        )
+    if "ERROR at setup" in logs:
+        return IssueCorpusFocusedTestDiagnosisResult(
+            task_id=task_id,
+            repository=repository,
+            issue_url=issue_url,
+            run_status=run_status,
+            category="pytest_setup_error",
+            severity="environment",
+            summary="Focused test command reached pytest but failed during setup.",
+            evidence=_matching_lines(logs, ["ERROR at setup"], limit=4),
+            suggested_next_actions=[
+                "Inspect fixture and service requirements before attempting automated repair.",
+            ],
+            stdout_path=stdout_path,
+            stderr_path=stderr_path,
+        )
+    if not logs.strip():
+        evidence = _string_list(record.get("errors")) or _string_list(record.get("warnings"))
+        category = "missing_logs" if not evidence else "nonzero_exit"
+        summary = (
+            "Focused test command did not produce saved logs."
+            if category == "missing_logs"
+            else "Focused test command failed without a classified log signature."
+        )
+        return IssueCorpusFocusedTestDiagnosisResult(
+            task_id=task_id,
+            repository=repository,
+            issue_url=issue_url,
+            run_status=run_status,
+            category=category,
+            severity="environment" if category == "missing_logs" else "unknown",
+            summary=summary,
+            evidence=evidence,
+            suggested_next_actions=[
+                "Rerun the focused command and capture stdout/stderr before interpreting failure quality.",
+            ],
+            stdout_path=stdout_path,
+            stderr_path=stderr_path,
+        )
+    return IssueCorpusFocusedTestDiagnosisResult(
+        task_id=task_id,
+        repository=repository,
+        issue_url=issue_url,
+        run_status=run_status,
+        category="nonzero_exit",
+        severity="unknown",
+        summary="Focused test command failed without a known readiness signature.",
+        evidence=_last_nonempty_lines(logs, limit=4),
+        suggested_next_actions=[
+            "Inspect the saved stdout/stderr and add a narrower diagnosis before repair-quality claims.",
+        ],
+        stdout_path=stdout_path,
+        stderr_path=stderr_path,
+    )
+
+
+def _focused_test_log_text(*, stdout_path: str | None, stderr_path: str | None) -> str:
+    parts: list[str] = []
+    for path_value in [stdout_path, stderr_path]:
+        if not path_value:
+            continue
+        path = Path(path_value)
+        if not path.exists() or not path.is_file():
+            continue
+        parts.append(path.read_text(encoding="utf-8", errors="replace"))
+    return "\n".join(parts)
+
+
+def _matching_lines(text: str, patterns: list[str], *, limit: int) -> list[str]:
+    matches: list[str] = []
+    lowered_patterns = [pattern.lower() for pattern in patterns]
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        lowered_line = stripped.lower()
+        if any(pattern in lowered_line for pattern in lowered_patterns):
+            matches.append(stripped[:240])
+            if len(matches) >= limit:
+                break
+    return matches
+
+
+def _last_nonempty_lines(text: str, *, limit: int) -> list[str]:
+    lines = [line.strip()[:240] for line in text.splitlines() if line.strip()]
+    return lines[-limit:]
+
+
 def _issue_corpus_repositories(issues: list[Any]) -> list[tuple[str, str, int]]:
     repo_urls: dict[str, str] = {}
     issue_counts: dict[str, int] = {}
@@ -4511,6 +4933,10 @@ def _string_list(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
     return [item for item in value if isinstance(item, str)]
+
+
+def _markdown_table_text(value: str) -> str:
+    return value.replace("|", "\\|").replace("\n", " ")[:500]
 
 
 def _supplement_context_preview_source_neighbors(

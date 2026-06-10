@@ -220,6 +220,17 @@ PYTHONPATH=src python3 -m patchsmith.cli run-materialized-focused-tests \
 
 The focused test run executes the planned scoped commands and writes `focused_test_run_report.md`, `focused_test_run_summary.json`, result CSV/JSON, and per-task stdout/stderr files. Treat failed commands as environment or upstream-suite readiness evidence unless the run also captures issue reproduction and a PatchSmith-generated repair.
 
+Public issue focused test diagnosis:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli diagnose-focused-test-runs \
+  --results artifacts/experiments/public_issue_corpus_v1/focused_test_run_results.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+The diagnosis report classifies saved focused-run logs and suggests setup-oriented next actions. Do not execute dependency setup suggestions outside the approved sandbox model, and do not treat diagnosis categories as repair success or failure.
+
 Scaffold comparison:
 
 ```bash

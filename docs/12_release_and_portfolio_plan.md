@@ -249,6 +249,17 @@ PYTHONPATH=src python3 -m patchsmith.cli run-materialized-focused-tests \
 
 Current focused-run output attempts three scoped public-repo commands, with zero blocked commands and three failures. The pytest task currently fails before collection because the checked-out snapshot lacks generated `_pytest._version`; the requests tasks currently collect 341 tests but fail setup around the `httpbin` fixture. Use this as environment-readiness evidence, not repair success evidence.
 
+Diagnose focused public issue test failures:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli diagnose-focused-test-runs \
+  --results artifacts/experiments/public_issue_corpus_v1/focused_test_run_results.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+Current diagnosis output classifies one dependency issue, two environment issues, zero timeouts, zero blocked tasks, and zero unknown failures. Use it as a dependency/setup backlog before making public issue repair claims.
+
 Generate the release hygiene report:
 
 ```bash
@@ -260,7 +271,7 @@ PYTHONPATH=src python3 -m patchsmith.cli release-hygiene \
   --json
 ```
 
-Current release hygiene output is `ready_with_warnings`: generated review artifacts now include calibration-readiness and public issue context-preview/materialization validation/readiness/focused-test plan and run evidence, package build metadata exists, local Git metadata exists, and the remaining release caveat is live LLM calibration.
+Current release hygiene output is `ready_with_warnings`: generated review artifacts now include calibration-readiness and public issue context-preview/materialization validation/readiness/focused-test plan/run/diagnosis evidence, package build metadata exists, local Git metadata exists, and the remaining release caveat is live LLM calibration.
 
 ## Example flagship demo scenario
 

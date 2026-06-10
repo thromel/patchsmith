@@ -5,6 +5,7 @@ from pathlib import Path
 from patchsmith.cli import main
 from patchsmith.evaluation import (
     check_materialized_issue_run_readiness,
+    diagnose_focused_test_runs,
     load_seeded_tasks,
     materialize_issue_corpus_tasks,
     plan_materialized_issue_focused_tests,
@@ -801,6 +802,83 @@ def test_run_materialized_issue_focused_tests_blocks_policy_mismatch(
     assert results[0].status == "blocked"
     assert not results[0].policy_allowed
     assert "rejected by policy" in ";".join(results[0].errors)
+
+
+def test_diagnose_focused_test_runs_classifies_readiness_failures(
+    tmp_path: Path,
+) -> None:
+    logs_dir = tmp_path / "logs"
+    pytest_dir = logs_dir / "pytest_task"
+    requests_dir = logs_dir / "requests_task"
+    pytest_dir.mkdir(parents=True)
+    requests_dir.mkdir(parents=True)
+    pytest_stderr = pytest_dir / "stderr.txt"
+    pytest_stderr.write_text(
+        "ModuleNotFoundError: No module named '_pytest._version'\n",
+        encoding="utf-8",
+    )
+    requests_stdout = requests_dir / "stdout.txt"
+    requests_stdout.write_text(
+        "ERROR at setup of TestRequests.test_no_content_length\n"
+        "E       recursive dependency involving fixture 'httpbin' detected\n",
+        encoding="utf-8",
+    )
+    results_path = tmp_path / "focused_test_run_results.json"
+    results_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "pytest_task",
+                    "repository": "pytest-dev/pytest",
+                    "issue_url": "https://github.com/pytest-dev/pytest/issues/14552",
+                    "status": "failed",
+                    "stdout_path": str(pytest_dir / "stdout.txt"),
+                    "stderr_path": str(pytest_stderr),
+                },
+                {
+                    "task_id": "requests_task",
+                    "repository": "psf/requests",
+                    "issue_url": "https://github.com/psf/requests/issues/7223",
+                    "status": "failed",
+                    "stdout_path": str(requests_stdout),
+                    "stderr_path": str(requests_dir / "stderr.txt"),
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    output_dir = tmp_path / "diagnosis"
+    results, summary = diagnose_focused_test_runs(
+        results_path=results_path,
+        output_dir=output_dir,
+    )
+
+    categories = {result.task_id: result.category for result in results}
+    assert categories == {
+        "pytest_task": "missing_generated_version_metadata",
+        "requests_task": "pytest_fixture_dependency_error",
+    }
+    assert summary.task_count == 2
+    assert summary.dependency_issue_tasks == 1
+    assert summary.environment_issue_tasks == 1
+    assert summary.category_counts["missing_generated_version_metadata"] == 1
+    assert (output_dir / "focused_test_diagnosis_report.md").exists()
+    assert (output_dir / "focused_test_diagnosis_results.csv").exists()
+
+    cli_output = tmp_path / "cli_diagnosis"
+    exit_code = main(
+        [
+            "diagnose-focused-test-runs",
+            "--results",
+            str(results_path),
+            "--output",
+            str(cli_output),
+            "--json",
+        ]
+    )
+    assert exit_code == 0
+    assert (cli_output / "focused_test_diagnosis_report.md").exists()
 
 
 def test_graph_retrieval_dataset_validates(tmp_path: Path) -> None:

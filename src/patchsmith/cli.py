@@ -7,6 +7,7 @@ from pathlib import Path
 
 from patchsmith.evaluation import (
     check_materialized_issue_run_readiness,
+    diagnose_focused_test_runs,
     materialize_issue_corpus_tasks,
     plan_materialized_issue_focused_tests,
     preflight_issue_corpus_repositories,
@@ -390,6 +391,33 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f"passed={summary.passed_tasks} failed={summary.failed_tasks} "
                 f"timed_out={summary.timed_out_tasks} blocked={summary.blocked_tasks}"
+            )
+        return 0
+
+    if args.command == "diagnose-focused-test-runs":
+        results, summary = diagnose_focused_test_runs(
+            results_path=Path(args.results),
+            output_dir=Path(args.output),
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "result_count": len(results),
+                        "report_path": str(
+                            Path(args.output) / "focused_test_diagnosis_report.md"
+                        ),
+                        "summary": summary.to_dict(),
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(f"Report: {Path(args.output) / 'focused_test_diagnosis_report.md'}")
+            print(
+                f"environment={summary.environment_issue_tasks} "
+                f"dependency={summary.dependency_issue_tasks} "
+                f"unknown={summary.unknown_failure_tasks}"
             )
         return 0
 
@@ -1220,6 +1248,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="Maximum planned tasks to execute. Use 0 for all planned tasks.",
     )
     focused_test_run_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print JSON summary.",
+    )
+
+    focused_test_diagnosis_parser = subparsers.add_parser(
+        "diagnose-focused-test-runs",
+        help="Classify focused public issue test failures from saved stdout/stderr logs.",
+    )
+    focused_test_diagnosis_parser.add_argument(
+        "--results",
+        default="artifacts/experiments/public_issue_corpus_v1/focused_test_run_results.json",
+        help="Focused test run results JSON.",
+    )
+    focused_test_diagnosis_parser.add_argument(
+        "--output",
+        default="artifacts/experiments/public_issue_corpus_v1",
+        help="Focused test diagnosis output directory.",
+    )
+    focused_test_diagnosis_parser.add_argument(
         "--json",
         action="store_true",
         help="Print JSON summary.",

@@ -100,6 +100,19 @@ public repository snapshots. The current lane is readiness evidence only; it is
 not solved-run evidence until issue reproduction, patch generation, and passing
 validation are added.
 
+Focused test diagnosis command:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli diagnose-focused-test-runs \
+  --results artifacts/experiments/public_issue_corpus_v1/focused_test_run_results.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+Focused test diagnosis classifies saved stdout/stderr logs into setup-oriented
+failure categories. It is safe planning evidence, not permission to run
+dependency setup outside the sandbox policy.
+
 Selection criteria:
 
 - public GitHub issue URL,
