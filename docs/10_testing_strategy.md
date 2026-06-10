@@ -173,7 +173,18 @@ PYTHONPATH=src python3 -m patchsmith.cli preflight-issue-corpus \
   --json
 ```
 
-The corpus report is planning evidence. It is not repair-quality evidence until the issues are cloned, reproduced, run, and saved as normal PatchSmith artifacts.
+Preview context retrieval before converting candidates into executable tasks:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli preview-issue-corpus-context \
+  --corpus evals/issue_corpora/public_issue_smoke_v1/issues.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --context-provider native_hybrid \
+  --top-k 5 \
+  --json
+```
+
+The corpus, preflight, and context-preview reports are planning and plumbing evidence. They are not repair-quality evidence until the issues are reproduced, patched, tested, and saved as normal PatchSmith run artifacts.
 
 ## Definition of test completion
 

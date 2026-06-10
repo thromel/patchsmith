@@ -309,12 +309,24 @@ PYTHONPATH=src python3 -m patchsmith.cli preflight-issue-corpus \
   --json
 ```
 
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli preview-issue-corpus-context \
+  --corpus evals/issue_corpora/public_issue_smoke_v1/issues.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --context-provider native_hybrid \
+  --top-k 5 \
+  --json
+```
+
 Latest expected evidence:
 
 - `artifacts/experiments/public_issue_corpus_v1/corpus_report.md`,
 - `artifacts/experiments/public_issue_corpus_v1/repo_preflight_report.md`,
+- `artifacts/experiments/public_issue_corpus_v1/context_preview_report.md`,
 - valid public issue candidates: 3,
 - reachable public repositories: 2,
+- context preview completed issues: 3,
+- context preview source-free summaries: true,
 - invalid entries: 0,
 - repositories: `psf/requests`, `pytest-dev/pytest`.
 
@@ -682,8 +694,8 @@ Latest evidence:
 - readiness status: `ready_with_caveats`,
 - live calibration readiness: `not_configured`,
 - release hygiene status: `ready_with_warnings`,
-- release hygiene checks: 10 passed, 1 warning, 0 blockers,
-- indexed experiments: 15,
+- release hygiene checks: generated review artifacts include public issue context preview evidence; live LLM calibration remains the only warning,
+- indexed experiments: 16,
 - indexed saved runs: 443,
 - normalized metric rows: 29,
 - runs requiring attention: 72,

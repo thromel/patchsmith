@@ -150,6 +150,19 @@ PYTHONPATH=src python3 -m patchsmith.cli preflight-issue-corpus \
 
 The preflight checks repository reachability and records current branch/HEAD metadata before any source clone or repair attempt.
 
+Public issue context preview:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli preview-issue-corpus-context \
+  --corpus evals/issue_corpora/public_issue_smoke_v1/issues.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --context-provider native_hybrid \
+  --top-k 5 \
+  --json
+```
+
+The preview clones and indexes reachable corpus repositories, then records source-free retrieved-file summaries. Treat it as context plumbing evidence only; issue reproduction, patch generation, and test success require normal run artifacts.
+
 Scaffold comparison:
 
 ```bash

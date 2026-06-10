@@ -269,6 +269,19 @@ PYTHONPATH=src python3 -m patchsmith.cli preflight-issue-corpus \
 
 The preflight report checks repository reachability and records current default branch and HEAD metadata with `git ls-remote`. It does not clone source or run repairs.
 
+Preview public issue context retrieval:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli preview-issue-corpus-context \
+  --corpus evals/issue_corpora/public_issue_smoke_v1/issues.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --context-provider native_hybrid \
+  --top-k 5 \
+  --json
+```
+
+The context preview clones/indexes the reachable public repositories and records source-free retrieved-file summaries. It proves clone/index/retrieval plumbing for external issue candidates, not reproduction, patch generation, or test success.
+
 Run the seeded repair evaluation:
 
 ```bash
@@ -482,7 +495,7 @@ PYTHONPATH=src python3 -m patchsmith.cli release-hygiene \
   --json
 ```
 
-Latest release hygiene evidence is saved in `artifacts/experiments/release_hygiene.md` and `artifacts/experiments/release_hygiene.json`. Current status is `ready_with_warnings`: CI, packaging metadata, architecture-diagram, demo-media, calibration-readiness, and local Git metadata checks pass, while live LLM calibration remains unproven and must stay visible in release claims.
+Latest release hygiene evidence is saved in `artifacts/experiments/release_hygiene.md` and `artifacts/experiments/release_hygiene.json`. Current status is `ready_with_warnings`: CI, packaging metadata, architecture-diagram, demo-media, calibration-readiness, public issue corpus/context-preview evidence, and local Git metadata checks pass, while live LLM calibration remains unproven and must stay visible in release claims.
 
 Build package artifacts:
 
@@ -517,7 +530,7 @@ When those rates are set, reports estimate model cost from provider token usage.
 
 ## Next engineering wedges
 
-The context broker boundary, retrieval eval runner, repair eval runner, scaffold comparison runner, patch-search evaluator, static artifact index/dashboard with normalized metrics and generated run-detail trace pages, failure review report, demo readiness report, live calibration readiness report, generated demo script, final evaluation report, release hygiene report, deterministic heuristic runtime, LangGraph orchestration runtime, DeepAgents adapter compatibility mode plus package-backed smoke evidence, OpenAI Agents SDK adapter compatibility mode, offline model-planner seam, credential-gated OpenAI Responses client, and Python Code Context Graph v0 now exist. The current seeded suite has 10 tasks and compares `native`, `native_hybrid`, `native_graph`, and `ctxhelm_cli` for retrieval, including aggregate context packing metadata. Scaffold comparison now includes trace complexity and debuggability metrics. The next useful development step is resolving the remaining live-provider warning, harder patch-search tasks with model-diverse candidates, or live-provider calibration when credentials and budget are explicitly available.
+The context broker boundary, retrieval eval runner, repair eval runner, scaffold comparison runner, patch-search evaluator, public issue corpus validation/preflight/context preview, static artifact index/dashboard with normalized metrics and generated run-detail trace pages, failure review report, demo readiness report, live calibration readiness report, generated demo script, final evaluation report, release hygiene report, deterministic heuristic runtime, LangGraph orchestration runtime, DeepAgents adapter compatibility mode plus package-backed smoke evidence, OpenAI Agents SDK adapter compatibility mode, offline model-planner seam, credential-gated OpenAI Responses client, and Python Code Context Graph v0 now exist. The current seeded suite has 10 tasks and compares `native`, `native_hybrid`, `native_graph`, and `ctxhelm_cli` for retrieval, including aggregate context packing metadata. Scaffold comparison now includes trace complexity and debuggability metrics. The next useful development step is resolving the remaining live-provider warning, harder patch-search tasks with model-diverse candidates, or live-provider calibration when credentials and budget are explicitly available.
 
 The current LangGraph repair skeleton is:
 

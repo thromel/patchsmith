@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import csv
 import json
+import shutil
 import subprocess
 import tempfile
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -129,6 +130,44 @@ class IssueCorpusRepoPreflightSummary:
     unreachable_repositories: int
     issue_count: int
     avg_latency_ms: float
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class IssueCorpusContextPreviewResult:
+    task_id: str
+    repository: str
+    issue_url: str
+    status: str
+    error: str | None
+    repo_path: str | None
+    commit_hash: str | None
+    branch: str | None
+    file_count: int
+    language_summary: dict[str, int]
+    package_manager: str | None
+    test_commands: list[str]
+    context_provider: str
+    context_count: int
+    retrieved_files: list[str]
+    top_contexts: list[dict[str, Any]]
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class IssueCorpusContextPreviewSummary:
+    corpus_path: str
+    attempted_issues: int
+    completed_issues: int
+    failed_issues: int
+    repository_count: int
+    context_provider: str
+    avg_context_count: float
+    source_free: bool
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -629,6 +668,208 @@ def write_issue_corpus_repo_preflight_outputs(
                 writer.writerow(result.to_dict())
     (output_dir / "repo_preflight_report.md").write_text(
         render_issue_corpus_repo_preflight_report(
+            corpus_path=corpus_path,
+            results=results,
+            summary=summary,
+        ),
+        encoding="utf-8",
+    )
+
+
+def preview_issue_corpus_context(
+    *,
+    corpus_path: Path,
+    output_dir: Path,
+    context_provider: str = "native_hybrid",
+    top_k: int = 5,
+    max_issues: int | None = None,
+) -> tuple[list[IssueCorpusContextPreviewResult], IssueCorpusContextPreviewSummary]:
+    if not corpus_path.exists():
+        raise FileNotFoundError(f"issue corpus does not exist: {corpus_path}")
+    payload = json.loads(corpus_path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict) or not isinstance(payload.get("issues"), list):
+        raise ValueError("issue corpus missing list field: issues")
+    issues = [issue for issue in payload["issues"] if isinstance(issue, dict)]
+    if max_issues is not None:
+        issues = issues[:max_issues]
+    output_dir.mkdir(parents=True, exist_ok=True)
+    repositories_dir = output_dir / "repositories"
+    repositories_dir.mkdir(parents=True, exist_ok=True)
+    snapshots: dict[str, Any] = {}
+    indexes: dict[str, Any] = {}
+    results: list[IssueCorpusContextPreviewResult] = []
+
+    for issue in issues:
+        task_id = str(issue.get("task_id", "unknown"))
+        repository = str(issue.get("repository", "unknown"))
+        issue_url = str(issue.get("issue_url", ""))
+        repo_url = str(issue.get("repo_url", ""))
+        try:
+            if repository not in snapshots:
+                repo_dir = repositories_dir / _safe_artifact_name(repository)
+                if repo_dir.exists():
+                    _remove_artifact_dir(root=output_dir, target=repo_dir)
+                snapshot = clone_or_copy_repository(repo_url, repo_dir)
+                snapshots[repository] = snapshot
+                indexes[repository] = index_repository(snapshot.repo_path)
+            snapshot = snapshots[repository]
+            repo_index = indexes[repository]
+            retriever = _issue_corpus_retriever(context_provider)
+            contexts = retriever.retrieve(
+                repo_path=snapshot.repo_path,
+                repo_index=repo_index,
+                issue_text=_issue_corpus_issue_text(issue),
+                top_k=top_k,
+            )
+            contexts = _supplement_context_preview_source_neighbors(
+                contexts=contexts,
+                repo_index=repo_index,
+                top_k=top_k,
+                context_provider=context_provider,
+            )
+            results.append(
+                IssueCorpusContextPreviewResult(
+                    task_id=task_id,
+                    repository=repository,
+                    issue_url=issue_url,
+                    status="completed",
+                    error=None,
+                    repo_path=str(snapshot.repo_path),
+                    commit_hash=snapshot.commit_hash,
+                    branch=snapshot.branch,
+                    file_count=snapshot.file_count,
+                    language_summary=snapshot.language_summary,
+                    package_manager=snapshot.package_manager,
+                    test_commands=snapshot.test_commands,
+                    context_provider=context_provider,
+                    context_count=len(contexts),
+                    retrieved_files=[context.path for context in contexts],
+                    top_contexts=[_source_free_context(context) for context in contexts],
+                )
+            )
+        except Exception as error:  # noqa: BLE001 - report all corpus materialization failures.
+            results.append(
+                IssueCorpusContextPreviewResult(
+                    task_id=task_id,
+                    repository=repository,
+                    issue_url=issue_url,
+                    status="failed",
+                    error=str(error),
+                    repo_path=None,
+                    commit_hash=None,
+                    branch=None,
+                    file_count=0,
+                    language_summary={},
+                    package_manager=None,
+                    test_commands=[],
+                    context_provider=context_provider,
+                    context_count=0,
+                    retrieved_files=[],
+                    top_contexts=[],
+                )
+            )
+
+    summary = summarize_issue_corpus_context_preview(
+        corpus_path=corpus_path,
+        results=results,
+        context_provider=context_provider,
+    )
+    write_issue_corpus_context_preview_outputs(
+        output_dir=output_dir,
+        corpus_path=corpus_path,
+        results=results,
+        summary=summary,
+    )
+    return results, summary
+
+
+def summarize_issue_corpus_context_preview(
+    *,
+    corpus_path: Path,
+    results: list[IssueCorpusContextPreviewResult],
+    context_provider: str,
+) -> IssueCorpusContextPreviewSummary:
+    completed = [result for result in results if result.status == "completed"]
+    return IssueCorpusContextPreviewSummary(
+        corpus_path=str(corpus_path),
+        attempted_issues=len(results),
+        completed_issues=len(completed),
+        failed_issues=sum(1 for result in results if result.status != "completed"),
+        repository_count=len({result.repository for result in results}),
+        context_provider=context_provider,
+        avg_context_count=(
+            round(sum(result.context_count for result in completed) / len(completed), 1)
+            if completed
+            else 0.0
+        ),
+        source_free=all(
+            "excerpt" not in context
+            for result in results
+            for context in result.top_contexts
+        ),
+    )
+
+
+def write_issue_corpus_context_preview_outputs(
+    *,
+    output_dir: Path,
+    corpus_path: Path,
+    results: list[IssueCorpusContextPreviewResult],
+    summary: IssueCorpusContextPreviewSummary,
+) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "context_preview_results.json").write_text(
+        json.dumps([result.to_dict() for result in results], indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (output_dir / "context_preview_summary.json").write_text(
+        json.dumps(summary.to_dict(), indent=2) + "\n",
+        encoding="utf-8",
+    )
+    with (output_dir / "context_preview_results.csv").open(
+        "w",
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=[
+                "task_id",
+                "repository",
+                "issue_url",
+                "status",
+                "error",
+                "commit_hash",
+                "branch",
+                "file_count",
+                "package_manager",
+                "test_commands",
+                "context_provider",
+                "context_count",
+                "retrieved_files",
+            ],
+        )
+        writer.writeheader()
+        for result in results:
+            writer.writerow(
+                {
+                    "task_id": result.task_id,
+                    "repository": result.repository,
+                    "issue_url": result.issue_url,
+                    "status": result.status,
+                    "error": result.error,
+                    "commit_hash": result.commit_hash,
+                    "branch": result.branch,
+                    "file_count": result.file_count,
+                    "package_manager": result.package_manager,
+                    "test_commands": ";".join(result.test_commands),
+                    "context_provider": result.context_provider,
+                    "context_count": result.context_count,
+                    "retrieved_files": ";".join(result.retrieved_files),
+                }
+            )
+    (output_dir / "context_preview_report.md").write_text(
+        render_issue_corpus_context_preview_report(
             corpus_path=corpus_path,
             results=results,
             summary=summary,
@@ -1695,6 +1936,55 @@ def render_issue_corpus_repo_preflight_report(
     return "\n".join(lines)
 
 
+def render_issue_corpus_context_preview_report(
+    *,
+    corpus_path: Path,
+    results: list[IssueCorpusContextPreviewResult],
+    summary: IssueCorpusContextPreviewSummary,
+) -> str:
+    lines = [
+        "# Public Issue Corpus Context Preview",
+        "",
+        f"- Corpus: `{corpus_path}`",
+        f"- Attempted issues: `{summary.attempted_issues}`",
+        f"- Completed issues: `{summary.completed_issues}`",
+        f"- Failed issues: `{summary.failed_issues}`",
+        f"- Repositories: `{summary.repository_count}`",
+        f"- Context provider: `{summary.context_provider}`",
+        f"- Average context count: `{summary.avg_context_count:.1f}`",
+        f"- Source-free summary: `{str(summary.source_free).lower()}`",
+        "",
+        "## Results",
+        "",
+        "| Task | Repository | Status | Commit | Files | Contexts | Retrieved Files | Error |",
+        "|---|---|---|---|---:|---:|---|---|",
+    ]
+    for result in results:
+        lines.append(
+            "| "
+            f"{result.task_id} | "
+            f"{result.repository} | "
+            f"{result.status} | "
+            f"{(result.commit_hash or 'unknown')[:12]} | "
+            f"{result.file_count} | "
+            f"{result.context_count} | "
+            f"{', '.join(result.retrieved_files) or 'none'} | "
+            f"{result.error or 'none'} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Claim Boundary",
+            "",
+            "- This preview proves repository clone/index/retrieval plumbing on public issue candidates.",
+            "- Retrieved source excerpts are intentionally omitted from this summary.",
+            "- It does not prove issue reproduction, patch generation, or test success.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def render_repair_eval_report(
     *,
     dataset_dir: Path,
@@ -2362,6 +2652,162 @@ def _parse_ls_remote_head(output: str) -> tuple[str | None, str | None]:
         if len(parts) >= 2 and parts[1] == "HEAD":
             head_sha = parts[0]
     return default_branch, head_sha
+
+
+def _issue_corpus_retriever(context_provider: str):
+    if context_provider == "native":
+        return KeywordRetriever()
+    if context_provider == "native_hybrid":
+        return HybridRetriever()
+    if context_provider == "native_graph":
+        return GraphRetriever()
+    raise ValueError(f"unsupported issue-corpus context provider: {context_provider}")
+
+
+def _issue_corpus_issue_text(issue: dict[str, Any]) -> str:
+    fields: list[str] = []
+    for key in ("title", "task_type", "selection_reason"):
+        value = issue.get(key)
+        if isinstance(value, str):
+            fields.append(value)
+    workflow = issue.get("expected_workflow")
+    if isinstance(workflow, list):
+        fields.extend(item for item in workflow if isinstance(item, str))
+    return "\n".join(fields)
+
+
+def _source_free_context(context: RetrievedContext) -> dict[str, Any]:
+    return {
+        "path": context.path,
+        "rank": context.rank,
+        "score": context.score,
+        "method": context.method,
+        "matched_terms": context.matched_terms,
+    }
+
+
+def _supplement_context_preview_source_neighbors(
+    *,
+    contexts: list[RetrievedContext],
+    repo_index: Any,
+    top_k: int,
+    context_provider: str,
+) -> list[RetrievedContext]:
+    if top_k <= 0 or not contexts:
+        return []
+    existing_paths = {context.path for context in contexts}
+    source_paths = {
+        file.path
+        for file in repo_index.files
+        if isinstance(getattr(file, "path", None), str)
+        and not _is_issue_corpus_test_path(file.path)
+    }
+    supplements: list[RetrievedContext] = []
+    for context in contexts:
+        if not _is_issue_corpus_test_path(context.path):
+            continue
+        for candidate in _source_neighbor_candidates(context.path, source_paths):
+            if candidate in existing_paths:
+                continue
+            existing_paths.add(candidate)
+            supplements.append(
+                RetrievedContext(
+                    path=candidate,
+                    rank=0,
+                    score=max(context.score - 0.001, 0.0),
+                    method=f"{context_provider}_source_neighbor",
+                    matched_terms=["source_neighbor", f"test:{context.path}"],
+                    excerpt="",
+                )
+            )
+            break
+    if not supplements:
+        return _rerank_contexts(contexts)
+
+    if len(contexts) + len(supplements) <= top_k:
+        return _rerank_contexts([*contexts, *supplements])
+
+    non_test_contexts = [
+        context for context in contexts if not _is_issue_corpus_test_path(context.path)
+    ]
+    if not non_test_contexts:
+        kept_originals = contexts[: max(top_k - len(supplements), 0)]
+        return _rerank_contexts([*kept_originals, *supplements[:top_k]])[:top_k]
+    return _rerank_contexts(contexts[:top_k])
+
+
+def _source_neighbor_candidates(test_path: str, source_paths: set[str]) -> list[str]:
+    path = Path(test_path)
+    name = path.name
+    stem = path.stem
+    normalized_stem = stem
+    if normalized_stem.startswith("test_"):
+        normalized_stem = normalized_stem[len("test_") :]
+    if normalized_stem.endswith("_test"):
+        normalized_stem = normalized_stem[: -len("_test")]
+
+    stripped_parts = [
+        part
+        for part in path.parts
+        if part not in {"tests", "test", "unit", "integration"}
+    ]
+    if stripped_parts:
+        stripped_parts[-1] = f"{normalized_stem}{path.suffix}"
+    relative_guess = Path(*stripped_parts) if stripped_parts else Path(f"{normalized_stem}.py")
+
+    candidates = [
+        f"src/{relative_guess.as_posix()}",
+        f"lib/{relative_guess.as_posix()}",
+        relative_guess.as_posix(),
+        f"src/{normalized_stem}{path.suffix}",
+        f"lib/{normalized_stem}{path.suffix}",
+        f"{normalized_stem}{path.suffix}",
+    ]
+    candidates.extend(
+        sorted(
+            source_path
+            for source_path in source_paths
+            if Path(source_path).stem == normalized_stem
+        )
+    )
+    deduped: list[str] = []
+    for candidate in candidates:
+        if candidate in source_paths and candidate not in deduped:
+            deduped.append(candidate)
+    return deduped
+
+
+def _is_issue_corpus_test_path(path: str) -> bool:
+    parts = Path(path).parts
+    name = Path(path).name
+    return (
+        "tests" in parts
+        or "test" in parts
+        or name.startswith("test_")
+        or name.endswith("_test.py")
+    )
+
+
+def _rerank_contexts(contexts: list[RetrievedContext]) -> list[RetrievedContext]:
+    return [replace(context, rank=index + 1) for index, context in enumerate(contexts)]
+
+
+def _safe_artifact_name(value: str) -> str:
+    sanitized = "".join(character if character.isalnum() else "_" for character in value)
+    sanitized = "_".join(part for part in sanitized.split("_") if part)
+    return sanitized or "unknown"
+
+
+def _remove_artifact_dir(*, root: Path, target: Path) -> None:
+    root = root.resolve()
+    target = target.resolve()
+    try:
+        target.relative_to(root)
+    except ValueError as error:
+        raise ValueError(f"refusing to remove path outside artifact root: {target}") from error
+    if target == root:
+        raise ValueError("refusing to remove artifact root")
+    shutil.rmtree(target)
 
 
 def _required_entry_string(entry: dict[str, Any], key: str, errors: list[str]) -> str | None:

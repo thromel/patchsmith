@@ -6,6 +6,7 @@ from patchsmith.cli import main
 from patchsmith.evaluation import (
     load_seeded_tasks,
     preflight_issue_corpus_repositories,
+    preview_issue_corpus_context,
     recall,
     run_patch_search_evaluation,
     run_repair_evaluation,
@@ -210,6 +211,63 @@ def test_preflight_issue_corpus_repositories_writes_outputs(
     )
     assert exit_code == 0
     assert (cli_output / "repo_preflight_report.md").exists()
+
+
+def test_preview_issue_corpus_context_writes_source_free_outputs(
+    tmp_path: Path,
+) -> None:
+    fixture_repo = Path("evals/tasks/seeded_bugs_v1/task_001_logic_bug/repo").resolve()
+    corpus_path = tmp_path / "issues.json"
+    corpus_path.write_text(
+        json.dumps(
+            {
+                "corpus_id": "local_preview",
+                "issues": [
+                    {
+                        "task_id": "local_simple_calc",
+                        "repository": "local/simple_calc",
+                        "repo_url": str(fixture_repo),
+                        "issue_url": "https://github.com/example/simple-calc/issues/1",
+                        "title": "Addition returns the wrong result in simple_calc",
+                        "task_type": "logic_bug",
+                        "selection_reason": "Local fixture for source-free preview coverage.",
+                        "expected_workflow": ["retrieve simple_calc implementation"],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    output_dir = tmp_path / "preview"
+    results, summary = preview_issue_corpus_context(
+        corpus_path=corpus_path,
+        output_dir=output_dir,
+        context_provider="native_hybrid",
+    )
+
+    assert summary.attempted_issues == 1
+    assert summary.completed_issues == 1
+    assert summary.source_free
+    assert results[0].retrieved_files
+    assert "src/simple_calc.py" in results[0].retrieved_files
+    assert "excerpt" not in results[0].top_contexts[0]
+    assert (output_dir / "context_preview_report.md").exists()
+    assert (output_dir / "context_preview_results.csv").exists()
+
+    cli_output = tmp_path / "cli_preview"
+    exit_code = main(
+        [
+            "preview-issue-corpus-context",
+            "--corpus",
+            str(corpus_path),
+            "--output",
+            str(cli_output),
+            "--json",
+        ]
+    )
+    assert exit_code == 0
+    assert (cli_output / "context_preview_report.md").exists()
 
 
 def test_graph_retrieval_dataset_validates(tmp_path: Path) -> None:

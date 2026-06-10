@@ -7,6 +7,7 @@ from pathlib import Path
 
 from patchsmith.evaluation import (
     preflight_issue_corpus_repositories,
+    preview_issue_corpus_context,
     run_patch_search_evaluation,
     run_repair_evaluation,
     run_scaffold_comparison,
@@ -215,6 +216,34 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f"reachable={summary.reachable_repositories}/{summary.repository_count} "
                 f"issues={summary.issue_count}"
+            )
+        return 0
+
+    if args.command == "preview-issue-corpus-context":
+        max_issues = None if args.max_issues == 0 else args.max_issues
+        results, summary = preview_issue_corpus_context(
+            corpus_path=Path(args.corpus),
+            output_dir=Path(args.output),
+            context_provider=args.context_provider,
+            top_k=args.top_k,
+            max_issues=max_issues,
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "result_count": len(results),
+                        "report_path": str(Path(args.output) / "context_preview_report.md"),
+                        "summary": summary.to_dict(),
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(f"Report: {Path(args.output) / 'context_preview_report.md'}")
+            print(
+                f"completed={summary.completed_issues}/{summary.attempted_issues} "
+                f"context_provider={summary.context_provider}"
             )
         return 0
 
@@ -867,6 +896,44 @@ def build_parser() -> argparse.ArgumentParser:
         help="Per-repository git ls-remote timeout.",
     )
     preflight_issue_corpus_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print JSON summary.",
+    )
+
+    preview_issue_corpus_parser = subparsers.add_parser(
+        "preview-issue-corpus-context",
+        help="Clone/index public issue-corpus repos and write retrieval preview artifacts.",
+    )
+    preview_issue_corpus_parser.add_argument(
+        "--corpus",
+        default="evals/issue_corpora/public_issue_smoke_v1/issues.json",
+        help="Issue corpus JSON manifest.",
+    )
+    preview_issue_corpus_parser.add_argument(
+        "--output",
+        default="artifacts/experiments/public_issue_corpus_v1",
+        help="Issue corpus context preview output directory.",
+    )
+    preview_issue_corpus_parser.add_argument(
+        "--context-provider",
+        choices=["native", "native_hybrid", "native_graph"],
+        default="native_hybrid",
+        help="Retriever to use for source-free public issue context previews.",
+    )
+    preview_issue_corpus_parser.add_argument(
+        "--top-k",
+        type=int,
+        default=5,
+        help="Number of retrieved files to record per issue.",
+    )
+    preview_issue_corpus_parser.add_argument(
+        "--max-issues",
+        type=int,
+        default=0,
+        help="Maximum issue entries to preview. Use 0 for all entries.",
+    )
+    preview_issue_corpus_parser.add_argument(
         "--json",
         action="store_true",
         help="Print JSON summary.",
