@@ -3117,6 +3117,14 @@ def write_public_issue_reproduction_plan_outputs(
         json.dumps(summary.to_dict(), indent=2) + "\n",
         encoding="utf-8",
     )
+    (output_dir / "public_issue_reproduction_specs_template.json").write_text(
+        json.dumps(
+            _public_issue_reproduction_specs_template(results),
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     with (output_dir / "public_issue_reproduction_plan_results.csv").open(
         "w",
         encoding="utf-8",
@@ -3176,6 +3184,33 @@ def write_public_issue_reproduction_plan_outputs(
         ),
         encoding="utf-8",
     )
+
+
+def _public_issue_reproduction_specs_template(
+    results: list[IssueCorpusPublicReproductionPlanResult],
+) -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "claim_boundary": [
+            "This template is for reviewed public issue reproduction criteria.",
+            "Do not count a task as reproduced until execute-public-issue-reproductions records a nonzero exit and matches every expected failure signal.",
+            "Keep commands within the normal PatchSmith command policy, such as python3 -m pytest.",
+        ],
+        "specs": [
+            {
+                "task_id": result.task_id,
+                "repository": result.repository,
+                "issue_url": result.issue_url,
+                "command": result.reproduction_command,
+                "expected_failure_signals": [],
+                "review_notes": (
+                    "Fill after reviewing the issue-specific failing traceback, "
+                    "assertion, or behavior mismatch."
+                ),
+            }
+            for result in results
+        ],
+    }
 
 
 def execute_public_issue_reproductions(

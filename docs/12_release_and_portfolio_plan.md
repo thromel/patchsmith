@@ -397,7 +397,7 @@ PYTHONPATH=src python3 -m patchsmith.cli plan-public-issue-reproductions \
   --json
 ```
 
-Add `--reproduction-specs <reviewed-specs.json>` when reviewed criteria are available. The specs file accepts `task_id`, optional `command`, and `expected_failure_signals`, and the corpus includes `evals/issue_corpora/public_issue_smoke_v1/reproduction_specs.template.json` as the source-controlled authoring template.
+The planner emits `public_issue_reproduction_specs_template.json` with task-specific candidate commands for review. Add `--reproduction-specs <reviewed-specs.json>` when reviewed criteria are available. The specs file accepts `task_id`, optional `command`, and `expected_failure_signals`, and the corpus includes `evals/issue_corpora/public_issue_smoke_v1/reproduction_specs.template.json` as the source-controlled authoring template.
 
 Dry-run or execute public issue reproductions:
 

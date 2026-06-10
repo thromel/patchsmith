@@ -1655,6 +1655,17 @@ def test_plan_public_issue_reproductions_warns_without_expected_failure_spec(
     assert "expected failing signal is not encoded" in ";".join(results[0].warnings)
     assert (output_dir / "public_issue_reproduction_plan_report.md").exists()
     assert (output_dir / "public_issue_reproduction_plan_results.csv").exists()
+    generated_template = json.loads(
+        (output_dir / "public_issue_reproduction_specs_template.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert generated_template["specs"][0]["task_id"] == "public_task"
+    assert (
+        generated_template["specs"][0]["command"]
+        == "python3 -m pytest tests/test_bug.py"
+    )
+    assert generated_template["specs"][0]["expected_failure_signals"] == []
 
     cli_output = tmp_path / "cli_reproduction_plan"
     exit_code = main(
@@ -1671,6 +1682,7 @@ def test_plan_public_issue_reproductions_warns_without_expected_failure_spec(
     )
     assert exit_code == 0
     assert (cli_output / "public_issue_reproduction_plan_report.md").exists()
+    assert (cli_output / "public_issue_reproduction_specs_template.json").exists()
 
 
 def test_plan_public_issue_reproductions_plans_explicit_failure_spec(
