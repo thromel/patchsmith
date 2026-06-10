@@ -1341,7 +1341,7 @@ def build_evidence_refresh_report(
         )
     steps.append(
         _run_evidence_refresh_step(
-            name="Delivery audit",
+            name="Delivery audit pre-release",
             artifact_paths=output_paths("delivery_audit.md", "delivery_audit.json"),
             action=lambda: write_delivery_audit_report(
                 project_root=project_root,
@@ -1373,6 +1373,29 @@ def build_evidence_refresh_report(
                 output_path=experiment_path("release_hygiene.md"),
                 json_output_path=experiment_path("release_hygiene.json"),
                 max_failure_runs=max_failure_runs,
+            ),
+        )
+    )
+    steps.append(
+        _run_evidence_refresh_step(
+            name="Launch blockers final",
+            artifact_paths=output_paths("launch_blockers.md", "launch_blockers.json"),
+            action=lambda: write_launch_blocker_report(
+                artifacts_dir=artifacts_dir,
+                output_path=experiment_path("launch_blockers.md"),
+                json_output_path=experiment_path("launch_blockers.json"),
+            ),
+        )
+    )
+    steps.append(
+        _run_evidence_refresh_step(
+            name="Delivery audit final",
+            artifact_paths=output_paths("delivery_audit.md", "delivery_audit.json"),
+            action=lambda: write_delivery_audit_report(
+                project_root=project_root,
+                artifacts_dir=artifacts_dir,
+                output_path=experiment_path("delivery_audit.md"),
+                json_output_path=experiment_path("delivery_audit.json"),
             ),
         )
     )
