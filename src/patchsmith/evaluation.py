@@ -712,6 +712,10 @@ class IssueCorpusPublicRepairReadinessResult:
     diagnosis_category: str | None
     setup_validation_status: str | None
     setup_failure_category: str | None
+    reproduction_execution_status: str | None
+    reproduction_stdout_path: str | None
+    reproduction_stderr_path: str | None
+    matched_failure_signals: list[str]
     sandbox_mode: str | None
     sandbox_network: str | None
     evidence: list[str]
@@ -730,6 +734,7 @@ class IssueCorpusPublicRepairReadinessSummary:
     focused_run_path: str
     diagnosis_path: str
     setup_validation_path: str
+    reproduction_execution_path: str | None
     task_count: int
     ready_tasks: int
     warning_tasks: int
@@ -737,6 +742,7 @@ class IssueCorpusPublicRepairReadinessSummary:
     repair_command_tasks: int
     passed_focused_tasks: int
     passed_setup_validation_tasks: int
+    reproduced_tasks: int
     missing_reproduction_tasks: int
 
     def to_dict(self) -> dict[str, Any]:
@@ -3317,6 +3323,7 @@ def check_public_issue_repair_readiness(
     setup_validation_path: Path,
     output_dir: Path,
     tasks_dir: Path | None = None,
+    reproduction_execution_path: Path | None = None,
 ) -> tuple[
     list[IssueCorpusPublicRepairReadinessResult],
     IssueCorpusPublicRepairReadinessSummary,
@@ -3330,14 +3337,27 @@ def check_public_issue_repair_readiness(
     setup_validation_records = _load_json_record_list(
         setup_validation_path, label="focused test setup validation results"
     )
+    reproduction_execution_records = (
+        _load_json_record_list(
+            reproduction_execution_path,
+            label="public issue reproduction execution results",
+        )
+        if reproduction_execution_path is not None
+        and reproduction_execution_path.exists()
+        else []
+    )
     manifests = _load_public_issue_task_manifests(tasks_dir)
     diagnosis_by_task = _records_by_task_id(diagnosis_records)
     setup_validation_by_task = _records_by_task_id(setup_validation_records)
+    reproduction_execution_by_task = _records_by_task_id(reproduction_execution_records)
     results = [
         _check_public_issue_repair_readiness_record(
             focused_record=record,
             diagnosis_record=diagnosis_by_task.get(_optional_string(record.get("task_id")) or ""),
             setup_validation_record=setup_validation_by_task.get(
+                _optional_string(record.get("task_id")) or ""
+            ),
+            reproduction_execution_record=reproduction_execution_by_task.get(
                 _optional_string(record.get("task_id")) or ""
             ),
             manifest=manifests.get(_optional_string(record.get("task_id")) or ""),
@@ -3349,6 +3369,11 @@ def check_public_issue_repair_readiness(
         focused_run_path=focused_run_path,
         diagnosis_path=diagnosis_path,
         setup_validation_path=setup_validation_path,
+        reproduction_execution_path=(
+            reproduction_execution_path
+            if reproduction_execution_records
+            else None
+        ),
         results=results,
     )
     write_public_issue_repair_readiness_outputs(
@@ -3357,6 +3382,11 @@ def check_public_issue_repair_readiness(
         focused_run_path=focused_run_path,
         diagnosis_path=diagnosis_path,
         setup_validation_path=setup_validation_path,
+        reproduction_execution_path=(
+            reproduction_execution_path
+            if reproduction_execution_records
+            else None
+        ),
         results=results,
         summary=summary,
     )
@@ -3369,6 +3399,7 @@ def summarize_public_issue_repair_readiness(
     focused_run_path: Path,
     diagnosis_path: Path,
     setup_validation_path: Path,
+    reproduction_execution_path: Path | None,
     results: list[IssueCorpusPublicRepairReadinessResult],
 ) -> IssueCorpusPublicRepairReadinessSummary:
     return IssueCorpusPublicRepairReadinessSummary(
@@ -3379,6 +3410,11 @@ def summarize_public_issue_repair_readiness(
         focused_run_path=str(focused_run_path),
         diagnosis_path=str(diagnosis_path),
         setup_validation_path=str(setup_validation_path),
+        reproduction_execution_path=(
+            str(reproduction_execution_path)
+            if reproduction_execution_path is not None
+            else None
+        ),
         task_count=len(results),
         ready_tasks=sum(1 for result in results if result.status == "ready"),
         warning_tasks=sum(1 for result in results if result.status == "warning"),
@@ -3390,10 +3426,15 @@ def summarize_public_issue_repair_readiness(
         passed_setup_validation_tasks=sum(
             1 for result in results if result.setup_validation_status == "passed"
         ),
+        reproduced_tasks=sum(
+            1
+            for result in results
+            if result.reproduction_execution_status == "reproduced"
+        ),
         missing_reproduction_tasks=sum(
             1
             for result in results
-            if any("issue reproduction" in warning for warning in result.warnings)
+            if result.reproduction_execution_status != "reproduced"
         ),
     )
 
@@ -3405,6 +3446,7 @@ def write_public_issue_repair_readiness_outputs(
     focused_run_path: Path,
     diagnosis_path: Path,
     setup_validation_path: Path,
+    reproduction_execution_path: Path | None,
     results: list[IssueCorpusPublicRepairReadinessResult],
     summary: IssueCorpusPublicRepairReadinessSummary,
 ) -> None:
@@ -3437,6 +3479,10 @@ def write_public_issue_repair_readiness_outputs(
                 "diagnosis_category",
                 "setup_validation_status",
                 "setup_failure_category",
+                "reproduction_execution_status",
+                "reproduction_stdout_path",
+                "reproduction_stderr_path",
+                "matched_failure_signals",
                 "sandbox_mode",
                 "sandbox_network",
                 "evidence",
@@ -3461,6 +3507,14 @@ def write_public_issue_repair_readiness_outputs(
                     "diagnosis_category": result.diagnosis_category,
                     "setup_validation_status": result.setup_validation_status,
                     "setup_failure_category": result.setup_failure_category,
+                    "reproduction_execution_status": (
+                        result.reproduction_execution_status
+                    ),
+                    "reproduction_stdout_path": result.reproduction_stdout_path,
+                    "reproduction_stderr_path": result.reproduction_stderr_path,
+                    "matched_failure_signals": ";".join(
+                        result.matched_failure_signals
+                    ),
                     "sandbox_mode": result.sandbox_mode,
                     "sandbox_network": result.sandbox_network,
                     "evidence": ";".join(result.evidence),
@@ -3475,6 +3529,7 @@ def write_public_issue_repair_readiness_outputs(
             focused_run_path=focused_run_path,
             diagnosis_path=diagnosis_path,
             setup_validation_path=setup_validation_path,
+            reproduction_execution_path=reproduction_execution_path,
             results=results,
             summary=summary,
         ),
@@ -5293,6 +5348,7 @@ def render_public_issue_repair_readiness_report(
     focused_run_path: Path,
     diagnosis_path: Path,
     setup_validation_path: Path,
+    reproduction_execution_path: Path | None,
     results: list[IssueCorpusPublicRepairReadinessResult],
     summary: IssueCorpusPublicRepairReadinessSummary,
 ) -> str:
@@ -5304,6 +5360,7 @@ def render_public_issue_repair_readiness_report(
         f"- Focused run path: `{focused_run_path}`",
         f"- Diagnosis path: `{diagnosis_path}`",
         f"- Setup validation path: `{setup_validation_path}`",
+        f"- Reproduction execution path: `{reproduction_execution_path or 'not provided'}`",
         f"- Task count: `{summary.task_count}`",
         f"- Ready tasks: `{summary.ready_tasks}`",
         f"- Warning tasks: `{summary.warning_tasks}`",
@@ -5311,15 +5368,16 @@ def render_public_issue_repair_readiness_report(
         f"- Repair-command tasks: `{summary.repair_command_tasks}`",
         f"- Passed focused tasks: `{summary.passed_focused_tasks}`",
         f"- Passed setup-validation tasks: `{summary.passed_setup_validation_tasks}`",
+        f"- Reproduced tasks: `{summary.reproduced_tasks}`",
         f"- Missing reproduction tasks: `{summary.missing_reproduction_tasks}`",
         "",
         "## Results",
         "",
         (
             "| Task | Status | Repository | Focused Run | Diagnosis | Setup Validation | "
-            "Repair Command | Evidence | Blockers | Warnings | Next Actions |"
+            "Reproduction | Repair Command | Evidence | Blockers | Warnings | Next Actions |"
         ),
-        "|---|---|---|---|---|---|---|---|---|---|---|",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for result in results:
         lines.append(
@@ -5330,6 +5388,7 @@ def render_public_issue_repair_readiness_report(
             f"{_markdown_table_text(result.focused_run_status or 'missing')} | "
             f"{_markdown_table_text(result.diagnosis_category or 'missing')} | "
             f"{_markdown_table_text(result.setup_validation_status or 'missing')} | "
+            f"{_markdown_table_text(result.reproduction_execution_status or 'missing')} | "
             f"{_markdown_table_text(result.repair_command or 'missing')} | "
             f"{_markdown_table_text('; '.join(result.evidence) or 'none')} | "
             f"{_markdown_table_text('; '.join(result.blockers) or 'none')} | "
@@ -7661,6 +7720,7 @@ def _check_public_issue_repair_readiness_record(
     focused_record: dict[str, Any],
     diagnosis_record: dict[str, Any] | None,
     setup_validation_record: dict[str, Any] | None,
+    reproduction_execution_record: dict[str, Any] | None,
     manifest: dict[str, Any] | None,
 ) -> IssueCorpusPublicRepairReadinessResult:
     task_id = _optional_string(focused_record.get("task_id"))
@@ -7704,6 +7764,26 @@ def _check_public_issue_repair_readiness_record(
         if setup_validation_record is not None
         else None
     )
+    reproduction_execution_status = (
+        _optional_string(reproduction_execution_record.get("status"))
+        if reproduction_execution_record is not None
+        else None
+    )
+    reproduction_stdout_path = (
+        _optional_string(reproduction_execution_record.get("stdout_path"))
+        if reproduction_execution_record is not None
+        else None
+    )
+    reproduction_stderr_path = (
+        _optional_string(reproduction_execution_record.get("stderr_path"))
+        if reproduction_execution_record is not None
+        else None
+    )
+    matched_failure_signals = (
+        _string_list(reproduction_execution_record.get("matched_failure_signals"))
+        if reproduction_execution_record is not None
+        else []
+    )
     repair_command = _first_manifest_repair_command(manifest)
 
     evidence: list[str] = []
@@ -7725,12 +7805,15 @@ def _check_public_issue_repair_readiness_record(
 
     if focused_status == "passed":
         evidence.append("focused validation command passed before repair")
-        warnings.append(
-            "pre-repair focused command passed; issue reproduction is not proven by saved evidence"
-        )
-        next_actions.append(
-            "record an issue-specific failing reproduction or keep repair-quality claims scoped"
-        )
+        if reproduction_execution_status == "reproduced":
+            evidence.append("separate reproduction execution provides failing pre-repair evidence")
+        else:
+            warnings.append(
+                "pre-repair focused command passed; issue reproduction is not proven by saved evidence"
+            )
+            next_actions.append(
+                "record an issue-specific failing reproduction or keep repair-quality claims scoped"
+            )
     elif focused_status in {"failed", "timed_out"}:
         if diagnosis_category == "nonzero_exit":
             evidence.append("focused command failed with an unclassified nonzero exit")
@@ -7769,6 +7852,34 @@ def _check_public_issue_repair_readiness_record(
         if setup_failure_category:
             blockers.append(f"setup validation failure category is {setup_failure_category}")
 
+    if reproduction_execution_record is None:
+        warnings.append("public issue reproduction execution record is missing")
+        next_actions.append("run `execute-public-issue-reproductions` before repair attempts")
+    elif reproduction_execution_status == "reproduced":
+        evidence.append("public issue reproduction execution saved failing evidence")
+        if reproduction_stdout_path:
+            evidence.append(f"reproduction stdout saved: {reproduction_stdout_path}")
+        if reproduction_stderr_path:
+            evidence.append(f"reproduction stderr saved: {reproduction_stderr_path}")
+        if matched_failure_signals:
+            evidence.append(
+                "matched reproduction signal: " + "; ".join(matched_failure_signals)
+            )
+    elif reproduction_execution_status == "dry_run":
+        warnings.append("public issue reproduction execution is only dry-run")
+        next_actions.append("rerun reproduction execution with --execute after review")
+    elif reproduction_execution_status == "blocked":
+        warnings.append("public issue reproduction execution is blocked")
+        next_actions.append("resolve reproduction execution blockers before repair attempts")
+    elif reproduction_execution_status == "not_reproduced":
+        warnings.append("public issue reproduction command did not fail as expected")
+        next_actions.append("confirm whether the issue is already fixed or update reproduction")
+    else:
+        warnings.append(
+            f"public issue reproduction execution status is {reproduction_execution_status or 'missing'}"
+        )
+        next_actions.append("inspect reproduction execution logs before repair attempts")
+
     if repair_command:
         evidence.append("saved PatchSmith repair command is available")
     else:
@@ -7804,6 +7915,10 @@ def _check_public_issue_repair_readiness_record(
         diagnosis_category=diagnosis_category,
         setup_validation_status=setup_status,
         setup_failure_category=setup_failure_category,
+        reproduction_execution_status=reproduction_execution_status,
+        reproduction_stdout_path=reproduction_stdout_path,
+        reproduction_stderr_path=reproduction_stderr_path,
+        matched_failure_signals=matched_failure_signals,
         sandbox_mode=sandbox_mode,
         sandbox_network=sandbox_network,
         evidence=_dedupe_preserve_order(evidence),

@@ -2023,6 +2023,114 @@ def test_check_public_issue_repair_readiness_warns_without_reproduction(
     assert (cli_output / "public_issue_repair_readiness_report.md").exists()
 
 
+def test_check_public_issue_repair_readiness_uses_reproduction_execution(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    task_id = "public_task"
+    focused_run_path = tmp_path / "focused_test_run_results.json"
+    diagnosis_path = tmp_path / "focused_test_diagnosis_results.json"
+    setup_validation_path = tmp_path / "focused_test_setup_validation_results.json"
+    reproduction_execution_path = tmp_path / "public_issue_reproduction_execution_results.json"
+    tasks_dir = tmp_path / "materialized_tasks"
+    task_dir = tasks_dir / task_id
+    task_dir.mkdir(parents=True)
+    focused_run_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": task_id,
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/10",
+                    "status": "passed",
+                    "command": "python3 -m pytest tests/test_bug.py",
+                    "repo_path": str(repo_dir),
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    diagnosis_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": task_id,
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/10",
+                    "category": "focused_test_passed",
+                    "severity": "info",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    setup_validation_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": task_id,
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/10",
+                    "status": "passed",
+                    "setup_execution_status": "passed",
+                    "repo_path": str(repo_dir),
+                    "validation_command": "python3 -m pytest tests/test_bug.py",
+                    "sandbox_mode": "docker",
+                    "sandbox_network": "none",
+                    "failure_category": None,
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    reproduction_execution_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": task_id,
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/10",
+                    "status": "reproduced",
+                    "stdout_path": str(tmp_path / "stdout.txt"),
+                    "stderr_path": str(tmp_path / "stderr.txt"),
+                    "matched_failure_signals": ["AssertionError: expected public bug"],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (task_dir / "task_manifest.json").write_text(
+        json.dumps(
+            {
+                "task_id": task_id,
+                "suggested_commands": [
+                    "PYTHONPATH=src python3 -m patchsmith.cli run --repo repo --json"
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    results, summary = check_public_issue_repair_readiness(
+        focused_run_path=focused_run_path,
+        diagnosis_path=diagnosis_path,
+        setup_validation_path=setup_validation_path,
+        reproduction_execution_path=reproduction_execution_path,
+        output_dir=tmp_path / "repair_readiness",
+        tasks_dir=tasks_dir,
+    )
+
+    assert summary.ready_tasks == 1
+    assert summary.warning_tasks == 0
+    assert summary.missing_reproduction_tasks == 0
+    assert summary.reproduced_tasks == 1
+    assert results[0].status == "ready"
+    assert results[0].reproduction_execution_status == "reproduced"
+    assert "saved failing evidence" in ";".join(results[0].evidence)
+    assert "issue reproduction is not proven" not in ";".join(results[0].warnings)
+
+
 def test_check_public_issue_repair_readiness_blocks_missing_setup_validation(
     tmp_path: Path,
 ) -> None:

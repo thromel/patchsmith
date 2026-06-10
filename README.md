@@ -430,12 +430,13 @@ PYTHONPATH=src python3 -m patchsmith.cli check-public-issue-repair-readiness \
   --focused-run artifacts/experiments/public_issue_corpus_v1/focused_test_run_results.json \
   --diagnosis artifacts/experiments/public_issue_corpus_v1/focused_test_diagnosis_results.json \
   --setup-validation artifacts/experiments/public_issue_corpus_v1/focused_test_setup_validation_results.json \
+  --reproduction-execution artifacts/experiments/public_issue_corpus_v1/public_issue_reproduction_execution_results.json \
   --tasks-dir artifacts/experiments/public_issue_corpus_v1/materialized_tasks \
   --output artifacts/experiments/public_issue_corpus_v1 \
   --json
 ```
 
-The repair-readiness report joins focused-run, diagnosis, setup-validation, reproduction-plan, and materialized-task command evidence before any public issue repair attempt. Current public issue repair readiness is warning-class: all three tasks have runnable validation and saved PatchSmith repair commands, but all three lack saved failing reproduction evidence, so repair-quality claims remain unproven.
+The repair-readiness report joins focused-run, diagnosis, setup-validation, reproduction-execution, and materialized-task command evidence before any public issue repair attempt. Current public issue repair readiness is warning-class: all three tasks have runnable validation and saved PatchSmith repair commands, but all three lack saved failing reproduction evidence, so repair-quality claims remain unproven.
 
 Run the seeded repair evaluation:
 

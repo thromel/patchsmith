@@ -1553,6 +1553,9 @@ def build_evidence_refresh_report(
         experiment_path("public_issue_corpus_v1/focused_test_diagnosis_results.json"),
         experiment_path("public_issue_corpus_v1/focused_test_setup_validation_results.json"),
     ]
+    public_reproduction_execution_path = experiment_path(
+        "public_issue_corpus_v1/public_issue_reproduction_execution_results.json"
+    )
     if all(path.exists() for path in public_repair_inputs):
         steps.append(
             _run_evidence_refresh_step(
@@ -1565,6 +1568,11 @@ def build_evidence_refresh_report(
                     focused_run_path=public_repair_inputs[0],
                     diagnosis_path=public_repair_inputs[1],
                     setup_validation_path=public_repair_inputs[2],
+                    reproduction_execution_path=(
+                        public_reproduction_execution_path
+                        if public_reproduction_execution_path.exists()
+                        else None
+                    ),
                     tasks_dir=experiment_path("public_issue_corpus_v1/materialized_tasks"),
                     output_dir=experiment_path("public_issue_corpus_v1"),
                 )[1],

@@ -630,6 +630,7 @@ def main(argv: list[str] | None = None) -> int:
             focused_run_path=Path(args.focused_run),
             diagnosis_path=Path(args.diagnosis),
             setup_validation_path=Path(args.setup_validation),
+            reproduction_execution_path=Path(args.reproduction_execution),
             output_dir=Path(args.output),
             tasks_dir=tasks_dir,
         )
@@ -2098,6 +2099,14 @@ def build_parser() -> argparse.ArgumentParser:
             "focused_test_setup_validation_results.json"
         ),
         help="Focused public issue setup-validation results JSON.",
+    )
+    public_repair_readiness_parser.add_argument(
+        "--reproduction-execution",
+        default=(
+            "artifacts/experiments/public_issue_corpus_v1/"
+            "public_issue_reproduction_execution_results.json"
+        ),
+        help="Optional public issue reproduction-execution results JSON.",
     )
     public_repair_readiness_parser.add_argument(
         "--tasks-dir",
