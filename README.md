@@ -700,7 +700,7 @@ PYTHONPATH=src python3 -m patchsmith.cli release-hygiene \
   --json
 ```
 
-Latest release hygiene evidence is saved in `artifacts/experiments/release_hygiene.md` and `artifacts/experiments/release_hygiene.json`. Current status is `ready_with_warnings`: CI, packaging metadata, architecture-diagram, demo-media, quality-gate, project-status, project-status freshness, environment-readiness evidence, calibration-readiness, live-calibration plan, delivery audit, launch-blocker, public issue corpus/context-preview/materialized-task validation/readiness/focused-test plan/run/diagnosis/setup-plan/setup-readiness/setup-execution/setup-validation evidence, and local Git metadata checks pass, while live LLM calibration remains unproven and must stay visible in release claims.
+Latest release hygiene evidence is saved in `artifacts/experiments/release_hygiene.md` and `artifacts/experiments/release_hygiene.json`. Current status is `ready_with_warnings`: CI, packaging metadata, architecture-diagram, demo-media, quality-gate, project-status, project-status freshness, calibration-readiness, live-calibration plan, delivery audit, launch-blocker, public issue corpus/context-preview/materialized-task validation/readiness/focused-test plan/run/diagnosis/setup-plan/setup-readiness/setup-execution/setup-validation evidence, and local Git metadata checks pass, while blocked environment readiness and unproven live LLM calibration remain warning-class caveats that must stay visible in release claims.
 
 Build package artifacts:
 

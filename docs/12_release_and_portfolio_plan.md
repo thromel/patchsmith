@@ -218,7 +218,7 @@ PYTHONPATH=src python3 -m patchsmith.cli delivery-audit \
   --json
 ```
 
-Current delivery audit output is `in_progress_with_blockers`: requirements, roadmaps, sprint plans, process docs, development commits, executable quality-gate evidence, and saved evaluation artifacts are present, while Docker smoke, public issue setup validation, and live LLM calibration remain blocker-class evidence gaps.
+Current delivery audit output is `in_progress_with_blockers`: requirements, roadmaps, sprint plans, process docs, development commits, executable quality-gate evidence, saved evaluation artifacts, and the live-calibration execution plan are present, while environment readiness, Docker smoke, public issue setup validation, and live LLM calibration remain blocker-class evidence gaps.
 
 Generate the Docker smoke report:
 
@@ -395,7 +395,7 @@ PYTHONPATH=src python3 -m patchsmith.cli release-hygiene \
   --json
 ```
 
-Current release hygiene output is `ready_with_warnings`: generated review artifacts now include quality-gate, project-status, calibration-readiness, live-calibration plan, delivery audit, launch-blocker, and public issue context-preview/materialization validation/readiness/focused-test plan/run/diagnosis/setup-plan/setup-readiness/setup-execution/setup-validation evidence, package build metadata exists, local Git metadata exists, and the remaining release caveat is live LLM calibration.
+Current release hygiene output is `ready_with_warnings`: generated review artifacts now include quality-gate, project-status, project-status freshness, environment-readiness, calibration-readiness, live-calibration plan, delivery audit, launch-blocker, and public issue context-preview/materialization validation/readiness/focused-test plan/run/diagnosis/setup-plan/setup-readiness/setup-execution/setup-validation evidence, package build metadata exists, local Git metadata exists, and the remaining release caveats are blocked environment readiness and unproven live LLM calibration.
 
 ## Example flagship demo scenario
 
