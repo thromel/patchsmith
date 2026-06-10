@@ -77,7 +77,7 @@ Current implementation:
 - `docker` mode is opt-in through `--sandbox-mode docker`,
 - Docker mode runs policy-checked commands with implicit image pulls disabled, network disabled, dropped capabilities, resource limits, a `/workspace` bind mount, and a sanitized host environment,
 - Docker mode requires an image that already contains the task test dependencies.
-- `docker-smoke` records daemon/image/test-run evidence plus Docker-related environment/socket diagnostics and remediation commands.
+- `docker-smoke` records daemon/image/test-run evidence plus Docker-related environment/socket diagnostics, host-side Docker Desktop/Colima hints, and remediation commands.
 - focused public-issue setup execution defaults to dry-run and keeps dependency installs blocked unless `--allow-dependency-installs` is explicitly set with Docker mode.
 
 ### Network policy

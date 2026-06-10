@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import shlex
 import subprocess
 import struct
@@ -2027,6 +2028,7 @@ def build_docker_smoke_report(
         "PYTHONPATH=src python3 -m patchsmith.cli docker-smoke "
         f"--image {image} --json"
     )
+    environment_snapshot = _docker_environment_snapshot(docker_binary)
     return DockerSmokeReport(
         project_root=str(project_root),
         artifacts_dir=str(artifacts_dir),
@@ -2043,11 +2045,12 @@ def build_docker_smoke_report(
         run_id=run_id,
         test_exit_code=test_exit_code,
         checks=checks,
-        environment=_docker_environment_snapshot(docker_binary),
+        environment=environment_snapshot,
         remediation_commands=_docker_remediation_commands(
             docker_binary=docker_binary,
             build_command=build_command,
             smoke_command=smoke_command,
+            environment=environment_snapshot,
         ),
         build_command=build_command,
         smoke_command=smoke_command,
@@ -4229,10 +4232,20 @@ def _docker_image_check(docker_binary: str, image: str) -> DockerSmokeCheck:
 def _docker_environment_snapshot(docker_binary: str) -> dict[str, str]:
     home_socket = Path.home() / ".docker" / "run" / "docker.sock"
     default_socket = Path("/var/run/docker.sock")
+    docker_desktop_paths = [
+        Path("/Applications/Docker.app"),
+        Path.home() / "Applications" / "Docker.app",
+    ]
     return {
         "docker_binary": docker_binary,
+        "docker_cli_path": shutil.which(docker_binary) or "missing",
         "DOCKER_HOST": os.environ.get("DOCKER_HOST", "unset"),
         "DOCKER_CONTEXT": os.environ.get("DOCKER_CONTEXT", "unset"),
+        "DOCKER_CONFIG": os.environ.get("DOCKER_CONFIG", "unset"),
+        "docker_desktop_application": (
+            "exists" if any(path.exists() for path in docker_desktop_paths) else "missing"
+        ),
+        "colima_binary": shutil.which("colima") or "missing",
         str(home_socket): "exists" if home_socket.exists() else "missing",
         str(default_socket): "exists" if default_socket.exists() else "missing",
     }
@@ -4243,13 +4256,18 @@ def _docker_remediation_commands(
     docker_binary: str,
     build_command: str,
     smoke_command: str,
+    environment: dict[str, str],
 ) -> list[str]:
-    return [
+    commands = [
         f"{docker_binary} context ls",
         f"{docker_binary} version",
-        build_command,
-        smoke_command,
     ]
+    if environment.get("docker_desktop_application") == "exists":
+        commands.append("open -a Docker")
+    if environment.get("colima_binary", "missing") != "missing":
+        commands.append("colima start")
+    commands.extend([build_command, smoke_command])
+    return commands
 
 
 def _run_docker_seeded_smoke(

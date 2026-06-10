@@ -1784,6 +1784,10 @@ def test_docker_smoke_report_records_unavailable_daemon(
     payload = json.loads((tmp_path / "docker_smoke.json").read_text(encoding="utf-8"))
     assert payload["smoke_status"] == "not_available"
     assert payload["environment"]["docker_binary"] == "docker"
+    assert "docker_cli_path" in payload["environment"]
+    assert "DOCKER_CONFIG" in payload["environment"]
+    assert payload["environment"]["docker_desktop_application"] in {"exists", "missing"}
+    assert "colima_binary" in payload["environment"]
     assert payload["remediation_commands"][0] == "docker context ls"
 
     cli_output = tmp_path / "cli_docker_smoke.md"
@@ -1806,6 +1810,8 @@ def test_docker_smoke_report_records_unavailable_daemon(
     cli_payload = json.loads(capsys.readouterr().out)
     assert cli_payload["smoke_status"] == "not_available"
     assert cli_payload["environment"]["docker_binary"] == "docker"
+    assert "docker_cli_path" in cli_payload["environment"]
+    assert "docker_desktop_application" in cli_payload["environment"]
     assert "docker version" in cli_payload["remediation_commands"]
     assert cli_output.exists()
 
