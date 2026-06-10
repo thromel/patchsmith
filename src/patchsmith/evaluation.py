@@ -504,6 +504,7 @@ class IssueCorpusFocusedTestSetupExecutionResult:
     requires_network: bool
     sandbox_required: bool
     sandbox_mode: str
+    sandbox_image: str
     sandbox_network: str
     dry_run: bool
     allow_dependency_installs: bool
@@ -528,6 +529,7 @@ class IssueCorpusFocusedTestSetupExecutionSummary:
     allow_warnings: bool
     allow_dependency_installs: bool
     sandbox_mode: str
+    sandbox_image: str
     sandbox_network: str
     timeout_seconds: int
     dry_run_tasks: int
@@ -555,6 +557,7 @@ class IssueCorpusFocusedTestSetupValidationResult:
     repo_path: str | None
     validation_command: str | None
     sandbox_mode: str
+    sandbox_image: str
     sandbox_network: str
     dry_run: bool
     command_result: IssueCorpusFocusedTestSetupCommandResult | None
@@ -576,6 +579,7 @@ class IssueCorpusFocusedTestSetupValidationSummary:
     task_count: int
     dry_run: bool
     sandbox_mode: str
+    sandbox_image: str
     sandbox_network: str
     timeout_seconds: int
     dry_run_tasks: int
@@ -2391,7 +2395,7 @@ def execute_focused_test_setups(
     readiness_path: Path,
     output_dir: Path,
     sandbox_mode: str = "docker",
-    sandbox_image: str = "python:3.12-slim",
+    sandbox_image: str = "patchsmith-seeded-smoke:py312",
     sandbox_network: str = "none",
     timeout_seconds: int = 300,
     max_tasks: int | None = None,
@@ -2447,6 +2451,7 @@ def execute_focused_test_setups(
             runner=runner,
             policy=policy,
             sandbox_mode=sandbox_mode,
+            sandbox_image=sandbox_image,
             sandbox_network=sandbox_network,
             timeout_seconds=timeout_seconds,
             dry_run=dry_run,
@@ -2462,6 +2467,7 @@ def execute_focused_test_setups(
         allow_warnings=allow_warnings,
         allow_dependency_installs=allow_dependency_installs,
         sandbox_mode=sandbox_mode,
+        sandbox_image=sandbox_image,
         sandbox_network=sandbox_network,
         timeout_seconds=timeout_seconds,
     )
@@ -2482,6 +2488,7 @@ def summarize_focused_test_setup_execution(
     allow_warnings: bool,
     allow_dependency_installs: bool,
     sandbox_mode: str,
+    sandbox_image: str,
     sandbox_network: str,
     timeout_seconds: int,
 ) -> IssueCorpusFocusedTestSetupExecutionSummary:
@@ -2492,6 +2499,7 @@ def summarize_focused_test_setup_execution(
         allow_warnings=allow_warnings,
         allow_dependency_installs=allow_dependency_installs,
         sandbox_mode=sandbox_mode,
+        sandbox_image=sandbox_image,
         sandbox_network=sandbox_network,
         timeout_seconds=timeout_seconds,
         dry_run_tasks=sum(1 for result in results if result.status == "dry_run"),
@@ -2549,6 +2557,7 @@ def write_focused_test_setup_execution_outputs(
                 "requires_network",
                 "sandbox_required",
                 "sandbox_mode",
+                "sandbox_image",
                 "sandbox_network",
                 "dry_run",
                 "allow_dependency_installs",
@@ -2574,6 +2583,7 @@ def write_focused_test_setup_execution_outputs(
                     "requires_network": result.requires_network,
                     "sandbox_required": result.sandbox_required,
                     "sandbox_mode": result.sandbox_mode,
+                    "sandbox_image": result.sandbox_image,
                     "sandbox_network": result.sandbox_network,
                     "dry_run": result.dry_run,
                     "allow_dependency_installs": result.allow_dependency_installs,
@@ -2601,7 +2611,7 @@ def validate_focused_test_setups(
     setup_execution_path: Path,
     output_dir: Path,
     sandbox_mode: str = "docker",
-    sandbox_image: str = "python:3.12-slim",
+    sandbox_image: str = "patchsmith-seeded-smoke:py312",
     sandbox_network: str = "none",
     timeout_seconds: int = 300,
     max_tasks: int | None = None,
@@ -2649,6 +2659,7 @@ def validate_focused_test_setups(
             runner=runner,
             policy=policy,
             sandbox_mode=sandbox_mode,
+            sandbox_image=sandbox_image,
             sandbox_network=sandbox_network,
             timeout_seconds=timeout_seconds,
             dry_run=dry_run,
@@ -2660,6 +2671,7 @@ def validate_focused_test_setups(
         results=results,
         dry_run=dry_run,
         sandbox_mode=sandbox_mode,
+        sandbox_image=sandbox_image,
         sandbox_network=sandbox_network,
         timeout_seconds=timeout_seconds,
     )
@@ -2678,6 +2690,7 @@ def summarize_focused_test_setup_validation(
     results: list[IssueCorpusFocusedTestSetupValidationResult],
     dry_run: bool,
     sandbox_mode: str,
+    sandbox_image: str,
     sandbox_network: str,
     timeout_seconds: int,
 ) -> IssueCorpusFocusedTestSetupValidationSummary:
@@ -2686,6 +2699,7 @@ def summarize_focused_test_setup_validation(
         task_count=len(results),
         dry_run=dry_run,
         sandbox_mode=sandbox_mode,
+        sandbox_image=sandbox_image,
         sandbox_network=sandbox_network,
         timeout_seconds=timeout_seconds,
         dry_run_tasks=sum(1 for result in results if result.status == "dry_run"),
@@ -2733,6 +2747,7 @@ def write_focused_test_setup_validation_outputs(
                 "repo_path",
                 "validation_command",
                 "sandbox_mode",
+                "sandbox_image",
                 "sandbox_network",
                 "dry_run",
                 "command_result",
@@ -2754,6 +2769,7 @@ def write_focused_test_setup_validation_outputs(
                     "repo_path": result.repo_path,
                     "validation_command": result.validation_command,
                     "sandbox_mode": result.sandbox_mode,
+                    "sandbox_image": result.sandbox_image,
                     "sandbox_network": result.sandbox_network,
                     "dry_run": result.dry_run,
                     "command_result": (
@@ -4329,6 +4345,7 @@ def render_focused_test_setup_execution_report(
             f"`{str(summary.allow_dependency_installs).lower()}`"
         ),
         f"- Sandbox mode: `{summary.sandbox_mode}`",
+        f"- Sandbox image: `{summary.sandbox_image}`",
         f"- Sandbox network: `{summary.sandbox_network}`",
         f"- Timeout seconds: `{summary.timeout_seconds}`",
         f"- Dry-run tasks: `{summary.dry_run_tasks}`",
@@ -4344,10 +4361,10 @@ def render_focused_test_setup_execution_report(
         "## Results",
         "",
         (
-            "| Task | Status | Readiness | Profile | Network | Dependency Installs | "
+            "| Task | Status | Readiness | Profile | Image | Network | Dependency Installs | "
             "Commands | Command Statuses | Notes | Next Actions |"
         ),
-        "|---|---|---|---|---|---|---|---|---|---|",
+        "|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for result in results:
         notes = [*result.errors, *result.warnings]
@@ -4361,6 +4378,7 @@ def render_focused_test_setup_execution_report(
             f"{_markdown_table_text(result.status)} | "
             f"{_markdown_table_text(result.readiness_status)} | "
             f"{_markdown_table_text(result.setup_profile)} | "
+            f"{_markdown_table_text(result.sandbox_image)} | "
             f"{_markdown_table_text(result.sandbox_network)} | "
             f"{_markdown_table_text(str(result.allow_dependency_installs).lower())} | "
             f"{_markdown_table_text('; '.join(result.setup_commands) or 'none')} | "
@@ -4396,6 +4414,7 @@ def render_focused_test_setup_validation_report(
         f"- Task count: `{summary.task_count}`",
         f"- Dry run: `{str(summary.dry_run).lower()}`",
         f"- Sandbox mode: `{summary.sandbox_mode}`",
+        f"- Sandbox image: `{summary.sandbox_image}`",
         f"- Sandbox network: `{summary.sandbox_network}`",
         f"- Timeout seconds: `{summary.timeout_seconds}`",
         f"- Dry-run tasks: `{summary.dry_run_tasks}`",
@@ -4408,8 +4427,8 @@ def render_focused_test_setup_validation_report(
         "",
         "## Results",
         "",
-        "| Task | Status | Setup Status | Profile | Validation Command | Command Status | Notes | Next Actions |",
-        "|---|---|---|---|---|---|---|---|",
+        "| Task | Status | Setup Status | Profile | Image | Validation Command | Command Status | Notes | Next Actions |",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
     for result in results:
         notes = [*result.errors, *result.warnings]
@@ -4424,6 +4443,7 @@ def render_focused_test_setup_validation_report(
             f"{_markdown_table_text(result.status)} | "
             f"{_markdown_table_text(result.setup_execution_status)} | "
             f"{_markdown_table_text(result.setup_profile)} | "
+            f"{_markdown_table_text(result.sandbox_image)} | "
             f"{_markdown_table_text(result.validation_command or 'none')} | "
             f"{_markdown_table_text(command_status)} | "
             f"{_markdown_table_text('; '.join(notes) or 'none')} | "
@@ -5884,6 +5904,7 @@ def _execute_focused_test_setup_record(
     runner: Any | None,
     policy: CommandPolicy,
     sandbox_mode: str,
+    sandbox_image: str,
     sandbox_network: str,
     timeout_seconds: int,
     dry_run: bool,
@@ -5948,6 +5969,7 @@ def _execute_focused_test_setup_record(
             requires_network=requires_network,
             sandbox_required=sandbox_required,
             sandbox_mode=sandbox_mode,
+            sandbox_image=sandbox_image,
             sandbox_network=sandbox_network,
             dry_run=dry_run,
             allow_dependency_installs=allow_dependency_installs,
@@ -5990,6 +6012,7 @@ def _execute_focused_test_setup_record(
             requires_network=requires_network,
             sandbox_required=sandbox_required,
             sandbox_mode=sandbox_mode,
+            sandbox_image=sandbox_image,
             sandbox_network=sandbox_network,
             dry_run=dry_run,
             allow_dependency_installs=allow_dependency_installs,
@@ -6018,6 +6041,7 @@ def _execute_focused_test_setup_record(
             requires_network=requires_network,
             sandbox_required=sandbox_required,
             sandbox_mode=sandbox_mode,
+            sandbox_image=sandbox_image,
             sandbox_network=sandbox_network,
             dry_run=dry_run,
             allow_dependency_installs=allow_dependency_installs,
@@ -6092,6 +6116,7 @@ def _execute_focused_test_setup_record(
         requires_network=requires_network,
         sandbox_required=sandbox_required,
         sandbox_mode=sandbox_mode,
+        sandbox_image=sandbox_image,
         sandbox_network=sandbox_network,
         dry_run=dry_run,
         allow_dependency_installs=allow_dependency_installs,
@@ -6111,6 +6136,7 @@ def _validate_focused_test_setup_record(
     runner: Any | None,
     policy: CommandPolicy,
     sandbox_mode: str,
+    sandbox_image: str,
     sandbox_network: str,
     timeout_seconds: int,
     dry_run: bool,
@@ -6169,6 +6195,7 @@ def _validate_focused_test_setup_record(
             repo_path=repo_path_value,
             validation_command=validation_command,
             sandbox_mode=sandbox_mode,
+            sandbox_image=sandbox_image,
             sandbox_network=sandbox_network,
             dry_run=dry_run,
             command_result=command_result_payload,
@@ -6188,6 +6215,7 @@ def _validate_focused_test_setup_record(
             repo_path=repo_path_value,
             validation_command=validation_command,
             sandbox_mode=sandbox_mode,
+            sandbox_image=sandbox_image,
             sandbox_network=sandbox_network,
             dry_run=dry_run,
             command_result=command_result_payload,
@@ -6246,6 +6274,7 @@ def _validate_focused_test_setup_record(
         repo_path=repo_path_value,
         validation_command=validation_command,
         sandbox_mode=sandbox_mode,
+        sandbox_image=sandbox_image,
         sandbox_network=sandbox_network,
         dry_run=dry_run,
         command_result=command_result_payload,

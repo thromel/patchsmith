@@ -1779,7 +1779,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     focused_test_setup_execution_parser.add_argument(
         "--sandbox-image",
-        default="python:3.12-slim",
+        default="patchsmith-seeded-smoke:py312",
         help="Docker image used when --sandbox-mode docker is selected.",
     )
     focused_test_setup_execution_parser.add_argument(
@@ -1846,7 +1846,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     focused_test_setup_validation_parser.add_argument(
         "--sandbox-image",
-        default="python:3.12-slim",
+        default="patchsmith-seeded-smoke:py312",
         help="Docker image used when --sandbox-mode docker is selected.",
     )
     focused_test_setup_validation_parser.add_argument(

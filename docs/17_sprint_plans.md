@@ -135,7 +135,7 @@ Acceptance criteria:
 
 Current status:
 
-Implemented as the first development slice. The default runner remains the local command-policy sandbox for fast deterministic development. An opt-in Docker runner now exists for `run`, `eval-repair`, `eval-scaffold`, and `eval-patch-search`; it disables implicit image pulls and container networking, drops capabilities, applies resource limits, mounts the task workspace at `/workspace`, and records the selected sandbox mode in traces. The `docker-smoke` command now records daemon, image, seeded-run evidence, Docker-related environment/socket diagnostics, host-side Docker Desktop/Colima hints, and remediation commands. A passing live Docker daemon/image smoke is still separate evidence because Docker mode requires a reachable daemon and an image with task dependencies installed.
+Implemented as the first development slice. The default runner remains the local command-policy sandbox for fast deterministic development. An opt-in Docker runner now exists for `run`, `eval-repair`, `eval-scaffold`, and `eval-patch-search`; it disables implicit image pulls and container networking, drops capabilities, applies resource limits, mounts the task workspace at `/workspace`, and records the selected sandbox mode in traces. The `docker-smoke` command now records daemon, image, seeded-run evidence, Docker-related environment/socket diagnostics, host-side Docker Desktop/Colima hints, and remediation commands. The provided `patchsmith-seeded-smoke:py312` image includes `pytest` and `git` for seeded smoke and focused setup work. A passing live Docker daemon/image smoke is still separate evidence because Docker mode requires a reachable daemon and an image with task dependencies installed.
 
 ### Sprint 2: Context Broker and Retrieval Evaluation
 
@@ -431,10 +431,14 @@ Latest expected evidence:
 - focused public issue setup environment plans: 2,
 - focused public issue setup network-required plans: 3,
 - focused public issue setup-readiness ready tasks: 0,
-- focused public issue setup-readiness blocked tasks: 3,
-- focused public issue setup-execution blocked tasks: 3,
+- focused public issue setup-readiness warning tasks: 3,
+- focused public issue setup-readiness blocked tasks: 0,
+- focused public issue setup-execution completed tasks: 3,
+- focused public issue setup-execution blocked tasks: 0,
 - focused public issue setup dependency installs: blocked by default policy unless explicitly enabled with Docker mode,
-- focused public issue setup-validation blocked tasks: 3,
+- focused public issue setup-validation attempted tasks: 3,
+- focused public issue setup-validation failed tasks: 3,
+- focused public issue setup-validation blocked tasks: 0,
 - invalid entries: 0,
 - repositories: `psf/requests`, `pytest-dev/pytest`.
 
@@ -859,13 +863,13 @@ Latest evidence:
 - quality gate: `passed`,
 - project status: `in_progress_with_blockers`,
 - project-status freshness: `fresh`,
-- environment readiness: `blocked`,
+- environment readiness: `ready_with_warnings`,
 - evidence refresh: `passed_with_skips`,
-- launch blocker status: `blocked`,
-- launch blockers: 2,
-- launch warnings: 2,
+- launch blocker status: `ready_with_warnings`,
+- launch blockers: 0,
+- launch warnings: 3,
 - release hygiene status: `ready_with_warnings`,
-- release hygiene checks: generated review artifacts include quality-gate, project-status freshness, environment readiness, live-calibration planning, launch blockers, public issue context preview, task materialization validation/readiness, focused-test planning, focused-test run, focused-test diagnosis, focused-test setup-plan, setup-readiness, setup-execution, and setup-validation evidence; live LLM calibration and blocked environment prerequisites remain warnings,
+- release hygiene checks: generated review artifacts include quality-gate, project-status freshness, environment readiness, live-calibration planning, launch blockers, public issue context preview, task materialization validation/readiness, focused-test planning, focused-test run, focused-test diagnosis, focused-test setup-plan, setup-readiness, setup-execution, and setup-validation evidence; live LLM calibration and warning-class environment/setup evidence remain caveats,
 - indexed experiments: 17,
 - indexed saved runs: 443,
 - normalized metric rows: 29,
@@ -896,7 +900,7 @@ Reason:
 
 - Sprints 1 through 9 now have working code paths and saved evidence artifacts.
 - Static review surfaces now cover aggregate metrics, run details, and failure cases without adding a web stack.
-- The remaining gap is launch execution: resolve Docker smoke availability, unblock focused public issue setup-readiness, and run live-provider calibration only when credentials and budget are available.
+- The remaining gap is launch execution: resolve public issue setup-validation failures and run live-provider calibration only when credentials and budget are available.
 
 ## Sprint 10 task breakdown
 

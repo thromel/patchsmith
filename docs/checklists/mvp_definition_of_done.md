@@ -16,7 +16,7 @@ The MVP is complete when all items below are satisfied.
 - [ ] Final diff is generated.
 - [ ] Markdown run report is generated.
 
-Note: an opt-in Docker sandbox runner exists; the MVP checkbox should stay open until `docker-smoke` records a passing seeded test in Docker mode. Build the local smoke image with `docker build -f docker/seeded-smoke.Dockerfile -t patchsmith-seeded-smoke:py312 .`.
+Note: an opt-in Docker sandbox runner exists; the MVP checkbox should stay open until `docker-smoke` records a passing seeded test in Docker mode. Build the local smoke/setup image, which includes `pytest` and `git`, with `docker build -f docker/seeded-smoke.Dockerfile -t patchsmith-seeded-smoke:py312 .`.
 
 ## Observability
 

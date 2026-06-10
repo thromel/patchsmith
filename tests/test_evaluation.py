@@ -1238,8 +1238,10 @@ def test_execute_focused_test_setups_allows_dependency_install_dry_run_with_opt_
 
     assert summary.dry_run_tasks == 1
     assert summary.allow_dependency_installs
+    assert summary.sandbox_image == "patchsmith-seeded-smoke:py312"
     assert summary.sandbox_network == "bridge"
     assert results[0].status == "dry_run"
+    assert results[0].sandbox_image == "patchsmith-seeded-smoke:py312"
     assert results[0].allow_dependency_installs
     assert results[0].command_results[0].status == "dry_run"
     assert results[0].command_results[0].policy_allowed
@@ -1401,7 +1403,9 @@ def test_validate_focused_test_setups_dry_runs_after_setup_passes(
 
     assert summary.dry_run_tasks == 1
     assert summary.blocked_tasks == 0
+    assert summary.sandbox_image == "patchsmith-seeded-smoke:py312"
     assert results[0].status == "dry_run"
+    assert results[0].sandbox_image == "patchsmith-seeded-smoke:py312"
     assert results[0].command_result is not None
     assert results[0].command_result.policy_allowed
 

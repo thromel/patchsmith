@@ -152,7 +152,7 @@ PYTHONPATH=src python3 -m patchsmith.cli launch-blockers \
   --json
 ```
 
-Current launch blocker output is `blocked`: Docker smoke availability and focused public issue setup-readiness are the two P0 blockers. Live-provider calibration and release hygiene remain warning-class caveats. The generated backlog includes dependency-chain and remediation-command sections so the blocker order and next runnable commands are preserved with the evidence.
+Current launch blocker output is `ready_with_warnings`: Docker smoke is ready and focused public issue setup-readiness is warning-class rather than blocked. Live-provider calibration, release hygiene, and public issue setup-validation failures remain caveats. The generated backlog includes dependency-chain and remediation-command sections so the blocker order and next runnable commands are preserved with the evidence.
 
 Generate the MVP progress report:
 
@@ -218,7 +218,7 @@ PYTHONPATH=src python3 -m patchsmith.cli delivery-audit \
   --json
 ```
 
-Current delivery audit output is `in_progress_with_blockers`: requirements, roadmaps, sprint plans, process docs, development commits, executable quality-gate evidence, saved evaluation artifacts, and the live-calibration execution plan are present, while environment readiness, Docker smoke, public issue setup validation, and live LLM calibration remain blocker-class evidence gaps.
+Current delivery audit output is `in_progress_with_blockers`: requirements, roadmaps, sprint plans, process docs, development commits, executable quality-gate evidence, saved evaluation artifacts, Docker smoke evidence, and the live-calibration execution plan are present, while public issue setup validation and live LLM calibration remain blocker-class evidence gaps.
 
 Generate the Docker smoke report:
 
@@ -232,7 +232,7 @@ PYTHONPATH=src python3 -m patchsmith.cli docker-smoke \
   --json
 ```
 
-Current Docker smoke output records `not_available` when Docker is not reachable, including Docker-related environment/socket diagnostics, host-side Docker Desktop/Colima hints, and remediation commands. A passing Docker smoke artifact is required before claiming Docker-sandboxed seeded tests.
+Current Docker smoke output records a passing seeded Docker run when Docker is reachable, including Docker-related environment/socket diagnostics, host-side Docker Desktop/Colima hints, and remediation commands. A passing Docker smoke artifact is required before claiming Docker-sandboxed seeded tests.
 
 Generate the public issue corpus report:
 
@@ -358,7 +358,7 @@ PYTHONPATH=src python3 -m patchsmith.cli check-focused-test-setup-readiness \
   --json
 ```
 
-Current setup-readiness output has zero ready tasks and three blocked tasks because Docker smoke is `not_available`. Use this as the stop condition before any public issue dependency setup is executed.
+Current setup-readiness output has zero blocked tasks and three warning-class tasks because each setup requires reviewed networked Docker execution. Use this as a reviewed gate before public issue dependency setup is executed.
 
 Dry-run focused public issue setup execution:
 
@@ -369,7 +369,7 @@ PYTHONPATH=src python3 -m patchsmith.cli execute-focused-test-setups \
   --json
 ```
 
-Current setup-execution output remains blocked for all three tasks because setup-readiness is blocked. This artifact is still useful launch evidence because it proves the setup executor refuses unsafe execution instead of silently running dependency installation commands.
+Current setup-execution output completes all three setup tasks in Docker with explicit warning, dependency-install, and bridge-network approval. This artifact is setup evidence only; it does not prove public issue repair quality.
 
 The default command policy still blocks dependency installation. Setup execution only permits the narrow editable-install setup policy when `--allow-dependency-installs` is set with Docker mode; networked dependency setup must also use an explicit sandbox network such as `--sandbox-network bridge` and remain labeled in reports.
 
@@ -382,7 +382,7 @@ PYTHONPATH=src python3 -m patchsmith.cli validate-focused-test-setups \
   --json
 ```
 
-Current setup-validation output remains blocked for all three tasks because setup execution is blocked. This is the expected stop condition before claiming public issue reproduction evidence.
+Current setup-validation output executes all three validation commands and fails all three on upstream test-environment issues: the pytest snapshot reports its own dev version below its configured `minversion`, and the requests snapshots hit a recursive `httpbin` fixture dependency. This is setup/reproduction evidence, not repair-quality evidence.
 
 Generate the release hygiene report:
 
@@ -395,7 +395,7 @@ PYTHONPATH=src python3 -m patchsmith.cli release-hygiene \
   --json
 ```
 
-Current release hygiene output is `ready_with_warnings`: generated review artifacts now include quality-gate, project-status, project-status freshness, environment-readiness, calibration-readiness, live-calibration plan, delivery audit, launch-blocker, and public issue context-preview/materialization validation/readiness/focused-test plan/run/diagnosis/setup-plan/setup-readiness/setup-execution/setup-validation evidence, package build metadata exists, local Git metadata exists, and the remaining release caveats are blocked environment readiness and unproven live LLM calibration.
+Current release hygiene output is `ready_with_warnings`: generated review artifacts now include quality-gate, project-status, project-status freshness, environment-readiness, calibration-readiness, live-calibration plan, delivery audit, launch-blocker, and public issue context-preview/materialization validation/readiness/focused-test plan/run/diagnosis/setup-plan/setup-readiness/setup-execution/setup-validation evidence, package build metadata exists, local Git metadata exists, and the remaining release caveats are unproven live LLM calibration plus warning-class environment/setup evidence.
 
 ## Example flagship demo scenario
 

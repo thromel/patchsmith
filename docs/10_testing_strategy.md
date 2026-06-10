@@ -265,7 +265,7 @@ PYTHONPATH=src python3 -m patchsmith.cli check-focused-test-setup-readiness \
   --json
 ```
 
-Current setup readiness blocks all three setup tasks because Docker smoke is `not_available`. Do not run dependency setup until Docker smoke passes and the setup-readiness report is no longer blocked.
+Current setup readiness has zero blocked tasks and three warning-class tasks because Docker smoke passes and each setup requires reviewed networked Docker execution. Do not run dependency setup until the setup-readiness report is reviewed and the selected sandbox/network policy is approved.
 
 Dry-run setup execution before any dependency install:
 
@@ -276,7 +276,7 @@ PYTHONPATH=src python3 -m patchsmith.cli execute-focused-test-setups \
   --json
 ```
 
-The setup executor keeps dependency installation blocked by default. The narrow editable-install setup policy requires Docker mode, `--allow-dependency-installs`, and explicit network selection such as `--sandbox-network bridge`; use `--execute` only after the dry-run report and sandbox decision are approved.
+The setup executor keeps dependency installation blocked by default. The narrow editable-install setup policy requires Docker mode, `--allow-dependency-installs`, and explicit network selection such as `--sandbox-network bridge`; focused setup execution and validation default to `patchsmith-seeded-smoke:py312`. Use `--execute` only after the dry-run report and sandbox decision are approved.
 
 Dry-run setup validation after setup execution:
 
@@ -287,7 +287,7 @@ PYTHONPATH=src python3 -m patchsmith.cli validate-focused-test-setups \
   --json
 ```
 
-Setup validation remains blocked until setup execution passes or is skipped because no setup was needed. Passing setup validation proves only that the focused validation command runs after setup, not that PatchSmith repaired the issue.
+Setup validation now executes after setup completion and currently fails on upstream test-environment issues. Passing setup validation proves only that the focused validation command runs after setup, not that PatchSmith repaired the issue.
 
 The corpus, preflight, context-preview, materialization, validation, run-readiness, focused-test planning, focused-test run, focused-test diagnosis, focused-test setup-plan, setup-readiness, setup-execution, and setup-validation reports are planning and plumbing evidence. They are not repair-quality evidence until the issues are reproduced, patched, tested, and saved as normal PatchSmith run artifacts.
 
