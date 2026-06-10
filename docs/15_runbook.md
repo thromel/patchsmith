@@ -293,6 +293,17 @@ PYTHONPATH=src python3 -m patchsmith.cli plan-public-issue-reproductions \
 
 The reproduction-plan report records candidate commands and expected-failure signal gaps before public issue repairs. Treat `warning` rows as planning work, not reproduction evidence; encode the failing assertion, traceback, or behavior mismatch before running repair attempts.
 
+Public issue reproduction execution:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli execute-public-issue-reproductions \
+  --plan artifacts/experiments/public_issue_corpus_v1/public_issue_reproduction_plan_results.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+The reproduction-execution command writes `public_issue_reproduction_execution_*` artifacts and is dry-run by default. It blocks rows without explicit expected-failure signals. Use `--execute` only after review; `reproduced` means the command failed nonzero and every configured expected-failure signal appeared in saved stdout/stderr logs.
+
 Public issue repair readiness:
 
 ```bash
@@ -604,7 +615,7 @@ PYTHONPATH=src python3 -m patchsmith.cli release-hygiene \
   --json
 ```
 
-The release hygiene report checks required docs, generated review artifacts, public issue reproduction-plan and repair-readiness evidence, project-status freshness, environment readiness, demo readiness, failure visibility, live-provider caveats, Git metadata, packaging metadata, CI, demo media, architecture diagram evidence, and README caveat markers. Treat `blocked` as a hard stop for tagged/public release claims.
+The release hygiene report checks required docs, generated review artifacts, public issue reproduction-plan, reproduction-execution, and repair-readiness evidence, project-status freshness, environment readiness, demo readiness, failure visibility, live-provider caveats, Git metadata, packaging metadata, CI, demo media, architecture diagram evidence, and README caveat markers. Treat `blocked` as a hard stop for tagged/public release claims.
 
 Package build:
 
@@ -789,6 +800,7 @@ Run:
 - focused public issue setup-execution regeneration,
 - focused public issue setup-validation regeneration,
 - public issue reproduction-plan regeneration,
+- public issue reproduction-execution regeneration,
 - public issue repair-readiness regeneration,
 - release hygiene report regeneration,
 - README quickstart validation,

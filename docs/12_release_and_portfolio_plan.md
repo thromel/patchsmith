@@ -387,6 +387,39 @@ PYTHONPATH=src python3 -m patchsmith.cli validate-focused-test-setups \
 
 Current setup-validation output executes all three validation commands successfully after Docker setup. This is setup/reproduction evidence, not repair-quality evidence.
 
+Plan public issue reproductions:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli plan-public-issue-reproductions \
+  --tasks-dir artifacts/experiments/public_issue_corpus_v1/materialized_tasks \
+  --focused-plan artifacts/experiments/public_issue_corpus_v1/focused_test_plan_results.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+Dry-run or execute public issue reproductions:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli execute-public-issue-reproductions \
+  --plan artifacts/experiments/public_issue_corpus_v1/public_issue_reproduction_plan_results.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+Current reproduction execution is a safety gate: rows without explicit expected-failure signals are blocked, and executed rows only count as reproduced when the command fails nonzero and all expected signals appear in saved logs.
+
+Check public issue repair readiness:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli check-public-issue-repair-readiness \
+  --focused-run artifacts/experiments/public_issue_corpus_v1/focused_test_run_results.json \
+  --diagnosis artifacts/experiments/public_issue_corpus_v1/focused_test_diagnosis_results.json \
+  --setup-validation artifacts/experiments/public_issue_corpus_v1/focused_test_setup_validation_results.json \
+  --tasks-dir artifacts/experiments/public_issue_corpus_v1/materialized_tasks \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
 Generate the release hygiene report:
 
 ```bash
@@ -398,7 +431,7 @@ PYTHONPATH=src python3 -m patchsmith.cli release-hygiene \
   --json
 ```
 
-Current release hygiene output is `ready_with_warnings`: generated review artifacts now include quality-gate, project-status, project-status freshness, environment-readiness, calibration-readiness, live-calibration plan, delivery audit, launch-blocker, and public issue context-preview/materialization validation/readiness/focused-test plan/run/diagnosis/setup-plan/setup-readiness/setup-execution/setup-validation evidence, package build metadata exists, local Git metadata exists, and the remaining release caveats are unproven live LLM calibration plus warning-class environment/setup evidence.
+Current release hygiene output is `ready_with_warnings`: generated review artifacts now include quality-gate, project-status, project-status freshness, environment-readiness, calibration-readiness, live-calibration plan, delivery audit, launch-blocker, and public issue context-preview/materialization validation/readiness/focused-test plan/run/diagnosis/setup-plan/setup-readiness/setup-execution/setup-validation/reproduction-plan/reproduction-execution/repair-readiness evidence, package build metadata exists, local Git metadata exists, and the remaining release caveats are unproven live LLM calibration plus warning-class environment/setup/reproduction evidence.
 
 ## Example flagship demo scenario
 

@@ -11,6 +11,7 @@ from patchsmith.evaluation import (
     check_public_issue_repair_readiness,
     diagnose_focused_test_runs,
     execute_focused_test_setups,
+    execute_public_issue_reproductions,
     materialize_issue_corpus_tasks,
     plan_focused_test_setups,
     plan_materialized_issue_focused_tests,
@@ -583,6 +584,43 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f"planned={summary.planned_tasks} warning={summary.warning_tasks} "
                 f"blocked={summary.blocked_tasks}"
+            )
+        return 0
+
+    if args.command == "execute-public-issue-reproductions":
+        max_tasks = None if args.max_tasks == 0 else args.max_tasks
+        results, summary = execute_public_issue_reproductions(
+            plan_path=Path(args.plan),
+            output_dir=Path(args.output),
+            sandbox_mode=args.sandbox_mode,
+            sandbox_image=args.sandbox_image,
+            sandbox_network=args.sandbox_network,
+            timeout_seconds=args.timeout_seconds,
+            max_tasks=max_tasks,
+            dry_run=not args.execute,
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "result_count": len(results),
+                        "report_path": str(
+                            Path(args.output)
+                            / "public_issue_reproduction_execution_report.md"
+                        ),
+                        "summary": summary.to_dict(),
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(
+                "Report: "
+                f"{Path(args.output) / 'public_issue_reproduction_execution_report.md'}"
+            )
+            print(
+                f"dry_run={summary.dry_run_tasks} attempted={summary.attempted_tasks} "
+                f"reproduced={summary.reproduced_tasks} blocked={summary.blocked_tasks}"
             )
         return 0
 
@@ -1971,6 +2009,63 @@ def build_parser() -> argparse.ArgumentParser:
         help="Public issue reproduction-plan output directory.",
     )
     public_reproduction_plan_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print JSON summary.",
+    )
+
+    public_reproduction_execution_parser = subparsers.add_parser(
+        "execute-public-issue-reproductions",
+        help="Dry-run or execute planned public issue failing reproduction checks.",
+    )
+    public_reproduction_execution_parser.add_argument(
+        "--plan",
+        default=(
+            "artifacts/experiments/public_issue_corpus_v1/"
+            "public_issue_reproduction_plan_results.json"
+        ),
+        help="Public issue reproduction-plan results JSON.",
+    )
+    public_reproduction_execution_parser.add_argument(
+        "--output",
+        default="artifacts/experiments/public_issue_corpus_v1",
+        help="Public issue reproduction-execution output directory.",
+    )
+    public_reproduction_execution_parser.add_argument(
+        "--sandbox-mode",
+        choices=["local", "docker"],
+        default="docker",
+        help="Sandbox runner to use when --execute is set.",
+    )
+    public_reproduction_execution_parser.add_argument(
+        "--sandbox-image",
+        default="patchsmith-seeded-smoke:py312",
+        help="Docker image used when --sandbox-mode docker is selected.",
+    )
+    public_reproduction_execution_parser.add_argument(
+        "--sandbox-network",
+        choices=["none", "bridge"],
+        default="none",
+        help="Docker network mode used when --execute and --sandbox-mode docker are selected.",
+    )
+    public_reproduction_execution_parser.add_argument(
+        "--timeout-seconds",
+        type=int,
+        default=300,
+        help="Per-reproduction-command timeout when --execute is set.",
+    )
+    public_reproduction_execution_parser.add_argument(
+        "--max-tasks",
+        type=int,
+        default=0,
+        help="Maximum reproduction-plan records to process. Use 0 for all records.",
+    )
+    public_reproduction_execution_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Execute reproduction commands instead of writing dry-run evidence.",
+    )
+    public_reproduction_execution_parser.add_argument(
         "--json",
         action="store_true",
         help="Print JSON summary.",

@@ -9,6 +9,7 @@ from patchsmith.evaluation import (
     check_public_issue_repair_readiness,
     diagnose_focused_test_runs,
     execute_focused_test_setups,
+    execute_public_issue_reproductions,
     load_seeded_tasks,
     materialize_issue_corpus_tasks,
     plan_focused_test_setups,
@@ -1707,6 +1708,206 @@ def test_plan_public_issue_reproductions_plans_explicit_failure_spec(
     assert not results[0].manual_spec_required
     assert results[0].expected_failure_signals == ["AssertionError: expected public bug"]
     assert results[0].command_source == "manifest_reproduction"
+
+
+def test_execute_public_issue_reproductions_blocks_missing_failure_spec(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    plan_path = tmp_path / "public_issue_reproduction_plan_results.json"
+    plan_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "public_task",
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/12",
+                    "status": "warning",
+                    "repo_path": str(repo_dir),
+                    "reproduction_command": "python3 -m pytest tests/test_bug.py",
+                    "expected_failure_signals": [],
+                    "manual_spec_required": True,
+                    "blockers": [],
+                    "warnings": ["expected failing signal is not encoded"],
+                    "next_actions": [],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    output_dir = tmp_path / "reproduction_execution"
+    results, summary = execute_public_issue_reproductions(
+        plan_path=plan_path,
+        output_dir=output_dir,
+        sandbox_mode="local",
+    )
+
+    assert summary.blocked_tasks == 1
+    assert summary.manual_spec_required_tasks == 1
+    assert results[0].status == "blocked"
+    assert "expected failing signal is not encoded" in ";".join(results[0].errors)
+    assert (output_dir / "public_issue_reproduction_execution_report.md").exists()
+    assert (output_dir / "public_issue_reproduction_execution_results.csv").exists()
+
+    cli_output = tmp_path / "cli_reproduction_execution"
+    exit_code = main(
+        [
+            "execute-public-issue-reproductions",
+            "--plan",
+            str(plan_path),
+            "--output",
+            str(cli_output),
+            "--sandbox-mode",
+            "local",
+            "--json",
+        ]
+    )
+    assert exit_code == 0
+    assert (cli_output / "public_issue_reproduction_execution_report.md").exists()
+
+
+def test_execute_public_issue_reproductions_dry_runs_explicit_failure_spec(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    tests_dir = repo_dir / "tests"
+    tests_dir.mkdir(parents=True)
+    (tests_dir / "test_bug.py").write_text(
+        'def test_bug():\n    assert False, "expected public bug"\n',
+        encoding="utf-8",
+    )
+    plan_path = tmp_path / "public_issue_reproduction_plan_results.json"
+    plan_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "public_task",
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/12",
+                    "status": "planned",
+                    "repo_path": str(repo_dir),
+                    "reproduction_command": "python3 -m pytest tests/test_bug.py",
+                    "expected_failure_signals": ["AssertionError: expected public bug"],
+                    "manual_spec_required": False,
+                    "blockers": [],
+                    "warnings": [],
+                    "next_actions": [],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    results, summary = execute_public_issue_reproductions(
+        plan_path=plan_path,
+        output_dir=tmp_path / "reproduction_execution",
+        sandbox_mode="local",
+    )
+
+    assert summary.dry_run_tasks == 1
+    assert summary.blocked_tasks == 0
+    assert results[0].status == "dry_run"
+    assert results[0].policy_allowed
+    assert results[0].missing_failure_signals == ["AssertionError: expected public bug"]
+
+
+def test_execute_public_issue_reproductions_records_failing_signal(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    tests_dir = repo_dir / "tests"
+    tests_dir.mkdir(parents=True)
+    (tests_dir / "test_bug.py").write_text(
+        'def test_bug():\n    assert False, "expected public bug"\n',
+        encoding="utf-8",
+    )
+    plan_path = tmp_path / "public_issue_reproduction_plan_results.json"
+    plan_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "public_task",
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/12",
+                    "status": "planned",
+                    "repo_path": str(repo_dir),
+                    "reproduction_command": "python3 -m pytest tests/test_bug.py",
+                    "expected_failure_signals": ["AssertionError: expected public bug"],
+                    "manual_spec_required": False,
+                    "blockers": [],
+                    "warnings": [],
+                    "next_actions": [],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    output_dir = tmp_path / "reproduction_execution"
+    results, summary = execute_public_issue_reproductions(
+        plan_path=plan_path,
+        output_dir=output_dir,
+        sandbox_mode="local",
+        dry_run=False,
+        timeout_seconds=30,
+    )
+
+    assert summary.attempted_tasks == 1
+    assert summary.reproduced_tasks == 1
+    assert results[0].status == "reproduced"
+    assert results[0].exit_code != 0
+    assert results[0].matched_failure_signals == ["AssertionError: expected public bug"]
+    assert results[0].missing_failure_signals == []
+    assert results[0].stdout_path is not None
+    assert Path(results[0].stdout_path).exists()
+    assert results[0].stderr_path is not None
+    assert Path(results[0].stderr_path).exists()
+
+
+def test_execute_public_issue_reproductions_does_not_count_passing_command(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    tests_dir = repo_dir / "tests"
+    tests_dir.mkdir(parents=True)
+    (tests_dir / "test_bug.py").write_text("def test_bug():\n    assert True\n", encoding="utf-8")
+    plan_path = tmp_path / "public_issue_reproduction_plan_results.json"
+    plan_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "public_task",
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/12",
+                    "status": "planned",
+                    "repo_path": str(repo_dir),
+                    "reproduction_command": "python3 -m pytest tests/test_bug.py",
+                    "expected_failure_signals": ["AssertionError: expected public bug"],
+                    "manual_spec_required": False,
+                    "blockers": [],
+                    "warnings": [],
+                    "next_actions": [],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    results, summary = execute_public_issue_reproductions(
+        plan_path=plan_path,
+        output_dir=tmp_path / "reproduction_execution",
+        sandbox_mode="local",
+        dry_run=False,
+        timeout_seconds=30,
+    )
+
+    assert summary.not_reproduced_tasks == 1
+    assert summary.reproduced_tasks == 0
+    assert results[0].status == "not_reproduced"
+    assert results[0].exit_code == 0
+    assert "expected pre-repair failure was absent" in ";".join(results[0].warnings)
 
 
 def test_check_public_issue_repair_readiness_warns_without_reproduction(

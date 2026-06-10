@@ -412,6 +412,17 @@ PYTHONPATH=src python3 -m patchsmith.cli plan-public-issue-reproductions \
 
 The reproduction-plan report records candidate commands before public issue repair attempts and marks tasks that still need explicit expected-failure signals. Current public issue reproduction planning is warning-class: all three tasks have candidate commands, but all three still need manual failing-signal specs before reproduction can be claimed.
 
+Dry-run or execute public issue reproduction checks:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli execute-public-issue-reproductions \
+  --plan artifacts/experiments/public_issue_corpus_v1/public_issue_reproduction_plan_results.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+The reproduction-execution report is dry-run by default. It blocks rows without explicit expected-failure signals, and only `--execute` can save stdout/stderr evidence. A task counts as `reproduced` only when the command exits nonzero and all configured expected-failure signals appear in the saved logs.
+
 Check public issue repair-attempt readiness:
 
 ```bash
@@ -729,7 +740,7 @@ PYTHONPATH=src python3 -m patchsmith.cli release-hygiene \
   --json
 ```
 
-Latest release hygiene evidence is saved in `artifacts/experiments/release_hygiene.md` and `artifacts/experiments/release_hygiene.json`. Current status is `ready_with_warnings`: CI, packaging metadata, architecture-diagram, demo-media, quality-gate, project-status, project-status freshness, calibration-readiness, live-calibration plan, delivery audit, launch-blocker, public issue corpus/context-preview/materialized-task validation/readiness/focused-test plan/run/diagnosis/setup-plan/setup-readiness/setup-execution/setup-validation/reproduction-plan/repair-readiness evidence, and local Git metadata checks pass, while unproven live LLM calibration and warning-class environment/setup/reproduction evidence must stay visible in release claims.
+Latest release hygiene evidence is saved in `artifacts/experiments/release_hygiene.md` and `artifacts/experiments/release_hygiene.json`. Current status is `ready_with_warnings`: CI, packaging metadata, architecture-diagram, demo-media, quality-gate, project-status, project-status freshness, calibration-readiness, live-calibration plan, delivery audit, launch-blocker, public issue corpus/context-preview/materialized-task validation/readiness/focused-test plan/run/diagnosis/setup-plan/setup-readiness/setup-execution/setup-validation/reproduction-plan/reproduction-execution/repair-readiness evidence, and local Git metadata checks pass, while unproven live LLM calibration and warning-class environment/setup/reproduction evidence must stay visible in release claims.
 
 Build package artifacts:
 
@@ -764,7 +775,7 @@ When those rates are set, reports estimate model cost from provider token usage.
 
 ## Next engineering wedges
 
-The context broker boundary, retrieval eval runner, repair eval runner, scaffold comparison runner, patch-search evaluator, public issue corpus validation/preflight/context preview/task materialization, validation, run-readiness, focused-test planning, focused-test execution, focused-test diagnosis, focused-test setup planning, setup-readiness checks, setup-execution dry-run and executed Docker evidence, passing setup-validation execution evidence, public issue reproduction planning, public issue repair-readiness gating, static artifact index/dashboard with normalized metrics and generated run-detail trace pages, failure review report, demo readiness report, executable quality-gate report, consolidated project-status report with evidence freshness, environment readiness report, evidence-refresh orchestration report with opt-in Docker smoke refresh, live calibration readiness report and execution plan, delivery audit, launch blocker backlog with dependency-chain remediation commands, generated demo script, final evaluation report, release hygiene report, deterministic heuristic runtime, LangGraph orchestration runtime, DeepAgents adapter compatibility mode plus package-backed smoke evidence, OpenAI Agents SDK adapter compatibility mode, offline model-planner seam, credential-gated OpenAI Responses client, and Python Code Context Graph v0 now exist. The current seeded suite has 10 tasks and compares `native`, `native_hybrid`, `native_graph`, and `ctxhelm_cli` for retrieval, including aggregate context packing metadata. Scaffold comparison now includes trace complexity and debuggability metrics. The next useful development step is resolving the live-provider warning, harder patch-search tasks with model-diverse candidates, or public issue repair attempts once reproduction criteria are explicit.
+The context broker boundary, retrieval eval runner, repair eval runner, scaffold comparison runner, patch-search evaluator, public issue corpus validation/preflight/context preview/task materialization, validation, run-readiness, focused-test planning, focused-test execution, focused-test diagnosis, focused-test setup planning, setup-readiness checks, setup-execution dry-run and executed Docker evidence, passing setup-validation execution evidence, public issue reproduction planning, public issue reproduction execution gating, public issue repair-readiness gating, static artifact index/dashboard with normalized metrics and generated run-detail trace pages, failure review report, demo readiness report, executable quality-gate report, consolidated project-status report with evidence freshness, environment readiness report, evidence-refresh orchestration report with opt-in Docker smoke refresh, live calibration readiness report and execution plan, delivery audit, launch blocker backlog with dependency-chain remediation commands, generated demo script, final evaluation report, release hygiene report, deterministic heuristic runtime, LangGraph orchestration runtime, DeepAgents adapter compatibility mode plus package-backed smoke evidence, OpenAI Agents SDK adapter compatibility mode, offline model-planner seam, credential-gated OpenAI Responses client, and Python Code Context Graph v0 now exist. The current seeded suite has 10 tasks and compares `native`, `native_hybrid`, `native_graph`, and `ctxhelm_cli` for retrieval, including aggregate context packing metadata. Scaffold comparison now includes trace complexity and debuggability metrics. The next useful development step is resolving the live-provider warning, harder patch-search tasks with model-diverse candidates, or public issue repair attempts once reproduction criteria are explicit.
 
 The current LangGraph repair skeleton is:
 

@@ -643,6 +643,62 @@ class IssueCorpusPublicReproductionPlanSummary:
 
 
 @dataclass(frozen=True)
+class IssueCorpusPublicReproductionExecutionResult:
+    task_id: str | None
+    repository: str | None
+    issue_url: str | None
+    status: str
+    reproduction_plan_status: str
+    repo_path: str | None
+    reproduction_command: str | None
+    expected_failure_signals: list[str]
+    manual_spec_required: bool
+    sandbox_mode: str
+    sandbox_image: str
+    sandbox_network: str
+    dry_run: bool
+    exit_code: int | None
+    timed_out: bool
+    duration_ms: int
+    policy_allowed: bool
+    policy_reason: str | None
+    stdout_path: str | None
+    stderr_path: str | None
+    matched_failure_signals: list[str]
+    missing_failure_signals: list[str]
+    errors: list[str]
+    warnings: list[str]
+    next_actions: list[str]
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class IssueCorpusPublicReproductionExecutionSummary:
+    generated_at: str
+    reproduction_plan_path: str
+    task_count: int
+    dry_run: bool
+    sandbox_mode: str
+    sandbox_image: str
+    sandbox_network: str
+    timeout_seconds: int
+    dry_run_tasks: int
+    attempted_tasks: int
+    reproduced_tasks: int
+    not_reproduced_tasks: int
+    failed_tasks: int
+    timed_out_tasks: int
+    blocked_tasks: int
+    manual_spec_required_tasks: int
+    policy_allowed_commands: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class IssueCorpusPublicRepairReadinessResult:
     task_id: str | None
     repository: str | None
@@ -3050,6 +3106,210 @@ def write_public_issue_reproduction_plan_outputs(
     )
 
 
+def execute_public_issue_reproductions(
+    *,
+    plan_path: Path,
+    output_dir: Path,
+    sandbox_mode: str = "docker",
+    sandbox_image: str = "patchsmith-seeded-smoke:py312",
+    sandbox_network: str = "none",
+    timeout_seconds: int = 300,
+    max_tasks: int | None = None,
+    dry_run: bool = True,
+) -> tuple[
+    list[IssueCorpusPublicReproductionExecutionResult],
+    IssueCorpusPublicReproductionExecutionSummary,
+]:
+    records = _load_json_record_list(plan_path, label="public issue reproduction plan")
+    selected_records = records
+    if max_tasks is not None and max_tasks > 0:
+        selected_records = records[:max_tasks]
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    run_logs_dir = output_dir / "public_issue_reproductions"
+    run_logs_dir.mkdir(parents=True, exist_ok=True)
+    policy = CommandPolicy()
+    runner = (
+        None
+        if dry_run
+        else create_sandbox_runner(
+            mode=sandbox_mode,
+            image=sandbox_image,
+            policy=policy,
+            network=sandbox_network,
+        )
+    )
+    results = [
+        _execute_public_issue_reproduction_record(
+            record=record,
+            run_logs_dir=run_logs_dir,
+            runner=runner,
+            policy=policy,
+            sandbox_mode=sandbox_mode,
+            sandbox_image=sandbox_image,
+            sandbox_network=sandbox_network,
+            timeout_seconds=timeout_seconds,
+            dry_run=dry_run,
+        )
+        for record in selected_records
+    ]
+    summary = summarize_public_issue_reproduction_execution(
+        plan_path=plan_path,
+        results=results,
+        dry_run=dry_run,
+        sandbox_mode=sandbox_mode,
+        sandbox_image=sandbox_image,
+        sandbox_network=sandbox_network,
+        timeout_seconds=timeout_seconds,
+    )
+    write_public_issue_reproduction_execution_outputs(
+        output_dir=output_dir,
+        plan_path=plan_path,
+        results=results,
+        summary=summary,
+    )
+    return results, summary
+
+
+def summarize_public_issue_reproduction_execution(
+    *,
+    plan_path: Path,
+    results: list[IssueCorpusPublicReproductionExecutionResult],
+    dry_run: bool,
+    sandbox_mode: str,
+    sandbox_image: str,
+    sandbox_network: str,
+    timeout_seconds: int,
+) -> IssueCorpusPublicReproductionExecutionSummary:
+    return IssueCorpusPublicReproductionExecutionSummary(
+        generated_at=datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace(
+            "+00:00", "Z"
+        ),
+        reproduction_plan_path=str(plan_path),
+        task_count=len(results),
+        dry_run=dry_run,
+        sandbox_mode=sandbox_mode,
+        sandbox_image=sandbox_image,
+        sandbox_network=sandbox_network,
+        timeout_seconds=timeout_seconds,
+        dry_run_tasks=sum(1 for result in results if result.status == "dry_run"),
+        attempted_tasks=sum(
+            1
+            for result in results
+            if result.status in {"reproduced", "not_reproduced", "failed", "timed_out"}
+        ),
+        reproduced_tasks=sum(1 for result in results if result.status == "reproduced"),
+        not_reproduced_tasks=sum(
+            1 for result in results if result.status == "not_reproduced"
+        ),
+        failed_tasks=sum(1 for result in results if result.status == "failed"),
+        timed_out_tasks=sum(1 for result in results if result.status == "timed_out"),
+        blocked_tasks=sum(1 for result in results if result.status == "blocked"),
+        manual_spec_required_tasks=sum(
+            1 for result in results if result.manual_spec_required
+        ),
+        policy_allowed_commands=sum(1 for result in results if result.policy_allowed),
+    )
+
+
+def write_public_issue_reproduction_execution_outputs(
+    *,
+    output_dir: Path,
+    plan_path: Path,
+    results: list[IssueCorpusPublicReproductionExecutionResult],
+    summary: IssueCorpusPublicReproductionExecutionSummary,
+) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "public_issue_reproduction_execution_results.json").write_text(
+        json.dumps([result.to_dict() for result in results], indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (output_dir / "public_issue_reproduction_execution_summary.json").write_text(
+        json.dumps(summary.to_dict(), indent=2) + "\n",
+        encoding="utf-8",
+    )
+    with (output_dir / "public_issue_reproduction_execution_results.csv").open(
+        "w",
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=[
+                "task_id",
+                "repository",
+                "issue_url",
+                "status",
+                "reproduction_plan_status",
+                "repo_path",
+                "reproduction_command",
+                "expected_failure_signals",
+                "manual_spec_required",
+                "sandbox_mode",
+                "sandbox_image",
+                "sandbox_network",
+                "dry_run",
+                "exit_code",
+                "timed_out",
+                "duration_ms",
+                "policy_allowed",
+                "policy_reason",
+                "stdout_path",
+                "stderr_path",
+                "matched_failure_signals",
+                "missing_failure_signals",
+                "errors",
+                "warnings",
+                "next_actions",
+            ],
+        )
+        writer.writeheader()
+        for result in results:
+            writer.writerow(
+                {
+                    "task_id": result.task_id,
+                    "repository": result.repository,
+                    "issue_url": result.issue_url,
+                    "status": result.status,
+                    "reproduction_plan_status": result.reproduction_plan_status,
+                    "repo_path": result.repo_path,
+                    "reproduction_command": result.reproduction_command,
+                    "expected_failure_signals": ";".join(
+                        result.expected_failure_signals
+                    ),
+                    "manual_spec_required": result.manual_spec_required,
+                    "sandbox_mode": result.sandbox_mode,
+                    "sandbox_image": result.sandbox_image,
+                    "sandbox_network": result.sandbox_network,
+                    "dry_run": result.dry_run,
+                    "exit_code": result.exit_code,
+                    "timed_out": result.timed_out,
+                    "duration_ms": result.duration_ms,
+                    "policy_allowed": result.policy_allowed,
+                    "policy_reason": result.policy_reason,
+                    "stdout_path": result.stdout_path,
+                    "stderr_path": result.stderr_path,
+                    "matched_failure_signals": ";".join(
+                        result.matched_failure_signals
+                    ),
+                    "missing_failure_signals": ";".join(
+                        result.missing_failure_signals
+                    ),
+                    "errors": ";".join(result.errors),
+                    "warnings": ";".join(result.warnings),
+                    "next_actions": ";".join(result.next_actions),
+                }
+            )
+    (output_dir / "public_issue_reproduction_execution_report.md").write_text(
+        render_public_issue_reproduction_execution_report(
+            plan_path=plan_path,
+            results=results,
+            summary=summary,
+        ),
+        encoding="utf-8",
+    )
+
+
 def check_public_issue_repair_readiness(
     *,
     focused_run_path: Path,
@@ -4949,6 +5209,78 @@ def render_public_issue_reproduction_plan_report(
             "- `warning` means a candidate command exists but a reviewer still needs to encode the expected failing signal.",
             "- `blocked` means the reproduction command should not be run until the listed prerequisite is fixed.",
             "- This report does not run tests, prove issue reproduction, generate patches, or call a live model provider.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def render_public_issue_reproduction_execution_report(
+    *,
+    plan_path: Path,
+    results: list[IssueCorpusPublicReproductionExecutionResult],
+    summary: IssueCorpusPublicReproductionExecutionSummary,
+) -> str:
+    lines = [
+        "# Public Issue Reproduction Execution",
+        "",
+        f"- Generated at: `{summary.generated_at}`",
+        f"- Reproduction plan path: `{plan_path}`",
+        f"- Task count: `{summary.task_count}`",
+        f"- Dry run: `{summary.dry_run}`",
+        f"- Sandbox mode: `{summary.sandbox_mode}`",
+        f"- Sandbox image: `{summary.sandbox_image}`",
+        f"- Sandbox network: `{summary.sandbox_network}`",
+        f"- Timeout seconds: `{summary.timeout_seconds}`",
+        f"- Dry-run tasks: `{summary.dry_run_tasks}`",
+        f"- Attempted tasks: `{summary.attempted_tasks}`",
+        f"- Reproduced tasks: `{summary.reproduced_tasks}`",
+        f"- Not-reproduced tasks: `{summary.not_reproduced_tasks}`",
+        f"- Failed tasks: `{summary.failed_tasks}`",
+        f"- Timed-out tasks: `{summary.timed_out_tasks}`",
+        f"- Blocked tasks: `{summary.blocked_tasks}`",
+        f"- Manual-spec-required tasks: `{summary.manual_spec_required_tasks}`",
+        f"- Policy-allowed commands: `{summary.policy_allowed_commands}`",
+        "",
+        "## Results",
+        "",
+        (
+            "| Task | Status | Repository | Plan Status | Command | Expected Signals | "
+            "Matched Signals | Exit | Logs | Notes | Next Actions |"
+        ),
+        "|---|---|---|---|---|---|---|---|---|---|---|",
+    ]
+    for result in results:
+        notes = [*result.errors, *result.warnings]
+        log_paths = "; ".join(
+            path
+            for path in [result.stdout_path, result.stderr_path]
+            if path is not None
+        )
+        lines.append(
+            "| "
+            f"{_markdown_table_text(result.task_id or 'unknown')} | "
+            f"{_markdown_table_text(result.status)} | "
+            f"{_markdown_table_text(result.repository or 'unknown')} | "
+            f"{_markdown_table_text(result.reproduction_plan_status)} | "
+            f"{_markdown_table_text(result.reproduction_command or 'missing')} | "
+            f"{_markdown_table_text('; '.join(result.expected_failure_signals) or 'missing')} | "
+            f"{_markdown_table_text('; '.join(result.matched_failure_signals) or 'none')} | "
+            f"{_markdown_table_text(str(result.exit_code) if result.exit_code is not None else 'not run')} | "
+            f"{_markdown_table_text(log_paths or 'none')} | "
+            f"{_markdown_table_text('; '.join(notes) or 'none')} | "
+            f"{_markdown_table_text('; '.join(result.next_actions) or 'none')} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Claim Boundary",
+            "",
+            "- This report only executes commands from the public issue reproduction plan.",
+            "- `blocked` means the command was not run because required safety or expected-failure criteria were missing.",
+            "- `dry_run` means the command and expected failure signal passed preflight, but no repository code was executed.",
+            "- `reproduced` means an executed command failed nonzero and all configured expected failure signals appeared in saved stdout/stderr.",
+            "- This report does not generate patches, prove repair quality, or call a live model provider.",
             "",
         ]
     )
@@ -7109,6 +7441,221 @@ def _plan_public_issue_reproduction_record(
     )
 
 
+def _execute_public_issue_reproduction_record(
+    *,
+    record: dict[str, Any],
+    run_logs_dir: Path,
+    runner: Any | None,
+    policy: CommandPolicy,
+    sandbox_mode: str,
+    sandbox_image: str,
+    sandbox_network: str,
+    timeout_seconds: int,
+    dry_run: bool,
+) -> IssueCorpusPublicReproductionExecutionResult:
+    task_id = _optional_string(record.get("task_id"))
+    repository = _optional_string(record.get("repository"))
+    issue_url = _optional_string(record.get("issue_url"))
+    plan_status = _optional_string(record.get("status")) or "unknown"
+    repo_path_value = _optional_string(record.get("repo_path"))
+    command = _optional_string(record.get("reproduction_command"))
+    expected_failure_signals = _string_list(record.get("expected_failure_signals"))
+    manual_spec_required = record.get("manual_spec_required") is True or not (
+        expected_failure_signals
+    )
+    errors = _string_list(record.get("blockers"))
+    warnings = _string_list(record.get("warnings"))
+    next_actions = _string_list(record.get("next_actions"))
+
+    exit_code: int | None = None
+    timed_out = False
+    duration_ms = 0
+    policy_allowed = False
+    policy_reason: str | None = None
+    stdout_path: str | None = None
+    stderr_path: str | None = None
+    matched_failure_signals: list[str] = []
+    missing_failure_signals = list(expected_failure_signals)
+
+    workspace: Path | None = None
+    if plan_status == "blocked":
+        errors.append("reproduction plan is blocked")
+    elif plan_status not in {"planned", "warning"}:
+        warnings.append(f"reproduction plan status is {plan_status}")
+
+    if repo_path_value:
+        repo_path = Path(repo_path_value)
+        if repo_path.exists() and repo_path.is_dir():
+            workspace = repo_path
+        else:
+            errors.append(f"repository snapshot is not available: {repo_path_value}")
+    else:
+        errors.append("reproduction plan record has no repo_path")
+
+    if not command:
+        errors.append("reproduction command is missing")
+    elif workspace is not None:
+        decision = policy.evaluate(command, workspace=workspace)
+        policy_allowed = decision.allowed
+        policy_reason = decision.reason
+        if not decision.allowed:
+            errors.append(f"reproduction command rejected by policy: {decision.reason}")
+
+    if manual_spec_required:
+        errors.append("expected failing signal is not encoded")
+        next_actions.append(
+            "encode an issue-specific expected failure signal before executing reproduction"
+        )
+
+    if errors:
+        return IssueCorpusPublicReproductionExecutionResult(
+            task_id=task_id,
+            repository=repository,
+            issue_url=issue_url,
+            status="blocked",
+            reproduction_plan_status=plan_status,
+            repo_path=repo_path_value,
+            reproduction_command=command,
+            expected_failure_signals=expected_failure_signals,
+            manual_spec_required=manual_spec_required,
+            sandbox_mode=sandbox_mode,
+            sandbox_image=sandbox_image,
+            sandbox_network=sandbox_network,
+            dry_run=dry_run,
+            exit_code=exit_code,
+            timed_out=timed_out,
+            duration_ms=duration_ms,
+            policy_allowed=policy_allowed,
+            policy_reason=policy_reason,
+            stdout_path=stdout_path,
+            stderr_path=stderr_path,
+            matched_failure_signals=matched_failure_signals,
+            missing_failure_signals=missing_failure_signals,
+            errors=_dedupe_preserve_order(errors),
+            warnings=_dedupe_preserve_order(warnings),
+            next_actions=_dedupe_preserve_order(
+                [*next_actions, "resolve reproduction blockers before execution"]
+            ),
+        )
+
+    if dry_run:
+        return IssueCorpusPublicReproductionExecutionResult(
+            task_id=task_id,
+            repository=repository,
+            issue_url=issue_url,
+            status="dry_run",
+            reproduction_plan_status=plan_status,
+            repo_path=repo_path_value,
+            reproduction_command=command,
+            expected_failure_signals=expected_failure_signals,
+            manual_spec_required=manual_spec_required,
+            sandbox_mode=sandbox_mode,
+            sandbox_image=sandbox_image,
+            sandbox_network=sandbox_network,
+            dry_run=dry_run,
+            exit_code=exit_code,
+            timed_out=timed_out,
+            duration_ms=duration_ms,
+            policy_allowed=policy_allowed,
+            policy_reason=policy_reason,
+            stdout_path=stdout_path,
+            stderr_path=stderr_path,
+            matched_failure_signals=matched_failure_signals,
+            missing_failure_signals=missing_failure_signals,
+            errors=[],
+            warnings=_dedupe_preserve_order(warnings),
+            next_actions=_dedupe_preserve_order(
+                [*next_actions, "rerun with --execute to save failing reproduction logs"]
+            ),
+        )
+
+    assert runner is not None
+    assert workspace is not None
+    assert command is not None
+    run_dir = run_logs_dir / _safe_artifact_name(task_id or repository or "task")
+    run_dir.mkdir(parents=True, exist_ok=True)
+    command_result = runner.run(
+        command=command,
+        workspace=workspace,
+        timeout_seconds=timeout_seconds,
+    )
+    stdout_file = run_dir / "stdout.txt"
+    stderr_file = run_dir / "stderr.txt"
+    stdout_file.write_text(command_result.stdout, encoding="utf-8")
+    stderr_file.write_text(command_result.stderr, encoding="utf-8")
+
+    exit_code = command_result.exit_code
+    timed_out = command_result.timed_out
+    duration_ms = command_result.duration_ms
+    policy_allowed = command_result.policy_decision.allowed
+    policy_reason = command_result.policy_decision.reason
+    stdout_path = str(stdout_file)
+    stderr_path = str(stderr_file)
+    combined_logs = "\n".join([command_result.stdout, command_result.stderr])
+    matched_failure_signals = _matched_expected_failure_signals(
+        combined_logs,
+        expected_failure_signals,
+    )
+    matched_set = set(matched_failure_signals)
+    missing_failure_signals = [
+        signal for signal in expected_failure_signals if signal not in matched_set
+    ]
+
+    if not policy_allowed:
+        status = "blocked"
+        errors.append(
+            f"reproduction command rejected by policy: {policy_reason or 'unknown'}"
+        )
+        next_actions.append("resolve command-policy blockers before execution")
+    elif timed_out:
+        status = "timed_out"
+        warnings.append(f"reproduction command timed out after {timeout_seconds}s")
+        next_actions.append("inspect saved logs and narrow or raise the timeout")
+    elif exit_code == 0:
+        status = "not_reproduced"
+        warnings.append("reproduction command passed; expected pre-repair failure was absent")
+        next_actions.append(
+            "confirm whether the issue is already fixed or update the reproduction command"
+        )
+    elif missing_failure_signals:
+        status = "failed"
+        warnings.append("reproduction command failed without all expected failure signals")
+        next_actions.append(
+            "inspect saved stdout/stderr and update expected failure criteria if appropriate"
+        )
+    else:
+        status = "reproduced"
+        next_actions.append("use the saved failing logs as pre-repair reproduction evidence")
+
+    return IssueCorpusPublicReproductionExecutionResult(
+        task_id=task_id,
+        repository=repository,
+        issue_url=issue_url,
+        status=status,
+        reproduction_plan_status=plan_status,
+        repo_path=repo_path_value,
+        reproduction_command=command,
+        expected_failure_signals=expected_failure_signals,
+        manual_spec_required=manual_spec_required,
+        sandbox_mode=sandbox_mode,
+        sandbox_image=sandbox_image,
+        sandbox_network=sandbox_network,
+        dry_run=dry_run,
+        exit_code=exit_code,
+        timed_out=timed_out,
+        duration_ms=duration_ms,
+        policy_allowed=policy_allowed,
+        policy_reason=policy_reason,
+        stdout_path=stdout_path,
+        stderr_path=stderr_path,
+        matched_failure_signals=matched_failure_signals,
+        missing_failure_signals=missing_failure_signals,
+        errors=_dedupe_preserve_order(errors),
+        warnings=_dedupe_preserve_order(warnings),
+        next_actions=_dedupe_preserve_order(next_actions),
+    )
+
+
 def _check_public_issue_repair_readiness_record(
     *,
     focused_record: dict[str, Any],
@@ -7380,6 +7927,15 @@ def _matching_lines(text: str, patterns: list[str], *, limit: int) -> list[str]:
             if len(matches) >= limit:
                 break
     return matches
+
+
+def _matched_expected_failure_signals(text: str, patterns: list[str]) -> list[str]:
+    matched: list[str] = []
+    lowered_text = text.lower()
+    for pattern in patterns:
+        if pattern.lower() in lowered_text:
+            matched.append(pattern)
+    return matched
 
 
 def _last_nonempty_lines(text: str, *, limit: int) -> list[str]:
