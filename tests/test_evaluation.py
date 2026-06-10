@@ -4,6 +4,7 @@ from pathlib import Path
 
 from patchsmith.cli import main
 from patchsmith.evaluation import (
+    check_focused_test_setup_readiness,
     check_materialized_issue_run_readiness,
     diagnose_focused_test_runs,
     load_seeded_tasks,
@@ -949,6 +950,109 @@ def test_plan_focused_test_setups_writes_setup_backlog(
     )
     assert exit_code == 0
     assert (cli_output / "focused_test_setup_plan_report.md").exists()
+
+
+def test_check_focused_test_setup_readiness_blocks_without_docker(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    setup_plan_path = tmp_path / "focused_test_setup_plan_results.json"
+    setup_plan_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "setup_task",
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/1",
+                    "status": "planned",
+                    "setup_profile": "python_dependency_install",
+                    "repo_path": str(repo_dir),
+                    "setup_commands": ["python3 -m pip install -e ."],
+                    "validation_command": "python3 -m pytest tests/test_ok.py",
+                    "requires_network": True,
+                    "sandbox_required": True,
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    docker_smoke_path = tmp_path / "docker_smoke.json"
+    docker_smoke_path.write_text(
+        json.dumps({"smoke_status": "not_available"}),
+        encoding="utf-8",
+    )
+
+    output_dir = tmp_path / "readiness"
+    results, summary = check_focused_test_setup_readiness(
+        setup_plan_path=setup_plan_path,
+        docker_smoke_path=docker_smoke_path,
+        output_dir=output_dir,
+    )
+
+    assert summary.blocked_tasks == 1
+    assert summary.ready_tasks == 0
+    assert results[0].status == "blocked"
+    assert results[0].repo_exists
+    assert "Docker sandbox smoke is not_available" in ";".join(results[0].errors)
+    assert "setup requires network access" in ";".join(results[0].warnings)
+    assert (output_dir / "focused_test_setup_readiness_report.md").exists()
+    assert (output_dir / "focused_test_setup_readiness_results.csv").exists()
+
+    cli_output = tmp_path / "cli_readiness"
+    exit_code = main(
+        [
+            "check-focused-test-setup-readiness",
+            "--setup-plan",
+            str(setup_plan_path),
+            "--docker-smoke",
+            str(docker_smoke_path),
+            "--output",
+            str(cli_output),
+            "--json",
+        ]
+    )
+    assert exit_code == 0
+    assert (cli_output / "focused_test_setup_readiness_report.md").exists()
+
+
+def test_check_focused_test_setup_readiness_ready_without_network(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    setup_plan_path = tmp_path / "focused_test_setup_plan_results.json"
+    setup_plan_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "setup_task",
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/1",
+                    "status": "planned",
+                    "setup_profile": "metadata_check",
+                    "repo_path": str(repo_dir),
+                    "setup_commands": ["python3 -m pytest --version"],
+                    "validation_command": "python3 -m pytest tests/test_ok.py",
+                    "requires_network": False,
+                    "sandbox_required": True,
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    docker_smoke_path = tmp_path / "docker_smoke.json"
+    docker_smoke_path.write_text(json.dumps({"smoke_status": "passed"}), encoding="utf-8")
+
+    results, summary = check_focused_test_setup_readiness(
+        setup_plan_path=setup_plan_path,
+        docker_smoke_path=docker_smoke_path,
+        output_dir=tmp_path / "readiness",
+    )
+
+    assert summary.ready_tasks == 1
+    assert summary.blocked_tasks == 0
+    assert results[0].status == "ready"
 
 
 def test_graph_retrieval_dataset_validates(tmp_path: Path) -> None:

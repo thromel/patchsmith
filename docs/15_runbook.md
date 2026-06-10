@@ -242,6 +242,18 @@ PYTHONPATH=src python3 -m patchsmith.cli plan-focused-test-setups \
 
 The setup plan converts diagnosis categories into explicit setup profiles, setup commands, validation commands, network flags, and sandbox-required flags. Execute those steps only in disposable sandboxes; the plan itself is not validation evidence.
 
+Public issue focused test setup readiness:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli check-focused-test-setup-readiness \
+  --setup-plan artifacts/experiments/public_issue_corpus_v1/focused_test_setup_plan_results.json \
+  --docker-smoke artifacts/experiments/docker_smoke.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+The setup-readiness report checks local repository snapshots, validation commands, network flags, and Docker smoke evidence before setup execution. `blocked` means setup must not run yet.
+
 Scaffold comparison:
 
 ```bash

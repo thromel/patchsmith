@@ -369,6 +369,14 @@ PYTHONPATH=src python3 -m patchsmith.cli plan-focused-test-setups \
   --json
 ```
 
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli check-focused-test-setup-readiness \
+  --setup-plan artifacts/experiments/public_issue_corpus_v1/focused_test_setup_plan_results.json \
+  --docker-smoke artifacts/experiments/docker_smoke.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
 Latest expected evidence:
 
 - `artifacts/experiments/public_issue_corpus_v1/corpus_report.md`,
@@ -381,6 +389,7 @@ Latest expected evidence:
 - `artifacts/experiments/public_issue_corpus_v1/focused_test_run_report.md`,
 - `artifacts/experiments/public_issue_corpus_v1/focused_test_diagnosis_report.md`,
 - `artifacts/experiments/public_issue_corpus_v1/focused_test_setup_plan_report.md`,
+- `artifacts/experiments/public_issue_corpus_v1/focused_test_setup_readiness_report.md`,
 - valid public issue candidates: 3,
 - reachable public repositories: 2,
 - context preview completed issues: 3,
@@ -405,6 +414,8 @@ Latest expected evidence:
 - focused public issue setup dependency plans: 1,
 - focused public issue setup environment plans: 2,
 - focused public issue setup network-required plans: 3,
+- focused public issue setup-readiness ready tasks: 0,
+- focused public issue setup-readiness blocked tasks: 3,
 - invalid entries: 0,
 - repositories: `psf/requests`, `pytest-dev/pytest`.
 
@@ -772,7 +783,7 @@ Latest evidence:
 - readiness status: `ready_with_caveats`,
 - live calibration readiness: `not_configured`,
 - release hygiene status: `ready_with_warnings`,
-- release hygiene checks: generated review artifacts include public issue context preview, task materialization validation/readiness, focused-test planning, focused-test run, focused-test diagnosis, and focused-test setup-plan evidence; live LLM calibration remains the only warning,
+- release hygiene checks: generated review artifacts include public issue context preview, task materialization validation/readiness, focused-test planning, focused-test run, focused-test diagnosis, focused-test setup-plan, and focused-test setup-readiness evidence; live LLM calibration remains the only warning,
 - indexed experiments: 16,
 - indexed saved runs: 443,
 - normalized metric rows: 29,

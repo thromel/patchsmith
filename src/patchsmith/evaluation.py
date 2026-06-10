@@ -366,6 +366,7 @@ class IssueCorpusFocusedTestDiagnosisResult:
     issue_url: str | None
     run_status: str | None
     command: str | None
+    repo_path: str | None
     focused_files: list[str]
     category: str
     severity: str
@@ -403,6 +404,7 @@ class IssueCorpusFocusedTestSetupPlanResult:
     status: str
     category: str
     severity: str
+    repo_path: str | None
     setup_profile: str
     setup_commands: list[str]
     validation_command: str | None
@@ -429,6 +431,44 @@ class IssueCorpusFocusedTestSetupPlanSummary:
     network_required_tasks: int
     sandbox_required_tasks: int
     category_counts: dict[str, int]
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class IssueCorpusFocusedTestSetupReadinessResult:
+    task_id: str | None
+    repository: str | None
+    issue_url: str | None
+    status: str
+    setup_profile: str
+    repo_path: str | None
+    repo_exists: bool
+    setup_commands: list[str]
+    validation_command: str | None
+    requires_network: bool
+    sandbox_required: bool
+    docker_smoke_status: str
+    errors: list[str]
+    warnings: list[str]
+    next_actions: list[str]
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class IssueCorpusFocusedTestSetupReadinessSummary:
+    setup_plan_path: str
+    docker_smoke_path: str
+    docker_smoke_status: str
+    task_count: int
+    ready_tasks: int
+    warning_tasks: int
+    blocked_tasks: int
+    network_required_tasks: int
+    sandbox_required_tasks: int
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -1920,6 +1960,7 @@ def write_focused_test_diagnosis_outputs(
                 "issue_url",
                 "run_status",
                 "command",
+                "repo_path",
                 "focused_files",
                 "category",
                 "severity",
@@ -1939,6 +1980,7 @@ def write_focused_test_diagnosis_outputs(
                     "issue_url": result.issue_url,
                     "run_status": result.run_status,
                     "command": result.command,
+                    "repo_path": result.repo_path,
                     "focused_files": ";".join(result.focused_files),
                     "category": result.category,
                     "severity": result.severity,
@@ -2045,6 +2087,7 @@ def write_focused_test_setup_plan_outputs(
                 "status",
                 "category",
                 "severity",
+                "repo_path",
                 "setup_profile",
                 "setup_commands",
                 "validation_command",
@@ -2066,6 +2109,7 @@ def write_focused_test_setup_plan_outputs(
                     "status": result.status,
                     "category": result.category,
                     "severity": result.severity,
+                    "repo_path": result.repo_path,
                     "setup_profile": result.setup_profile,
                     "setup_commands": ";".join(result.setup_commands),
                     "validation_command": result.validation_command,
@@ -2080,6 +2124,145 @@ def write_focused_test_setup_plan_outputs(
     (output_dir / "focused_test_setup_plan_report.md").write_text(
         render_focused_test_setup_plan_report(
             diagnosis_path=diagnosis_path,
+            results=results,
+            summary=summary,
+        ),
+        encoding="utf-8",
+    )
+
+
+def check_focused_test_setup_readiness(
+    *,
+    setup_plan_path: Path,
+    docker_smoke_path: Path,
+    output_dir: Path,
+) -> tuple[
+    list[IssueCorpusFocusedTestSetupReadinessResult],
+    IssueCorpusFocusedTestSetupReadinessSummary,
+]:
+    if not setup_plan_path.exists():
+        raise FileNotFoundError(f"focused test setup plan does not exist: {setup_plan_path}")
+    if not setup_plan_path.is_file():
+        raise ValueError(f"focused test setup plan path is not a file: {setup_plan_path}")
+    parsed = json.loads(setup_plan_path.read_text(encoding="utf-8"))
+    if not isinstance(parsed, list):
+        raise ValueError("focused test setup plan must contain a JSON list")
+    records = [record for record in parsed if isinstance(record, dict)]
+    if len(records) != len(parsed):
+        raise ValueError("focused test setup plan records must be JSON objects")
+
+    docker_smoke_status = _docker_smoke_status_from_file(docker_smoke_path)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    results = [
+        _check_focused_test_setup_record(
+            record=record,
+            docker_smoke_status=docker_smoke_status,
+        )
+        for record in records
+    ]
+    summary = summarize_focused_test_setup_readiness(
+        setup_plan_path=setup_plan_path,
+        docker_smoke_path=docker_smoke_path,
+        docker_smoke_status=docker_smoke_status,
+        results=results,
+    )
+    write_focused_test_setup_readiness_outputs(
+        output_dir=output_dir,
+        setup_plan_path=setup_plan_path,
+        docker_smoke_path=docker_smoke_path,
+        results=results,
+        summary=summary,
+    )
+    return results, summary
+
+
+def summarize_focused_test_setup_readiness(
+    *,
+    setup_plan_path: Path,
+    docker_smoke_path: Path,
+    docker_smoke_status: str,
+    results: list[IssueCorpusFocusedTestSetupReadinessResult],
+) -> IssueCorpusFocusedTestSetupReadinessSummary:
+    return IssueCorpusFocusedTestSetupReadinessSummary(
+        setup_plan_path=str(setup_plan_path),
+        docker_smoke_path=str(docker_smoke_path),
+        docker_smoke_status=docker_smoke_status,
+        task_count=len(results),
+        ready_tasks=sum(1 for result in results if result.status == "ready"),
+        warning_tasks=sum(1 for result in results if result.status == "warning"),
+        blocked_tasks=sum(1 for result in results if result.status == "blocked"),
+        network_required_tasks=sum(1 for result in results if result.requires_network),
+        sandbox_required_tasks=sum(1 for result in results if result.sandbox_required),
+    )
+
+
+def write_focused_test_setup_readiness_outputs(
+    *,
+    output_dir: Path,
+    setup_plan_path: Path,
+    docker_smoke_path: Path,
+    results: list[IssueCorpusFocusedTestSetupReadinessResult],
+    summary: IssueCorpusFocusedTestSetupReadinessSummary,
+) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "focused_test_setup_readiness_results.json").write_text(
+        json.dumps([result.to_dict() for result in results], indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (output_dir / "focused_test_setup_readiness_summary.json").write_text(
+        json.dumps(summary.to_dict(), indent=2) + "\n",
+        encoding="utf-8",
+    )
+    with (output_dir / "focused_test_setup_readiness_results.csv").open(
+        "w",
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=[
+                "task_id",
+                "repository",
+                "issue_url",
+                "status",
+                "setup_profile",
+                "repo_path",
+                "repo_exists",
+                "setup_commands",
+                "validation_command",
+                "requires_network",
+                "sandbox_required",
+                "docker_smoke_status",
+                "errors",
+                "warnings",
+                "next_actions",
+            ],
+        )
+        writer.writeheader()
+        for result in results:
+            writer.writerow(
+                {
+                    "task_id": result.task_id,
+                    "repository": result.repository,
+                    "issue_url": result.issue_url,
+                    "status": result.status,
+                    "setup_profile": result.setup_profile,
+                    "repo_path": result.repo_path,
+                    "repo_exists": result.repo_exists,
+                    "setup_commands": ";".join(result.setup_commands),
+                    "validation_command": result.validation_command,
+                    "requires_network": result.requires_network,
+                    "sandbox_required": result.sandbox_required,
+                    "docker_smoke_status": result.docker_smoke_status,
+                    "errors": ";".join(result.errors),
+                    "warnings": ";".join(result.warnings),
+                    "next_actions": ";".join(result.next_actions),
+                }
+            )
+    (output_dir / "focused_test_setup_readiness_report.md").write_text(
+        render_focused_test_setup_readiness_report(
+            setup_plan_path=setup_plan_path,
+            docker_smoke_path=docker_smoke_path,
             results=results,
             summary=summary,
         ),
@@ -3570,6 +3753,58 @@ def render_focused_test_setup_plan_report(
     return "\n".join(lines)
 
 
+def render_focused_test_setup_readiness_report(
+    *,
+    setup_plan_path: Path,
+    docker_smoke_path: Path,
+    results: list[IssueCorpusFocusedTestSetupReadinessResult],
+    summary: IssueCorpusFocusedTestSetupReadinessSummary,
+) -> str:
+    lines = [
+        "# Public Issue Focused Test Setup Readiness",
+        "",
+        f"- Setup plan path: `{setup_plan_path}`",
+        f"- Docker smoke path: `{docker_smoke_path}`",
+        f"- Docker smoke status: `{summary.docker_smoke_status}`",
+        f"- Task count: `{summary.task_count}`",
+        f"- Ready tasks: `{summary.ready_tasks}`",
+        f"- Warning tasks: `{summary.warning_tasks}`",
+        f"- Blocked tasks: `{summary.blocked_tasks}`",
+        f"- Network-required tasks: `{summary.network_required_tasks}`",
+        f"- Sandbox-required tasks: `{summary.sandbox_required_tasks}`",
+        "",
+        "## Results",
+        "",
+        "| Task | Status | Profile | Repository Snapshot | Docker | Notes | Next Actions |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    for result in results:
+        notes = [*result.errors, *result.warnings]
+        lines.append(
+            "| "
+            f"{_markdown_table_text(result.task_id or 'unknown')} | "
+            f"{_markdown_table_text(result.status)} | "
+            f"{_markdown_table_text(result.setup_profile)} | "
+            f"{_markdown_table_text('present' if result.repo_exists else result.repo_path or 'missing')} | "
+            f"{_markdown_table_text(result.docker_smoke_status)} | "
+            f"{_markdown_table_text('; '.join(notes) or 'none')} | "
+            f"{_markdown_table_text('; '.join(result.next_actions) or 'none')} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Claim Boundary",
+            "",
+            "- This report checks whether focused public issue setup plans are ready to execute.",
+            "- It does not execute setup commands, install dependencies, or run validation tests.",
+            "- `blocked` means setup should not be attempted until the listed safety or environment issue is fixed.",
+            "- Public issue repair quality remains unproven until setup, reproduction, patching, and validation are saved as run artifacts.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def render_repair_eval_report(
     *,
     dataset_dir: Path,
@@ -4617,6 +4852,7 @@ def _diagnose_focused_test_run_record(
     issue_url = _optional_string(record.get("issue_url"))
     run_status = _optional_string(record.get("status"))
     command = _optional_string(record.get("command"))
+    repo_path = _optional_string(record.get("repo_path"))
     focused_files = _string_list(record.get("focused_files"))
     stdout_path = _optional_string(record.get("stdout_path"))
     stderr_path = _optional_string(record.get("stderr_path"))
@@ -4629,6 +4865,7 @@ def _diagnose_focused_test_run_record(
             issue_url=issue_url,
             run_status=run_status,
             command=command,
+            repo_path=repo_path,
             focused_files=focused_files,
             category="focused_test_passed",
             severity="info",
@@ -4647,6 +4884,7 @@ def _diagnose_focused_test_run_record(
             issue_url=issue_url,
             run_status=run_status,
             command=command,
+            repo_path=repo_path,
             focused_files=focused_files,
             category="timeout",
             severity="environment",
@@ -4666,6 +4904,7 @@ def _diagnose_focused_test_run_record(
             issue_url=issue_url,
             run_status=run_status,
             command=command,
+            repo_path=repo_path,
             focused_files=focused_files,
             category="execution_blocked",
             severity="blocked",
@@ -4686,6 +4925,7 @@ def _diagnose_focused_test_run_record(
             issue_url=issue_url,
             run_status=run_status,
             command=command,
+            repo_path=repo_path,
             focused_files=focused_files,
             category="missing_generated_version_metadata",
             severity="dependency",
@@ -4705,6 +4945,7 @@ def _diagnose_focused_test_run_record(
             issue_url=issue_url,
             run_status=run_status,
             command=command,
+            repo_path=repo_path,
             focused_files=focused_files,
             category="pytest_fixture_dependency_error",
             severity="environment",
@@ -4728,6 +4969,7 @@ def _diagnose_focused_test_run_record(
             issue_url=issue_url,
             run_status=run_status,
             command=command,
+            repo_path=repo_path,
             focused_files=focused_files,
             category="missing_python_module",
             severity="dependency",
@@ -4746,6 +4988,7 @@ def _diagnose_focused_test_run_record(
             issue_url=issue_url,
             run_status=run_status,
             command=command,
+            repo_path=repo_path,
             focused_files=focused_files,
             category="pytest_setup_error",
             severity="environment",
@@ -4771,6 +5014,7 @@ def _diagnose_focused_test_run_record(
             issue_url=issue_url,
             run_status=run_status,
             command=command,
+            repo_path=repo_path,
             focused_files=focused_files,
             category=category,
             severity="environment" if category == "missing_logs" else "unknown",
@@ -4788,6 +5032,7 @@ def _diagnose_focused_test_run_record(
         issue_url=issue_url,
         run_status=run_status,
         command=command,
+        repo_path=repo_path,
         focused_files=focused_files,
         category="nonzero_exit",
         severity="unknown",
@@ -4811,6 +5056,7 @@ def _plan_focused_test_setup(
     category = _optional_string(record.get("category")) or "unknown"
     severity = _optional_string(record.get("severity")) or "unknown"
     command = _optional_string(record.get("command"))
+    repo_path = _optional_string(record.get("repo_path"))
     focused_files = _string_list(record.get("focused_files"))
     evidence = _string_list(record.get("evidence"))
     diagnosis_next_actions = _string_list(record.get("suggested_next_actions"))
@@ -4905,6 +5151,7 @@ def _plan_focused_test_setup(
         status=status,
         category=category,
         severity=severity,
+        repo_path=repo_path,
         setup_profile=setup_profile,
         setup_commands=setup_commands,
         validation_command=validation_command,
@@ -4915,6 +5162,104 @@ def _plan_focused_test_setup(
         risk_notes=risk_notes,
         suggested_next_actions=suggested_next_actions,
     )
+
+
+def _check_focused_test_setup_record(
+    *,
+    record: dict[str, Any],
+    docker_smoke_status: str,
+) -> IssueCorpusFocusedTestSetupReadinessResult:
+    task_id = _optional_string(record.get("task_id"))
+    repository = _optional_string(record.get("repository"))
+    issue_url = _optional_string(record.get("issue_url"))
+    setup_profile = _optional_string(record.get("setup_profile")) or "unknown"
+    setup_status = _optional_string(record.get("status")) or "unknown"
+    repo_path = _optional_string(record.get("repo_path"))
+    setup_commands = _string_list(record.get("setup_commands"))
+    validation_command = _optional_string(record.get("validation_command"))
+    requires_network = bool(record.get("requires_network"))
+    sandbox_required = bool(record.get("sandbox_required"))
+    errors: list[str] = []
+    warnings: list[str] = []
+    next_actions: list[str] = []
+
+    repo_exists = False
+    if repo_path:
+        repo = Path(repo_path)
+        repo_exists = repo.exists() and repo.is_dir()
+        if not repo_exists:
+            errors.append(f"repository snapshot is not available: {repo_path}")
+            next_actions.append("rerun public issue context preview or materialization")
+    else:
+        errors.append("setup plan is missing repo_path")
+        next_actions.append("regenerate focused diagnosis and setup plan from run results")
+
+    if setup_status == "manual_review":
+        errors.append("setup plan requires manual review before execution")
+    elif setup_status == "ready":
+        if setup_commands:
+            warnings.append("ready setup task unexpectedly includes setup commands")
+    elif setup_status != "planned":
+        warnings.append(f"setup plan status is {setup_status}")
+
+    if setup_status == "planned" and not setup_commands:
+        errors.append("planned setup task has no setup commands")
+    if setup_status == "planned" and not validation_command:
+        errors.append("planned setup task has no validation command")
+
+    if sandbox_required and docker_smoke_status != "passed":
+        errors.append(f"Docker sandbox smoke is {docker_smoke_status}")
+        next_actions.append("start Docker, build the smoke image, and rerun docker-smoke")
+    if requires_network:
+        warnings.append("setup requires network access; use a controlled disposable build step")
+        next_actions.append("review network access and dependency trust before setup execution")
+    if sandbox_required:
+        next_actions.append("execute setup only inside a disposable sandbox with no host secrets")
+
+    status = "blocked" if errors else "warning" if warnings else "ready"
+    if not next_actions and status == "ready":
+        next_actions.append("run setup commands in the approved sandbox, then rerun validation")
+    return IssueCorpusFocusedTestSetupReadinessResult(
+        task_id=task_id,
+        repository=repository,
+        issue_url=issue_url,
+        status=status,
+        setup_profile=setup_profile,
+        repo_path=repo_path,
+        repo_exists=repo_exists,
+        setup_commands=setup_commands,
+        validation_command=validation_command,
+        requires_network=requires_network,
+        sandbox_required=sandbox_required,
+        docker_smoke_status=docker_smoke_status,
+        errors=_dedupe_preserve_order(errors),
+        warnings=_dedupe_preserve_order(warnings),
+        next_actions=_dedupe_preserve_order(next_actions),
+    )
+
+
+def _docker_smoke_status_from_file(path: Path) -> str:
+    if not path.exists() or not path.is_file():
+        return "missing"
+    try:
+        parsed = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return "invalid"
+    if not isinstance(parsed, dict):
+        return "invalid"
+    status = parsed.get("smoke_status")
+    return status if isinstance(status, str) and status else "unknown"
+
+
+def _dedupe_preserve_order(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        deduped.append(value)
+    return deduped
 
 
 def _fixture_listing_command(focused_files: list[str]) -> str:

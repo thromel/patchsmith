@@ -271,6 +271,18 @@ PYTHONPATH=src python3 -m patchsmith.cli plan-focused-test-setups \
 
 Current setup-plan output has three planned setup tasks, one dependency setup, two environment fixture setups, and three network/sandbox-required tasks. Use this to gate future public issue reproduction attempts.
 
+Check focused public issue setup readiness:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli check-focused-test-setup-readiness \
+  --setup-plan artifacts/experiments/public_issue_corpus_v1/focused_test_setup_plan_results.json \
+  --docker-smoke artifacts/experiments/docker_smoke.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+Current setup-readiness output has zero ready tasks and three blocked tasks because Docker smoke is `not_available`. Use this as the stop condition before any public issue dependency setup is executed.
+
 Generate the release hygiene report:
 
 ```bash
@@ -282,7 +294,7 @@ PYTHONPATH=src python3 -m patchsmith.cli release-hygiene \
   --json
 ```
 
-Current release hygiene output is `ready_with_warnings`: generated review artifacts now include calibration-readiness and public issue context-preview/materialization validation/readiness/focused-test plan/run/diagnosis/setup-plan evidence, package build metadata exists, local Git metadata exists, and the remaining release caveat is live LLM calibration.
+Current release hygiene output is `ready_with_warnings`: generated review artifacts now include calibration-readiness and public issue context-preview/materialization validation/readiness/focused-test plan/run/diagnosis/setup-plan/setup-readiness evidence, package build metadata exists, local Git metadata exists, and the remaining release caveat is live LLM calibration.
 
 ## Example flagship demo scenario
 

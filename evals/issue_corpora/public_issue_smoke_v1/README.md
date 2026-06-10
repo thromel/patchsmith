@@ -126,6 +126,19 @@ Focused test setup planning records sandbox setup profiles and validation
 commands before public issue repair attempts. It does not execute dependency
 installation.
 
+Focused test setup-readiness command:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli check-focused-test-setup-readiness \
+  --setup-plan artifacts/experiments/public_issue_corpus_v1/focused_test_setup_plan_results.json \
+  --docker-smoke artifacts/experiments/docker_smoke.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+Setup readiness must pass before setup commands are executed. A blocked report
+means the lane remains planning evidence only.
+
 Selection criteria:
 
 - public GitHub issue URL,

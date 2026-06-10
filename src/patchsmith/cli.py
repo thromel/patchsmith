@@ -7,6 +7,7 @@ from pathlib import Path
 
 from patchsmith.evaluation import (
     check_materialized_issue_run_readiness,
+    check_focused_test_setup_readiness,
     diagnose_focused_test_runs,
     materialize_issue_corpus_tasks,
     plan_focused_test_setups,
@@ -445,6 +446,33 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f"planned={summary.planned_tasks} ready={summary.ready_tasks} "
                 f"manual_review={summary.manual_review_tasks}"
+            )
+        return 0
+
+    if args.command == "check-focused-test-setup-readiness":
+        results, summary = check_focused_test_setup_readiness(
+            setup_plan_path=Path(args.setup_plan),
+            docker_smoke_path=Path(args.docker_smoke),
+            output_dir=Path(args.output),
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "result_count": len(results),
+                        "report_path": str(
+                            Path(args.output) / "focused_test_setup_readiness_report.md"
+                        ),
+                        "summary": summary.to_dict(),
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(f"Report: {Path(args.output) / 'focused_test_setup_readiness_report.md'}")
+            print(
+                f"ready={summary.ready_tasks} warning={summary.warning_tasks} "
+                f"blocked={summary.blocked_tasks}"
             )
         return 0
 
@@ -1315,6 +1343,31 @@ def build_parser() -> argparse.ArgumentParser:
         help="Focused test setup-plan output directory.",
     )
     focused_test_setup_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print JSON summary.",
+    )
+
+    focused_test_setup_readiness_parser = subparsers.add_parser(
+        "check-focused-test-setup-readiness",
+        help="Check sandbox and repository readiness before executing focused test setup plans.",
+    )
+    focused_test_setup_readiness_parser.add_argument(
+        "--setup-plan",
+        default="artifacts/experiments/public_issue_corpus_v1/focused_test_setup_plan_results.json",
+        help="Focused test setup-plan results JSON.",
+    )
+    focused_test_setup_readiness_parser.add_argument(
+        "--docker-smoke",
+        default="artifacts/experiments/docker_smoke.json",
+        help="Docker smoke JSON report to use as sandbox readiness evidence.",
+    )
+    focused_test_setup_readiness_parser.add_argument(
+        "--output",
+        default="artifacts/experiments/public_issue_corpus_v1",
+        help="Focused test setup-readiness output directory.",
+    )
+    focused_test_setup_readiness_parser.add_argument(
         "--json",
         action="store_true",
         help="Print JSON summary.",

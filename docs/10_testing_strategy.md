@@ -255,7 +255,19 @@ PYTHONPATH=src python3 -m patchsmith.cli plan-focused-test-setups \
 
 The current setup plan has three planned setup tasks, all sandbox-required and network-risk-bearing. Treat it as the setup backlog before reproduction or repair runs, not as permission to install dependencies on the host.
 
-The corpus, preflight, context-preview, materialization, validation, run-readiness, focused-test planning, focused-test run, focused-test diagnosis, and focused-test setup-plan reports are planning and plumbing evidence. They are not repair-quality evidence until the issues are reproduced, patched, tested, and saved as normal PatchSmith run artifacts.
+Check setup readiness before executing setup commands:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli check-focused-test-setup-readiness \
+  --setup-plan artifacts/experiments/public_issue_corpus_v1/focused_test_setup_plan_results.json \
+  --docker-smoke artifacts/experiments/docker_smoke.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+Current setup readiness blocks all three setup tasks because Docker smoke is `not_available`. Do not run dependency setup until Docker smoke passes and the setup-readiness report is no longer blocked.
+
+The corpus, preflight, context-preview, materialization, validation, run-readiness, focused-test planning, focused-test run, focused-test diagnosis, focused-test setup-plan, and focused-test setup-readiness reports are planning and plumbing evidence. They are not repair-quality evidence until the issues are reproduced, patched, tested, and saved as normal PatchSmith run artifacts.
 
 ## Definition of test completion
 
