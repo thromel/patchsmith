@@ -10,6 +10,7 @@ from patchsmith.portfolio import (
     write_demo_script_report,
     write_delivery_audit_report,
     write_docker_smoke_report,
+    write_environment_readiness_report,
     write_evidence_refresh_report,
     write_launch_blocker_report,
     write_live_calibration_plan_report,
@@ -1336,6 +1337,12 @@ def test_project_status_report_summarizes_saved_evidence(
             "run_id": None,
             "test_exit_code": None,
         },
+        "environment_readiness.json": {
+            "readiness_status": "blocked",
+            "passed_count": 4,
+            "warning_count": 5,
+            "blocked_count": 1,
+        },
         "release_hygiene.json": {
             "release_status": "ready_with_warnings",
             "passed_count": 10,
@@ -1387,6 +1394,7 @@ def test_project_status_report_summarizes_saved_evidence(
     assert report.quality_status == "passed"
     assert report.launch_status == "blocked"
     assert report.docker_smoke_status == "not_available"
+    assert report.environment_readiness_status == "blocked"
     assert report.saved_live_provider_count == 0
     assert report.deepagents_package_run_count == 10
     assert report.evidence_freshness_status == "stale"
@@ -1396,6 +1404,7 @@ def test_project_status_report_summarizes_saved_evidence(
     rendered = output_path.read_text(encoding="utf-8")
     assert "# PatchSmith Project Status Report" in rendered
     assert "Live LLM Calibration" in rendered
+    assert "Environment Readiness" in rendered
     assert "## Evidence Freshness" in rendered
     assert "experiments/docker_smoke.json" in rendered
     payload = json.loads(json_output_path.read_text(encoding="utf-8"))
@@ -1421,6 +1430,7 @@ def test_project_status_report_summarizes_saved_evidence(
     assert exit_code == 0
     cli_payload = json.loads(capsys.readouterr().out)
     assert cli_payload["overall_status"] == "in_progress_with_blockers"
+    assert cli_payload["environment_readiness_status"] == "blocked"
     assert cli_payload["evidence_freshness_status"] == "stale"
     assert cli_payload["stale_source_count"] == 1
     assert cli_payload["missing_source_count"] == 0
@@ -1450,8 +1460,10 @@ def test_evidence_refresh_report_runs_lightweight_status_refresh(
     assert report.docker_smoke_refreshed is False
     assert any(step.name == "Docker smoke" and step.status == "skipped" for step in report.steps)
     assert any(step.name == "Quality gate" and step.status == "skipped" for step in report.steps)
+    assert any(step.name == "Environment readiness" and step.status == "passed" for step in report.steps)
     assert (artifacts_dir / "experiments" / "project_status.json").exists()
     assert (artifacts_dir / "experiments" / "release_hygiene.json").exists()
+    assert (artifacts_dir / "experiments" / "environment_readiness.json").exists()
     rendered = output_path.read_text(encoding="utf-8")
     assert "# PatchSmith Evidence Refresh Report" in rendered
     assert "--include-quality-gate" in rendered
@@ -1552,6 +1564,72 @@ def test_evidence_refresh_can_refresh_docker_smoke(
     cli_payload = json.loads(capsys.readouterr().out)
     assert cli_payload["docker_smoke_refreshed"] is True
     assert cli_payload["skipped_count"] == 1
+    assert cli_output.exists()
+
+
+def test_environment_readiness_report_summarizes_external_prerequisites(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    artifacts_dir = tmp_path / "artifacts"
+    experiments_dir = artifacts_dir / "experiments"
+    experiments_dir.mkdir(parents=True)
+    (experiments_dir / "docker_smoke.json").write_text(
+        json.dumps(
+            {
+                "generated_at": "2026-06-10T00:00:00Z",
+                "smoke_status": "not_available",
+                "remediation_commands": ["docker version"],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    output_path = tmp_path / "environment_readiness.md"
+    json_output_path = tmp_path / "environment_readiness.json"
+    report = write_environment_readiness_report(
+        project_root=Path("."),
+        artifacts_dir=artifacts_dir,
+        output_path=output_path,
+        json_output_path=json_output_path,
+        environment={},
+        package_availability={"openai": True, "deepagents": False, "agents": False},
+    )
+
+    assert report.readiness_status == "blocked"
+    assert report.blocked_count == 1
+    assert report.warning_count > 0
+    checks = {(check.area, check.name): check.status for check in report.checks}
+    assert checks[("Docker", "Saved Docker Smoke Evidence")] == "blocked"
+    assert checks[("Model Providers", "OpenAI SDK")] == "passed"
+    assert checks[("Model Providers", "OpenAI Credentials")] == "warning"
+    assert "docker version" in report.remediation_commands
+    rendered = output_path.read_text(encoding="utf-8")
+    assert "# PatchSmith Environment Readiness" in rendered
+    assert "does not call live model providers" in rendered
+    payload = json.loads(json_output_path.read_text(encoding="utf-8"))
+    assert payload["readiness_status"] == "blocked"
+
+    cli_output = tmp_path / "cli_environment_readiness.md"
+    cli_json_output = tmp_path / "cli_environment_readiness.json"
+    exit_code = main(
+        [
+            "environment-readiness",
+            "--project-root",
+            ".",
+            "--artifacts-dir",
+            str(artifacts_dir),
+            "--output",
+            str(cli_output),
+            "--json-output",
+            str(cli_json_output),
+            "--json",
+        ]
+    )
+    assert exit_code == 0
+    cli_payload = json.loads(capsys.readouterr().out)
+    assert cli_payload["readiness_status"] in {"blocked", "ready_with_warnings"}
     assert cli_output.exists()
 
 

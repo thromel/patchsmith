@@ -219,6 +219,44 @@ class DockerSmokeReport:
 
 
 @dataclass(frozen=True)
+class EnvironmentReadinessCheck:
+    area: str
+    name: str
+    status: str
+    evidence: str
+    next_action: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class EnvironmentReadinessReport:
+    project_root: str
+    artifacts_dir: str
+    generated_at: str
+    readiness_status: str
+    passed_count: int
+    warning_count: int
+    blocked_count: int
+    checks: list[EnvironmentReadinessCheck]
+    remediation_commands: list[str]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "project_root": self.project_root,
+            "artifacts_dir": self.artifacts_dir,
+            "generated_at": self.generated_at,
+            "readiness_status": self.readiness_status,
+            "passed_count": self.passed_count,
+            "warning_count": self.warning_count,
+            "blocked_count": self.blocked_count,
+            "checks": [check.to_dict() for check in self.checks],
+            "remediation_commands": self.remediation_commands,
+        }
+
+
+@dataclass(frozen=True)
 class DemoScriptSection:
     title: str
     duration_seconds: int
@@ -588,6 +626,7 @@ class ProjectStatusReport:
     launch_status: str
     release_status: str
     docker_smoke_status: str
+    environment_readiness_status: str
     live_calibration_status: str
     saved_live_provider_count: int
     deepagents_package_run_count: int
@@ -620,6 +659,7 @@ class ProjectStatusReport:
             "launch_status": self.launch_status,
             "release_status": self.release_status,
             "docker_smoke_status": self.docker_smoke_status,
+            "environment_readiness_status": self.environment_readiness_status,
             "live_calibration_status": self.live_calibration_status,
             "saved_live_provider_count": self.saved_live_provider_count,
             "deepagents_package_run_count": self.deepagents_package_run_count,
@@ -927,6 +967,7 @@ def build_project_status_report(
         "quality": "experiments/quality_gate.json",
         "launch": "experiments/launch_blockers.json",
         "docker": "experiments/docker_smoke.json",
+        "environment": "experiments/environment_readiness.json",
         "release": "experiments/release_hygiene.json",
         "calibration": "experiments/calibration_readiness.json",
         "final": "experiments/final_evaluation.json",
@@ -955,6 +996,7 @@ def build_project_status_report(
     quality = payloads["quality"] or {}
     launch = payloads["launch"] or {}
     docker = payloads["docker"] or {}
+    environment = payloads["environment"] or {}
     release = payloads["release"] or {}
     calibration = payloads["calibration"] or {}
     final = payloads["final"] or {}
@@ -968,6 +1010,9 @@ def build_project_status_report(
     launch_status = _payload_string(launch, "launch_status", "missing")
     release_status = _payload_string(release, "release_status", "missing")
     docker_status = _payload_string(docker, "smoke_status", "missing")
+    environment_status = _payload_string(
+        environment, "readiness_status", "missing"
+    )
     calibration_status = _payload_string(calibration, "calibration_status", "missing")
     blocker_count = _payload_int(launch, "blocked_count")
     warning_count = _payload_int(launch, "warning_count")
@@ -1042,6 +1087,16 @@ def build_project_status_report(
             source=sources["calibration"],
         ),
         _project_status_surface(
+            name="Environment Readiness",
+            status=environment_status,
+            evidence=(
+                f"{_payload_int(environment, 'passed_count')} passed, "
+                f"{_payload_int(environment, 'warning_count')} warnings, "
+                f"{_payload_int(environment, 'blocked_count')} blocked."
+            ),
+            source=sources["environment"],
+        ),
+        _project_status_surface(
             name="Adapter Evidence",
             status="recorded" if calibration else "missing",
             evidence=(
@@ -1084,6 +1139,7 @@ def build_project_status_report(
             release_status=release_status,
             mvp_status=mvp_status,
             calibration_status=calibration_status,
+            environment_status=environment_status,
         ),
         mvp_status=mvp_status,
         mvp_completion_percent=mvp_completion,
@@ -1093,6 +1149,7 @@ def build_project_status_report(
         launch_status=launch_status,
         release_status=release_status,
         docker_smoke_status=docker_status,
+        environment_readiness_status=environment_status,
         live_calibration_status=calibration_status,
         saved_live_provider_count=_payload_int(calibration, "saved_live_provider_count"),
         deepagents_package_run_count=_payload_int(
@@ -1162,6 +1219,7 @@ def render_project_status_report(report: ProjectStatusReport) -> str:
         f"- Launch status: `{report.launch_status}`",
         f"- Release status: `{report.release_status}`",
         f"- Docker smoke: `{report.docker_smoke_status}`",
+        f"- Environment readiness: `{report.environment_readiness_status}`",
         f"- Live calibration: `{report.live_calibration_status}`",
         f"- Saved live-provider runs: `{report.saved_live_provider_count}`",
         f"- DeepAgents package-backed runs: `{report.deepagents_package_run_count}`",
@@ -1346,6 +1404,21 @@ def build_evidence_refresh_report(
                 ),
             )
         )
+    steps.append(
+        _run_evidence_refresh_step(
+            name="Environment readiness",
+            artifact_paths=output_paths(
+                "environment_readiness.md",
+                "environment_readiness.json",
+            ),
+            action=lambda: write_environment_readiness_report(
+                project_root=project_root,
+                artifacts_dir=artifacts_dir,
+                output_path=experiment_path("environment_readiness.md"),
+                json_output_path=experiment_path("environment_readiness.json"),
+            ),
+        )
+    )
     steps.append(
         _run_evidence_refresh_step(
             name="Demo script",
@@ -2085,6 +2158,115 @@ def render_docker_smoke_report(report: DockerSmokeReport) -> str:
         if report.run_trace_path:
             lines.append(f"- Trace: `{report.run_trace_path}`")
     lines.extend(["", "## Decision", "", _docker_smoke_decision(report)])
+    return "\n".join(lines) + "\n"
+
+
+def build_environment_readiness_report(
+    *,
+    project_root: Path,
+    artifacts_dir: Path,
+    environment: dict[str, str] | None = None,
+    package_availability: dict[str, bool] | None = None,
+) -> EnvironmentReadinessReport:
+    project_root = project_root.resolve()
+    artifacts_dir = artifacts_dir.resolve()
+    environment = dict(os.environ if environment is None else environment)
+    calibration = build_live_calibration_report(
+        artifacts_dir=artifacts_dir,
+        environment=environment,
+        package_availability=package_availability,
+    )
+    docker_payload = _load_json_artifact(
+        artifacts_dir / "experiments" / "docker_smoke.json"
+    )
+    checks = _environment_readiness_checks(
+        docker_payload=docker_payload,
+        calibration=calibration,
+    )
+    status_counts = Counter(check.status for check in checks)
+    return EnvironmentReadinessReport(
+        project_root=str(project_root),
+        artifacts_dir=str(artifacts_dir),
+        generated_at=_utc_now(),
+        readiness_status=_environment_readiness_status(checks),
+        passed_count=status_counts.get("passed", 0),
+        warning_count=status_counts.get("warning", 0),
+        blocked_count=status_counts.get("blocked", 0),
+        checks=checks,
+        remediation_commands=_environment_remediation_commands(
+            docker_payload=docker_payload,
+            calibration=calibration,
+        ),
+    )
+
+
+def write_environment_readiness_report(
+    *,
+    project_root: Path,
+    artifacts_dir: Path,
+    output_path: Path,
+    json_output_path: Path | None = None,
+    environment: dict[str, str] | None = None,
+    package_availability: dict[str, bool] | None = None,
+) -> EnvironmentReadinessReport:
+    report = build_environment_readiness_report(
+        project_root=project_root,
+        artifacts_dir=artifacts_dir,
+        environment=environment,
+        package_availability=package_availability,
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(render_environment_readiness_report(report), encoding="utf-8")
+    if json_output_path is not None:
+        json_output_path.parent.mkdir(parents=True, exist_ok=True)
+        json_output_path.write_text(
+            json.dumps(report.to_dict(), indent=2) + "\n",
+            encoding="utf-8",
+        )
+    return report
+
+
+def render_environment_readiness_report(report: EnvironmentReadinessReport) -> str:
+    lines = [
+        "# PatchSmith Environment Readiness",
+        "",
+        f"- Generated at: `{report.generated_at}`",
+        f"- Project root: `{report.project_root}`",
+        f"- Artifacts directory: `{report.artifacts_dir}`",
+        f"- Readiness status: `{report.readiness_status}`",
+        f"- Passed: `{report.passed_count}`",
+        f"- Warnings: `{report.warning_count}`",
+        f"- Blocked: `{report.blocked_count}`",
+        "",
+        "## Checks",
+        "",
+        "| Area | Check | Status | Evidence | Next Action |",
+        "|---|---|---|---|---|",
+    ]
+    for check in report.checks:
+        lines.append(
+            "| "
+            f"{check.area} | "
+            f"{check.name} | "
+            f"{check.status} | "
+            f"{_markdown_cell(check.evidence)} | "
+            f"{_markdown_cell(check.next_action)} |"
+        )
+    lines.extend(["", "## Remediation Commands", ""])
+    if report.remediation_commands:
+        lines.extend(["```bash", *report.remediation_commands, "```"])
+    else:
+        lines.append("No command needed.")
+    lines.extend(
+        [
+            "",
+            "## Claim Boundary",
+            "",
+            "- This report summarizes current-shell prerequisites and saved evidence.",
+            "- It does not execute Docker smoke; run `docker-smoke` or `refresh-evidence --include-docker-smoke` to refresh Docker evidence.",
+            "- It does not call live model providers.",
+        ]
+    )
     return "\n".join(lines) + "\n"
 
 
@@ -4084,6 +4266,111 @@ def _docker_smoke_decision(report: DockerSmokeReport) -> str:
     return "Docker sandbox smoke is not available in this environment. Keep Docker readiness as a caveat."
 
 
+def _environment_readiness_checks(
+    *,
+    docker_payload: dict[str, Any] | None,
+    calibration: LiveCalibrationReport,
+) -> list[EnvironmentReadinessCheck]:
+    checks = [_environment_docker_smoke_check(docker_payload)]
+    for check in calibration.checks:
+        checks.append(_environment_live_calibration_check(check))
+    return checks
+
+
+def _environment_docker_smoke_check(
+    docker_payload: dict[str, Any] | None,
+) -> EnvironmentReadinessCheck:
+    if docker_payload is None:
+        return _environment_check(
+            area="Docker",
+            name="Saved Docker Smoke Evidence",
+            status="blocked",
+            evidence="Docker smoke artifact is missing or invalid.",
+            next_action="Run `docker-smoke` or `refresh-evidence --include-docker-smoke`.",
+        )
+    smoke_status = _payload_string(docker_payload, "smoke_status", "missing")
+    if smoke_status == "passed":
+        status = "passed"
+        next_action = "No action needed."
+    elif smoke_status == "skipped":
+        status = "warning"
+        next_action = "Run Docker smoke without `--skip-run` for executable evidence."
+    else:
+        status = "blocked"
+        next_action = "Resolve Docker daemon/image availability and rerun Docker smoke."
+    generated_at = _payload_string(docker_payload, "generated_at", "unknown")
+    return _environment_check(
+        area="Docker",
+        name="Saved Docker Smoke Evidence",
+        status=status,
+        evidence=f"Docker smoke is `{smoke_status}` from `{generated_at}`.",
+        next_action=next_action,
+    )
+
+
+def _environment_live_calibration_check(
+    check: LiveCalibrationCheck,
+) -> EnvironmentReadinessCheck:
+    status = "passed" if check.status == "passed" else "warning"
+    return _environment_check(
+        area="Model Providers",
+        name=check.name,
+        status=status,
+        evidence=check.evidence,
+        next_action=check.next_action,
+    )
+
+
+def _environment_check(
+    *,
+    area: str,
+    name: str,
+    status: str,
+    evidence: str,
+    next_action: str,
+) -> EnvironmentReadinessCheck:
+    return EnvironmentReadinessCheck(
+        area=area,
+        name=name,
+        status=status,
+        evidence=evidence,
+        next_action=next_action,
+    )
+
+
+def _environment_readiness_status(checks: list[EnvironmentReadinessCheck]) -> str:
+    statuses = {check.status for check in checks}
+    if "blocked" in statuses:
+        return "blocked"
+    if "warning" in statuses:
+        return "ready_with_warnings"
+    return "ready"
+
+
+def _environment_remediation_commands(
+    *,
+    docker_payload: dict[str, Any] | None,
+    calibration: LiveCalibrationReport,
+) -> list[str]:
+    commands: list[str] = []
+    if docker_payload is not None:
+        commands.extend(_payload_string_list(docker_payload, "remediation_commands"))
+    else:
+        commands.extend(
+            [
+                "docker context ls",
+                "docker version",
+                "PYTHONPATH=src python3 -m patchsmith.cli docker-smoke --json",
+            ]
+        )
+    commands.extend(calibration.smoke_commands)
+    commands.append(
+        "PYTHONPATH=src python3 -m patchsmith.cli environment-readiness "
+        "--project-root . --artifacts-dir artifacts --json"
+    )
+    return _dedupe_strings(commands)
+
+
 def _path_exists(path: Path) -> bool:
     return path.exists()
 
@@ -5165,6 +5452,7 @@ def _project_overall_status(
     release_status: str,
     mvp_status: str,
     calibration_status: str,
+    environment_status: str,
 ) -> str:
     if missing_sources:
         return "incomplete_evidence"
@@ -5173,6 +5461,7 @@ def _project_overall_status(
         or launch_status == "blocked"
         or quality_status == "failed"
         or release_status == "blocked"
+        or environment_status == "blocked"
     ):
         return "in_progress_with_blockers"
     if (
@@ -5357,6 +5646,11 @@ def _evidence_refresh_summary(result: Any) -> str:
         return (
             f"launch_status={result.launch_status}, "
             f"blockers={result.blocked_count}, warnings={result.warning_count}"
+        )
+    if hasattr(result, "readiness_status") and hasattr(result, "blocked_count"):
+        return (
+            f"readiness_status={result.readiness_status}, "
+            f"blocked={result.blocked_count}, warnings={result.warning_count}"
         )
     if hasattr(result, "readiness_status"):
         return (

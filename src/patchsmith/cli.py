@@ -34,6 +34,7 @@ from patchsmith.portfolio import (
     write_demo_script_report,
     write_delivery_audit_report,
     write_docker_smoke_report,
+    write_environment_readiness_report,
     write_evidence_refresh_report,
     write_final_evaluation_report,
     write_launch_blocker_report,
@@ -1025,6 +1026,43 @@ def main(argv: list[str] | None = None) -> int:
             )
         return 0
 
+    if args.command == "environment-readiness":
+        json_output_path = Path(args.json_output) if args.json_output else None
+        report = write_environment_readiness_report(
+            project_root=Path(args.project_root),
+            artifacts_dir=Path(args.artifacts_dir),
+            output_path=Path(args.output),
+            json_output_path=json_output_path,
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "project_root": report.project_root,
+                        "artifacts_dir": report.artifacts_dir,
+                        "generated_at": report.generated_at,
+                        "readiness_status": report.readiness_status,
+                        "passed_count": report.passed_count,
+                        "warning_count": report.warning_count,
+                        "blocked_count": report.blocked_count,
+                        "report_path": str(Path(args.output)),
+                        "json_path": str(json_output_path) if json_output_path else None,
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(f"Environment readiness report: {Path(args.output)}")
+            if json_output_path:
+                print(f"JSON: {json_output_path}")
+            print(
+                f"Status: {report.readiness_status} "
+                f"Passed: {report.passed_count} "
+                f"Warnings: {report.warning_count} "
+                f"Blocked: {report.blocked_count}"
+            )
+        return 0
+
     if args.command == "release-hygiene":
         json_output_path = Path(args.json_output) if args.json_output else None
         max_failure_runs = None if args.max_failure_runs == 0 else args.max_failure_runs
@@ -1252,6 +1290,9 @@ def main(argv: list[str] | None = None) -> int:
                         "launch_status": report.launch_status,
                         "release_status": report.release_status,
                         "docker_smoke_status": report.docker_smoke_status,
+                        "environment_readiness_status": (
+                            report.environment_readiness_status
+                        ),
                         "live_calibration_status": report.live_calibration_status,
                         "saved_live_provider_count": report.saved_live_provider_count,
                         "blocker_count": report.blocker_count,
@@ -1276,6 +1317,7 @@ def main(argv: list[str] | None = None) -> int:
                 f"Delivery: {report.delivery_completion_percent:.1f}% "
                 f"Launch: {report.launch_status} "
                 f"Quality: {report.quality_status} "
+                f"Environment: {report.environment_readiness_status} "
                 f"Freshness: {report.evidence_freshness_status}"
             )
         return 0
@@ -2215,6 +2257,36 @@ def build_parser() -> argparse.ArgumentParser:
         help="Only run Docker daemon and image preflight checks.",
     )
     docker_smoke.add_argument("--json", action="store_true", help="Print JSON summary.")
+
+    environment_readiness = subparsers.add_parser(
+        "environment-readiness",
+        help="Summarize current launch environment prerequisites from saved evidence.",
+    )
+    environment_readiness.add_argument(
+        "--project-root",
+        default=".",
+        help="Project root to include in the environment readiness report.",
+    )
+    environment_readiness.add_argument(
+        "--artifacts-dir",
+        default="artifacts",
+        help="Root artifact directory to inspect.",
+    )
+    environment_readiness.add_argument(
+        "--output",
+        default="artifacts/experiments/environment_readiness.md",
+        help="Markdown environment readiness report output path.",
+    )
+    environment_readiness.add_argument(
+        "--json-output",
+        default="artifacts/experiments/environment_readiness.json",
+        help="Optional JSON environment readiness output path.",
+    )
+    environment_readiness.add_argument(
+        "--json",
+        action="store_true",
+        help="Print JSON summary.",
+    )
 
     release_hygiene = subparsers.add_parser(
         "release-hygiene",

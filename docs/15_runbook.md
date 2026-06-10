@@ -436,6 +436,19 @@ PYTHONPATH=src python3 -m patchsmith.cli project-status \
 
 The project-status report is the concise briefing surface for progress percentage, delivery percentage, quality gate, launch blockers, Docker smoke, live calibration, adapter evidence, release hygiene, and saved-evidence counts. It summarizes saved artifacts and includes a 24-hour evidence-freshness table for each upstream JSON source; rerun the underlying gates when evidence is stale, undated, or missing.
 
+Environment readiness:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli environment-readiness \
+  --project-root . \
+  --artifacts-dir artifacts \
+  --output artifacts/experiments/environment_readiness.md \
+  --json-output artifacts/experiments/environment_readiness.json \
+  --json
+```
+
+The environment-readiness report consolidates saved Docker smoke evidence, current OpenAI credential/package readiness, optional DeepAgents/OpenAI Agents package importability, saved adapter evidence, and remediation commands. It does not execute Docker smoke or call live model providers.
+
 Evidence refresh:
 
 ```bash
@@ -447,7 +460,7 @@ PYTHONPATH=src python3 -m patchsmith.cli refresh-evidence \
   --json
 ```
 
-The evidence refresh command regenerates the lightweight review/status reports in dependency order: artifact index, failure report, demo readiness, live-calibration readiness and plan, demo script/media, final evaluation, launch blockers, MVP progress, delivery audit, project status, and release hygiene. It skips the full quality gate and Docker smoke by default; pass `--include-quality-gate` only when the refresh should also run compile, pytest, and package build, and pass `--include-docker-smoke` when the Docker sandbox evidence should be refreshed before launch/status reports.
+The evidence refresh command regenerates the lightweight review/status reports in dependency order: artifact index, failure report, demo readiness, live-calibration readiness and plan, environment readiness, demo script/media, final evaluation, launch blockers, MVP progress, delivery audit, project status, and release hygiene. It skips the full quality gate and Docker smoke by default; pass `--include-quality-gate` only when the refresh should also run compile, pytest, and package build, and pass `--include-docker-smoke` when the Docker sandbox evidence should be refreshed before launch/status reports.
 
 Live calibration readiness:
 
