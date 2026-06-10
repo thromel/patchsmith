@@ -834,10 +834,23 @@ def test_launch_blocker_report_prioritizes_readiness_artifacts(
     }
     rendered = output_path.read_text(encoding="utf-8")
     assert "# PatchSmith Launch Blocker Backlog" in rendered
+    assert "## Dependency Chain" in rendered
+    assert "## Remediation Commands" in rendered
     assert "Start Docker Desktop" in rendered
+    assert "check-focused-test-setup-readiness" in rendered
     payload = json.loads(json_output_path.read_text(encoding="utf-8"))
     assert payload["launch_status"] == "blocked"
     assert payload["blocked_count"] == 2
+    payload_items = {item["blocker_id"]: item for item in payload["items"]}
+    assert payload_items["focused_setup_readiness"]["dependencies"] == ["docker_smoke"]
+    assert any(
+        "docker build -f docker/seeded-smoke.Dockerfile" in command
+        for command in payload_items["docker_smoke"]["remediation_commands"]
+    )
+    assert any(
+        "execute-focused-test-setups" in command
+        for command in payload_items["focused_setup_readiness"]["remediation_commands"]
+    )
 
     cli_output = tmp_path / "cli_launch_blockers.md"
     cli_json_output = tmp_path / "cli_launch_blockers.json"

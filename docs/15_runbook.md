@@ -509,7 +509,7 @@ PYTHONPATH=src python3 -m patchsmith.cli launch-blockers \
   --json
 ```
 
-The launch blocker backlog consolidates Docker smoke, focused public issue setup-readiness, live calibration, and release hygiene into a prioritized action list. Treat `blocked` as a hard stop for public release claims and `warning` as a caveat that must stay visible.
+The launch blocker backlog consolidates Docker smoke, focused public issue setup-readiness, live calibration, and release hygiene into a prioritized action list. It also renders each item's upstream dependencies and remediation commands so recovery steps are reviewable without reverse-engineering prior reports. Treat `blocked` as a hard stop for public release claims and `warning` as a caveat that must stay visible.
 
 Quality gate:
 

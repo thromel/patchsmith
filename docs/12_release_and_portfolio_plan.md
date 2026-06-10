@@ -152,7 +152,7 @@ PYTHONPATH=src python3 -m patchsmith.cli launch-blockers \
   --json
 ```
 
-Current launch blocker output is `blocked`: Docker smoke availability and focused public issue setup-readiness are the two P0 blockers. Live-provider calibration and release hygiene remain warning-class caveats.
+Current launch blocker output is `blocked`: Docker smoke availability and focused public issue setup-readiness are the two P0 blockers. Live-provider calibration and release hygiene remain warning-class caveats. The generated backlog includes dependency-chain and remediation-command sections so the blocker order and next runnable commands are preserved with the evidence.
 
 Generate the MVP progress report:
 

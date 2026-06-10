@@ -9,7 +9,7 @@ import time
 import tomllib
 import zlib
 from collections import Counter
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from html import escape
 from importlib.util import find_spec
@@ -515,6 +515,8 @@ class LaunchBlockerItem:
     evidence: str
     next_action: str
     source_artifact: str
+    dependencies: list[str] = field(default_factory=list)
+    remediation_commands: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -748,7 +750,25 @@ def render_launch_blocker_report(report: LaunchBlockerReport) -> str:
             f"{_markdown_cell(item.next_action)} | "
             f"`{item.source_artifact}` |"
         )
-    lines.extend(["", "## Decision", "", _launch_blocker_decision(report)])
+    lines.extend(["", "## Dependency Chain", ""])
+    for item in report.items:
+        dependencies = ", ".join(f"`{dependency}`" for dependency in item.dependencies)
+        lines.append(
+            f"- `{item.blocker_id}`: "
+            f"{dependencies if dependencies else 'no upstream blocker dependency'}"
+        )
+    lines.extend(["", "## Remediation Commands", ""])
+    for item in report.items:
+        lines.append(f"### `{item.blocker_id}`")
+        lines.append("")
+        if item.remediation_commands:
+            lines.append("```bash")
+            lines.extend(item.remediation_commands)
+            lines.append("```")
+        else:
+            lines.append("No command needed.")
+        lines.append("")
+    lines.extend(["## Decision", "", _launch_blocker_decision(report)])
     return "\n".join(lines) + "\n"
 
 
@@ -3987,6 +4007,18 @@ def _docker_smoke_launch_item(artifacts_dir: Path) -> LaunchBlockerItem:
             evidence=f"`{source}` was not found or could not be parsed.",
             next_action="Run `docker-smoke` after Docker Desktop or DOCKER_HOST is available.",
             source_artifact=source,
+            remediation_commands=[
+                "docker context ls",
+                "docker version",
+                "docker build -f docker/seeded-smoke.Dockerfile -t patchsmith-seeded-smoke:py312 .",
+                (
+                    "PYTHONPATH=src python3 -m patchsmith.cli docker-smoke "
+                    "--project-root . --artifacts-dir artifacts "
+                    "--image patchsmith-seeded-smoke:py312 "
+                    "--output artifacts/experiments/docker_smoke.md "
+                    "--json-output artifacts/experiments/docker_smoke.json --json"
+                ),
+            ],
         )
 
     smoke_status = _payload_string(payload, "smoke_status", "unknown")
@@ -4001,6 +4033,13 @@ def _docker_smoke_launch_item(artifacts_dir: Path) -> LaunchBlockerItem:
         actionable_check.get("evidence")
         if actionable_check
         else f"Docker smoke status is `{smoke_status}`."
+    )
+    commands = _dedupe_strings(
+        [
+            *_payload_string_list(payload, "remediation_commands"),
+            _payload_string(payload, "build_command"),
+            _payload_string(payload, "smoke_command"),
+        ]
     )
     return _launch_item(
         blocker_id="docker_smoke",
@@ -4019,6 +4058,7 @@ def _docker_smoke_launch_item(artifacts_dir: Path) -> LaunchBlockerItem:
             else str(next_action or "Start Docker, build the smoke image, and rerun `docker-smoke`.")
         ),
         source_artifact=source,
+        remediation_commands=[] if smoke_status == "passed" else commands,
     )
 
 
@@ -4069,6 +4109,31 @@ def _focused_setup_readiness_launch_item(artifacts_dir: Path) -> LaunchBlockerIt
         ),
         next_action=next_action,
         source_artifact=source,
+        dependencies=["docker_smoke"],
+        remediation_commands=[
+            (
+                "PYTHONPATH=src python3 -m patchsmith.cli check-focused-test-setup-readiness "
+                "--setup-plan artifacts/experiments/public_issue_corpus_v1/"
+                "focused_test_setup_plan_results.json "
+                "--docker-smoke artifacts/experiments/docker_smoke.json "
+                "--output artifacts/experiments/public_issue_corpus_v1 --json"
+            ),
+            (
+                "PYTHONPATH=src python3 -m patchsmith.cli execute-focused-test-setups "
+                "--readiness artifacts/experiments/public_issue_corpus_v1/"
+                "focused_test_setup_readiness_results.json "
+                "--output artifacts/experiments/public_issue_corpus_v1 "
+                "--allow-dependency-installs --sandbox-mode docker "
+                "--sandbox-network bridge --json"
+            ),
+            (
+                "PYTHONPATH=src python3 -m patchsmith.cli validate-focused-test-setups "
+                "--setup-execution artifacts/experiments/public_issue_corpus_v1/"
+                "focused_test_setup_execution_results.json "
+                "--output artifacts/experiments/public_issue_corpus_v1 "
+                "--sandbox-mode docker --sandbox-network bridge --json"
+            ),
+        ],
     )
 
 
@@ -4113,6 +4178,22 @@ def _live_calibration_launch_item(artifacts_dir: Path) -> LaunchBlockerItem:
             else "Configure credentials and budget, then run a live calibration smoke before claiming live LLM quality."
         ),
         source_artifact=source,
+        remediation_commands=[] if live_runs else [
+            "export OPENAI_API_KEY=...",
+            "export PATCHSMITH_OPENAI_MODEL=<model>",
+            (
+                "PYTHONPATH=src python3 -m patchsmith.cli live-calibration "
+                "--artifacts-dir artifacts "
+                "--output artifacts/experiments/calibration_readiness.md "
+                "--json-output artifacts/experiments/calibration_readiness.json --json"
+            ),
+            (
+                "PYTHONPATH=src python3 -m patchsmith.cli live-calibration-plan "
+                "--artifacts-dir artifacts "
+                "--output artifacts/experiments/live_calibration_plan.md "
+                "--json-output artifacts/experiments/live_calibration_plan.json --json"
+            ),
+        ],
     )
 
 
@@ -4162,6 +4243,28 @@ def _release_hygiene_launch_item(artifacts_dir: Path) -> LaunchBlockerItem:
         ),
         next_action=next_action,
         source_artifact=source,
+        dependencies=["quality_gate", "launch_blockers"],
+        remediation_commands=[
+            (
+                "PYTHONPATH=src python3 -m patchsmith.cli quality-gate "
+                "--project-root . --artifacts-dir artifacts "
+                "--output artifacts/experiments/quality_gate.md "
+                "--json-output artifacts/experiments/quality_gate.json "
+                "--logs-dir artifacts/experiments/quality_gate_logs --json"
+            ),
+            (
+                "PYTHONPATH=src python3 -m patchsmith.cli launch-blockers "
+                "--artifacts-dir artifacts "
+                "--output artifacts/experiments/launch_blockers.md "
+                "--json-output artifacts/experiments/launch_blockers.json --json"
+            ),
+            (
+                "PYTHONPATH=src python3 -m patchsmith.cli release-hygiene "
+                "--project-root . --artifacts-dir artifacts "
+                "--output artifacts/experiments/release_hygiene.md "
+                "--json-output artifacts/experiments/release_hygiene.json --json"
+            ),
+        ],
     )
 
 
@@ -4190,6 +4293,25 @@ def _payload_string(payload: dict[str, Any], key: str, default: str = "") -> str
     return value if isinstance(value, str) else default
 
 
+def _payload_string_list(payload: dict[str, Any], key: str) -> list[str]:
+    value = payload.get(key)
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str) and item.strip()]
+
+
+def _dedupe_strings(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for value in values:
+        normalized = value.strip()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        deduped.append(normalized)
+    return deduped
+
+
 def _launch_item(
     *,
     blocker_id: str,
@@ -4200,6 +4322,8 @@ def _launch_item(
     evidence: str,
     next_action: str,
     source_artifact: str,
+    dependencies: list[str] | None = None,
+    remediation_commands: list[str] | None = None,
 ) -> LaunchBlockerItem:
     return LaunchBlockerItem(
         blocker_id=blocker_id,
@@ -4210,6 +4334,8 @@ def _launch_item(
         evidence=evidence,
         next_action=next_action,
         source_artifact=source_artifact,
+        dependencies=dependencies or [],
+        remediation_commands=remediation_commands or [],
     )
 
 
