@@ -130,6 +130,18 @@ PYTHONPATH=src python3 -m patchsmith.cli final-evaluation \
 
 Current final evaluation output has `ready_with_caveats`, 29 normalized metric rows, nine decision bullets, and six limitations. Use it as the public-claim boundary for the offline seeded-suite portfolio demo.
 
+Generate the launch blocker backlog:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli launch-blockers \
+  --artifacts-dir artifacts \
+  --output artifacts/experiments/launch_blockers.md \
+  --json-output artifacts/experiments/launch_blockers.json \
+  --json
+```
+
+Current launch blocker output is `blocked`: Docker smoke availability and focused public issue setup-readiness are the two P0 blockers. Live-provider calibration and release hygiene remain warning-class caveats.
+
 Generate the MVP progress report:
 
 ```bash
@@ -294,7 +306,7 @@ PYTHONPATH=src python3 -m patchsmith.cli release-hygiene \
   --json
 ```
 
-Current release hygiene output is `ready_with_warnings`: generated review artifacts now include calibration-readiness and public issue context-preview/materialization validation/readiness/focused-test plan/run/diagnosis/setup-plan/setup-readiness evidence, package build metadata exists, local Git metadata exists, and the remaining release caveat is live LLM calibration.
+Current release hygiene output is `ready_with_warnings`: generated review artifacts now include calibration-readiness, launch-blocker, and public issue context-preview/materialization validation/readiness/focused-test plan/run/diagnosis/setup-plan/setup-readiness evidence, package build metadata exists, local Git metadata exists, and the remaining release caveat is live LLM calibration.
 
 ## Example flagship demo scenario
 

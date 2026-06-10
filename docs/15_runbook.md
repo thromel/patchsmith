@@ -450,6 +450,18 @@ PYTHONPATH=src python3 -m patchsmith.cli final-evaluation \
 
 The final evaluation report ties normalized metric rows, failure categories, provider metadata, launch decisions, limitations, and review artifact links into one portfolio-facing narrative. Use it as the source of truth for public claims.
 
+Launch blockers:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli launch-blockers \
+  --artifacts-dir artifacts \
+  --output artifacts/experiments/launch_blockers.md \
+  --json-output artifacts/experiments/launch_blockers.json \
+  --json
+```
+
+The launch blocker backlog consolidates Docker smoke, focused public issue setup-readiness, live calibration, and release hygiene into a prioritized action list. Treat `blocked` as a hard stop for public release claims and `warning` as a caveat that must stay visible.
+
 Release hygiene:
 
 ```bash
@@ -630,6 +642,7 @@ Run:
 - demo script regeneration,
 - demo media regeneration,
 - final evaluation report regeneration,
+- launch blocker backlog regeneration,
 - release hygiene report regeneration,
 - README quickstart validation,
 - final report review.

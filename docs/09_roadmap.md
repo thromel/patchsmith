@@ -216,6 +216,7 @@ Publish the project as a recruiter-grade artifact.
 - 2 to 4 minute demo video,
 - architecture diagram,
 - final evaluation report,
+- launch blocker backlog,
 - failure analysis report,
 - blog post series,
 - stable tagged release.

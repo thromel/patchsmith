@@ -778,12 +778,17 @@ Latest evidence:
 - `artifacts/experiments/demo_media.png`,
 - `artifacts/experiments/final_evaluation.md`,
 - `artifacts/experiments/final_evaluation.json`,
+- `artifacts/experiments/launch_blockers.md`,
+- `artifacts/experiments/launch_blockers.json`,
 - `artifacts/experiments/release_hygiene.md`,
 - `artifacts/experiments/release_hygiene.json`,
 - readiness status: `ready_with_caveats`,
 - live calibration readiness: `not_configured`,
+- launch blocker status: `blocked`,
+- launch blockers: 2,
+- launch warnings: 2,
 - release hygiene status: `ready_with_warnings`,
-- release hygiene checks: generated review artifacts include public issue context preview, task materialization validation/readiness, focused-test planning, focused-test run, focused-test diagnosis, focused-test setup-plan, and focused-test setup-readiness evidence; live LLM calibration remains the only warning,
+- release hygiene checks: generated review artifacts include launch blockers, public issue context preview, task materialization validation/readiness, focused-test planning, focused-test run, focused-test diagnosis, focused-test setup-plan, and focused-test setup-readiness evidence; live LLM calibration remains the only warning,
 - indexed experiments: 16,
 - indexed saved runs: 443,
 - normalized metric rows: 29,
@@ -814,7 +819,7 @@ Reason:
 
 - Sprints 1 through 9 now have working code paths and saved evidence artifacts.
 - Static review surfaces now cover aggregate metrics, run details, and failure cases without adding a web stack.
-- The remaining gap is launch packaging: demo script, final evaluation narrative, screenshots or video, and release hygiene.
+- The remaining gap is launch execution: resolve Docker smoke availability, unblock focused public issue setup-readiness, and run live-provider calibration only when credentials and budget are available.
 
 ## Sprint 10 task breakdown
 
@@ -824,8 +829,9 @@ Reason:
 | S10-T6 | Media | PatchSmith | `demo-media` command plus SVG/PNG demo media assets |
 | S10-T2 | Reports | PatchSmith | `final-evaluation` command plus narrative tying retrieval, repair, scaffold, patch-search, and failure evidence together |
 | S10-T3 | Portfolio | PatchSmith | README/demo copy with honest metrics, limits, and non-live-provider caveats |
-| S10-T4 | Release | PatchSmith | `release-hygiene` command plus release blocker/warning report |
+| S10-T4 | Release | PatchSmith | `release-hygiene` command plus release warning report |
 | S10-T5 | Readiness | PatchSmith | `demo-readiness` command plus Markdown/JSON launch review report |
+| S10-T7 | Blockers | PatchSmith | `launch-blockers` command plus prioritized Docker/setup/calibration/release action backlog |
 
 ## Completed Sprint 9 task breakdown
 

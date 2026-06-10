@@ -32,6 +32,7 @@ from patchsmith.portfolio import (
     write_demo_script_report,
     write_docker_smoke_report,
     write_final_evaluation_report,
+    write_launch_blocker_report,
     write_live_calibration_report,
     write_mvp_progress_report,
     write_release_hygiene_report,
@@ -947,6 +948,42 @@ def main(argv: list[str] | None = None) -> int:
             )
         return 0
 
+    if args.command == "launch-blockers":
+        json_output_path = Path(args.json_output) if args.json_output else None
+        report = write_launch_blocker_report(
+            artifacts_dir=Path(args.artifacts_dir),
+            output_path=Path(args.output),
+            json_output_path=json_output_path,
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "artifacts_dir": report.artifacts_dir,
+                        "generated_at": report.generated_at,
+                        "launch_status": report.launch_status,
+                        "item_count": report.item_count,
+                        "blocked_count": report.blocked_count,
+                        "warning_count": report.warning_count,
+                        "ready_count": report.ready_count,
+                        "report_path": str(Path(args.output)),
+                        "json_path": str(json_output_path) if json_output_path else None,
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(f"Launch blocker report: {Path(args.output)}")
+            if json_output_path:
+                print(f"JSON: {json_output_path}")
+            print(
+                f"Status: {report.launch_status} "
+                f"Items: {report.item_count} "
+                f"Blocked: {report.blocked_count} "
+                f"Warnings: {report.warning_count}"
+            )
+        return 0
+
     if args.command == "mvp-progress":
         json_output_path = Path(args.json_output) if args.json_output else None
         max_failure_runs = None if args.max_failure_runs == 0 else args.max_failure_runs
@@ -1758,6 +1795,27 @@ def build_parser() -> argparse.ArgumentParser:
         help="Maximum recent runs to scan for failure visibility. Use 0 to scan all runs.",
     )
     release_hygiene.add_argument("--json", action="store_true", help="Print JSON summary.")
+
+    launch_blockers = subparsers.add_parser(
+        "launch-blockers",
+        help="Generate a prioritized launch-blocker backlog from readiness artifacts.",
+    )
+    launch_blockers.add_argument(
+        "--artifacts-dir",
+        default="artifacts",
+        help="Root artifact directory to scan.",
+    )
+    launch_blockers.add_argument(
+        "--output",
+        default="artifacts/experiments/launch_blockers.md",
+        help="Markdown launch-blocker backlog output path.",
+    )
+    launch_blockers.add_argument(
+        "--json-output",
+        default="artifacts/experiments/launch_blockers.json",
+        help="Optional JSON launch-blocker backlog output path.",
+    )
+    launch_blockers.add_argument("--json", action="store_true", help="Print JSON summary.")
 
     mvp_progress = subparsers.add_parser(
         "mvp-progress",

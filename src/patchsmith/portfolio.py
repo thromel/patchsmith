@@ -369,6 +369,45 @@ class ReleaseHygieneReport:
         }
 
 
+@dataclass(frozen=True)
+class LaunchBlockerItem:
+    blocker_id: str
+    status: str
+    severity: str
+    area: str
+    summary: str
+    evidence: str
+    next_action: str
+    source_artifact: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class LaunchBlockerReport:
+    artifacts_dir: str
+    generated_at: str
+    launch_status: str
+    item_count: int
+    blocked_count: int
+    warning_count: int
+    ready_count: int
+    items: list[LaunchBlockerItem]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "artifacts_dir": self.artifacts_dir,
+            "generated_at": self.generated_at,
+            "launch_status": self.launch_status,
+            "item_count": self.item_count,
+            "blocked_count": self.blocked_count,
+            "warning_count": self.warning_count,
+            "ready_count": self.ready_count,
+            "items": [item.to_dict() for item in self.items],
+        }
+
+
 def build_demo_readiness_report(
     *,
     artifacts_dir: Path,
@@ -435,6 +474,7 @@ def build_release_hygiene_report(
             "artifacts/experiments/failure_report.md",
             "artifacts/experiments/demo_readiness.md",
             "artifacts/experiments/calibration_readiness.md",
+            "artifacts/experiments/launch_blockers.md",
             "artifacts/experiments/demo_script.md",
             "artifacts/experiments/demo_media.svg",
             "artifacts/experiments/demo_media.png",
@@ -504,6 +544,73 @@ def render_release_hygiene_report(report: ReleaseHygieneReport) -> str:
             _release_decision(report),
         ]
     )
+    return "\n".join(lines) + "\n"
+
+
+def build_launch_blocker_report(*, artifacts_dir: Path) -> LaunchBlockerReport:
+    artifacts_dir = artifacts_dir.resolve()
+    items = _launch_blocker_items(artifacts_dir)
+    status_counts = Counter(item.status for item in items)
+    return LaunchBlockerReport(
+        artifacts_dir=str(artifacts_dir),
+        generated_at=_utc_now(),
+        launch_status=_launch_blocker_status(items),
+        item_count=len(items),
+        blocked_count=status_counts.get("blocked", 0),
+        warning_count=status_counts.get("warning", 0),
+        ready_count=status_counts.get("ready", 0),
+        items=items,
+    )
+
+
+def write_launch_blocker_report(
+    *,
+    artifacts_dir: Path,
+    output_path: Path,
+    json_output_path: Path | None = None,
+) -> LaunchBlockerReport:
+    report = build_launch_blocker_report(artifacts_dir=artifacts_dir)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(render_launch_blocker_report(report), encoding="utf-8")
+    if json_output_path is not None:
+        json_output_path.parent.mkdir(parents=True, exist_ok=True)
+        json_output_path.write_text(
+            json.dumps(report.to_dict(), indent=2) + "\n",
+            encoding="utf-8",
+        )
+    return report
+
+
+def render_launch_blocker_report(report: LaunchBlockerReport) -> str:
+    lines = [
+        "# PatchSmith Launch Blocker Backlog",
+        "",
+        f"- Generated at: `{report.generated_at}`",
+        f"- Artifacts directory: `{report.artifacts_dir}`",
+        f"- Launch status: `{report.launch_status}`",
+        f"- Items: `{report.item_count}`",
+        f"- Blocked: `{report.blocked_count}`",
+        f"- Warnings: `{report.warning_count}`",
+        f"- Ready: `{report.ready_count}`",
+        "",
+        "## Prioritized Items",
+        "",
+        "| ID | Status | Severity | Area | Summary | Evidence | Next Action | Source |",
+        "|---|---|---|---|---|---|---|---|",
+    ]
+    for item in report.items:
+        lines.append(
+            "| "
+            f"{item.blocker_id} | "
+            f"{item.status} | "
+            f"{item.severity} | "
+            f"{item.area} | "
+            f"{_markdown_cell(item.summary)} | "
+            f"{_markdown_cell(item.evidence)} | "
+            f"{_markdown_cell(item.next_action)} | "
+            f"`{item.source_artifact}` |"
+        )
+    lines.extend(["", "## Decision", "", _launch_blocker_decision(report)])
     return "\n".join(lines) + "\n"
 
 
@@ -2542,6 +2649,8 @@ def _release_hygiene_checks(
         "experiments/demo_readiness.json",
         "experiments/calibration_readiness.md",
         "experiments/calibration_readiness.json",
+        "experiments/launch_blockers.md",
+        "experiments/launch_blockers.json",
         "experiments/public_issue_corpus_v1/corpus_report.md",
         "experiments/public_issue_corpus_v1/corpus_summary.json",
         "experiments/public_issue_corpus_v1/repo_preflight_report.md",
@@ -2678,6 +2787,284 @@ def _release_hygiene_checks(
         ),
     ]
     return checks
+
+
+def _launch_blocker_items(artifacts_dir: Path) -> list[LaunchBlockerItem]:
+    items = [
+        _docker_smoke_launch_item(artifacts_dir),
+        _focused_setup_readiness_launch_item(artifacts_dir),
+        _live_calibration_launch_item(artifacts_dir),
+        _release_hygiene_launch_item(artifacts_dir),
+    ]
+    return sorted(items, key=_launch_blocker_sort_key)
+
+
+def _docker_smoke_launch_item(artifacts_dir: Path) -> LaunchBlockerItem:
+    source = "experiments/docker_smoke.json"
+    payload = _load_json_artifact(artifacts_dir / source)
+    if payload is None:
+        return _launch_item(
+            blocker_id="docker_smoke",
+            status="blocked",
+            severity="P0",
+            area="Sandbox",
+            summary="Docker sandbox smoke evidence is missing.",
+            evidence=f"`{source}` was not found or could not be parsed.",
+            next_action="Run `docker-smoke` after Docker Desktop or DOCKER_HOST is available.",
+            source_artifact=source,
+        )
+
+    smoke_status = _payload_string(payload, "smoke_status", "unknown")
+    checks = payload.get("checks")
+    actionable_check = _first_actionable_check(checks if isinstance(checks, list) else [])
+    next_action = (
+        actionable_check.get("next_action")
+        if actionable_check
+        else payload.get("smoke_command")
+    )
+    evidence = (
+        actionable_check.get("evidence")
+        if actionable_check
+        else f"Docker smoke status is `{smoke_status}`."
+    )
+    return _launch_item(
+        blocker_id="docker_smoke",
+        status="ready" if smoke_status == "passed" else "blocked",
+        severity="P2" if smoke_status == "passed" else "P0",
+        area="Sandbox",
+        summary=(
+            "Docker sandbox smoke passed."
+            if smoke_status == "passed"
+            else f"Docker sandbox smoke is `{smoke_status}`."
+        ),
+        evidence=str(evidence),
+        next_action=(
+            "No action needed."
+            if smoke_status == "passed"
+            else str(next_action or "Start Docker, build the smoke image, and rerun `docker-smoke`.")
+        ),
+        source_artifact=source,
+    )
+
+
+def _focused_setup_readiness_launch_item(artifacts_dir: Path) -> LaunchBlockerItem:
+    source = "experiments/public_issue_corpus_v1/focused_test_setup_readiness_summary.json"
+    payload = _load_json_artifact(artifacts_dir / source)
+    if payload is None:
+        return _launch_item(
+            blocker_id="focused_setup_readiness",
+            status="blocked",
+            severity="P0",
+            area="Public Issue Setup",
+            summary="Focused public issue setup-readiness evidence is missing.",
+            evidence=f"`{source}` was not found or could not be parsed.",
+            next_action="Run `check-focused-test-setup-readiness` after setup planning.",
+            source_artifact=source,
+        )
+
+    task_count = _payload_int(payload, "task_count")
+    blocked_tasks = _payload_int(payload, "blocked_tasks")
+    warning_tasks = _payload_int(payload, "warning_tasks")
+    ready_tasks = _payload_int(payload, "ready_tasks")
+    docker_status = _payload_string(payload, "docker_smoke_status", "unknown")
+    if blocked_tasks:
+        status = "blocked"
+        severity = "P0"
+        summary = f"{blocked_tasks} focused public issue setup task(s) are blocked."
+        next_action = "Resolve Docker smoke availability before executing setup commands."
+    elif warning_tasks:
+        status = "warning"
+        severity = "P1"
+        summary = f"{warning_tasks} focused public issue setup task(s) need review."
+        next_action = "Review warnings before running dependency setup against public repos."
+    else:
+        status = "ready"
+        severity = "P2"
+        summary = "Focused public issue setup tasks are ready."
+        next_action = "Proceed with focused setup execution under the approved sandbox policy."
+    return _launch_item(
+        blocker_id="focused_setup_readiness",
+        status=status,
+        severity=severity,
+        area="Public Issue Setup",
+        summary=summary,
+        evidence=(
+            f"{ready_tasks}/{task_count} ready, {warning_tasks} warning, "
+            f"{blocked_tasks} blocked; Docker smoke `{docker_status}`."
+        ),
+        next_action=next_action,
+        source_artifact=source,
+    )
+
+
+def _live_calibration_launch_item(artifacts_dir: Path) -> LaunchBlockerItem:
+    source = "experiments/calibration_readiness.json"
+    payload = _load_json_artifact(artifacts_dir / source)
+    if payload is None:
+        return _launch_item(
+            blocker_id="live_calibration",
+            status="warning",
+            severity="P1",
+            area="Model Evidence",
+            summary="Live calibration readiness evidence is missing.",
+            evidence=f"`{source}` was not found or could not be parsed.",
+            next_action="Run `live-calibration` before making provider or model-quality claims.",
+            source_artifact=source,
+        )
+
+    live_runs = _payload_int(payload, "saved_live_provider_count")
+    deepagents_runs = _payload_int(payload, "deepagents_package_run_count")
+    compatibility_runs = _payload_int(payload, "deepagents_compatibility_run_count")
+    calibration_status = _payload_string(payload, "calibration_status", "unknown")
+    status = "ready" if live_runs else "warning"
+    return _launch_item(
+        blocker_id="live_calibration",
+        status=status,
+        severity="P2" if status == "ready" else "P1",
+        area="Model Evidence",
+        summary=(
+            "Saved live-provider calibration evidence exists."
+            if live_runs
+            else "Live-provider calibration remains unconfigured."
+        ),
+        evidence=(
+            f"Calibration `{calibration_status}` with {live_runs} live-provider run(s), "
+            f"{deepagents_runs} DeepAgents package-backed run(s), and "
+            f"{compatibility_runs} DeepAgents compatibility-mode run(s)."
+        ),
+        next_action=(
+            "Report live quality, token use, and estimated cost together."
+            if live_runs
+            else "Configure credentials and budget, then run a live calibration smoke before claiming live LLM quality."
+        ),
+        source_artifact=source,
+    )
+
+
+def _release_hygiene_launch_item(artifacts_dir: Path) -> LaunchBlockerItem:
+    source = "experiments/release_hygiene.json"
+    payload = _load_json_artifact(artifacts_dir / source)
+    if payload is None:
+        return _launch_item(
+            blocker_id="release_hygiene",
+            status="warning",
+            severity="P1",
+            area="Release",
+            summary="Release hygiene evidence is missing.",
+            evidence=f"`{source}` was not found or could not be parsed.",
+            next_action="Run `release-hygiene` after refreshing launch blockers.",
+            source_artifact=source,
+        )
+
+    release_status = _payload_string(payload, "release_status", "unknown")
+    blocked_count = _payload_int(payload, "blocked_count")
+    warning_count = _payload_int(payload, "warning_count")
+    passed_count = _payload_int(payload, "passed_count")
+    if release_status == "ready":
+        status = "ready"
+        severity = "P2"
+        summary = "Release hygiene is ready."
+        next_action = "No action needed."
+    elif release_status == "ready_with_warnings":
+        status = "warning"
+        severity = "P1"
+        summary = "Release hygiene has warnings."
+        next_action = "Review warning checks and keep caveats visible in release materials."
+    else:
+        status = "blocked"
+        severity = "P0"
+        summary = "Release hygiene is blocked."
+        next_action = "Resolve blocked release hygiene checks before claiming launch readiness."
+    return _launch_item(
+        blocker_id="release_hygiene",
+        status=status,
+        severity=severity,
+        area="Release",
+        summary=summary,
+        evidence=(
+            f"Release status `{release_status}` with {passed_count} passed, "
+            f"{warning_count} warning, {blocked_count} blocked check(s)."
+        ),
+        next_action=next_action,
+        source_artifact=source,
+    )
+
+
+def _load_json_artifact(path: Path) -> dict[str, Any] | None:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _first_actionable_check(checks: list[Any]) -> dict[str, Any] | None:
+    for check in checks:
+        if isinstance(check, dict) and check.get("status") not in {"passed", "ready"}:
+            return check
+    return None
+
+
+def _payload_int(payload: dict[str, Any], key: str, default: int = 0) -> int:
+    value = payload.get(key)
+    return value if isinstance(value, int) else default
+
+
+def _payload_string(payload: dict[str, Any], key: str, default: str = "") -> str:
+    value = payload.get(key)
+    return value if isinstance(value, str) else default
+
+
+def _launch_item(
+    *,
+    blocker_id: str,
+    status: str,
+    severity: str,
+    area: str,
+    summary: str,
+    evidence: str,
+    next_action: str,
+    source_artifact: str,
+) -> LaunchBlockerItem:
+    return LaunchBlockerItem(
+        blocker_id=blocker_id,
+        status=status,
+        severity=severity,
+        area=area,
+        summary=summary,
+        evidence=evidence,
+        next_action=next_action,
+        source_artifact=source_artifact,
+    )
+
+
+def _launch_blocker_sort_key(item: LaunchBlockerItem) -> tuple[int, int, str]:
+    status_rank = {"blocked": 0, "warning": 1, "ready": 2}.get(item.status, 3)
+    severity_rank = {"P0": 0, "P1": 1, "P2": 2}.get(item.severity, 3)
+    return status_rank, severity_rank, item.blocker_id
+
+
+def _launch_blocker_status(items: list[LaunchBlockerItem]) -> str:
+    statuses = {item.status for item in items}
+    if "blocked" in statuses:
+        return "blocked"
+    if "warning" in statuses:
+        return "ready_with_warnings"
+    return "ready"
+
+
+def _launch_blocker_decision(report: LaunchBlockerReport) -> str:
+    if report.launch_status == "ready":
+        return "No launch blockers are present in the current readiness artifacts."
+    if report.launch_status == "ready_with_warnings":
+        return (
+            "Launch can proceed only with the listed caveats and without live-provider "
+            "or unsupported sandbox claims."
+        )
+    return (
+        "Launch is blocked by readiness evidence. Resolve P0 items before claiming "
+        "public or tagged release readiness."
+    )
 
 
 def _path_check(
@@ -3134,6 +3521,7 @@ def _final_review_artifacts() -> list[str]:
         "artifacts/experiments/failure_report.md",
         "artifacts/experiments/demo_readiness.md",
         "artifacts/experiments/calibration_readiness.md",
+        "artifacts/experiments/launch_blockers.md",
         "artifacts/experiments/demo_script.md",
         "artifacts/experiments/public_issue_corpus_v1/corpus_report.md",
         "artifacts/experiments/public_issue_corpus_v1/repo_preflight_report.md",
