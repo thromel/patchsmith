@@ -4,7 +4,7 @@ from patchsmith.ingest import clone_or_copy_repository, index_repository
 from patchsmith.models import RunRequest
 from patchsmith.planning import RepairPlan
 from patchsmith.retrieval import HybridRetriever
-from patchsmith.runtime import AgentTask, DeepAgentsRuntime, LangGraphRuntime
+from patchsmith.runtime import AgentTask, DeepAgentsRuntime, LangGraphRuntime, OpenAIAgentsRuntime
 from patchsmith.workflow import RepairRunner
 
 
@@ -123,6 +123,71 @@ def test_repair_runner_deepagents_runtime_emits_runtime_node_traces(tmp_path: Pa
     trace_text = result.trace_path.read_text(encoding="utf-8")
     assert "runtime.harness" in trace_text
     assert "runtime.todo" in trace_text
+    assert "runtime.review" in trace_text
+
+
+def test_openai_agents_runtime_generates_patch_with_adapter_trace(tmp_path: Path) -> None:
+    fixture = Path("evals/tasks/seeded_bugs_v1/task_001_logic_bug")
+    snapshot = clone_or_copy_repository(str(fixture / "repo"), tmp_path / "repo")
+    repo_index = index_repository(snapshot.repo_path)
+    issue_text = (fixture / "issue.md").read_text(encoding="utf-8")
+    contexts = HybridRetriever().retrieve(
+        repo_path=snapshot.repo_path,
+        repo_index=repo_index,
+        issue_text=issue_text,
+    )
+
+    result = OpenAIAgentsRuntime().run(
+        AgentTask(
+            run_id="test-run",
+            repo_path=str(snapshot.repo_path),
+            issue_text=issue_text,
+            retrieved_context=contexts,
+            test_command="python3 -m pytest",
+        )
+    )
+
+    assert result.status == "patch_generated"
+    assert result.patch_candidates[0].generation_strategy.startswith("openai_agents:")
+    assert "return left + right" in (snapshot.repo_path / "src/simple_calc.py").read_text(
+        encoding="utf-8"
+    )
+    assert [event["node"] for event in result.runtime_trace] == [
+        "harness",
+        "agent",
+        "guardrails",
+        "context",
+        "plan",
+        "edit",
+        "review",
+    ]
+    assert result.runtime_trace[0]["framework"] == "openai_agents"
+
+
+def test_repair_runner_openai_agents_runtime_emits_runtime_node_traces(
+    tmp_path: Path,
+) -> None:
+    fixture = Path("evals/tasks/seeded_bugs_v1/task_001_logic_bug")
+
+    result = RepairRunner(artifacts_dir=tmp_path / "artifacts").run(
+        RunRequest(
+            repo=str(fixture / "repo"),
+            issue_text=(fixture / "issue.md").read_text(encoding="utf-8"),
+            test_command="python3 -m pytest",
+            runtime="openai_agents",
+            context_provider="native_hybrid",
+            retrieval_strategy="native_hybrid",
+        )
+    )
+
+    assert result.test_result is not None
+    assert result.test_result.exit_code == 0
+    report = result.report_path.read_text(encoding="utf-8")
+    assert "Runtime: `openai_agents`" in report
+    trace_text = result.trace_path.read_text(encoding="utf-8")
+    assert "runtime.harness" in trace_text
+    assert "runtime.agent" in trace_text
+    assert "runtime.guardrails" in trace_text
     assert "runtime.review" in trace_text
 
 

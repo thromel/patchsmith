@@ -169,7 +169,7 @@ Supported runtimes:
 
 - `LangGraphRuntime`: primary production workflow,
 - `DeepAgentsRuntime`: dependency-gated adapter for DeepAgents-style scaffold comparison,
-- `OpenAIAgentsRuntime`: tool and guardrail comparison runtime,
+- `OpenAIAgentsRuntime`: dependency-gated OpenAI Agents SDK scaffold adapter,
 - `AgentlessRuntime`: baseline localization-repair-validation runtime,
 - `TreeSearchRuntime`: research mode for test-time exploration.
 

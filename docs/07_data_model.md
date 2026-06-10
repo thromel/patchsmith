@@ -78,7 +78,7 @@ Represents one issue-to-patch attempt.
 | snapshot_id | UUID | foreign key |
 | issue_url | string | optional |
 | issue_text | text | raw issue text |
-| runtime | string | langgraph, deepagents, agentless |
+| runtime | string | langgraph, deepagents, openai_agents, agentless |
 | retrieval_strategy | string | strategy name |
 | model_config | JSON | model settings |
 | status | string | lifecycle status |

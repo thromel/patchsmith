@@ -71,7 +71,7 @@ Secondary:
 | langgraph_fake_model | 1.00 | 1.00 | 0.00 | 482ms | 15.0 | 6.0 | 0 | 1.0 | 5.0 | offline JSON model-planner contract; no live provider |
 | deepagents | 1.00 | 1.00 | n/a | 465ms | 15.0 | 6.0 | 0 | 0.0 | 5.0 | dependency-gated adapter in offline compatibility mode; no live DeepAgents package/model execution |
 | deepagents_live | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | install optional extra and configure model provider before running |
-| openai_agents | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |  |
+| openai_agents | 1.00 | 1.00 | n/a | 466ms | 16.0 | 7.0 | 0 | 0.0 | 5.0 | dependency-gated OpenAI Agents SDK adapter in offline compatibility mode; no live Agents model execution |
 | tree_search | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |  |
 
 ## Qualitative analysis
@@ -90,7 +90,7 @@ Use LangGraph as the default runtime unless another scaffold demonstrates clear 
 
 ## Initial smoke result
 
-Date: 2026-06-09
+Date: 2026-06-10
 
 Aggregate command:
 
@@ -102,6 +102,7 @@ PYTHONPATH=src python3 -m patchsmith.cli eval-scaffold \
   --variant langgraph \
   --variant langgraph_fake_model \
   --variant deepagents \
+  --variant openai_agents \
   --context-provider native_hybrid \
   --output artifacts/experiments/scaffold_comparison_v1 \
   --json
@@ -115,10 +116,11 @@ Aggregate artifacts:
 
 Aggregate result:
 
-- scaffold count: 4,
+- scaffold count: 6,
 - agentless patch generated rate: 0.00,
-- heuristic, LangGraph heuristic, and LangGraph fake-model targeted test pass rate: 1.00,
+- heuristic, LangGraph heuristic, LangGraph fake-model, DeepAgents adapter, and OpenAI Agents adapter targeted test pass rate: 1.00,
 - LangGraph variants expose 15.0 average trace events, 6.0 average runtime nodes, and 1.0 retry-decision events per task,
+- OpenAI Agents adapter exposes 16.0 average trace events and 7.0 average runtime nodes per task,
 - offline fake-model provider: `offline_fake_model`,
 - total model cost: $0.00.
 
@@ -129,10 +131,11 @@ Nested repair reports:
 - `artifacts/experiments/scaffold_comparison_v1/langgraph/repair_report.md`
 - `artifacts/experiments/scaffold_comparison_v1/langgraph_fake_model/repair_report.md`
 - `artifacts/experiments/scaffold_comparison_v1/deepagents/repair_report.md`
+- `artifacts/experiments/scaffold_comparison_v1/openai_agents/repair_report.md`
 
 Interpretation:
 
-This proves the repair-evaluation plumbing, patch artifact loop, LangGraph orchestration trace shape including `analyze` and `retry`, DeepAgents adapter trace shape, model-planner JSON contract, provider/cost metadata plumbing, post-test repair outcome reporting, and trace-complexity measurement. It does not prove autonomous agent quality because current repair planners are deterministic or offline seeded-task baselines. The current DeepAgents row is adapter compatibility evidence; live DeepAgents package/model execution remains a follow-up.
+This proves the repair-evaluation plumbing, patch artifact loop, LangGraph orchestration trace shape including `analyze` and `retry`, DeepAgents adapter trace shape, OpenAI Agents SDK adapter trace shape, model-planner JSON contract, provider/cost metadata plumbing, post-test repair outcome reporting, and trace-complexity measurement. It does not prove autonomous agent quality because current repair planners are deterministic or offline seeded-task baselines. The current DeepAgents and OpenAI Agents rows are adapter compatibility evidence; live package/model execution remains a follow-up.
 
 ## Follow-up
 

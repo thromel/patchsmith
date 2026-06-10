@@ -2023,6 +2023,7 @@ def _demo_commands() -> list[str]:
             "--dataset evals/tasks/seeded_bugs_v1 "
             "--variant agentless --variant heuristic --variant langgraph "
             "--variant langgraph_fake_model --variant deepagents "
+            "--variant openai_agents "
             "--context-provider native_hybrid "
             "--output artifacts/experiments/scaffold_comparison_v1 --json"
         ),
@@ -2125,10 +2126,11 @@ def _demo_script_sections(readiness: DemoReadinessReport) -> list[DemoScriptSect
             artifact="artifacts/experiments/scaffold_comparison_v1/scaffold_report.md",
             narration=(
                 "The scaffold comparison keeps Agentless, heuristic, LangGraph, "
-                "LangGraph fake-model, and the DeepAgents adapter under the same seeded "
-                "task set and context provider. The important interview story is that "
-                "quality, latency, trace complexity, and debuggability are measured "
-                "together instead of treated as separate anecdotes."
+                "LangGraph fake-model, DeepAgents, and OpenAI Agents SDK adapters "
+                "under the same seeded task set and context provider. The important "
+                "interview story is that quality, latency, trace complexity, and "
+                "debuggability are measured together instead of treated as separate "
+                "anecdotes."
             ),
         ),
         DemoScriptSection(

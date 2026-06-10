@@ -116,7 +116,7 @@ PYTHONPATH=src python3 -m patchsmith.cli live-calibration \
   --json
 ```
 
-Current live calibration readiness output is `not_configured`: the OpenAI SDK is importable locally, but `OPENAI_API_KEY` is not set and saved provider evidence is offline-only. DeepAgents has 10 saved package-backed adapter smoke runs and 20 compatibility-mode runs; this proves optional-package import compatibility, not live DeepAgents model quality.
+Current live calibration readiness output is `not_configured`: the OpenAI SDK is importable locally, but `OPENAI_API_KEY` is not set and saved provider evidence is offline-only. DeepAgents has 10 saved package-backed adapter smoke runs and 30 compatibility-mode runs; this proves optional-package import compatibility, not live DeepAgents model quality. OpenAI Agents SDK now has an offline adapter smoke and scaffold lane, but the `agents` package is not importable in the current shell and no live model evidence exists.
 
 Generate the final evaluation narrative:
 
@@ -128,7 +128,7 @@ PYTHONPATH=src python3 -m patchsmith.cli final-evaluation \
   --json
 ```
 
-Current final evaluation output has `ready_with_caveats`, 26 normalized metric rows, eight decision bullets, and five limitations. Use it as the public-claim boundary for the offline seeded-suite portfolio demo.
+Current final evaluation output has `ready_with_caveats`, 28 normalized metric rows, eight decision bullets, and five limitations. Use it as the public-claim boundary for the offline seeded-suite portfolio demo.
 
 Generate the release hygiene report:
 
@@ -212,7 +212,7 @@ Focus:
 ```text
 Built PatchSmith Research, an AI software-maintenance agent that converts GitHub issues into tested patch diffs using LangGraph orchestration, hybrid code retrieval, opt-in Docker sandboxing, and evaluation-driven development.
 
-Implemented a research harness comparing Agentless, LangGraph, a DeepAgents adapter, and patch-search scaffolds across success rate, retrieval hit rate, cost, latency, and failure modes.
+Implemented a research harness comparing Agentless, LangGraph, DeepAgents, OpenAI Agents SDK, and patch-search scaffolds across success rate, retrieval hit rate, cost, latency, and failure modes.
 
 Designed a Code Context Graph combining files, symbols, imports, tests, stack traces, and retrieval signals to improve fault-localization analysis over simple embeddings.
 

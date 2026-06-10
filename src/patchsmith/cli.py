@@ -201,7 +201,14 @@ def main(argv: list[str] | None = None) -> int:
         results = run_scaffold_comparison(
             dataset_dir=Path(args.dataset),
             variants=args.variant
-            or ["agentless", "heuristic", "langgraph", "langgraph_fake_model", "deepagents"],
+            or [
+                "agentless",
+                "heuristic",
+                "langgraph",
+                "langgraph_fake_model",
+                "deepagents",
+                "openai_agents",
+            ],
             context_provider=args.context_provider,
             output_dir=Path(args.output),
             sandbox_mode=args.sandbox_mode,
@@ -585,7 +592,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--test-command", help="Allowed test command to run in the sandbox.")
     run.add_argument(
         "--runtime",
-        choices=["agentless", "heuristic", "langgraph", "deepagents"],
+        choices=["agentless", "heuristic", "langgraph", "deepagents", "openai_agents"],
         default="agentless",
         help="Runtime label for the run report.",
     )
@@ -674,7 +681,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     eval_repair.add_argument(
         "--runtime",
-        choices=["agentless", "heuristic", "langgraph", "deepagents"],
+        choices=["agentless", "heuristic", "langgraph", "deepagents", "openai_agents"],
         default="heuristic",
         help="Runtime to evaluate.",
     )
@@ -715,7 +722,14 @@ def build_parser() -> argparse.ArgumentParser:
     eval_scaffold.add_argument(
         "--variant",
         action="append",
-        choices=["agentless", "heuristic", "langgraph", "langgraph_fake_model", "deepagents"],
+        choices=[
+            "agentless",
+            "heuristic",
+            "langgraph",
+            "langgraph_fake_model",
+            "deepagents",
+            "openai_agents",
+        ],
         default=[],
         help="Scaffold variant to evaluate. Repeat for multiple variants.",
     )

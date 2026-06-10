@@ -20,6 +20,10 @@ The process of selecting and formatting retrieved repository context for model i
 
 An experimental runtime adapter for DeepAgents-style high-level scaffold behavior. Current local evidence uses dependency-gated offline compatibility mode; live DeepAgents package/model execution is a separate calibration step.
 
+## OpenAI Agents runtime
+
+An experimental runtime adapter for the OpenAI Agents SDK scaffold. Current local evidence uses dependency-gated offline compatibility mode behind PatchSmith's bounded planner/edit contract; live OpenAI Agents package/model execution is a separate calibration step.
+
 ## Evaluation harness
 
 The system that runs tasks across configurations and records metrics, artifacts, and reports.

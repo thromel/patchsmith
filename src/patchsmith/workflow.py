@@ -30,6 +30,7 @@ from patchsmith.runtime import (
     DeepAgentsRuntime,
     HeuristicRuntime,
     LangGraphRuntime,
+    OpenAIAgentsRuntime,
 )
 from patchsmith.sandbox import create_sandbox_runner
 from patchsmith.tracing import RunTrace
@@ -355,11 +356,13 @@ def _runtime_for(runtime_name: str, planner_name: str) -> AgentRuntime:
         return LangGraphRuntime(planner=_planner_for(planner_name))
     if runtime_name == "deepagents":
         return DeepAgentsRuntime(planner=_planner_for(planner_name))
+    if runtime_name == "openai_agents":
+        return OpenAIAgentsRuntime(planner=_planner_for(planner_name))
     if runtime_name == "heuristic":
         if planner_name != "heuristic":
             raise ValueError(
                 "non-heuristic planners are currently supported only by langgraph "
-                "and deepagents runtimes"
+                "deepagents, and openai_agents runtimes"
             )
         return HeuristicRuntime()
     return AgentlessRuntime()

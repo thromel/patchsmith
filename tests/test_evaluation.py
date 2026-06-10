@@ -178,7 +178,7 @@ def test_run_repair_evaluation_langgraph_fake_model_tracks_usage(tmp_path: Path)
 def test_run_scaffold_comparison_writes_outputs(tmp_path: Path) -> None:
     results = run_scaffold_comparison(
         dataset_dir=Path("evals/tasks/seeded_bugs_v1"),
-        variants=["agentless", "heuristic", "deepagents"],
+        variants=["agentless", "heuristic", "deepagents", "openai_agents"],
         context_provider="native_hybrid",
         output_dir=tmp_path / "scaffold_comparison",
     )
@@ -190,12 +190,16 @@ def test_run_scaffold_comparison_writes_outputs(tmp_path: Path) -> None:
     assert by_scaffold["heuristic"].targeted_test_pass_rate == 1.0
     assert by_scaffold["deepagents"].patch_generated_rate == 1.0
     assert by_scaffold["deepagents"].targeted_test_pass_rate == 1.0
+    assert by_scaffold["openai_agents"].patch_generated_rate == 1.0
+    assert by_scaffold["openai_agents"].targeted_test_pass_rate == 1.0
     assert by_scaffold["agentless"].avg_runtime_nodes == 0.0
     assert by_scaffold["agentless"].avg_debuggability_score == 4.0
     assert by_scaffold["heuristic"].avg_runtime_nodes > 0
     assert by_scaffold["heuristic"].avg_debuggability_score == 5.0
     assert by_scaffold["deepagents"].avg_runtime_nodes >= 6.0
     assert by_scaffold["deepagents"].avg_debuggability_score == 5.0
+    assert by_scaffold["openai_agents"].avg_runtime_nodes >= 7.0
+    assert by_scaffold["openai_agents"].avg_debuggability_score == 5.0
     assert (tmp_path / "scaffold_comparison" / "scaffold_report.md").exists()
     assert (tmp_path / "scaffold_comparison" / "scaffold_results.csv").exists()
     results_json = json.loads(
@@ -212,6 +216,7 @@ def test_run_scaffold_comparison_writes_outputs(tmp_path: Path) -> None:
     assert "agentless" in report
     assert "heuristic" in report
     assert "deepagents" in report
+    assert "openai_agents" in report
     assert "dependency-gated adapter evidence" in report
 
 

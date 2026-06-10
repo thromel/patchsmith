@@ -138,13 +138,30 @@ PYTHONPATH=src python3 -m patchsmith.cli eval-scaffold \
   --variant langgraph \
   --variant langgraph_fake_model \
   --variant deepagents \
+  --variant openai_agents \
   --context-provider native_hybrid \
   --output artifacts/experiments/scaffold_comparison_v1 \
   --json
 ```
 
 The scaffold report includes patch/test rates, latency, trace event counts, runtime node counts, failed trace events, retry events, and a 0-5 debug score.
-The `deepagents` variant currently uses PatchSmith's dependency-gated DeepAgents adapter in offline compatibility mode unless the optional `deepagents` extra is installed.
+The `deepagents` and `openai_agents` variants currently use PatchSmith's dependency-gated adapters in offline compatibility mode unless their optional extras are installed.
+
+OpenAI Agents SDK adapter smoke:
+
+```bash
+python -m pip install -e ".[dev,openai-agents]"
+
+PYTHONPATH=src python3 -m patchsmith.cli eval-repair \
+  --dataset evals/tasks/seeded_bugs_v1 \
+  --runtime openai_agents \
+  --planner heuristic \
+  --context-provider native_hybrid \
+  --output artifacts/experiments/openai_agents_adapter_smoke_v1 \
+  --json
+```
+
+This proves the `openai-agents` import boundary and PatchSmith adapter contract when the extra is installed. It does not prove live OpenAI Agents model quality unless credentials, model config, and non-offline provider metadata are present.
 
 Patch-search evaluation:
 

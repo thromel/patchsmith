@@ -219,6 +219,7 @@ SCAFFOLD_VARIANTS: dict[str, ScaffoldVariant] = {
     "langgraph": ScaffoldVariant("langgraph", "langgraph", "heuristic"),
     "langgraph_fake_model": ScaffoldVariant("langgraph_fake_model", "langgraph", "fake_model"),
     "deepagents": ScaffoldVariant("deepagents", "deepagents", "heuristic"),
+    "openai_agents": ScaffoldVariant("openai_agents", "openai_agents", "heuristic"),
 }
 
 
@@ -1423,6 +1424,15 @@ def render_repair_eval_report(
                 "`deepagents` extra and live model provider are configured."
             ),
         )
+    if summary.runtime == "openai_agents":
+        lines.insert(
+            -1,
+            (
+                "- The `openai_agents` runtime row is dependency-gated adapter evidence; "
+                "local runs use offline compatibility mode unless the optional "
+                "`openai-agents` extra and live model provider are configured."
+            ),
+        )
     return "\n".join(lines)
 
 
@@ -1501,6 +1511,15 @@ def render_scaffold_comparison_report(
             (
                 "- The `deepagents` row is dependency-gated adapter evidence; local "
                 "runs use offline compatibility mode unless the optional `deepagents` "
+                "extra and live model provider are configured."
+            ),
+        )
+    if any(result.scaffold == "openai_agents" for result in results):
+        lines.insert(
+            -1,
+            (
+                "- The `openai_agents` row is dependency-gated adapter evidence; local "
+                "runs use offline compatibility mode unless the optional `openai-agents` "
                 "extra and live model provider are configured."
             ),
         )

@@ -103,7 +103,7 @@ The repository now includes a runnable Python scaffold for the first half of the
 issue input -> repo copy/clone -> context broker -> file index -> retrieval metrics -> command policy -> test run -> trace/report artifacts
 ```
 
-Deterministic patch generation is wired for seeded smoke tasks. The current runtimes are `agentless`, `heuristic`, `langgraph`, and `deepagents`; LangGraph supports planner selection with `heuristic`, `fake_model`, and `openai`, while the DeepAgents adapter currently runs in an offline compatibility mode unless the optional `deepagents` extra is installed. The `fake_model` planner exercises the prompt/JSON model-backed planning seam offline, validates that model output targets retrieved repo-relative paths, and keeps local evals credential-free. The `openai` planner uses the OpenAI Responses API only when credentials are configured. The context layer supports native keyword retrieval, native hybrid retrieval, native graph retrieval, and a ctxhelm CLI broker. Test execution defaults to the local command-policy sandbox for developer speed, and `--sandbox-mode docker` selects the Docker runner for stronger process and environment isolation. Saved experiment and run artifacts can be summarized with a static artifact index for demo and review.
+Deterministic patch generation is wired for seeded smoke tasks. The current runtimes are `agentless`, `heuristic`, `langgraph`, `deepagents`, and `openai_agents`; LangGraph supports planner selection with `heuristic`, `fake_model`, and `openai`, while the DeepAgents and OpenAI Agents SDK adapters run in offline compatibility mode unless their optional extras are installed. The `fake_model` planner exercises the prompt/JSON model-backed planning seam offline, validates that model output targets retrieved repo-relative paths, and keeps local evals credential-free. The `openai` planner uses the OpenAI Responses API only when credentials are configured. The context layer supports native keyword retrieval, native hybrid retrieval, native graph retrieval, and a ctxhelm CLI broker. Test execution defaults to the local command-policy sandbox for developer speed, and `--sandbox-mode docker` selects the Docker runner for stronger process and environment isolation. Saved experiment and run artifacts can be summarized with a static artifact index for demo and review.
 
 ## Quickstart
 
@@ -279,12 +279,29 @@ PYTHONPATH=src python3 -m patchsmith.cli eval-scaffold \
   --variant langgraph \
   --variant langgraph_fake_model \
   --variant deepagents \
+  --variant openai_agents \
   --context-provider native_hybrid \
   --output artifacts/experiments/scaffold_comparison_v1 \
   --json
 ```
 
 Latest comparison evidence is saved in `artifacts/experiments/scaffold_comparison_v1/scaffold_report.md`.
+
+Run the OpenAI Agents SDK adapter smoke:
+
+```bash
+python -m pip install -e ".[dev,openai-agents]"
+
+PYTHONPATH=src python3 -m patchsmith.cli eval-repair \
+  --dataset evals/tasks/seeded_bugs_v1 \
+  --runtime openai_agents \
+  --planner heuristic \
+  --context-provider native_hybrid \
+  --output artifacts/experiments/openai_agents_adapter_smoke_v1 \
+  --json
+```
+
+The adapter imports the optional `openai-agents` package as `agents` when installed, but the saved local smoke is adapter-contract evidence, not live OpenAI Agents model quality.
 
 Run the patch-search ablation:
 
@@ -349,7 +366,7 @@ PYTHONPATH=src python3 -m patchsmith.cli live-calibration \
   --json
 ```
 
-Latest live calibration readiness evidence is saved in `artifacts/experiments/calibration_readiness.md` and `artifacts/experiments/calibration_readiness.json`. Current status is `not_configured`: the OpenAI SDK is importable, but `OPENAI_API_KEY` is not set and saved model-provider evidence is still offline-only. DeepAgents now has 10 saved package-backed adapter smoke runs, while the current shell still does not import `deepagents`.
+Latest live calibration readiness evidence is saved in `artifacts/experiments/calibration_readiness.md` and `artifacts/experiments/calibration_readiness.json`. Current status is `not_configured`: the OpenAI SDK is importable, but `OPENAI_API_KEY` is not set and saved model-provider evidence is still offline-only. DeepAgents now has 10 saved package-backed adapter smoke runs, while the current shell still does not import `deepagents`. OpenAI Agents SDK has saved offline adapter smoke evidence, but the current shell still does not import `agents`.
 
 Run DeepAgents with the optional package installed:
 
@@ -449,7 +466,7 @@ When those rates are set, reports estimate model cost from provider token usage.
 
 ## Next engineering wedges
 
-The context broker boundary, retrieval eval runner, repair eval runner, scaffold comparison runner, patch-search evaluator, static artifact index/dashboard with normalized metrics and generated run-detail trace pages, failure review report, demo readiness report, live calibration readiness report, generated demo script, final evaluation report, release hygiene report, deterministic heuristic runtime, LangGraph orchestration runtime, DeepAgents adapter compatibility mode plus package-backed smoke evidence, offline model-planner seam, credential-gated OpenAI Responses client, and Python Code Context Graph v0 now exist. The current seeded suite has 10 tasks and compares `native`, `native_hybrid`, `native_graph`, and `ctxhelm_cli` for retrieval, including aggregate context packing metadata. Scaffold comparison now includes trace complexity and debuggability metrics. The next useful development step is resolving the remaining live-provider warning, harder patch-search tasks with model-diverse candidates, or live-provider calibration when credentials and budget are explicitly available.
+The context broker boundary, retrieval eval runner, repair eval runner, scaffold comparison runner, patch-search evaluator, static artifact index/dashboard with normalized metrics and generated run-detail trace pages, failure review report, demo readiness report, live calibration readiness report, generated demo script, final evaluation report, release hygiene report, deterministic heuristic runtime, LangGraph orchestration runtime, DeepAgents adapter compatibility mode plus package-backed smoke evidence, OpenAI Agents SDK adapter compatibility mode, offline model-planner seam, credential-gated OpenAI Responses client, and Python Code Context Graph v0 now exist. The current seeded suite has 10 tasks and compares `native`, `native_hybrid`, `native_graph`, and `ctxhelm_cli` for retrieval, including aggregate context packing metadata. Scaffold comparison now includes trace complexity and debuggability metrics. The next useful development step is resolving the remaining live-provider warning, harder patch-search tasks with model-diverse candidates, or live-provider calibration when credentials and budget are explicitly available.
 
 The current LangGraph repair skeleton is:
 

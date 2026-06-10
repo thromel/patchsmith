@@ -409,7 +409,7 @@ In scope:
 
 Out of scope:
 
-- DeepAgents and OpenAI Agents SDK unless the baseline comparison is stable.
+- Tree-search runtime unless the adapter baseline comparison is stable.
 
 Acceptance criteria:
 
@@ -419,7 +419,7 @@ Acceptance criteria:
 
 Current status:
 
-Started. `eval-scaffold` now compares multiple repair scaffolds under the same dataset, context provider, sandbox, and repair-evaluation metrics. The comparison includes `agentless`, `heuristic`, `langgraph`, `langgraph_fake_model`, and the dependency-gated `deepagents` adapter in offline compatibility mode; each scaffold also keeps its own nested repair report and run artifacts.
+Started. `eval-scaffold` now compares multiple repair scaffolds under the same dataset, context provider, sandbox, and repair-evaluation metrics. The comparison includes `agentless`, `heuristic`, `langgraph`, `langgraph_fake_model`, the dependency-gated `deepagents` adapter, and the dependency-gated `openai_agents` adapter in offline compatibility mode; each scaffold also keeps its own nested repair report and run artifacts.
 
 Latest verification command:
 
@@ -431,6 +431,7 @@ PYTHONPATH=src python3 -m patchsmith.cli eval-scaffold \
   --variant langgraph \
   --variant langgraph_fake_model \
   --variant deepagents \
+  --variant openai_agents \
   --context-provider native_hybrid \
   --output artifacts/experiments/scaffold_comparison_v1 \
   --json
@@ -444,6 +445,7 @@ Latest evidence:
 - `langgraph`: patch generated 1.00, targeted tests passed 1.00, average latency 512ms, average trace events 15.0, runtime nodes 6.0, retries 1.0, debug score 5.0,
 - `langgraph_fake_model`: patch generated 1.00, targeted tests passed 1.00, average latency 482ms, average trace events 15.0, runtime nodes 6.0, retries 1.0, debug score 5.0, model provider `offline_fake_model`, cost $0.00,
 - `deepagents`: patch generated 1.00, targeted tests passed 1.00, average latency 465ms, average trace events 15.0, runtime nodes 6.0, retries 0.0, debug score 5.0; current evidence uses offline adapter compatibility mode, not live DeepAgents package/model execution.
+- `openai_agents`: patch generated 1.00, targeted tests passed 1.00, average latency 466ms, average trace events 16.0, runtime nodes 7.0, retries 0.0, debug score 5.0; current evidence uses offline adapter compatibility mode, not live OpenAI Agents package/model execution.
 
 ### Sprint 8: Multi-Candidate Patch Search
 
@@ -589,7 +591,7 @@ Acceptance criteria:
 
 Current status:
 
-Started. The README now surfaces current seeded-suite metrics, limitations, scaffold comparison, artifact dashboard generation, failure report generation, demo readiness generation, live calibration readiness generation, demo script generation, demo media generation, final evaluation generation, and release hygiene generation. The failure-analysis surface is generated from saved traces through `inspect-failures`, the launch review surface is generated through `demo-readiness`, the live-provider readiness surface is generated through `live-calibration`, the timed recording script is generated through `demo-script`, demo media is generated through `demo-media`, the portfolio-facing evaluation narrative is generated through `final-evaluation`, and release checks are generated through `release-hygiene`. Current readiness is `ready_with_caveats`: offline seeded-suite evidence is coherent, but live LLM calibration is not present beyond `offline_fake_model` metadata. Current live calibration readiness is `not_configured`: no `OPENAI_API_KEY`, 10 saved DeepAgents package-backed adapter runs, 20 compatibility-mode runs, and no saved non-offline provider rows. Current release hygiene is `ready_with_warnings` after restoring local Git metadata. CI workflow coverage, a Mermaid architecture diagram, and SVG/PNG demo media now exist. The remaining Sprint 10 work is running live-provider calibration when credentials and budget are available.
+Started. The README now surfaces current seeded-suite metrics, limitations, scaffold comparison, artifact dashboard generation, failure report generation, demo readiness generation, live calibration readiness generation, demo script generation, demo media generation, final evaluation generation, and release hygiene generation. The failure-analysis surface is generated from saved traces through `inspect-failures`, the launch review surface is generated through `demo-readiness`, the live-provider readiness surface is generated through `live-calibration`, the timed recording script is generated through `demo-script`, demo media is generated through `demo-media`, the portfolio-facing evaluation narrative is generated through `final-evaluation`, and release checks are generated through `release-hygiene`. Current readiness is `ready_with_caveats`: offline seeded-suite evidence is coherent, but live LLM calibration is not present beyond `offline_fake_model` metadata. Current live calibration readiness is `not_configured`: no `OPENAI_API_KEY`, 10 saved DeepAgents package-backed adapter runs, 30 compatibility-mode runs, OpenAI Agents adapter smoke evidence in offline compatibility mode, and no saved non-offline provider rows. Current release hygiene is `ready_with_warnings` after restoring local Git metadata. CI workflow coverage, a Mermaid architecture diagram, and SVG/PNG demo media now exist. The remaining Sprint 10 work is running live-provider calibration when credentials and budget are available.
 
 Latest verification command:
 
@@ -654,14 +656,14 @@ Latest evidence:
 - live calibration readiness: `not_configured`,
 - release hygiene status: `ready_with_warnings`,
 - release hygiene checks: 10 passed, 1 warning, 0 blockers,
-- indexed experiments: 13,
-- indexed saved runs: 363,
-- normalized metric rows: 26,
-- runs requiring attention: 62,
+- indexed experiments: 14,
+- indexed saved runs: 433,
+- normalized metric rows: 28,
+- runs requiring attention: 72,
 - model providers: `offline_fake_model` 23,
 - saved live-provider runs: 0,
 - DeepAgents package-backed runs: 10,
-- DeepAgents compatibility-mode runs: 20,
+- DeepAgents compatibility-mode runs: 30,
 - demo script sections: 6,
 - demo script target duration: 3m 10s,
 - demo media: SVG and PNG generated from saved evidence,
