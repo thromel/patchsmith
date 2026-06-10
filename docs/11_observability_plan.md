@@ -221,6 +221,7 @@ The MVP must record:
 - generated run-detail pages for current demo runs,
 - failure review report with repair-outcome categories and links back to run artifacts,
 - demo readiness report with launch gates, caveats, and regeneration commands,
+- live calibration plan with credential-gated run matrix, commands, and claim boundaries,
 - generated demo script with timed segments and artifact review path,
 - generated demo media assets for README or presentation use,
 - final evaluation report with decisions, limitations, metric rows, and claim boundaries,
@@ -239,6 +240,7 @@ The MVP must record:
 - artifact index table,
 - failure analysis report.
 - demo readiness report.
+- live calibration plan.
 - demo script.
 - demo media.
 - final evaluation report.

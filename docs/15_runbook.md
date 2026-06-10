@@ -422,6 +422,18 @@ PYTHONPATH=src python3 -m patchsmith.cli live-calibration \
 
 The live calibration readiness report checks whether the OpenAI SDK is importable, credentials are configured, cost-rate environment variables are present, the optional DeepAgents package is importable in the current shell, saved DeepAgents traces prove package-backed adapter execution, and saved artifacts contain non-offline provider metadata. `not_configured` means live calibration has not been run and public claims must stay scoped to offline seeded-suite evidence.
 
+Live calibration execution plan:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli live-calibration-plan \
+  --artifacts-dir artifacts \
+  --output artifacts/experiments/live_calibration_plan.md \
+  --json-output artifacts/experiments/live_calibration_plan.json \
+  --json
+```
+
+The plan records the required single-task live OpenAI smoke, follow-up seeded-suite eval, optional package-adapter refreshes, success evidence, and claim boundaries. `blocked` means prerequisites are missing and the plan itself must not be cited as live LLM evidence.
+
 DeepAgents package-backed adapter smoke:
 
 ```bash
@@ -667,6 +679,7 @@ Run:
 - demo media regeneration,
 - final evaluation report regeneration,
 - launch blocker backlog regeneration,
+- live calibration plan regeneration,
 - focused public issue setup-execution regeneration,
 - focused public issue setup-validation regeneration,
 - release hygiene report regeneration,

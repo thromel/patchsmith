@@ -755,6 +755,12 @@ PYTHONPATH=src python3 -m patchsmith.cli live-calibration \
   --json-output artifacts/experiments/calibration_readiness.json \
   --json
 
+PYTHONPATH=src python3 -m patchsmith.cli live-calibration-plan \
+  --artifacts-dir artifacts \
+  --output artifacts/experiments/live_calibration_plan.md \
+  --json-output artifacts/experiments/live_calibration_plan.json \
+  --json
+
 PYTHONPATH=src python3 -m patchsmith.cli demo-script \
   --artifacts-dir artifacts \
   --output artifacts/experiments/demo_script.md \
@@ -789,6 +795,8 @@ Latest evidence:
 - `artifacts/experiments/demo_readiness.json`,
 - `artifacts/experiments/calibration_readiness.md`,
 - `artifacts/experiments/calibration_readiness.json`,
+- `artifacts/experiments/live_calibration_plan.md`,
+- `artifacts/experiments/live_calibration_plan.json`,
 - `artifacts/experiments/demo_script.md`,
 - `artifacts/experiments/demo_script.json`,
 - `artifacts/experiments/demo_media.md`,
@@ -807,11 +815,12 @@ Latest evidence:
 - `artifacts/experiments/release_hygiene.json`,
 - readiness status: `ready_with_caveats`,
 - live calibration readiness: `not_configured`,
+- live calibration plan: `blocked`,
 - launch blocker status: `blocked`,
 - launch blockers: 2,
 - launch warnings: 2,
 - release hygiene status: `ready_with_warnings`,
-- release hygiene checks: generated review artifacts include launch blockers, public issue context preview, task materialization validation/readiness, focused-test planning, focused-test run, focused-test diagnosis, focused-test setup-plan, setup-readiness, setup-execution, and setup-validation evidence; live LLM calibration remains the only warning,
+- release hygiene checks: generated review artifacts include live-calibration planning, launch blockers, public issue context preview, task materialization validation/readiness, focused-test planning, focused-test run, focused-test diagnosis, focused-test setup-plan, setup-readiness, setup-execution, and setup-validation evidence; live LLM calibration remains the only warning,
 - indexed experiments: 16,
 - indexed saved runs: 443,
 - normalized metric rows: 29,
@@ -858,6 +867,7 @@ Reason:
 | S10-T8 | Setup execution | PatchSmith | `execute-focused-test-setups` command plus readiness-gated dry-run/execution evidence |
 | S10-T9 | Setup policy | PatchSmith | Docker-only editable-install policy behind explicit dependency-install and network flags |
 | S10-T10 | Setup validation | PatchSmith | `validate-focused-test-setups` command plus post-setup validation dry-run/execution evidence |
+| S10-T11 | Live calibration planning | PatchSmith | `live-calibration-plan` command plus credential-gated live-run matrix and claim boundaries |
 
 ## Completed Sprint 9 task breakdown
 

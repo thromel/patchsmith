@@ -35,6 +35,7 @@ from patchsmith.portfolio import (
     write_docker_smoke_report,
     write_final_evaluation_report,
     write_launch_blocker_report,
+    write_live_calibration_plan_report,
     write_live_calibration_report,
     write_mvp_progress_report,
     write_release_hygiene_report,
@@ -931,6 +932,45 @@ def main(argv: list[str] | None = None) -> int:
                 f"Saved live-provider runs: {report.saved_live_provider_count} "
                 f"DeepAgents package runs: {report.deepagents_package_run_count} "
                 f"OpenAI Agents package runs: {report.openai_agents_package_run_count}"
+            )
+        return 0
+
+    if args.command == "live-calibration-plan":
+        json_output_path = Path(args.json_output) if args.json_output else None
+        report = write_live_calibration_plan_report(
+            artifacts_dir=Path(args.artifacts_dir),
+            output_path=Path(args.output),
+            json_output_path=json_output_path,
+        )
+        ready_runs = sum(1 for run in report.runs if run.status == "ready")
+        blocked_runs = sum(1 for run in report.runs if run.status == "blocked")
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "artifacts_dir": report.artifacts_dir,
+                        "generated_at": report.generated_at,
+                        "plan_status": report.plan_status,
+                        "calibration_status": report.calibration_status,
+                        "saved_live_provider_count": report.saved_live_provider_count,
+                        "run_count": len(report.runs),
+                        "ready_runs": ready_runs,
+                        "blocked_runs": blocked_runs,
+                        "report_path": str(Path(args.output)),
+                        "json_path": str(json_output_path) if json_output_path else None,
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(f"Live calibration plan: {Path(args.output)}")
+            if json_output_path:
+                print(f"JSON: {json_output_path}")
+            print(
+                f"Status: {report.plan_status} "
+                f"Runs: {len(report.runs)} "
+                f"Ready: {ready_runs} "
+                f"Blocked: {blocked_runs}"
             )
         return 0
 
@@ -1897,6 +1937,31 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional JSON live calibration readiness report output path.",
     )
     live_calibration.add_argument("--json", action="store_true", help="Print JSON summary.")
+
+    live_calibration_plan = subparsers.add_parser(
+        "live-calibration-plan",
+        help="Generate an executable live-provider calibration plan.",
+    )
+    live_calibration_plan.add_argument(
+        "--artifacts-dir",
+        default="artifacts",
+        help="Root artifact directory to scan for saved provider evidence.",
+    )
+    live_calibration_plan.add_argument(
+        "--output",
+        default="artifacts/experiments/live_calibration_plan.md",
+        help="Markdown live calibration plan output path.",
+    )
+    live_calibration_plan.add_argument(
+        "--json-output",
+        default="artifacts/experiments/live_calibration_plan.json",
+        help="Optional JSON live calibration plan output path.",
+    )
+    live_calibration_plan.add_argument(
+        "--json",
+        action="store_true",
+        help="Print JSON summary.",
+    )
 
     docker_smoke = subparsers.add_parser(
         "docker-smoke",

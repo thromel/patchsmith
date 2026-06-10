@@ -9,6 +9,7 @@ from patchsmith.portfolio import (
     write_demo_script_report,
     write_docker_smoke_report,
     write_launch_blocker_report,
+    write_live_calibration_plan_report,
     write_live_calibration_report,
     write_mvp_progress_report,
 )
@@ -54,6 +55,8 @@ def _write_release_hygiene_fixture(project_root: Path, artifacts_dir: Path) -> N
         "experiments/demo_readiness.json",
         "experiments/calibration_readiness.md",
         "experiments/calibration_readiness.json",
+        "experiments/live_calibration_plan.md",
+        "experiments/live_calibration_plan.json",
         "experiments/launch_blockers.md",
         "experiments/launch_blockers.json",
         "experiments/public_issue_corpus_v1/corpus_report.md",
@@ -436,6 +439,58 @@ def test_demo_readiness_report_summarizes_launch_evidence(
     assert cli_calibration_payload["openai_agents_package_run_count"] == 0
     assert cli_calibration_output.exists()
 
+    calibration_plan_output = tmp_path / "live_calibration_plan.md"
+    calibration_plan_json_output = tmp_path / "live_calibration_plan.json"
+    calibration_plan = write_live_calibration_plan_report(
+        artifacts_dir=artifacts_dir,
+        output_path=calibration_plan_output,
+        json_output_path=calibration_plan_json_output,
+        environment={},
+        package_availability={"openai": True, "deepagents": False, "agents": False},
+    )
+    assert calibration_plan.plan_status == "blocked"
+    assert calibration_plan.credentials_configured is False
+    assert len(calibration_plan.runs) == 4
+    assert calibration_plan.runs[0].status == "blocked"
+    assert calibration_plan.runs[0].requires_credentials
+    assert "--planner openai" in calibration_plan.runs[0].command
+    assert calibration_plan.runs[1].status == "blocked"
+    plan_text = calibration_plan_output.read_text(encoding="utf-8")
+    assert "# PatchSmith Live Calibration Plan" in plan_text
+    assert "does not prove live model execution" in plan_text
+    plan_payload = json.loads(calibration_plan_json_output.read_text(encoding="utf-8"))
+    assert plan_payload["plan_status"] == "blocked"
+
+    ready_plan = write_live_calibration_plan_report(
+        artifacts_dir=artifacts_dir,
+        output_path=tmp_path / "ready_live_calibration_plan.md",
+        environment={"OPENAI_API_KEY": "test-key"},
+        package_availability={"openai": True, "deepagents": True, "agents": True},
+    )
+    assert ready_plan.plan_status == "ready_to_run"
+    assert ready_plan.runs[0].status == "ready"
+    assert ready_plan.runs[1].status == "waiting_for_smoke"
+
+    cli_calibration_plan_output = tmp_path / "cli_live_calibration_plan.md"
+    cli_calibration_plan_json_output = tmp_path / "cli_live_calibration_plan.json"
+    exit_code = main(
+        [
+            "live-calibration-plan",
+            "--artifacts-dir",
+            str(artifacts_dir),
+            "--output",
+            str(cli_calibration_plan_output),
+            "--json-output",
+            str(cli_calibration_plan_json_output),
+            "--json",
+        ]
+    )
+    assert exit_code == 0
+    cli_calibration_plan_payload = json.loads(capsys.readouterr().out)
+    assert cli_calibration_plan_payload["run_count"] == 4
+    assert cli_calibration_plan_payload["plan_status"] in {"blocked", "ready_to_run"}
+    assert cli_calibration_plan_output.exists()
+
     script_output = tmp_path / "demo_script.md"
     script_json_output = tmp_path / "demo_script.json"
     script = write_demo_script_report(
@@ -602,6 +657,8 @@ def test_demo_readiness_report_summarizes_launch_evidence(
         "experiments/demo_readiness.json",
         "experiments/calibration_readiness.md",
         "experiments/calibration_readiness.json",
+        "experiments/live_calibration_plan.md",
+        "experiments/live_calibration_plan.json",
         "experiments/launch_blockers.md",
         "experiments/launch_blockers.json",
         "experiments/public_issue_corpus_v1/corpus_report.md",

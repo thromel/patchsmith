@@ -108,6 +108,54 @@ class LiveCalibrationReport:
 
 
 @dataclass(frozen=True)
+class LiveCalibrationPlanRun:
+    name: str
+    stage: str
+    status: str
+    runtime: str
+    planner: str
+    context_provider: str
+    output_path: str
+    requires_credentials: bool
+    command: str
+    success_evidence: str
+    claim_boundary: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class LiveCalibrationPlanReport:
+    artifacts_dir: str
+    generated_at: str
+    plan_status: str
+    calibration_status: str
+    saved_live_provider_count: int
+    credentials_configured: bool
+    model: str
+    cost_rates_configured: bool
+    runs: list[LiveCalibrationPlanRun]
+    prerequisites: list[LiveCalibrationCheck]
+    claim_boundary: list[str]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "artifacts_dir": self.artifacts_dir,
+            "generated_at": self.generated_at,
+            "plan_status": self.plan_status,
+            "calibration_status": self.calibration_status,
+            "saved_live_provider_count": self.saved_live_provider_count,
+            "credentials_configured": self.credentials_configured,
+            "model": self.model,
+            "cost_rates_configured": self.cost_rates_configured,
+            "runs": [run.to_dict() for run in self.runs],
+            "prerequisites": [check.to_dict() for check in self.prerequisites],
+            "claim_boundary": self.claim_boundary,
+        }
+
+
+@dataclass(frozen=True)
 class DockerSmokeCheck:
     name: str
     status: str
@@ -712,6 +760,145 @@ def render_live_calibration_report(report: LiveCalibrationReport) -> str:
     for command in report.smoke_commands:
         lines.extend(["```bash", command, "```", ""])
     lines.extend(["## Decision", "", _live_calibration_decision(report)])
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def build_live_calibration_plan_report(
+    *,
+    artifacts_dir: Path,
+    environment: dict[str, str] | None = None,
+    package_availability: dict[str, bool] | None = None,
+) -> LiveCalibrationPlanReport:
+    artifacts_dir = artifacts_dir.resolve()
+    environment = dict(os.environ if environment is None else environment)
+    readiness = build_live_calibration_report(
+        artifacts_dir=artifacts_dir,
+        environment=environment,
+        package_availability=package_availability,
+    )
+    credentials_configured = bool(environment.get("OPENAI_API_KEY"))
+    openai_sdk_available = _package_available("openai", package_availability)
+    cost_rates_configured = bool(
+        environment.get("PATCHSMITH_OPENAI_INPUT_COST_PER_1M", "").strip()
+        and environment.get("PATCHSMITH_OPENAI_OUTPUT_COST_PER_1M", "").strip()
+    )
+    model = environment.get("PATCHSMITH_OPENAI_MODEL", "").strip() or "planner_default"
+    runs = _live_calibration_plan_runs(
+        openai_sdk_available=openai_sdk_available,
+        credentials_configured=credentials_configured,
+        deepagents_available=_package_available("deepagents", package_availability),
+        openai_agents_available=_package_available("agents", package_availability),
+        saved_live_provider_count=readiness.saved_live_provider_count,
+    )
+    return LiveCalibrationPlanReport(
+        artifacts_dir=str(artifacts_dir),
+        generated_at=_utc_now(),
+        plan_status=_live_calibration_plan_status(
+            readiness=readiness,
+            openai_sdk_available=openai_sdk_available,
+            credentials_configured=credentials_configured,
+        ),
+        calibration_status=readiness.calibration_status,
+        saved_live_provider_count=readiness.saved_live_provider_count,
+        credentials_configured=credentials_configured,
+        model=model,
+        cost_rates_configured=cost_rates_configured,
+        runs=runs,
+        prerequisites=readiness.checks,
+        claim_boundary=[
+            "The plan artifact does not prove live model execution.",
+            (
+                "A publishable live-provider claim requires a saved run trace with "
+                "non-offline model provider metadata and token usage."
+            ),
+            (
+                "Run the single seeded smoke before the full seeded evaluation to "
+                "control cost and failure blast radius."
+            ),
+        ],
+    )
+
+
+def write_live_calibration_plan_report(
+    *,
+    artifacts_dir: Path,
+    output_path: Path,
+    json_output_path: Path | None = None,
+    environment: dict[str, str] | None = None,
+    package_availability: dict[str, bool] | None = None,
+) -> LiveCalibrationPlanReport:
+    report = build_live_calibration_plan_report(
+        artifacts_dir=artifacts_dir,
+        environment=environment,
+        package_availability=package_availability,
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(render_live_calibration_plan_report(report), encoding="utf-8")
+    if json_output_path is not None:
+        json_output_path.parent.mkdir(parents=True, exist_ok=True)
+        json_output_path.write_text(
+            json.dumps(report.to_dict(), indent=2) + "\n",
+            encoding="utf-8",
+        )
+    return report
+
+
+def render_live_calibration_plan_report(report: LiveCalibrationPlanReport) -> str:
+    lines = [
+        "# PatchSmith Live Calibration Plan",
+        "",
+        f"- Generated at: `{report.generated_at}`",
+        f"- Artifacts directory: `{report.artifacts_dir}`",
+        f"- Plan status: `{report.plan_status}`",
+        f"- Calibration status: `{report.calibration_status}`",
+        f"- Saved live-provider runs: `{report.saved_live_provider_count}`",
+        f"- Credentials configured: `{str(report.credentials_configured).lower()}`",
+        f"- Model: `{report.model}`",
+        f"- Cost rates configured: `{str(report.cost_rates_configured).lower()}`",
+        "",
+        "## Prerequisites",
+        "",
+        "| Check | Status | Evidence | Next Action |",
+        "|---|---|---|---|",
+    ]
+    for check in report.prerequisites:
+        lines.append(
+            "| "
+            f"{check.name} | "
+            f"{check.status} | "
+            f"{_markdown_cell(check.evidence)} | "
+            f"{_markdown_cell(check.next_action)} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Planned Runs",
+            "",
+            "| Run | Stage | Status | Runtime | Planner | Context | Credentials | Output | Success Evidence | Claim Boundary |",
+            "|---|---|---|---|---|---|---|---|---|---|",
+        ]
+    )
+    for run in report.runs:
+        lines.append(
+            "| "
+            f"{run.name} | "
+            f"{run.stage} | "
+            f"{run.status} | "
+            f"{run.runtime} | "
+            f"{run.planner} | "
+            f"{run.context_provider} | "
+            f"{str(run.requires_credentials).lower()} | "
+            f"{_markdown_cell(run.output_path)} | "
+            f"{_markdown_cell(run.success_evidence)} | "
+            f"{_markdown_cell(run.claim_boundary)} |"
+        )
+    lines.extend(["", "## Commands", ""])
+    for run in report.runs:
+        lines.extend([f"### {run.name}", "", "```bash", run.command, "```", ""])
+    lines.extend(["## Claim Boundary", ""])
+    for claim in report.claim_boundary:
+        lines.append(f"- {claim}")
+    lines.extend(["", "## Decision", "", _live_calibration_plan_decision(report)])
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -2477,6 +2664,143 @@ def _live_calibration_status(
     return "needs_review"
 
 
+def _live_calibration_plan_runs(
+    *,
+    openai_sdk_available: bool,
+    credentials_configured: bool,
+    deepagents_available: bool,
+    openai_agents_available: bool,
+    saved_live_provider_count: int,
+) -> list[LiveCalibrationPlanRun]:
+    live_smoke_status = (
+        "ready"
+        if openai_sdk_available and credentials_configured
+        else "blocked"
+    )
+    live_suite_status = (
+        "ready"
+        if saved_live_provider_count
+        else "waiting_for_smoke"
+        if live_smoke_status == "ready"
+        else "blocked"
+    )
+    return [
+        LiveCalibrationPlanRun(
+            name="OpenAI LangGraph single-task smoke",
+            stage="required",
+            status=live_smoke_status,
+            runtime="langgraph",
+            planner="openai",
+            context_provider="native_hybrid",
+            output_path="artifacts/runs/<run_id>",
+            requires_credentials=True,
+            command=(
+                "PYTHONPATH=src python3 -m patchsmith.cli run "
+                "--repo evals/tasks/seeded_bugs_v1/task_001_logic_bug/repo "
+                "--issue-file evals/tasks/seeded_bugs_v1/task_001_logic_bug/issue.md "
+                "--test-command \"python3 -m pytest\" "
+                "--runtime langgraph --planner openai --context-provider native_hybrid "
+                "--artifacts-dir artifacts --json"
+            ),
+            success_evidence=(
+                "Run trace contains model_provider `openai_responses`, response metadata, "
+                "token counts, and a saved report."
+            ),
+            claim_boundary="Proves one bounded live planner smoke, not broad repair quality.",
+        ),
+        LiveCalibrationPlanRun(
+            name="OpenAI LangGraph seeded-suite eval",
+            stage="follow_up",
+            status=live_suite_status,
+            runtime="langgraph",
+            planner="openai",
+            context_provider="native_hybrid",
+            output_path="artifacts/experiments/live_openai_repair_eval_v1",
+            requires_credentials=True,
+            command=(
+                "PYTHONPATH=src python3 -m patchsmith.cli eval-repair "
+                "--dataset evals/tasks/seeded_bugs_v1 "
+                "--runtime langgraph --planner openai --context-provider native_hybrid "
+                "--output artifacts/experiments/live_openai_repair_eval_v1 --json"
+            ),
+            success_evidence=(
+                "Repair evaluation summary includes non-offline model provider metadata "
+                "and token/cost rows."
+            ),
+            claim_boundary=(
+                "Supports seeded-suite live-provider calibration only; public-issue "
+                "repair claims still require separate artifacts."
+            ),
+        ),
+        LiveCalibrationPlanRun(
+            name="DeepAgents package-backed adapter refresh",
+            stage="optional",
+            status="ready" if deepagents_available else "setup_required",
+            runtime="deepagents",
+            planner="heuristic",
+            context_provider="native_hybrid",
+            output_path="artifacts/experiments/deepagents_package_smoke_v1",
+            requires_credentials=False,
+            command=(
+                "PYTHONPATH=src python3 -m patchsmith.cli eval-repair "
+                "--dataset evals/tasks/seeded_bugs_v1 "
+                "--runtime deepagents --planner heuristic --context-provider native_hybrid "
+                "--output artifacts/experiments/deepagents_package_smoke_v1 --json"
+            ),
+            success_evidence="Trace harness status is `package_available` for DeepAgents rows.",
+            claim_boundary=(
+                "Proves optional package import compatibility, not live DeepAgents model quality."
+            ),
+        ),
+        LiveCalibrationPlanRun(
+            name="OpenAI Agents package-backed adapter refresh",
+            stage="optional",
+            status="ready" if openai_agents_available else "setup_required",
+            runtime="openai_agents",
+            planner="heuristic",
+            context_provider="native_hybrid",
+            output_path="artifacts/experiments/openai_agents_package_smoke_v1",
+            requires_credentials=False,
+            command=(
+                "PYTHONPATH=src python3 -m patchsmith.cli eval-repair "
+                "--dataset evals/tasks/seeded_bugs_v1 "
+                "--runtime openai_agents --planner heuristic --context-provider native_hybrid "
+                "--output artifacts/experiments/openai_agents_package_smoke_v1 --json"
+            ),
+            success_evidence=(
+                "Trace harness status is `package_available` for OpenAI Agents SDK rows."
+            ),
+            claim_boundary=(
+                "Proves optional package import compatibility, not live OpenAI Agents model quality."
+            ),
+        ),
+    ]
+
+
+def _live_calibration_plan_status(
+    *,
+    readiness: LiveCalibrationReport,
+    openai_sdk_available: bool,
+    credentials_configured: bool,
+) -> str:
+    if readiness.calibration_status == "calibrated":
+        return "calibrated"
+    if openai_sdk_available and credentials_configured:
+        return "ready_to_run"
+    return "blocked"
+
+
+def _live_calibration_plan_decision(report: LiveCalibrationPlanReport) -> str:
+    if report.plan_status == "calibrated":
+        return "Live-provider evidence already exists; rerun only when recalibrating a new model or scaffold."
+    if report.plan_status == "ready_to_run":
+        return "Run the required single-task smoke first, then regenerate `live-calibration` before broader evals."
+    return (
+        "Live calibration is planned but blocked by missing prerequisites. Do not claim "
+        "live LLM execution until a required run saves non-offline provider metadata."
+    )
+
+
 def _package_available(
     package_name: str,
     package_availability: dict[str, bool] | None,
@@ -2545,6 +2869,7 @@ def _discover_model_providers(artifacts_dir: Path) -> dict[str, int]:
             "failure_report.json",
             "demo_readiness.json",
             "calibration_readiness.json",
+            "live_calibration_plan.json",
             "demo_script.json",
             "demo_media.json",
             "final_evaluation.json",
@@ -2704,6 +3029,8 @@ def _release_hygiene_checks(
         "experiments/demo_readiness.json",
         "experiments/calibration_readiness.md",
         "experiments/calibration_readiness.json",
+        "experiments/live_calibration_plan.md",
+        "experiments/live_calibration_plan.json",
         "experiments/launch_blockers.md",
         "experiments/launch_blockers.json",
         "experiments/public_issue_corpus_v1/corpus_report.md",
@@ -3580,6 +3907,7 @@ def _final_review_artifacts() -> list[str]:
         "artifacts/experiments/failure_report.md",
         "artifacts/experiments/demo_readiness.md",
         "artifacts/experiments/calibration_readiness.md",
+        "artifacts/experiments/live_calibration_plan.md",
         "artifacts/experiments/launch_blockers.md",
         "artifacts/experiments/demo_script.md",
         "artifacts/experiments/public_issue_corpus_v1/corpus_report.md",

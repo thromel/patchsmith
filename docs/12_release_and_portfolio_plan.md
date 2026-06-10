@@ -118,6 +118,18 @@ PYTHONPATH=src python3 -m patchsmith.cli live-calibration \
 
 Current live calibration readiness output is `not_configured`: the OpenAI SDK is importable locally, but `OPENAI_API_KEY` is not set and saved provider evidence is offline-only. DeepAgents has 10 saved package-backed adapter smoke runs and 30 compatibility-mode runs; this proves optional-package import compatibility, not live DeepAgents model quality. OpenAI Agents SDK has 10 saved package-backed adapter smoke runs and 20 compatibility-mode runs; this proves optional-package import compatibility, not live OpenAI Agents model quality.
 
+Generate the live calibration execution plan:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli live-calibration-plan \
+  --artifacts-dir artifacts \
+  --output artifacts/experiments/live_calibration_plan.md \
+  --json-output artifacts/experiments/live_calibration_plan.json \
+  --json
+```
+
+Current live calibration plan output is `blocked` until `OPENAI_API_KEY` is configured. It records the required single-task live OpenAI smoke, follow-up seeded-suite eval, optional adapter refresh commands, success evidence, and claim boundaries without counting as live-provider evidence.
+
 Generate the final evaluation narrative:
 
 ```bash
@@ -330,7 +342,7 @@ PYTHONPATH=src python3 -m patchsmith.cli release-hygiene \
   --json
 ```
 
-Current release hygiene output is `ready_with_warnings`: generated review artifacts now include calibration-readiness, launch-blocker, and public issue context-preview/materialization validation/readiness/focused-test plan/run/diagnosis/setup-plan/setup-readiness/setup-execution/setup-validation evidence, package build metadata exists, local Git metadata exists, and the remaining release caveat is live LLM calibration.
+Current release hygiene output is `ready_with_warnings`: generated review artifacts now include calibration-readiness, live-calibration plan, launch-blocker, and public issue context-preview/materialization validation/readiness/focused-test plan/run/diagnosis/setup-plan/setup-readiness/setup-execution/setup-validation evidence, package build metadata exists, local Git metadata exists, and the remaining release caveat is live LLM calibration.
 
 ## Example flagship demo scenario
 
