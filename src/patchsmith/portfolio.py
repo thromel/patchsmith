@@ -4683,6 +4683,7 @@ def _release_hygiene_checks(
             missing_action="Regenerate index, failure, readiness, demo script, and final evaluation artifacts.",
             blocked=True,
         ),
+        _project_status_freshness_check(artifacts_dir),
         _release_check(
             name="Demo Readiness",
             status="passed" if readiness.readiness_status != "not_ready" else "blocked",
@@ -5454,6 +5455,47 @@ def _content_check(
             else f"Missing markers: {', '.join(missing)}."
         ),
         next_action="No action needed." if not missing else missing_action,
+    )
+
+
+def _project_status_freshness_check(artifacts_dir: Path) -> ReleaseHygieneCheck:
+    payload = _load_json_artifact(artifacts_dir / "experiments" / "project_status.json")
+    if payload is None:
+        return _release_check(
+            name="Project Status Freshness",
+            status="blocked",
+            evidence="Project status JSON is missing or invalid.",
+            next_action="Run `project-status` or `refresh-evidence` before release review.",
+        )
+
+    freshness_status = _payload_string(
+        payload, "evidence_freshness_status", "undated"
+    )
+    stale_count = _payload_int(payload, "stale_source_count")
+    undated_count = _payload_int(payload, "undated_source_count")
+    missing_count = len(_payload_string_list(payload, "missing_sources"))
+    if freshness_status in {"missing", "stale"} or missing_count:
+        status = "blocked"
+        next_action = (
+            "Regenerate missing or stale evidence with `refresh-evidence` before "
+            "claiming release readiness."
+        )
+    elif freshness_status == "undated" or undated_count:
+        status = "warning"
+        next_action = (
+            "Regenerate undated evidence so release claims have timestamped sources."
+        )
+    else:
+        status = "passed"
+        next_action = "No action needed."
+    return _release_check(
+        name="Project Status Freshness",
+        status=status,
+        evidence=(
+            f"Freshness is {freshness_status}; {stale_count} stale, "
+            f"{undated_count} undated, {missing_count} missing sources."
+        ),
+        next_action=next_action,
     )
 
 

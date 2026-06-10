@@ -1481,6 +1481,40 @@ def test_evidence_refresh_report_runs_lightweight_status_refresh(
     assert cli_output.exists()
 
 
+def test_release_hygiene_blocks_stale_project_status(
+    tmp_path: Path,
+) -> None:
+    project_root = tmp_path / "repo"
+    artifacts_dir = tmp_path / "artifacts"
+    project_root.mkdir()
+    _write_release_hygiene_fixture(project_root, artifacts_dir)
+    (artifacts_dir / "experiments" / "project_status.json").write_text(
+        json.dumps(
+            {
+                "evidence_freshness_status": "stale",
+                "stale_source_count": 1,
+                "undated_source_count": 0,
+                "missing_sources": [],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    report = write_release_hygiene_report(
+        project_root=project_root,
+        artifacts_dir=artifacts_dir,
+        output_path=tmp_path / "release_hygiene.md",
+    )
+
+    freshness_check = next(
+        check for check in report.checks if check.name == "Project Status Freshness"
+    )
+    assert freshness_check.status == "blocked"
+    assert "1 stale" in freshness_check.evidence
+    assert "refresh-evidence" in freshness_check.next_action
+
+
 def test_docker_smoke_report_records_unavailable_daemon(
     tmp_path: Path,
     monkeypatch,
