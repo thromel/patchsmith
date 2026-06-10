@@ -1760,6 +1760,12 @@ def test_plan_public_issue_reproductions_merges_reviewed_spec_file(
                     {
                         "task_id": "public_task",
                         "command": "python3 -m pytest tests/test_bug.py",
+                        "fixture_files": [
+                            {
+                                "path": "tests/test_reviewed_repro.py",
+                                "content": "def test_reviewed_repro():\n    assert False\n",
+                            }
+                        ],
                         "expected_failure_signals": [
                             "AssertionError: reviewed public issue signal"
                         ],
@@ -1779,8 +1785,16 @@ def test_plan_public_issue_reproductions_merges_reviewed_spec_file(
 
     assert summary.planned_tasks == 1
     assert summary.manual_spec_required_tasks == 0
+    assert summary.fixture_file_tasks == 1
+    assert summary.fixture_file_count == 1
     assert results[0].status == "planned"
     assert results[0].command_source == "reproduction_spec"
+    assert results[0].fixture_files == [
+        {
+            "path": "tests/test_reviewed_repro.py",
+            "content": "def test_reviewed_repro():\n    assert False\n",
+        }
+    ]
     assert results[0].expected_failure_signals == [
         "AssertionError: reviewed public issue signal"
     ]
@@ -1811,6 +1825,7 @@ def test_plan_public_issue_reproductions_merges_reviewed_spec_file(
         )
     )
     assert cli_results[0]["command_source"] == "reproduction_spec"
+    assert cli_results[0]["fixture_files"][0]["path"] == "tests/test_reviewed_repro.py"
 
 
 def test_validate_public_issue_reproduction_specs_blocks_unfilled_template(
@@ -1946,6 +1961,58 @@ def test_validate_public_issue_reproduction_specs_accepts_reviewed_spec(
     assert results[0].expected_failure_signals == ["AssertionError: reviewed signal"]
 
 
+def test_validate_public_issue_reproduction_specs_blocks_unsafe_fixture_path(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    tasks_dir = tmp_path / "materialized_tasks"
+    task_dir = tasks_dir / "public_task"
+    task_dir.mkdir(parents=True)
+    (task_dir / "task_manifest.json").write_text(
+        json.dumps(
+            {
+                "task_id": "public_task",
+                "issue": {"repository": "owner/repo"},
+                "repository_snapshot": {"repo_path": str(repo_dir)},
+            }
+        ),
+        encoding="utf-8",
+    )
+    specs_path = tmp_path / "reviewed_specs.json"
+    specs_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "public_task",
+                    "command": "python3 -m pytest tests/test_bug.py",
+                    "fixture_files": [
+                        {
+                            "path": "../tests/test_escape.py",
+                            "content": "def test_escape():\n    assert False\n",
+                        }
+                    ],
+                    "expected_failure_signals": ["AssertionError: reviewed signal"],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    results, summary = validate_public_issue_reproduction_specs(
+        specs_path=specs_path,
+        tasks_dir=tasks_dir,
+        output_dir=tmp_path / "spec_validation",
+    )
+
+    assert summary.blocked_tasks == 1
+    assert summary.unsafe_fixture_tasks == 1
+    assert results[0].status == "blocked"
+    assert "fixture_files[1].path cannot contain traversal" in ";".join(
+        results[0].errors
+    )
+
+
 def test_discover_public_issue_failure_signals_dry_runs_without_expected_spec(
     tmp_path: Path,
 ) -> None:
@@ -2061,6 +2128,62 @@ def test_discover_public_issue_failure_signals_extracts_local_failure(
     )
     assert results[0].stdout_path is not None
     assert results[0].stderr_path is not None
+
+
+def test_discover_public_issue_failure_signals_applies_fixture_to_temp_workspace(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    fixture_path = repo_dir / "tests" / "test_fixture_repro.py"
+    plan_path = tmp_path / "public_issue_reproduction_plan_results.json"
+    plan_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "public_task",
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/12",
+                    "status": "warning",
+                    "repo_path": str(repo_dir),
+                    "reproduction_command": "python3 -m pytest tests/test_fixture_repro.py",
+                    "fixture_files": [
+                        {
+                            "path": "tests/test_fixture_repro.py",
+                            "content": (
+                                "def test_fixture_repro():\n"
+                                "    raise AssertionError('fixture public bug')\n"
+                            ),
+                        }
+                    ],
+                    "expected_failure_signals": [],
+                    "manual_spec_required": True,
+                    "blockers": [],
+                    "warnings": [],
+                    "next_actions": [],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    results, summary = discover_public_issue_failure_signals(
+        plan_path=plan_path,
+        output_dir=tmp_path / "discovery",
+        sandbox_mode="local",
+        dry_run=False,
+        timeout_seconds=30,
+    )
+
+    assert summary.observed_failure_tasks == 1
+    assert summary.fixture_file_tasks == 1
+    assert results[0].status == "observed_failure"
+    assert results[0].fixture_paths == ["tests/test_fixture_repro.py"]
+    assert any(
+        "AssertionError" in signal
+        for signal in results[0].candidate_failure_signals
+    )
+    assert not fixture_path.exists()
 
 
 def test_discover_public_issue_failure_signals_ignores_xfailed_summary(
@@ -2266,6 +2389,59 @@ def test_execute_public_issue_reproductions_records_failing_signal(
     assert Path(results[0].stdout_path).exists()
     assert results[0].stderr_path is not None
     assert Path(results[0].stderr_path).exists()
+
+
+def test_execute_public_issue_reproductions_applies_fixture_to_temp_workspace(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    fixture_path = repo_dir / "tests" / "test_fixture_repro.py"
+    plan_path = tmp_path / "public_issue_reproduction_plan_results.json"
+    plan_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "public_task",
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/12",
+                    "status": "planned",
+                    "repo_path": str(repo_dir),
+                    "reproduction_command": "python3 -m pytest tests/test_fixture_repro.py",
+                    "fixture_files": [
+                        {
+                            "path": "tests/test_fixture_repro.py",
+                            "content": (
+                                "def test_fixture_repro():\n"
+                                "    assert False, 'fixture public bug'\n"
+                            ),
+                        }
+                    ],
+                    "expected_failure_signals": ["AssertionError: fixture public bug"],
+                    "manual_spec_required": False,
+                    "blockers": [],
+                    "warnings": [],
+                    "next_actions": [],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    results, summary = execute_public_issue_reproductions(
+        plan_path=plan_path,
+        output_dir=tmp_path / "reproduction_execution",
+        sandbox_mode="local",
+        dry_run=False,
+        timeout_seconds=30,
+    )
+
+    assert summary.reproduced_tasks == 1
+    assert summary.fixture_file_tasks == 1
+    assert results[0].status == "reproduced"
+    assert results[0].fixture_paths == ["tests/test_fixture_repro.py"]
+    assert results[0].matched_failure_signals == ["AssertionError: fixture public bug"]
+    assert not fixture_path.exists()
 
 
 def test_execute_public_issue_reproductions_does_not_count_passing_command(

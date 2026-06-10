@@ -410,7 +410,7 @@ PYTHONPATH=src python3 -m patchsmith.cli plan-public-issue-reproductions \
   --json
 ```
 
-The reproduction-plan report records candidate commands before public issue repair attempts and marks tasks that still need explicit expected-failure signals. It also emits `public_issue_reproduction_specs_template.json` with task-specific candidate commands for review. Add `--reproduction-specs <reviewed-specs.json>` when reviewed criteria are available; the specs file accepts `task_id`, optional `command`, and `expected_failure_signals`, and the corpus includes `evals/issue_corpora/public_issue_smoke_v1/reproduction_specs.template.json` as the source-controlled authoring template. Current public issue reproduction planning is warning-class: all three tasks have candidate commands, but all three still need manual failing-signal specs before reproduction can be claimed.
+The reproduction-plan report records candidate commands before public issue repair attempts and marks tasks that still need explicit expected-failure signals. It also emits `public_issue_reproduction_specs_template.json` with task-specific candidate commands for review. Add `--reproduction-specs <reviewed-specs.json>` when reviewed criteria are available; the specs file accepts `task_id`, optional `command`, optional `fixture_files`, and `expected_failure_signals`, and the corpus includes `evals/issue_corpora/public_issue_smoke_v1/reproduction_specs.template.json` as the source-controlled authoring template. Fixture files must use repository-relative paths and are written only to disposable execution workspaces. Current public issue reproduction planning is warning-class: all three tasks have candidate commands, but all three still need manual failing-signal specs before reproduction can be claimed.
 
 Discover candidate failure signals for review:
 
@@ -421,7 +421,7 @@ PYTHONPATH=src python3 -m patchsmith.cli discover-public-issue-failure-signals \
   --json
 ```
 
-The failure-signal discovery report is dry-run by default and does not prove reproduction. Use `--execute` only after reviewing the candidate commands; any extracted `candidate_failure_signals` are review hints to copy into a reviewed specs file, not reproduction evidence.
+The failure-signal discovery report is dry-run by default and does not prove reproduction. Use `--execute` only after reviewing the candidate commands; any extracted `candidate_failure_signals` are review hints to copy into a reviewed specs file, not reproduction evidence. When reviewed specs include `fixture_files`, discovery writes them into a disposable copy before running the command and leaves the repository snapshot unchanged.
 
 Validate reviewed reproduction specs before execution:
 
@@ -434,7 +434,7 @@ PYTHONPATH=src python3 -m patchsmith.cli validate-public-issue-reproduction-spec
   --json
 ```
 
-The spec-validation report blocks missing specs, empty `expected_failure_signals`, extra task IDs, and policy-rejected commands before reproduction execution.
+The spec-validation report blocks missing specs, empty `expected_failure_signals`, unsafe `fixture_files`, extra task IDs, and policy-rejected commands before reproduction execution.
 
 Dry-run or execute public issue reproduction checks:
 

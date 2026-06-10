@@ -397,7 +397,7 @@ PYTHONPATH=src python3 -m patchsmith.cli plan-public-issue-reproductions \
   --json
 ```
 
-The planner emits `public_issue_reproduction_specs_template.json` with task-specific candidate commands for review. Add `--reproduction-specs <reviewed-specs.json>` when reviewed criteria are available. The specs file accepts `task_id`, optional `command`, and `expected_failure_signals`, and the corpus includes `evals/issue_corpora/public_issue_smoke_v1/reproduction_specs.template.json` as the source-controlled authoring template.
+The planner emits `public_issue_reproduction_specs_template.json` with task-specific candidate commands for review. Add `--reproduction-specs <reviewed-specs.json>` when reviewed criteria are available. The specs file accepts `task_id`, optional `command`, optional `fixture_files`, and `expected_failure_signals`, and the corpus includes `evals/issue_corpora/public_issue_smoke_v1/reproduction_specs.template.json` as the source-controlled authoring template. Fixture files must use repository-relative paths and are written only to disposable execution workspaces.
 
 Discover candidate public issue failure signals:
 
@@ -408,7 +408,7 @@ PYTHONPATH=src python3 -m patchsmith.cli discover-public-issue-failure-signals \
   --json
 ```
 
-The discovery report is a non-claiming review surface: it can save logs and candidate failure text, but reproduction remains unproven until reviewed specs are executed and matched.
+The discovery report is a non-claiming review surface: it can save logs and candidate failure text, including fixture-backed candidate failures from a disposable copy, but reproduction remains unproven until reviewed specs are executed and matched.
 
 Validate reviewed public issue reproduction specs:
 

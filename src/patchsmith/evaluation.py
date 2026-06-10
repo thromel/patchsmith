@@ -30,6 +30,8 @@ from patchsmith.sandbox import create_sandbox_runner
 from patchsmith.security import CommandPolicy, FocusedSetupCommandPolicy
 from patchsmith.workflow import RepairRunner
 
+PUBLIC_ISSUE_FIXTURE_FILE_MAX_BYTES = 64_000
+
 
 @dataclass(frozen=True)
 class SeededTask:
@@ -614,6 +616,7 @@ class IssueCorpusPublicReproductionPlanResult:
     policy_allowed: bool
     policy_reason: str | None
     focused_files: list[str]
+    fixture_files: list[dict[str, str]]
     expected_failure_signals: list[str]
     manual_spec_required: bool
     evidence: list[str]
@@ -637,6 +640,8 @@ class IssueCorpusPublicReproductionPlanSummary:
     manual_spec_required_tasks: int
     command_count: int
     policy_allowed_commands: int
+    fixture_file_tasks: int
+    fixture_file_count: int
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -655,6 +660,7 @@ class IssueCorpusPublicReproductionSpecValidationResult:
     command_source: str
     policy_allowed: bool
     policy_reason: str | None
+    fixture_files: list[dict[str, str]]
     expected_failure_signals: list[str]
     errors: list[str]
     warnings: list[str]
@@ -680,6 +686,9 @@ class IssueCorpusPublicReproductionSpecValidationSummary:
     empty_signal_tasks: int
     policy_blocked_tasks: int
     extra_spec_tasks: int
+    fixture_file_tasks: int
+    fixture_file_count: int
+    unsafe_fixture_tasks: int
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -705,6 +714,7 @@ class IssueCorpusPublicFailureSignalDiscoveryResult:
     policy_reason: str | None
     stdout_path: str | None
     stderr_path: str | None
+    fixture_paths: list[str]
     candidate_failure_signals: list[str]
     errors: list[str]
     warnings: list[str]
@@ -732,6 +742,7 @@ class IssueCorpusPublicFailureSignalDiscoverySummary:
     blocked_tasks: int
     policy_allowed_commands: int
     candidate_signal_tasks: int
+    fixture_file_tasks: int
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -759,6 +770,7 @@ class IssueCorpusPublicReproductionExecutionResult:
     policy_reason: str | None
     stdout_path: str | None
     stderr_path: str | None
+    fixture_paths: list[str]
     matched_failure_signals: list[str]
     missing_failure_signals: list[str]
     errors: list[str]
@@ -788,6 +800,7 @@ class IssueCorpusPublicReproductionExecutionSummary:
     blocked_tasks: int
     manual_spec_required_tasks: int
     policy_allowed_commands: int
+    fixture_file_tasks: int
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -3192,6 +3205,8 @@ def summarize_public_issue_reproduction_plan(
         manual_spec_required_tasks=sum(1 for result in results if result.manual_spec_required),
         command_count=sum(1 for result in results if result.reproduction_command),
         policy_allowed_commands=sum(1 for result in results if result.policy_allowed),
+        fixture_file_tasks=sum(1 for result in results if result.fixture_files),
+        fixture_file_count=sum(len(result.fixture_files) for result in results),
     )
 
 
@@ -3239,6 +3254,7 @@ def write_public_issue_reproduction_plan_outputs(
                 "policy_allowed",
                 "policy_reason",
                 "focused_files",
+                "fixture_paths",
                 "expected_failure_signals",
                 "manual_spec_required",
                 "evidence",
@@ -3262,6 +3278,9 @@ def write_public_issue_reproduction_plan_outputs(
                     "policy_allowed": result.policy_allowed,
                     "policy_reason": result.policy_reason,
                     "focused_files": ";".join(result.focused_files),
+                    "fixture_paths": ";".join(
+                        _public_issue_fixture_paths(result.fixture_files)
+                    ),
                     "expected_failure_signals": ";".join(result.expected_failure_signals),
                     "manual_spec_required": result.manual_spec_required,
                     "evidence": ";".join(result.evidence),
@@ -3332,6 +3351,9 @@ def validate_public_issue_reproduction_specs(
                 command_source="reproduction_spec",
                 policy_allowed=False,
                 policy_reason=None,
+                fixture_files=_normalize_public_issue_fixture_files(
+                    specs_by_task[extra_task_id].get("fixture_files")
+                )[0],
                 expected_failure_signals=_string_list(
                     specs_by_task[extra_task_id].get("expected_failure_signals")
                 ),
@@ -3395,6 +3417,13 @@ def summarize_public_issue_reproduction_spec_validation(
             for result in results
             if "reproduction spec task_id has no materialized task" in result.errors
         ),
+        fixture_file_tasks=sum(1 for result in results if result.fixture_files),
+        fixture_file_count=sum(len(result.fixture_files) for result in results),
+        unsafe_fixture_tasks=sum(
+            1
+            for result in results
+            if any("fixture_files" in error for error in result.errors)
+        ),
     )
 
 
@@ -3435,6 +3464,7 @@ def write_public_issue_reproduction_spec_validation_outputs(
                 "command_source",
                 "policy_allowed",
                 "policy_reason",
+                "fixture_paths",
                 "expected_failure_signals",
                 "errors",
                 "warnings",
@@ -3457,6 +3487,9 @@ def write_public_issue_reproduction_spec_validation_outputs(
                     "command_source": result.command_source,
                     "policy_allowed": result.policy_allowed,
                     "policy_reason": result.policy_reason,
+                    "fixture_paths": ";".join(
+                        _public_issue_fixture_paths(result.fixture_files)
+                    ),
                     "expected_failure_signals": ";".join(
                         result.expected_failure_signals
                     ),
@@ -3577,6 +3610,7 @@ def summarize_public_issue_failure_signal_discovery(
         candidate_signal_tasks=sum(
             1 for result in results if result.candidate_failure_signals
         ),
+        fixture_file_tasks=sum(1 for result in results if result.fixture_paths),
     )
 
 
@@ -3622,6 +3656,7 @@ def write_public_issue_failure_signal_discovery_outputs(
                 "policy_reason",
                 "stdout_path",
                 "stderr_path",
+                "fixture_paths",
                 "candidate_failure_signals",
                 "errors",
                 "warnings",
@@ -3650,6 +3685,7 @@ def write_public_issue_failure_signal_discovery_outputs(
                     "policy_reason": result.policy_reason,
                     "stdout_path": result.stdout_path,
                     "stderr_path": result.stderr_path,
+                    "fixture_paths": ";".join(result.fixture_paths),
                     "candidate_failure_signals": ";".join(
                         result.candidate_failure_signals
                     ),
@@ -3684,6 +3720,7 @@ def _public_issue_reproduction_specs_template(
                 "repository": result.repository,
                 "issue_url": result.issue_url,
                 "command": result.reproduction_command,
+                "fixture_files": [],
                 "expected_failure_signals": [],
                 "review_notes": (
                     "Fill after reviewing the issue-specific failing traceback, "
@@ -3798,6 +3835,7 @@ def summarize_public_issue_reproduction_execution(
             1 for result in results if result.manual_spec_required
         ),
         policy_allowed_commands=sum(1 for result in results if result.policy_allowed),
+        fixture_file_tasks=sum(1 for result in results if result.fixture_paths),
     )
 
 
@@ -3845,6 +3883,7 @@ def write_public_issue_reproduction_execution_outputs(
                 "policy_reason",
                 "stdout_path",
                 "stderr_path",
+                "fixture_paths",
                 "matched_failure_signals",
                 "missing_failure_signals",
                 "errors",
@@ -3878,6 +3917,7 @@ def write_public_issue_reproduction_execution_outputs(
                     "policy_reason": result.policy_reason,
                     "stdout_path": result.stdout_path,
                     "stderr_path": result.stderr_path,
+                    "fixture_paths": ";".join(result.fixture_paths),
                     "matched_failure_signals": ";".join(
                         result.matched_failure_signals
                     ),
@@ -6026,17 +6066,20 @@ def render_public_issue_reproduction_plan_report(
         f"- Manual-spec-required tasks: `{summary.manual_spec_required_tasks}`",
         f"- Candidate commands: `{summary.command_count}`",
         f"- Policy-allowed commands: `{summary.policy_allowed_commands}`",
+        f"- Fixture-file tasks: `{summary.fixture_file_tasks}`",
+        f"- Fixture files: `{summary.fixture_file_count}`",
         "",
         "## Results",
         "",
         (
-            "| Task | Status | Repository | Command Source | Command | Expected Failure "
-            "Signals | Notes | Next Actions |"
+            "| Task | Status | Repository | Command Source | Command | Fixtures | "
+            "Expected Failure Signals | Notes | Next Actions |"
         ),
-        "|---|---|---|---|---|---|---|---|",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
     for result in results:
         notes = [*result.blockers, *result.warnings]
+        fixture_paths = "; ".join(_public_issue_fixture_paths(result.fixture_files))
         lines.append(
             "| "
             f"{_markdown_table_text(result.task_id or 'unknown')} | "
@@ -6044,6 +6087,7 @@ def render_public_issue_reproduction_plan_report(
             f"{_markdown_table_text(result.repository or 'unknown')} | "
             f"{_markdown_table_text(result.command_source)} | "
             f"{_markdown_table_text(result.reproduction_command or 'missing')} | "
+            f"{_markdown_table_text(fixture_paths or 'none')} | "
             f"{_markdown_table_text('; '.join(result.expected_failure_signals) or 'manual spec required')} | "
             f"{_markdown_table_text('; '.join(notes) or 'none')} | "
             f"{_markdown_table_text('; '.join(result.next_actions) or 'none')} |"
@@ -6057,6 +6101,7 @@ def render_public_issue_reproduction_plan_report(
             "- `planned` means an explicit expected failing signal is encoded and the command is policy-allowed.",
             "- `warning` means a candidate command exists but a reviewer still needs to encode the expected failing signal.",
             "- `blocked` means the reproduction command should not be run until the listed prerequisite is fixed.",
+            "- Fixture files are written only to disposable execution workspaces; they do not modify source snapshots.",
             "- This report does not run tests, prove issue reproduction, generate patches, or call a live model provider.",
             "",
         ]
@@ -6088,17 +6133,21 @@ def render_public_issue_reproduction_spec_validation_report(
         f"- Empty-signal tasks: `{summary.empty_signal_tasks}`",
         f"- Policy-blocked tasks: `{summary.policy_blocked_tasks}`",
         f"- Extra-spec tasks: `{summary.extra_spec_tasks}`",
+        f"- Fixture-file tasks: `{summary.fixture_file_tasks}`",
+        f"- Fixture files: `{summary.fixture_file_count}`",
+        f"- Unsafe-fixture tasks: `{summary.unsafe_fixture_tasks}`",
         "",
         "## Results",
         "",
         (
             "| Task | Status | Spec | Repository | Command Source | Command | "
-            "Expected Failure Signals | Notes | Next Actions |"
+            "Fixtures | Expected Failure Signals | Notes | Next Actions |"
         ),
-        "|---|---|---|---|---|---|---|---|---|",
+        "|---|---|---|---|---|---|---|---|---|---|",
     ]
     for result in results:
         notes = [*result.errors, *result.warnings]
+        fixture_paths = "; ".join(_public_issue_fixture_paths(result.fixture_files))
         lines.append(
             "| "
             f"{_markdown_table_text(result.task_id or 'unknown')} | "
@@ -6107,6 +6156,7 @@ def render_public_issue_reproduction_spec_validation_report(
             f"{_markdown_table_text(result.repository or 'unknown')} | "
             f"{_markdown_table_text(result.command_source)} | "
             f"{_markdown_table_text(result.reproduction_command or 'missing')} | "
+            f"{_markdown_table_text(fixture_paths or 'none')} | "
             f"{_markdown_table_text('; '.join(result.expected_failure_signals) or 'missing')} | "
             f"{_markdown_table_text('; '.join(notes) or 'none')} | "
             f"{_markdown_table_text('; '.join(result.next_actions) or 'none')} |"
@@ -6120,6 +6170,7 @@ def render_public_issue_reproduction_spec_validation_report(
             "- `ready` means a spec exists, the merged command is policy-allowed, and expected failure signals are non-empty.",
             "- `warning` means the spec can be reviewed further before execution.",
             "- `blocked` means the spec should not be used for reproduction execution until fixed.",
+            "- Fixture files must be repository-relative, traversal-free, and are applied only to disposable execution workspaces.",
             "- This report does not execute reproduction commands or prove public issue repair quality.",
             "",
         ]
@@ -6151,14 +6202,15 @@ def render_public_issue_failure_signal_discovery_report(
         f"- Timed-out tasks: `{summary.timed_out_tasks}`",
         f"- Blocked tasks: `{summary.blocked_tasks}`",
         f"- Candidate-signal tasks: `{summary.candidate_signal_tasks}`",
+        f"- Fixture-file tasks: `{summary.fixture_file_tasks}`",
         "",
         "## Results",
         "",
         (
             "| Task | Status | Repository | Command | Exit Code | Candidate "
-            "Signals | Logs | Notes | Next Actions |"
+            "Signals | Fixtures | Logs | Notes | Next Actions |"
         ),
-        "|---|---|---|---|---|---|---|---|---|",
+        "|---|---|---|---|---|---|---|---|---|---|",
     ]
     for result in results:
         notes = [*result.errors, *result.warnings]
@@ -6175,6 +6227,7 @@ def render_public_issue_failure_signal_discovery_report(
             f"{_markdown_table_text(result.reproduction_command or 'missing')} | "
             f"{_markdown_table_text(str(result.exit_code) if result.exit_code is not None else 'not run')} | "
             f"{_markdown_table_text('; '.join(result.candidate_failure_signals) or 'none')} | "
+            f"{_markdown_table_text('; '.join(result.fixture_paths) or 'none')} | "
             f"{_markdown_table_text(log_paths or 'none')} | "
             f"{_markdown_table_text('; '.join(notes) or 'none')} | "
             f"{_markdown_table_text('; '.join(result.next_actions) or 'none')} |"
@@ -6188,6 +6241,7 @@ def render_public_issue_failure_signal_discovery_report(
             "- `observed_failure` means the candidate command failed and logs were saved; it does not prove issue reproduction.",
             "- Only `execute-public-issue-reproductions` with reviewed expected failure signals can count a task as reproduced.",
             "- `passed` means the candidate command did not expose a pre-repair failure and likely needs a more specific reproduction.",
+            "- Fixture files, when present, are applied to a disposable copy before the candidate command runs.",
             "",
         ]
     )
@@ -6220,14 +6274,15 @@ def render_public_issue_reproduction_execution_report(
         f"- Blocked tasks: `{summary.blocked_tasks}`",
         f"- Manual-spec-required tasks: `{summary.manual_spec_required_tasks}`",
         f"- Policy-allowed commands: `{summary.policy_allowed_commands}`",
+        f"- Fixture-file tasks: `{summary.fixture_file_tasks}`",
         "",
         "## Results",
         "",
         (
             "| Task | Status | Repository | Plan Status | Command | Expected Signals | "
-            "Matched Signals | Exit | Logs | Notes | Next Actions |"
+            "Matched Signals | Fixtures | Exit | Logs | Notes | Next Actions |"
         ),
-        "|---|---|---|---|---|---|---|---|---|---|---|",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for result in results:
         notes = [*result.errors, *result.warnings]
@@ -6245,6 +6300,7 @@ def render_public_issue_reproduction_execution_report(
             f"{_markdown_table_text(result.reproduction_command or 'missing')} | "
             f"{_markdown_table_text('; '.join(result.expected_failure_signals) or 'missing')} | "
             f"{_markdown_table_text('; '.join(result.matched_failure_signals) or 'none')} | "
+            f"{_markdown_table_text('; '.join(result.fixture_paths) or 'none')} | "
             f"{_markdown_table_text(str(result.exit_code) if result.exit_code is not None else 'not run')} | "
             f"{_markdown_table_text(log_paths or 'none')} | "
             f"{_markdown_table_text('; '.join(notes) or 'none')} | "
@@ -6259,6 +6315,7 @@ def render_public_issue_reproduction_execution_report(
             "- `blocked` means the command was not run because required safety or expected-failure criteria were missing.",
             "- `dry_run` means the command and expected failure signal passed preflight, but no repository code was executed.",
             "- `reproduced` means an executed command failed nonzero and all configured expected failure signals appeared in saved stdout/stderr.",
+            "- Fixture files, when present, are applied to a disposable copy before the reproduction command runs.",
             "- This report does not generate patches, prove repair quality, or call a live model provider.",
             "",
         ]
@@ -8448,6 +8505,22 @@ def _plan_public_issue_reproduction_record(
         reproduction.get("expected_failure_signals")
     )
     expected_failure_signals = spec_failure_signals or manifest_failure_signals
+    if "fixture_files" in spec_reproduction:
+        fixture_files, fixture_errors = _normalize_public_issue_fixture_files(
+            spec_reproduction.get("fixture_files")
+        )
+        fixture_source = "reproduction spec"
+    else:
+        fixture_files, fixture_errors = _normalize_public_issue_fixture_files(
+            reproduction.get("fixture_files")
+        )
+        fixture_source = "task manifest"
+    if fixture_errors:
+        blockers.extend(fixture_errors)
+    elif fixture_files:
+        evidence.append(
+            f"{fixture_source} provides {len(fixture_files)} temporary fixture file(s)"
+        )
     manual_spec_required = not expected_failure_signals
     if expected_failure_signals:
         if spec_failure_signals:
@@ -8508,6 +8581,7 @@ def _plan_public_issue_reproduction_record(
         policy_allowed=policy_allowed,
         policy_reason=policy_reason,
         focused_files=focused_files,
+        fixture_files=fixture_files,
         expected_failure_signals=expected_failure_signals,
         manual_spec_required=manual_spec_required,
         evidence=_dedupe_preserve_order(evidence),
@@ -8575,6 +8649,7 @@ def _validate_public_issue_reproduction_spec_record(
         command_source=planned.command_source,
         policy_allowed=planned.policy_allowed,
         policy_reason=planned.policy_reason,
+        fixture_files=planned.fixture_files,
         expected_failure_signals=planned.expected_failure_signals,
         errors=_dedupe_preserve_order(errors),
         warnings=_dedupe_preserve_order(warnings),
@@ -8604,6 +8679,11 @@ def _discover_public_issue_failure_signal_record(
     errors = _string_list(record.get("blockers"))
     warnings = _string_list(record.get("warnings"))
     next_actions = _string_list(record.get("next_actions"))
+    fixture_files, fixture_errors = _normalize_public_issue_fixture_files(
+        record.get("fixture_files")
+    )
+    fixture_paths = _public_issue_fixture_paths(fixture_files)
+    errors.extend(fixture_errors)
     policy_allowed = False
     policy_reason: str | None = None
     workspace: Path | None = None
@@ -8651,6 +8731,7 @@ def _discover_public_issue_failure_signal_record(
             policy_reason=policy_reason,
             stdout_path=None,
             stderr_path=None,
+            fixture_paths=fixture_paths,
             candidate_failure_signals=[],
             errors=_dedupe_preserve_order(errors),
             warnings=_dedupe_preserve_order(warnings),
@@ -8679,6 +8760,7 @@ def _discover_public_issue_failure_signal_record(
             policy_reason=policy_reason,
             stdout_path=None,
             stderr_path=None,
+            fixture_paths=fixture_paths,
             candidate_failure_signals=[],
             errors=[],
             warnings=_dedupe_preserve_order(warnings),
@@ -8695,11 +8777,58 @@ def _discover_public_issue_failure_signal_record(
     assert command is not None
     run_dir = run_logs_dir / _safe_artifact_name(task_id or repository or "task")
     run_dir.mkdir(parents=True, exist_ok=True)
-    command_result = runner.run(
-        command=command,
-        workspace=workspace,
-        timeout_seconds=timeout_seconds,
-    )
+    try:
+        if fixture_files:
+            with tempfile.TemporaryDirectory(
+                prefix="patchsmith-public-repro-fixtures-"
+            ) as tmp_dir:
+                fixture_workspace = Path(tmp_dir) / "repo"
+                snapshot = clone_or_copy_repository(str(workspace), fixture_workspace)
+                _write_public_issue_fixture_files(
+                    repo_path=snapshot.repo_path,
+                    fixture_files=fixture_files,
+                )
+                command_result = runner.run(
+                    command=command,
+                    workspace=snapshot.repo_path,
+                    timeout_seconds=timeout_seconds,
+                )
+        else:
+            command_result = runner.run(
+                command=command,
+                workspace=workspace,
+                timeout_seconds=timeout_seconds,
+            )
+    except (OSError, ValueError) as error:
+        return IssueCorpusPublicFailureSignalDiscoveryResult(
+            task_id=task_id,
+            repository=repository,
+            issue_url=issue_url,
+            status="blocked",
+            reproduction_plan_status=plan_status,
+            repo_path=repo_path_value,
+            reproduction_command=command,
+            sandbox_mode=sandbox_mode,
+            sandbox_image=sandbox_image,
+            sandbox_network=sandbox_network,
+            dry_run=dry_run,
+            exit_code=None,
+            timed_out=False,
+            duration_ms=0,
+            policy_allowed=policy_allowed,
+            policy_reason=policy_reason,
+            stdout_path=None,
+            stderr_path=None,
+            fixture_paths=fixture_paths,
+            candidate_failure_signals=[],
+            errors=_dedupe_preserve_order(
+                [*errors, f"failed to prepare fixture workspace: {error}"]
+            ),
+            warnings=_dedupe_preserve_order(warnings),
+            next_actions=_dedupe_preserve_order(
+                [*next_actions, "resolve fixture workspace preparation before execution"]
+            ),
+        )
     stdout_file = run_dir / "stdout.txt"
     stderr_file = run_dir / "stderr.txt"
     stdout_file.write_text(command_result.stdout, encoding="utf-8")
@@ -8754,6 +8883,7 @@ def _discover_public_issue_failure_signal_record(
         policy_reason=policy_reason,
         stdout_path=str(stdout_file),
         stderr_path=str(stderr_file),
+        fixture_paths=fixture_paths,
         candidate_failure_signals=candidate_failure_signals,
         errors=_dedupe_preserve_order(errors),
         warnings=_dedupe_preserve_order(warnings),
@@ -8786,6 +8916,11 @@ def _execute_public_issue_reproduction_record(
     errors = _string_list(record.get("blockers"))
     warnings = _string_list(record.get("warnings"))
     next_actions = _string_list(record.get("next_actions"))
+    fixture_files, fixture_errors = _normalize_public_issue_fixture_files(
+        record.get("fixture_files")
+    )
+    fixture_paths = _public_issue_fixture_paths(fixture_files)
+    errors.extend(fixture_errors)
 
     exit_code: int | None = None
     timed_out = False
@@ -8849,6 +8984,7 @@ def _execute_public_issue_reproduction_record(
             policy_reason=policy_reason,
             stdout_path=stdout_path,
             stderr_path=stderr_path,
+            fixture_paths=fixture_paths,
             matched_failure_signals=matched_failure_signals,
             missing_failure_signals=missing_failure_signals,
             errors=_dedupe_preserve_order(errors),
@@ -8880,6 +9016,7 @@ def _execute_public_issue_reproduction_record(
             policy_reason=policy_reason,
             stdout_path=stdout_path,
             stderr_path=stderr_path,
+            fixture_paths=fixture_paths,
             matched_failure_signals=matched_failure_signals,
             missing_failure_signals=missing_failure_signals,
             errors=[],
@@ -8894,11 +9031,61 @@ def _execute_public_issue_reproduction_record(
     assert command is not None
     run_dir = run_logs_dir / _safe_artifact_name(task_id or repository or "task")
     run_dir.mkdir(parents=True, exist_ok=True)
-    command_result = runner.run(
-        command=command,
-        workspace=workspace,
-        timeout_seconds=timeout_seconds,
-    )
+    try:
+        if fixture_files:
+            with tempfile.TemporaryDirectory(
+                prefix="patchsmith-public-repro-fixtures-"
+            ) as tmp_dir:
+                fixture_workspace = Path(tmp_dir) / "repo"
+                snapshot = clone_or_copy_repository(str(workspace), fixture_workspace)
+                _write_public_issue_fixture_files(
+                    repo_path=snapshot.repo_path,
+                    fixture_files=fixture_files,
+                )
+                command_result = runner.run(
+                    command=command,
+                    workspace=snapshot.repo_path,
+                    timeout_seconds=timeout_seconds,
+                )
+        else:
+            command_result = runner.run(
+                command=command,
+                workspace=workspace,
+                timeout_seconds=timeout_seconds,
+            )
+    except (OSError, ValueError) as error:
+        return IssueCorpusPublicReproductionExecutionResult(
+            task_id=task_id,
+            repository=repository,
+            issue_url=issue_url,
+            status="blocked",
+            reproduction_plan_status=plan_status,
+            repo_path=repo_path_value,
+            reproduction_command=command,
+            expected_failure_signals=expected_failure_signals,
+            manual_spec_required=manual_spec_required,
+            sandbox_mode=sandbox_mode,
+            sandbox_image=sandbox_image,
+            sandbox_network=sandbox_network,
+            dry_run=dry_run,
+            exit_code=exit_code,
+            timed_out=timed_out,
+            duration_ms=duration_ms,
+            policy_allowed=policy_allowed,
+            policy_reason=policy_reason,
+            stdout_path=stdout_path,
+            stderr_path=stderr_path,
+            fixture_paths=fixture_paths,
+            matched_failure_signals=matched_failure_signals,
+            missing_failure_signals=missing_failure_signals,
+            errors=_dedupe_preserve_order(
+                [*errors, f"failed to prepare fixture workspace: {error}"]
+            ),
+            warnings=_dedupe_preserve_order(warnings),
+            next_actions=_dedupe_preserve_order(
+                [*next_actions, "resolve fixture workspace preparation before execution"]
+            ),
+        )
     stdout_file = run_dir / "stdout.txt"
     stderr_file = run_dir / "stderr.txt"
     stdout_file.write_text(command_result.stdout, encoding="utf-8")
@@ -8968,6 +9155,7 @@ def _execute_public_issue_reproduction_record(
         policy_reason=policy_reason,
         stdout_path=stdout_path,
         stderr_path=stderr_path,
+        fixture_paths=fixture_paths,
         matched_failure_signals=matched_failure_signals,
         missing_failure_signals=missing_failure_signals,
         errors=_dedupe_preserve_order(errors),
@@ -9503,6 +9691,95 @@ def _load_public_issue_reproduction_specs(path: Path) -> dict[str, dict[str, Any
             raise ValueError(f"duplicate reproduction spec for task_id: {task_id}")
         specs[task_id] = raw_record
     return specs
+
+
+def _normalize_public_issue_fixture_files(
+    value: Any,
+) -> tuple[list[dict[str, str]], list[str]]:
+    if value is None:
+        return [], []
+    if not isinstance(value, list):
+        return [], ["fixture_files must be a list"]
+
+    fixture_files: list[dict[str, str]] = []
+    errors: list[str] = []
+    seen_paths: set[str] = set()
+    for index, raw_fixture in enumerate(value, start=1):
+        if not isinstance(raw_fixture, dict):
+            errors.append(f"fixture_files[{index}] must be an object")
+            continue
+        raw_path = _optional_string(raw_fixture.get("path"))
+        if raw_path is None or not raw_path.strip():
+            errors.append(f"fixture_files[{index}].path is missing")
+            continue
+        path = Path(raw_path)
+        normalized_path = path.as_posix()
+        if path.is_absolute():
+            errors.append(
+                f"fixture_files[{index}].path must be repository-relative: {raw_path}"
+            )
+            continue
+        if raw_path.endswith(("/", "\\")) or normalized_path in {"", "."}:
+            errors.append(f"fixture_files[{index}].path must name a file: {raw_path}")
+            continue
+        if any(part in {"..", ""} for part in path.parts):
+            errors.append(
+                f"fixture_files[{index}].path cannot contain traversal: {raw_path}"
+            )
+            continue
+        if any(part == ".git" for part in path.parts):
+            errors.append(
+                f"fixture_files[{index}].path cannot target Git metadata: {raw_path}"
+            )
+            continue
+        if normalized_path in seen_paths:
+            errors.append(f"fixture_files[{index}].path is duplicated: {normalized_path}")
+            continue
+        content = raw_fixture.get("content")
+        if not isinstance(content, str):
+            errors.append(f"fixture_files[{index}].content must be a string")
+            continue
+        content_size = len(content.encode("utf-8"))
+        if content_size > PUBLIC_ISSUE_FIXTURE_FILE_MAX_BYTES:
+            errors.append(
+                f"fixture_files[{index}].content exceeds "
+                f"{PUBLIC_ISSUE_FIXTURE_FILE_MAX_BYTES} bytes"
+            )
+            continue
+        seen_paths.add(normalized_path)
+        fixture_files.append({"path": normalized_path, "content": content})
+    return fixture_files, errors
+
+
+def _public_issue_fixture_paths(fixture_files: list[dict[str, str]]) -> list[str]:
+    return [
+        fixture["path"]
+        for fixture in fixture_files
+        if isinstance(fixture.get("path"), str) and fixture["path"]
+    ]
+
+
+def _write_public_issue_fixture_files(
+    *,
+    repo_path: Path,
+    fixture_files: list[dict[str, str]],
+) -> None:
+    root = repo_path.resolve()
+    for fixture in fixture_files:
+        relative_path = Path(fixture["path"])
+        target = (root / relative_path).resolve()
+        try:
+            target.relative_to(root)
+        except ValueError as error:
+            raise ValueError(
+                f"fixture file escapes repository workspace: {fixture['path']}"
+            ) from error
+        if target.exists() and target.is_dir():
+            raise IsADirectoryError(
+                f"fixture file target is an existing directory: {fixture['path']}"
+            )
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(fixture["content"], encoding="utf-8")
 
 
 def _records_by_task_id(records: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:

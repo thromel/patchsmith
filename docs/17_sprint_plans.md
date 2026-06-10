@@ -968,6 +968,11 @@ Reason:
 | S10-T16 | Evidence freshness | PatchSmith | `project-status` freshness table plus stale/undated source counters |
 | S10-T17 | Docker evidence refresh | PatchSmith | `refresh-evidence --include-docker-smoke` opt-in path before launch/status reports |
 | S10-T18 | Environment readiness | PatchSmith | `environment-readiness` command plus Docker/OpenAI/adapter prerequisite summary |
+| S10-T19 | Reproduction fixtures | PatchSmith | Reviewed `fixture_files` specs applied only to disposable reproduction/discovery workspaces |
+
+### Sprint 10 implementation update: reviewed reproduction fixtures
+
+Started. Reviewed public issue reproduction specs now accept optional `fixture_files` entries with repository-relative paths and string content. Planning, spec validation, failure-signal discovery, and reproduction execution all surface fixture counts and paths in generated JSON/CSV/Markdown artifacts. Discovery and execution copy the repository snapshot to a temporary workspace before writing fixtures, so reviewed repro tests can be encoded without mutating the source snapshot. Unsafe fixture paths, traversal, Git metadata targets, duplicate paths, non-string content, and oversized fixture content are blocked before execution. This is still reproduction plumbing; a task is only reproduced after execution records a nonzero exit and matches every reviewed expected failure signal.
 
 ## Completed Sprint 9 task breakdown
 

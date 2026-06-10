@@ -9,18 +9,21 @@
     {
       "task_id": "pytest_14552_moved_file_filename",
       "command": null,
+      "fixture_files": [],
       "expected_failure_signals": [],
       "review_notes": "Fill after reviewing the issue-specific failing traceback, assertion, or behavior mismatch."
     },
     {
       "task_id": "requests_7223_chardet_extra",
       "command": null,
+      "fixture_files": [],
       "expected_failure_signals": [],
       "review_notes": "Fill after reviewing the issue-specific failing traceback, assertion, or behavior mismatch."
     },
     {
       "task_id": "requests_7341_chunked_encoding_docs",
       "command": null,
+      "fixture_files": [],
       "expected_failure_signals": [],
       "review_notes": "Fill after reviewing the issue-specific failing traceback, assertion, or behavior mismatch."
     }
