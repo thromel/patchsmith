@@ -167,7 +167,7 @@ PYTHONPATH=src python3 -m patchsmith.cli docker-smoke \
   --json
 ```
 
-Current Docker smoke output records `not_available` when Docker is not reachable. A passing Docker smoke artifact is required before claiming Docker-sandboxed seeded tests.
+Current Docker smoke output records `not_available` when Docker is not reachable, including Docker-related environment/socket diagnostics and remediation commands. A passing Docker smoke artifact is required before claiming Docker-sandboxed seeded tests.
 
 Generate the public issue corpus report:
 

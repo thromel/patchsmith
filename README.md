@@ -162,7 +162,7 @@ PYTHONPATH=src python3 -m patchsmith.cli docker-smoke \
   --json
 ```
 
-The report records Docker daemon availability, local smoke-image availability, and the seeded Docker test run when available. If the daemon is unavailable, it records `not_available` evidence instead of silently skipping the gate.
+The report records Docker daemon availability, local smoke-image availability, the seeded Docker test run when available, Docker-related environment/socket diagnostics, and remediation commands. If the daemon is unavailable, it records `not_available` evidence instead of silently skipping the gate.
 
 Run a deterministic patch smoke task:
 

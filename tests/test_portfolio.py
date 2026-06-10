@@ -1053,8 +1053,12 @@ def test_docker_smoke_report_records_unavailable_daemon(
     assert statuses["Seeded Docker Test Run"] == "skipped"
     rendered = (tmp_path / "docker_smoke.md").read_text(encoding="utf-8")
     assert "# PatchSmith Docker Smoke Report" in rendered
+    assert "## Environment" in rendered
+    assert "docker context ls" in rendered
     payload = json.loads((tmp_path / "docker_smoke.json").read_text(encoding="utf-8"))
     assert payload["smoke_status"] == "not_available"
+    assert payload["environment"]["docker_binary"] == "docker"
+    assert payload["remediation_commands"][0] == "docker context ls"
 
     cli_output = tmp_path / "cli_docker_smoke.md"
     cli_json_output = tmp_path / "cli_docker_smoke.json"
@@ -1075,6 +1079,8 @@ def test_docker_smoke_report_records_unavailable_daemon(
     assert exit_code == 0
     cli_payload = json.loads(capsys.readouterr().out)
     assert cli_payload["smoke_status"] == "not_available"
+    assert cli_payload["environment"]["docker_binary"] == "docker"
+    assert "docker version" in cli_payload["remediation_commands"]
     assert cli_output.exists()
 
 
@@ -1105,6 +1111,9 @@ def test_docker_smoke_report_can_stop_after_preflight(
     assert statuses["Smoke Image"] == "passed"
     assert statuses["Seeded Docker Test Run"] == "skipped"
     assert "docker/seeded-smoke.Dockerfile" in report.build_command
+    assert report.remediation_commands[-1].startswith(
+        "PYTHONPATH=src python3 -m patchsmith.cli docker-smoke"
+    )
 
 
 def test_release_hygiene_requires_committed_clean_git_repository(tmp_path: Path) -> None:

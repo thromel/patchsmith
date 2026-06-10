@@ -135,6 +135,8 @@ class DockerSmokeReport:
     run_id: str | None
     test_exit_code: int | None
     checks: list[DockerSmokeCheck]
+    environment: dict[str, str]
+    remediation_commands: list[str]
     build_command: str
     smoke_command: str
 
@@ -155,6 +157,8 @@ class DockerSmokeReport:
             "run_id": self.run_id,
             "test_exit_code": self.test_exit_code,
             "checks": [check.to_dict() for check in self.checks],
+            "environment": self.environment,
+            "remediation_commands": self.remediation_commands,
             "build_command": self.build_command,
             "smoke_command": self.smoke_command,
         }
@@ -807,6 +811,14 @@ def build_docker_smoke_report(
                 )
             )
 
+    build_command = (
+        f"{docker_binary} build -f docker/seeded-smoke.Dockerfile "
+        f"-t {image} ."
+    )
+    smoke_command = (
+        "PYTHONPATH=src python3 -m patchsmith.cli docker-smoke "
+        f"--image {image} --json"
+    )
     return DockerSmokeReport(
         project_root=str(project_root),
         artifacts_dir=str(artifacts_dir),
@@ -823,14 +835,14 @@ def build_docker_smoke_report(
         run_id=run_id,
         test_exit_code=test_exit_code,
         checks=checks,
-        build_command=(
-            f"{docker_binary} build -f docker/seeded-smoke.Dockerfile "
-            f"-t {image} ."
+        environment=_docker_environment_snapshot(docker_binary),
+        remediation_commands=_docker_remediation_commands(
+            docker_binary=docker_binary,
+            build_command=build_command,
+            smoke_command=smoke_command,
         ),
-        smoke_command=(
-            "PYTHONPATH=src python3 -m patchsmith.cli docker-smoke "
-            f"--image {image} --json"
-        ),
+        build_command=build_command,
+        smoke_command=smoke_command,
     )
 
 
@@ -903,7 +915,24 @@ def render_docker_smoke_report(report: DockerSmokeReport) -> str:
     lines.extend(
         [
             "",
+            "## Environment",
+            "",
+            "| Key | Value |",
+            "|---|---|",
+        ]
+    )
+    for key, value in report.environment.items():
+        lines.append(f"| {key} | {_markdown_cell(value)} |")
+    lines.extend(
+        [
+            "",
             "## Commands",
+            "",
+            "Diagnostic and remediation commands:",
+            "",
+            "```bash",
+            *report.remediation_commands,
+            "```",
             "",
             "Build the seeded smoke image:",
             "",
@@ -2148,6 +2177,32 @@ def _docker_image_check(docker_binary: str, image: str) -> DockerSmokeCheck:
         evidence=f"`{image}` is available locally.",
         next_action="No action needed.",
     )
+
+
+def _docker_environment_snapshot(docker_binary: str) -> dict[str, str]:
+    home_socket = Path.home() / ".docker" / "run" / "docker.sock"
+    default_socket = Path("/var/run/docker.sock")
+    return {
+        "docker_binary": docker_binary,
+        "DOCKER_HOST": os.environ.get("DOCKER_HOST", "unset"),
+        "DOCKER_CONTEXT": os.environ.get("DOCKER_CONTEXT", "unset"),
+        str(home_socket): "exists" if home_socket.exists() else "missing",
+        str(default_socket): "exists" if default_socket.exists() else "missing",
+    }
+
+
+def _docker_remediation_commands(
+    *,
+    docker_binary: str,
+    build_command: str,
+    smoke_command: str,
+) -> list[str]:
+    return [
+        f"{docker_binary} context ls",
+        f"{docker_binary} version",
+        build_command,
+        smoke_command,
+    ]
 
 
 def _run_docker_seeded_smoke(

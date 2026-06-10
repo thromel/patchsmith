@@ -961,6 +961,8 @@ def main(argv: list[str] | None = None) -> int:
                         "task_dir": report.task_dir,
                         "run_id": report.run_id,
                         "test_exit_code": report.test_exit_code,
+                        "environment": report.environment,
+                        "remediation_commands": report.remediation_commands,
                         "report_path": str(Path(args.output)),
                         "json_path": str(json_output_path) if json_output_path else None,
                     },

@@ -356,7 +356,7 @@ PYTHONPATH=src python3 -m patchsmith.cli docker-smoke \
   --json
 ```
 
-The Docker smoke report preserves daemon, image, and seeded-run evidence. `not_available` means Docker was not reachable in the current shell; it does not satisfy the MVP Docker checkbox.
+The Docker smoke report preserves daemon, image, seeded-run evidence, Docker-related environment/socket diagnostics, and remediation commands. `not_available` means Docker was not reachable in the current shell; it does not satisfy the MVP Docker checkbox.
 
 Artifact index:
 
