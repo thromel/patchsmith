@@ -1,0 +1,73 @@
+{
+  "corpus_id": "public_issue_smoke_v1",
+  "description": "Public real-world Python issue candidates for PatchSmith external evaluation planning.",
+  "captured_at": "2026-06-10T08:16:00Z",
+  "selection_criteria": [
+    "public GitHub issue",
+    "Python repository",
+    "maintenance task suitable for retrieval and patch planning",
+    "issue was open when checked through the GitHub API"
+  ],
+  "issues": [
+    {
+      "task_id": "requests_7341_chunked_encoding_docs",
+      "source": "github_issue",
+      "repository": "psf/requests",
+      "repo_url": "https://github.com/psf/requests",
+      "issue_url": "https://github.com/psf/requests/issues/7341",
+      "issue_number": 7341,
+      "title": "Documentation for ChunkedEncodingError is either incorrect or very misleading",
+      "language": "python",
+      "task_type": "documentation_bug",
+      "state_at_capture": "open",
+      "captured_at": "2026-06-10T08:16:00Z",
+      "expected_workflow": [
+        "clone public repository",
+        "reproduce documentation or behavior mismatch",
+        "retrieve relevant docs and exception implementation",
+        "propose patch and run focused tests or docs checks"
+      ],
+      "selection_reason": "Requests is a mature Python maintenance target and the issue requires repository understanding beyond a toy fixture."
+    },
+    {
+      "task_id": "requests_7223_chardet_extra",
+      "source": "github_issue",
+      "repository": "psf/requests",
+      "repo_url": "https://github.com/psf/requests",
+      "issue_url": "https://github.com/psf/requests/issues/7223",
+      "issue_number": 7223,
+      "title": "Chardet is used, when it is available, not when `[use-chardet-on-py3]`-extra is installed",
+      "language": "python",
+      "task_type": "dependency_behavior_bug",
+      "state_at_capture": "open",
+      "captured_at": "2026-06-10T08:16:00Z",
+      "expected_workflow": [
+        "clone public repository",
+        "inspect dependency extra behavior",
+        "retrieve charset detection paths and packaging metadata",
+        "propose patch and run focused test matrix"
+      ],
+      "selection_reason": "The issue exercises packaging metadata, optional dependencies, and runtime behavior in a real Python library."
+    },
+    {
+      "task_id": "pytest_14552_moved_file_filename",
+      "source": "github_issue",
+      "repository": "pytest-dev/pytest",
+      "repo_url": "https://github.com/pytest-dev/pytest",
+      "issue_url": "https://github.com/pytest-dev/pytest/issues/14552",
+      "issue_number": 14552,
+      "title": "The old co_filename is used when test files/folders are moved",
+      "language": "python",
+      "task_type": "test_runner_behavior_bug",
+      "state_at_capture": "open",
+      "captured_at": "2026-06-10T08:16:00Z",
+      "expected_workflow": [
+        "clone public repository",
+        "reproduce file move behavior",
+        "retrieve collection and traceback filename handling code",
+        "propose patch and run focused pytest tests"
+      ],
+      "selection_reason": "The issue targets a complex test-runner behavior that should stress retrieval and multi-file reasoning more than seeded fixtures."
+    }
+  ]
+}

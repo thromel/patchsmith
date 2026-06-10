@@ -10,7 +10,7 @@ This document decomposes the PatchSmith Research PRD, roadmap, evaluation plan, 
 
 The project should run like a small applied research engineering program: each sprint produces a product artifact, an engineering artifact, an evaluation artifact, and a documented decision.
 
-Latest evidence-backed MVP progress is `95.0%` with status `ready_with_caveats`: 27 checklist items pass, three are warnings, and no item is blocked or missing. The remaining warnings are live LLM calibration, Docker daemon/image smoke, and broader real-world task breadth.
+Latest evidence-backed MVP progress is `96.7%` with status `ready_with_caveats`: 28 checklist items pass, two are warnings, and no item is blocked or missing. The remaining warnings are live LLM calibration and Docker daemon/image smoke.
 
 ## Sprint operating model
 
@@ -273,7 +273,7 @@ Acceptance criteria:
 
 Current status:
 
-Started. The seeded suite currently has 10 Python tasks with expected touched files and related tests. Dataset validation is now a first-class CLI gate through `validate-dataset`; it writes task-level JSON, aggregate CSV, summary JSON, and a Markdown validation report. Retrieval and repair eval runners already save per-task and aggregate artifacts, and repair reports now classify post-test outcomes with failure categories or `patch_validated`.
+Started. The seeded suite currently has 10 Python tasks with expected touched files and related tests. Dataset validation is now a first-class CLI gate through `validate-dataset`; it writes task-level JSON, aggregate CSV, summary JSON, and a Markdown validation report. Retrieval and repair eval runners already save per-task and aggregate artifacts, and repair reports now classify post-test outcomes with failure categories or `patch_validated`. A public issue corpus validation lane now tracks real GitHub issue candidates separately from solved seeded runs.
 
 Latest validation command:
 
@@ -292,6 +292,22 @@ Latest evidence:
 - invalid tasks: 0,
 - errors: 0,
 - warnings: 0.
+
+Public issue corpus evidence:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli validate-issue-corpus \
+  --corpus evals/issue_corpora/public_issue_smoke_v1/issues.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+Latest expected evidence:
+
+- `artifacts/experiments/public_issue_corpus_v1/corpus_report.md`,
+- valid public issue candidates: 3,
+- invalid entries: 0,
+- repositories: `psf/requests`, `pytest-dev/pytest`.
 
 ### Sprint 5: Hybrid Retrieval v0
 

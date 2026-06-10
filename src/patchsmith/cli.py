@@ -10,6 +10,7 @@ from patchsmith.evaluation import (
     run_repair_evaluation,
     run_scaffold_comparison,
     run_retrieval_evaluation,
+    validate_issue_corpus,
     validate_seeded_dataset,
 )
 from patchsmith.ingest import clone_or_copy_repository, index_repository
@@ -163,6 +164,30 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Report: {Path(args.output) / 'validation_report.md'}")
             print(
                 f"valid={summary.valid_tasks}/{summary.task_count} "
+                f"errors={summary.error_count} warnings={summary.warning_count}"
+            )
+        return 0
+
+    if args.command == "validate-issue-corpus":
+        results, summary = validate_issue_corpus(
+            corpus_path=Path(args.corpus),
+            output_dir=Path(args.output),
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "result_count": len(results),
+                        "report_path": str(Path(args.output) / "corpus_report.md"),
+                        "summary": summary.to_dict(),
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(f"Report: {Path(args.output) / 'corpus_report.md'}")
+            print(
+                f"valid={summary.valid_entries}/{summary.entry_count} "
                 f"errors={summary.error_count} warnings={summary.warning_count}"
             )
         return 0
@@ -774,6 +799,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="Dataset validation output directory.",
     )
     validate_dataset.add_argument("--json", action="store_true", help="Print JSON summary.")
+
+    validate_issue_corpus_parser = subparsers.add_parser(
+        "validate-issue-corpus",
+        help="Validate public issue-corpus metadata for real-world eval planning.",
+    )
+    validate_issue_corpus_parser.add_argument(
+        "--corpus",
+        default="evals/issue_corpora/public_issue_smoke_v1/issues.json",
+        help="Issue corpus JSON manifest.",
+    )
+    validate_issue_corpus_parser.add_argument(
+        "--output",
+        default="artifacts/experiments/public_issue_corpus_v1",
+        help="Issue corpus validation output directory.",
+    )
+    validate_issue_corpus_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print JSON summary.",
+    )
 
     eval_repair = subparsers.add_parser(
         "eval-repair", help="Run seeded repair tasks and write aggregate reports."

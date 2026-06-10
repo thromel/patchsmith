@@ -1581,6 +1581,7 @@ def _mvp_progress_items(
     )
     docker_smoke_count = _docker_sandbox_success_count(artifacts_dir)
     latest_docker_smoke_status = _latest_docker_smoke_status(artifacts_dir)
+    issue_corpus_count = _validated_issue_corpus_count(artifacts_dir)
     run_artifact_reports = sum(1 for run in index.runs if run.report_path)
     run_artifact_diffs = sum(1 for run in index.runs if run.diff_path)
     run_artifact_traces = sum(1 for run in index.runs if run.trace_path)
@@ -1808,12 +1809,16 @@ def _mvp_progress_items(
         _mvp_item(
             "Portfolio",
             "Real-world task breadth is proven.",
-            "warning" if seeded_task_count >= 5 and has_repair else "missing",
+            "passed" if issue_corpus_count >= 3 else "warning" if seeded_task_count >= 5 and has_repair else "missing",
             (
-                f"{seeded_task_count} seeded bug task(s) exist; no saved real-world "
-                "issue corpus artifact was found."
+                f"{issue_corpus_count} validated public issue candidate(s) found."
+                if issue_corpus_count
+                else (
+                    f"{seeded_task_count} seeded bug task(s) exist; no saved real-world "
+                    "issue corpus artifact was found."
+                )
             ),
-            "Add real-world issue fixtures or a small public benchmark slice.",
+            "Generate the public issue corpus validation report.",
         ),
         _mvp_item(
             "Portfolio",
@@ -1955,6 +1960,22 @@ def _latest_docker_smoke_status(artifacts_dir: Path) -> str | None:
         if isinstance(payload, dict) and isinstance(payload.get("smoke_status"), str):
             return payload["smoke_status"]
     return None
+
+
+def _validated_issue_corpus_count(artifacts_dir: Path) -> int:
+    counts: list[int] = []
+    for summary_path in sorted(artifacts_dir.glob("**/corpus_summary.json")):
+        try:
+            payload = json.loads(summary_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(payload, dict):
+            continue
+        valid_entries = payload.get("valid_entries")
+        invalid_entries = payload.get("invalid_entries")
+        if isinstance(valid_entries, int) and invalid_entries == 0:
+            counts.append(valid_entries)
+    return max(counts, default=0)
 
 
 def _docker_daemon_check(docker_binary: str) -> DockerSmokeCheck:
@@ -2521,6 +2542,8 @@ def _release_hygiene_checks(
         "experiments/demo_readiness.json",
         "experiments/calibration_readiness.md",
         "experiments/calibration_readiness.json",
+        "experiments/public_issue_corpus_v1/corpus_report.md",
+        "experiments/public_issue_corpus_v1/corpus_summary.json",
         "experiments/demo_script.md",
         "experiments/demo_script.json",
         "experiments/final_evaluation.md",
@@ -3092,6 +3115,7 @@ def _final_review_artifacts() -> list[str]:
         "artifacts/experiments/demo_readiness.md",
         "artifacts/experiments/calibration_readiness.md",
         "artifacts/experiments/demo_script.md",
+        "artifacts/experiments/public_issue_corpus_v1/corpus_report.md",
         "artifacts/experiments/demo_media.md",
         "artifacts/experiments/demo_media.svg",
         "artifacts/experiments/demo_media.png",

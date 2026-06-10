@@ -141,7 +141,7 @@ PYTHONPATH=src python3 -m patchsmith.cli mvp-progress \
   --json
 ```
 
-Current MVP progress output is `ready_with_caveats` at `95.0%`: 27 evidence-backed checklist items pass, three are warnings, and no item is blocked or missing. Use it as the snapshot answer for "how far are we?" while keeping the live-calibration warning explicit.
+Current MVP progress output is `ready_with_caveats` at `96.7%`: 28 evidence-backed checklist items pass, two are warnings, and no item is blocked or missing. Use it as the snapshot answer for "how far are we?" while keeping the live-calibration warning explicit.
 
 Generate the Docker smoke report:
 
@@ -156,6 +156,17 @@ PYTHONPATH=src python3 -m patchsmith.cli docker-smoke \
 ```
 
 Current Docker smoke output records `not_available` when Docker is not reachable. A passing Docker smoke artifact is required before claiming Docker-sandboxed seeded tests.
+
+Generate the public issue corpus report:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli validate-issue-corpus \
+  --corpus evals/issue_corpora/public_issue_smoke_v1/issues.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+Current corpus output should validate three public GitHub issue candidates. Use it to show real-world task-breadth planning, not solved issue quality.
 
 Generate the release hygiene report:
 

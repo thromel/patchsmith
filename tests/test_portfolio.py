@@ -53,6 +53,8 @@ def _write_release_hygiene_fixture(project_root: Path, artifacts_dir: Path) -> N
         "experiments/demo_readiness.json",
         "experiments/calibration_readiness.md",
         "experiments/calibration_readiness.json",
+        "experiments/public_issue_corpus_v1/corpus_report.md",
+        "experiments/public_issue_corpus_v1/corpus_summary.json",
         "experiments/demo_script.md",
         "experiments/demo_script.json",
         "experiments/demo_media.md",
@@ -571,9 +573,11 @@ def test_demo_readiness_report_summarizes_launch_evidence(
         "experiments/failure_report.json",
         "experiments/demo_readiness.md",
         "experiments/demo_readiness.json",
-        "experiments/calibration_readiness.md",
-        "experiments/calibration_readiness.json",
-        "experiments/demo_script.md",
+            "experiments/calibration_readiness.md",
+            "experiments/calibration_readiness.json",
+            "experiments/public_issue_corpus_v1/corpus_report.md",
+            "experiments/public_issue_corpus_v1/corpus_summary.json",
+            "experiments/demo_script.md",
         "experiments/demo_script.json",
         "experiments/demo_media.md",
         "experiments/demo_media.json",
@@ -829,6 +833,29 @@ def test_mvp_progress_report_scores_checklist_from_evidence(
     assert cli_payload["status"] == "ready_with_caveats"
     assert cli_payload["completion_percent"] >= 85.0
     assert cli_output.exists()
+
+
+def test_mvp_progress_report_counts_validated_public_issue_corpus(
+    tmp_path: Path,
+) -> None:
+    artifacts_dir = tmp_path / "artifacts"
+    _write_progress_artifact_fixture(artifacts_dir)
+    corpus_dir = artifacts_dir / "experiments" / "public_issue_corpus_v1"
+    corpus_dir.mkdir(parents=True)
+    (corpus_dir / "corpus_summary.json").write_text(
+        json.dumps({"valid_entries": 3, "invalid_entries": 0}),
+        encoding="utf-8",
+    )
+
+    report = write_mvp_progress_report(
+        project_root=Path("."),
+        artifacts_dir=artifacts_dir,
+        output_path=tmp_path / "mvp_progress.md",
+    )
+
+    item_statuses = {item.item: item.status for item in report.items}
+    assert item_statuses["Real-world task breadth is proven."] == "passed"
+    assert report.warning_count == 2
 
 
 def test_docker_smoke_report_records_unavailable_daemon(

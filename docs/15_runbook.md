@@ -128,6 +128,17 @@ PYTHONPATH=src python3 -m patchsmith.cli eval-repair \
 
 `fake_model` is an offline JSON model double. It exercises prompt construction, model-output parsing, retrieved-path validation, LangGraph patch application, reports, and eval metrics without live credentials.
 
+Public issue corpus validation:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli validate-issue-corpus \
+  --corpus evals/issue_corpora/public_issue_smoke_v1/issues.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+The public issue corpus records real GitHub issue candidates for future external runs. Treat a valid corpus as task-breadth evidence only; it is not solved-run evidence.
+
 Scaffold comparison:
 
 ```bash

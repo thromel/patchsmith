@@ -247,6 +247,17 @@ PYTHONPATH=src python3 -m patchsmith.cli eval-retrieval \
 
 This retrieval-only dataset checks whether `native_graph` can expand from failing test paths to imported source files. The latest run has `native_graph` at 1.00 top-1/top-3/top-5 and `native_hybrid` at 0.00 on the three graph-specific tasks.
 
+Validate the public issue corpus:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli validate-issue-corpus \
+  --corpus evals/issue_corpora/public_issue_smoke_v1/issues.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+The corpus report validates curated public GitHub issue candidates for the next external evaluation lane. It proves task-breadth planning evidence, not solved real-world repair quality.
+
 Run the seeded repair evaluation:
 
 ```bash
@@ -383,7 +394,7 @@ PYTHONPATH=src python3 -m patchsmith.cli mvp-progress \
   --json
 ```
 
-Latest MVP progress evidence is saved in `artifacts/experiments/mvp_progress.md` and `artifacts/experiments/mvp_progress.json`. Current status is `ready_with_caveats` at `95.0%`: 27 checklist items pass, three remain warnings, and no item is blocked or missing. The warnings are intentionally evidence-based: live LLM calibration, Docker daemon/image smoke, and full real-world task breadth are still not proven.
+Latest MVP progress evidence is saved in `artifacts/experiments/mvp_progress.md` and `artifacts/experiments/mvp_progress.json`. Current status is `ready_with_caveats` at `96.7%`: 28 checklist items pass, two remain warnings, and no item is blocked or missing. The remaining warnings are intentionally evidence-based: live LLM calibration and Docker daemon/image smoke are still not proven.
 
 Generate the live calibration readiness report:
 

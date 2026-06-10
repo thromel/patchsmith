@@ -147,6 +147,25 @@ Each `expected.json` should include:
 }
 ```
 
+Keep public issue candidates separate from seeded tasks:
+
+```text
+evals/issue_corpora/public_issue_smoke_v1/
+  issues.json
+  README.md
+```
+
+Validate the corpus before citing real-world task breadth:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli validate-issue-corpus \
+  --corpus evals/issue_corpora/public_issue_smoke_v1/issues.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+The corpus report is planning evidence. It is not repair-quality evidence until the issues are cloned, reproduced, run, and saved as normal PatchSmith artifacts.
+
 ## Definition of test completion
 
 A feature that affects runtime behavior is not complete unless it has one of:

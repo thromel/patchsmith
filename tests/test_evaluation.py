@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+from patchsmith.cli import main
 from patchsmith.evaluation import (
     load_seeded_tasks,
     recall,
@@ -9,6 +10,7 @@ from patchsmith.evaluation import (
     run_scaffold_comparison,
     run_retrieval_evaluation,
     top_k_recall,
+    validate_issue_corpus,
     validate_seeded_dataset,
 )
 
@@ -73,6 +75,79 @@ def test_validate_seeded_dataset_flags_invalid_task(tmp_path: Path) -> None:
     assert summary.invalid_tasks == 1
     assert "expected_touched_files path does not exist" in ";".join(results[0].errors)
     assert "expected_related_tests path does not exist" in ";".join(results[0].errors)
+
+
+def test_validate_issue_corpus_writes_outputs(tmp_path: Path) -> None:
+    results, summary = validate_issue_corpus(
+        corpus_path=Path("evals/issue_corpora/public_issue_smoke_v1/issues.json"),
+        output_dir=tmp_path / "public_issue_corpus",
+    )
+
+    assert len(results) == 3
+    assert summary.corpus_id == "public_issue_smoke_v1"
+    assert summary.valid_entries == 3
+    assert summary.invalid_entries == 0
+    assert summary.open_issue_count == 3
+    assert "psf/requests" in summary.repositories
+    assert "pytest-dev/pytest" in summary.repositories
+    assert (tmp_path / "public_issue_corpus" / "corpus_report.md").exists()
+    assert (tmp_path / "public_issue_corpus" / "corpus_results.csv").exists()
+    assert (tmp_path / "public_issue_corpus" / "corpus_summary.json").exists()
+    report = (tmp_path / "public_issue_corpus" / "corpus_report.md").read_text(
+        encoding="utf-8"
+    )
+    assert "Claim Boundary" in report
+
+    cli_output = tmp_path / "cli_public_issue_corpus"
+    exit_code = main(
+        [
+            "validate-issue-corpus",
+            "--corpus",
+            "evals/issue_corpora/public_issue_smoke_v1/issues.json",
+            "--output",
+            str(cli_output),
+            "--json",
+        ]
+    )
+    assert exit_code == 0
+    assert (cli_output / "corpus_report.md").exists()
+
+
+def test_validate_issue_corpus_flags_bad_metadata(tmp_path: Path) -> None:
+    corpus_path = tmp_path / "issues.json"
+    corpus_path.write_text(
+        json.dumps(
+            {
+                "corpus_id": "bad",
+                "issues": [
+                    {
+                        "task_id": "bad task",
+                        "repository": "requests",
+                        "repo_url": "https://example.com/requests",
+                        "issue_url": "https://github.com/psf/requests/issues/1",
+                        "title": "bad",
+                        "language": "python",
+                        "task_type": "bug",
+                        "state_at_capture": "open",
+                        "captured_at": "2026-06-10T08:16:00Z",
+                        "expected_workflow": ["clone"],
+                        "selection_reason": "bad metadata",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    results, summary = validate_issue_corpus(
+        corpus_path=corpus_path,
+        output_dir=tmp_path / "out",
+    )
+
+    assert summary.invalid_entries == 1
+    assert "task_id contains unsafe characters" in ";".join(results[0].errors)
+    assert "repository must use owner/name format" in ";".join(results[0].errors)
+    assert "repo_url must be a GitHub URL" in ";".join(results[0].errors)
 
 
 def test_graph_retrieval_dataset_validates(tmp_path: Path) -> None:
