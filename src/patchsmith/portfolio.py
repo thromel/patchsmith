@@ -666,6 +666,7 @@ class EvidenceRefreshReport:
     failed_count: int
     skipped_count: int
     quality_gate_refreshed: bool
+    docker_smoke_refreshed: bool
     steps: list[EvidenceRefreshStep]
 
     def to_dict(self) -> dict[str, Any]:
@@ -679,6 +680,7 @@ class EvidenceRefreshReport:
             "failed_count": self.failed_count,
             "skipped_count": self.skipped_count,
             "quality_gate_refreshed": self.quality_gate_refreshed,
+            "docker_smoke_refreshed": self.docker_smoke_refreshed,
             "steps": [step.to_dict() for step in self.steps],
         }
 
@@ -1234,6 +1236,10 @@ def build_evidence_refresh_report(
     max_failure_runs: int | None = None,
     include_quality_gate: bool = False,
     quality_timeout_seconds: int = 180,
+    include_docker_smoke: bool = False,
+    docker_smoke_skip_run: bool = False,
+    docker_smoke_image: str = "patchsmith-seeded-smoke:py312",
+    docker_binary: str = "docker",
 ) -> EvidenceRefreshReport:
     project_root = project_root.resolve()
     artifacts_dir = artifacts_dir.resolve()
@@ -1311,6 +1317,35 @@ def build_evidence_refresh_report(
             ),
         )
     )
+    if include_docker_smoke:
+        steps.append(
+            _run_evidence_refresh_step(
+                name="Docker smoke",
+                artifact_paths=output_paths("docker_smoke.md", "docker_smoke.json"),
+                action=lambda: write_docker_smoke_report(
+                    project_root=project_root,
+                    artifacts_dir=artifacts_dir,
+                    output_path=experiment_path("docker_smoke.md"),
+                    json_output_path=experiment_path("docker_smoke.json"),
+                    image=docker_smoke_image,
+                    docker_binary=docker_binary,
+                    run_seeded=not docker_smoke_skip_run,
+                ),
+            )
+        )
+    else:
+        steps.append(
+            EvidenceRefreshStep(
+                name="Docker smoke",
+                status="skipped",
+                duration_ms=0,
+                artifact_paths=output_paths("docker_smoke.md", "docker_smoke.json"),
+                summary=(
+                    "Skipped by request. Run `docker-smoke` or pass "
+                    "`--include-docker-smoke` to refresh Docker sandbox evidence."
+                ),
+            )
+        )
     steps.append(
         _run_evidence_refresh_step(
             name="Demo script",
@@ -1489,6 +1524,7 @@ def build_evidence_refresh_report(
         failed_count=status_counts.get("failed", 0),
         skipped_count=status_counts.get("skipped", 0),
         quality_gate_refreshed=include_quality_gate,
+        docker_smoke_refreshed=include_docker_smoke,
         steps=steps,
     )
 
@@ -1502,6 +1538,10 @@ def write_evidence_refresh_report(
     max_failure_runs: int | None = None,
     include_quality_gate: bool = False,
     quality_timeout_seconds: int = 180,
+    include_docker_smoke: bool = False,
+    docker_smoke_skip_run: bool = False,
+    docker_smoke_image: str = "patchsmith-seeded-smoke:py312",
+    docker_binary: str = "docker",
 ) -> EvidenceRefreshReport:
     report = build_evidence_refresh_report(
         project_root=project_root,
@@ -1509,6 +1549,10 @@ def write_evidence_refresh_report(
         max_failure_runs=max_failure_runs,
         include_quality_gate=include_quality_gate,
         quality_timeout_seconds=quality_timeout_seconds,
+        include_docker_smoke=include_docker_smoke,
+        docker_smoke_skip_run=docker_smoke_skip_run,
+        docker_smoke_image=docker_smoke_image,
+        docker_binary=docker_binary,
     )
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(render_evidence_refresh_report(report), encoding="utf-8")
@@ -1534,6 +1578,7 @@ def render_evidence_refresh_report(report: EvidenceRefreshReport) -> str:
         f"- Failed: `{report.failed_count}`",
         f"- Skipped: `{report.skipped_count}`",
         f"- Quality gate refreshed: `{str(report.quality_gate_refreshed).lower()}`",
+        f"- Docker smoke refreshed: `{str(report.docker_smoke_refreshed).lower()}`",
         "",
         "## Steps",
         "",
@@ -5286,6 +5331,11 @@ def _evidence_refresh_summary(result: Any) -> str:
         )
     if hasattr(result, "refresh_status"):
         return f"refresh_status={result.refresh_status}"
+    if hasattr(result, "smoke_status"):
+        return (
+            f"smoke_status={result.smoke_status}, "
+            f"run_id={getattr(result, 'run_id', None) or 'none'}"
+        )
     if hasattr(result, "quality_status"):
         return (
             f"quality_status={result.quality_status}, "

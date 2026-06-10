@@ -1291,6 +1291,10 @@ def main(argv: list[str] | None = None) -> int:
             max_failure_runs=max_failure_runs,
             include_quality_gate=args.include_quality_gate,
             quality_timeout_seconds=args.quality_timeout_seconds,
+            include_docker_smoke=args.include_docker_smoke,
+            docker_smoke_skip_run=args.docker_smoke_skip_run,
+            docker_smoke_image=args.docker_smoke_image,
+            docker_binary=args.docker_binary,
         )
         if args.json:
             print(
@@ -1305,6 +1309,7 @@ def main(argv: list[str] | None = None) -> int:
                         "failed_count": report.failed_count,
                         "skipped_count": report.skipped_count,
                         "quality_gate_refreshed": report.quality_gate_refreshed,
+                        "docker_smoke_refreshed": report.docker_smoke_refreshed,
                         "report_path": str(Path(args.output)),
                         "json_path": str(json_output_path) if json_output_path else None,
                     },
@@ -1320,7 +1325,8 @@ def main(argv: list[str] | None = None) -> int:
                 f"Steps: {report.step_count} "
                 f"Passed: {report.passed_count} "
                 f"Failed: {report.failed_count} "
-                f"Skipped: {report.skipped_count}"
+                f"Skipped: {report.skipped_count} "
+                f"Docker: {str(report.docker_smoke_refreshed).lower()}"
             )
         return 0
 
@@ -2431,6 +2437,26 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=180,
         help="Per-command timeout for quality-gate steps when included.",
+    )
+    refresh_evidence.add_argument(
+        "--include-docker-smoke",
+        action="store_true",
+        help="Also refresh Docker sandbox smoke evidence before launch/status reports.",
+    )
+    refresh_evidence.add_argument(
+        "--docker-smoke-skip-run",
+        action="store_true",
+        help="When Docker smoke is included, stop after daemon/image preflight.",
+    )
+    refresh_evidence.add_argument(
+        "--docker-smoke-image",
+        default="patchsmith-seeded-smoke:py312",
+        help="Local Docker image to inspect and optionally run for Docker smoke.",
+    )
+    refresh_evidence.add_argument(
+        "--docker-binary",
+        default="docker",
+        help="Docker CLI binary used when Docker smoke is included.",
     )
     refresh_evidence.add_argument("--json", action="store_true", help="Print JSON summary.")
 

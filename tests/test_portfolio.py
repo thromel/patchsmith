@@ -1446,15 +1446,19 @@ def test_evidence_refresh_report_runs_lightweight_status_refresh(
 
     assert report.refresh_status == "passed_with_skips"
     assert report.failed_count == 0
-    assert report.skipped_count == 1
+    assert report.skipped_count == 2
+    assert report.docker_smoke_refreshed is False
+    assert any(step.name == "Docker smoke" and step.status == "skipped" for step in report.steps)
     assert any(step.name == "Quality gate" and step.status == "skipped" for step in report.steps)
     assert (artifacts_dir / "experiments" / "project_status.json").exists()
     assert (artifacts_dir / "experiments" / "release_hygiene.json").exists()
     rendered = output_path.read_text(encoding="utf-8")
     assert "# PatchSmith Evidence Refresh Report" in rendered
     assert "--include-quality-gate" in rendered
+    assert "--include-docker-smoke" in rendered
     payload = json.loads(json_output_path.read_text(encoding="utf-8"))
     assert payload["refresh_status"] == "passed_with_skips"
+    assert payload["docker_smoke_refreshed"] is False
 
     cli_output = tmp_path / "cli_evidence_refresh.md"
     cli_json_output = tmp_path / "cli_evidence_refresh.json"
@@ -1477,6 +1481,76 @@ def test_evidence_refresh_report_runs_lightweight_status_refresh(
     assert exit_code == 0
     cli_payload = json.loads(capsys.readouterr().out)
     assert cli_payload["refresh_status"] == "passed_with_skips"
+    assert cli_payload["skipped_count"] == 2
+    assert cli_payload["docker_smoke_refreshed"] is False
+    assert cli_output.exists()
+
+
+def test_evidence_refresh_can_refresh_docker_smoke(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    def fake_run(*_args, **_kwargs) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            ["docker", "version"],
+            1,
+            stdout="",
+            stderr="Cannot connect to the Docker daemon",
+        )
+
+    monkeypatch.setattr("patchsmith.portfolio.subprocess.run", fake_run)
+
+    artifacts_dir = tmp_path / "artifacts"
+    output_path = tmp_path / "evidence_refresh.md"
+    json_output_path = tmp_path / "evidence_refresh.json"
+    report = write_evidence_refresh_report(
+        project_root=Path("."),
+        artifacts_dir=artifacts_dir,
+        output_path=output_path,
+        json_output_path=json_output_path,
+        max_failure_runs=5,
+        include_docker_smoke=True,
+        docker_smoke_skip_run=True,
+    )
+
+    assert report.refresh_status == "passed_with_skips"
+    assert report.failed_count == 0
+    assert report.skipped_count == 1
+    assert report.docker_smoke_refreshed is True
+    docker_step = next(step for step in report.steps if step.name == "Docker smoke")
+    assert docker_step.status == "passed"
+    assert "smoke_status=not_available" in docker_step.summary
+    docker_payload = json.loads(
+        (artifacts_dir / "experiments" / "docker_smoke.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert docker_payload["smoke_status"] == "not_available"
+
+    cli_output = tmp_path / "cli_evidence_refresh.md"
+    cli_json_output = tmp_path / "cli_evidence_refresh.json"
+    exit_code = main(
+        [
+            "refresh-evidence",
+            "--project-root",
+            ".",
+            "--artifacts-dir",
+            str(artifacts_dir),
+            "--output",
+            str(cli_output),
+            "--json-output",
+            str(cli_json_output),
+            "--max-failure-runs",
+            "5",
+            "--include-docker-smoke",
+            "--docker-smoke-skip-run",
+            "--json",
+        ]
+    )
+    assert exit_code == 0
+    cli_payload = json.loads(capsys.readouterr().out)
+    assert cli_payload["docker_smoke_refreshed"] is True
     assert cli_payload["skipped_count"] == 1
     assert cli_output.exists()
 

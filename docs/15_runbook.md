@@ -447,7 +447,7 @@ PYTHONPATH=src python3 -m patchsmith.cli refresh-evidence \
   --json
 ```
 
-The evidence refresh command regenerates the lightweight review/status reports in dependency order: artifact index, failure report, demo readiness, live-calibration readiness and plan, demo script/media, final evaluation, launch blockers, MVP progress, delivery audit, project status, and release hygiene. It skips the full quality gate by default; pass `--include-quality-gate` only when the refresh should also run compile, pytest, and package build.
+The evidence refresh command regenerates the lightweight review/status reports in dependency order: artifact index, failure report, demo readiness, live-calibration readiness and plan, demo script/media, final evaluation, launch blockers, MVP progress, delivery audit, project status, and release hygiene. It skips the full quality gate and Docker smoke by default; pass `--include-quality-gate` only when the refresh should also run compile, pytest, and package build, and pass `--include-docker-smoke` when the Docker sandbox evidence should be refreshed before launch/status reports.
 
 Live calibration readiness:
 

@@ -916,6 +916,7 @@ Reason:
 | S10-T14 | Status briefing | PatchSmith | `project-status` command plus consolidated progress, verification, launch, model, and adapter evidence |
 | S10-T15 | Evidence refresh | PatchSmith | `refresh-evidence` command plus ordered review-artifact regeneration audit |
 | S10-T16 | Evidence freshness | PatchSmith | `project-status` freshness table plus stale/undated source counters |
+| S10-T17 | Docker evidence refresh | PatchSmith | `refresh-evidence --include-docker-smoke` opt-in path before launch/status reports |
 
 ## Completed Sprint 9 task breakdown
 
@@ -940,6 +941,7 @@ Reason:
 - Keep artifact indexes local and avoid copying source-bearing raw context into summary reports.
 - Treat the artifact index as a navigation surface; reports remain the source of truth for metrics and decisions.
 - Treat project-status freshness warnings as process evidence; rerun the underlying generator before sprint review when a source is stale, undated, or missing.
+- Keep Docker smoke opt-in during broad refreshes; use `--include-docker-smoke` when Docker evidence is stale or when release blockers need a current sandbox verdict.
 - Keep eval tasks small and deterministic.
 - Record generated reports under `artifacts/`, not tracked docs.
 
