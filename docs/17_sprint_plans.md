@@ -10,6 +10,8 @@ This document decomposes the PatchSmith Research PRD, roadmap, evaluation plan, 
 
 The project should run like a small applied research engineering program: each sprint produces a product artifact, an engineering artifact, an evaluation artifact, and a documented decision.
 
+Latest evidence-backed MVP progress is `95.0%` with status `ready_with_caveats`: 27 checklist items pass, three are warnings, and no item is blocked or missing. The remaining warnings are live LLM calibration, Docker daemon/image smoke, and broader real-world task breadth.
+
 ## Sprint operating model
 
 ### Cadence

@@ -21,6 +21,7 @@ from patchsmith.portfolio import (
     write_demo_script_report,
     write_final_evaluation_report,
     write_live_calibration_report,
+    write_mvp_progress_report,
     write_release_hygiene_report,
 )
 from patchsmith.retrieval import GraphRetriever, HybridRetriever, KeywordRetriever
@@ -591,6 +592,50 @@ def main(argv: list[str] | None = None) -> int:
             )
         return 0
 
+    if args.command == "mvp-progress":
+        json_output_path = Path(args.json_output) if args.json_output else None
+        max_failure_runs = None if args.max_failure_runs == 0 else args.max_failure_runs
+        report = write_mvp_progress_report(
+            project_root=Path(args.project_root),
+            artifacts_dir=Path(args.artifacts_dir),
+            output_path=Path(args.output),
+            json_output_path=json_output_path,
+            max_failure_runs=max_failure_runs,
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "project_root": report.project_root,
+                        "artifacts_dir": report.artifacts_dir,
+                        "generated_at": report.generated_at,
+                        "status": report.status,
+                        "completion_percent": report.completion_percent,
+                        "item_count": report.item_count,
+                        "passed_count": report.passed_count,
+                        "warning_count": report.warning_count,
+                        "blocked_count": report.blocked_count,
+                        "missing_count": report.missing_count,
+                        "report_path": str(Path(args.output)),
+                        "json_path": str(json_output_path) if json_output_path else None,
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(f"MVP progress report: {Path(args.output)}")
+            if json_output_path:
+                print(f"JSON: {json_output_path}")
+            print(
+                f"Status: {report.status} "
+                f"Completion: {report.completion_percent:.1f}% "
+                f"Passed: {report.passed_count} "
+                f"Warnings: {report.warning_count} "
+                f"Missing: {report.missing_count} "
+                f"Blocked: {report.blocked_count}"
+            )
+        return 0
+
     parser.print_help()
     return 2
 
@@ -1006,6 +1051,37 @@ def build_parser() -> argparse.ArgumentParser:
         help="Maximum recent runs to scan for failure visibility. Use 0 to scan all runs.",
     )
     release_hygiene.add_argument("--json", action="store_true", help="Print JSON summary.")
+
+    mvp_progress = subparsers.add_parser(
+        "mvp-progress",
+        help="Generate an evidence-weighted MVP checklist progress report.",
+    )
+    mvp_progress.add_argument(
+        "--project-root",
+        default=".",
+        help="Project root to inspect for source, docs, tests, and checklist evidence.",
+    )
+    mvp_progress.add_argument(
+        "--artifacts-dir",
+        default="artifacts",
+        help="Root artifact directory to scan.",
+    )
+    mvp_progress.add_argument(
+        "--output",
+        default="artifacts/experiments/mvp_progress.md",
+        help="Markdown MVP progress report output path.",
+    )
+    mvp_progress.add_argument(
+        "--json-output",
+        help="Optional JSON MVP progress report output path.",
+    )
+    mvp_progress.add_argument(
+        "--max-failure-runs",
+        type=int,
+        default=0,
+        help="Maximum recent runs to scan for failure visibility. Use 0 to scan all runs.",
+    )
+    mvp_progress.add_argument("--json", action="store_true", help="Print JSON summary.")
 
     return parser
 

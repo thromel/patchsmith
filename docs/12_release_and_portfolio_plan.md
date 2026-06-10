@@ -130,6 +130,19 @@ PYTHONPATH=src python3 -m patchsmith.cli final-evaluation \
 
 Current final evaluation output has `ready_with_caveats`, 29 normalized metric rows, nine decision bullets, and six limitations. Use it as the public-claim boundary for the offline seeded-suite portfolio demo.
 
+Generate the MVP progress report:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli mvp-progress \
+  --project-root . \
+  --artifacts-dir artifacts \
+  --output artifacts/experiments/mvp_progress.md \
+  --json-output artifacts/experiments/mvp_progress.json \
+  --json
+```
+
+Current MVP progress output is `ready_with_caveats` at `95.0%`: 27 evidence-backed checklist items pass, three are warnings, and no item is blocked or missing. Use it as the snapshot answer for "how far are we?" while keeping the live-calibration warning explicit.
+
 Generate the release hygiene report:
 
 ```bash

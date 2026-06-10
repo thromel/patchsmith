@@ -8,6 +8,7 @@ from patchsmith.portfolio import (
     write_demo_readiness_report,
     write_demo_script_report,
     write_live_calibration_report,
+    write_mvp_progress_report,
 )
 from patchsmith.portfolio import write_final_evaluation_report, write_release_hygiene_report
 
@@ -67,6 +68,123 @@ def _write_release_hygiene_fixture(project_root: Path, artifacts_dir: Path) -> N
 
 def _git(project_root: Path, *args: str) -> None:
     subprocess.run(["git", *args], cwd=project_root, check=True, capture_output=True, text=True)
+
+
+def _write_progress_artifact_fixture(artifacts_dir: Path) -> None:
+    retrieval_dir = artifacts_dir / "experiments" / "retrieval_eval_v1"
+    retrieval_dir.mkdir(parents=True)
+    (retrieval_dir / "report.md").write_text("# Retrieval\n", encoding="utf-8")
+    (retrieval_dir / "summary.json").write_text(
+        json.dumps(
+            [
+                {
+                    "provider": "native_hybrid",
+                    "attempted_tasks": 10,
+                    "completed_tasks": 10,
+                    "failed_tasks": 0,
+                    "avg_top5_touched_recall": 1.0,
+                    "avg_related_test_recall": 1.0,
+                    "avg_latency_ms": 3.0,
+                    "fallback_count": 0,
+                    "source_free_violation_count": 0,
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    scaffold_dir = artifacts_dir / "experiments" / "scaffold_comparison_v1"
+    scaffold_dir.mkdir(parents=True)
+    (scaffold_dir / "scaffold_report.md").write_text("# Scaffold\n", encoding="utf-8")
+    (scaffold_dir / "scaffold_results.json").write_text(
+        json.dumps(
+            [
+                {
+                    "scaffold": "langgraph_fake_model",
+                    "runtime": "langgraph",
+                    "planner": "fake_model",
+                    "attempted_tasks": 10,
+                    "completed_tasks": 10,
+                    "patch_generated_rate": 1.0,
+                    "targeted_test_pass_rate": 1.0,
+                    "avg_latency_ms": 450.0,
+                    "avg_trace_events": 15.0,
+                    "avg_runtime_nodes": 6.0,
+                    "failed_trace_event_count": 0,
+                    "model_provider": "offline_fake_model",
+                    "estimated_cost_usd": 0.0,
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    run_dir = scaffold_dir / "run_artifacts" / "runs" / "run-fail"
+    run_dir.mkdir(parents=True)
+    (run_dir / "report.md").write_text("# Run\n", encoding="utf-8")
+    (run_dir / "final.diff").write_text("diff --git a/a.py b/a.py\n", encoding="utf-8")
+    (run_dir / "logs").mkdir()
+    (run_dir / "logs" / "stdout.txt").write_text("stdout\n", encoding="utf-8")
+    (run_dir / "logs" / "stderr.txt").write_text("stderr\n", encoding="utf-8")
+    (run_dir / "traces.jsonl").write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "run_id": "run-fail",
+                        "event_id": "event-1",
+                        "node_name": "test",
+                        "event_type": "sandbox_command",
+                        "status": "failed",
+                        "latency_ms": 10,
+                        "payload": {"exit_code": 1, "sandbox_mode": "local"},
+                    }
+                ),
+                json.dumps(
+                    {
+                        "run_id": "run-fail",
+                        "event_id": "event-2",
+                        "node_name": "analyze",
+                        "event_type": "repair_outcome",
+                        "status": "unresolved",
+                        "latency_ms": 0,
+                        "payload": {
+                            "failure_category": "no_patch_generated",
+                            "verdict": "no_patch_tests_failed",
+                            "next_action": "Improve planning.",
+                            "test_exit_code": 1,
+                        },
+                    }
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    patch_search_dir = artifacts_dir / "experiments" / "patch_search_eval_v1"
+    patch_search_dir.mkdir(parents=True)
+    (patch_search_dir / "patch_search_report.md").write_text(
+        "# Patch Search\n",
+        encoding="utf-8",
+    )
+    (patch_search_dir / "patch_search_summary.json").write_text(
+        json.dumps(
+            [
+                {
+                    "variant": "candidates_3",
+                    "attempted_tasks": 10,
+                    "completed_tasks": 10,
+                    "success_at_1_rate": 1.0,
+                    "success_at_k_rate": 1.0,
+                    "selected_success_rate": 1.0,
+                    "avg_latency_ms": 1300.0,
+                    "avg_test_runs": 3.0,
+                    "estimated_cost_usd": 0.0,
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
 
 
 def test_demo_readiness_report_summarizes_launch_evidence(
@@ -655,6 +773,61 @@ def test_live_calibration_report_counts_saved_deepagents_package_runs(tmp_path: 
         "live OpenAI Agents model execution remains uncalibrated" in item
         for item in final.limitations
     )
+
+
+def test_mvp_progress_report_scores_checklist_from_evidence(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    artifacts_dir = tmp_path / "artifacts"
+    _write_progress_artifact_fixture(artifacts_dir)
+
+    output_path = tmp_path / "mvp_progress.md"
+    json_output_path = tmp_path / "mvp_progress.json"
+    report = write_mvp_progress_report(
+        project_root=Path("."),
+        artifacts_dir=artifacts_dir,
+        output_path=output_path,
+        json_output_path=json_output_path,
+        max_failure_runs=None,
+    )
+
+    assert report.status == "ready_with_caveats"
+    assert report.completion_percent >= 85.0
+    assert report.item_count == 30
+    assert report.missing_count == 0
+    assert report.blocked_count == 0
+    assert report.warning_count >= 2
+    item_statuses = {item.item: item.status for item in report.items}
+    assert item_statuses["Tests run in Docker sandbox."] == "warning"
+    assert item_statuses["Live LLM calibration has been run."] == "warning"
+    assert item_statuses["Real-world task breadth is proven."] == "warning"
+    assert item_statuses["Agent can read files through bounded tool."] == "passed"
+    assert item_statuses["LangGraph repair loop runs."] == "passed"
+    rendered = output_path.read_text(encoding="utf-8")
+    assert "# PatchSmith MVP Progress Report" in rendered
+    assert "Evidence-weighted completion" in rendered
+    payload = json.loads(json_output_path.read_text(encoding="utf-8"))
+    assert payload["completion_percent"] == report.completion_percent
+
+    cli_output = tmp_path / "cli_mvp_progress.md"
+    exit_code = main(
+        [
+            "mvp-progress",
+            "--project-root",
+            ".",
+            "--artifacts-dir",
+            str(artifacts_dir),
+            "--output",
+            str(cli_output),
+            "--json",
+        ]
+    )
+    assert exit_code == 0
+    cli_payload = json.loads(capsys.readouterr().out)
+    assert cli_payload["status"] == "ready_with_caveats"
+    assert cli_payload["completion_percent"] >= 85.0
+    assert cli_output.exists()
 
 
 def test_release_hygiene_requires_committed_clean_git_repository(tmp_path: Path) -> None:

@@ -356,6 +356,19 @@ PYTHONPATH=src python3 -m patchsmith.cli demo-readiness \
 
 Latest readiness evidence is saved in `artifacts/experiments/demo_readiness.md` and `artifacts/experiments/demo_readiness.json`. Current status is `ready_with_caveats`: saved offline evaluation and failure-analysis evidence is demo-ready, but live LLM calibration is not present unless a non-offline model provider appears in saved artifacts.
 
+Generate the MVP progress report:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli mvp-progress \
+  --project-root . \
+  --artifacts-dir artifacts \
+  --output artifacts/experiments/mvp_progress.md \
+  --json-output artifacts/experiments/mvp_progress.json \
+  --json
+```
+
+Latest MVP progress evidence is saved in `artifacts/experiments/mvp_progress.md` and `artifacts/experiments/mvp_progress.json`. Current status is `ready_with_caveats` at `95.0%`: 27 checklist items pass, three remain warnings, and no item is blocked or missing. The warnings are intentionally evidence-based: live LLM calibration, Docker daemon/image smoke, and full real-world task breadth are still not proven.
+
 Generate the live calibration readiness report:
 
 ```bash

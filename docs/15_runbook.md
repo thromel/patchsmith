@@ -231,6 +231,19 @@ PYTHONPATH=src python3 -m patchsmith.cli demo-readiness \
 
 The demo readiness report checks whether the saved artifact set contains experiment evidence, saved runs, normalized metrics, retrieval evidence, repair or scaffold evidence, patch-search evidence, visible failures, and live-provider metadata. `ready_with_caveats` means the offline portfolio demo is coherent but one or more warnings, such as missing live LLM calibration, must be stated publicly.
 
+MVP progress:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli mvp-progress \
+  --project-root . \
+  --artifacts-dir artifacts \
+  --output artifacts/experiments/mvp_progress.md \
+  --json-output artifacts/experiments/mvp_progress.json \
+  --json
+```
+
+The MVP progress report turns the implementation, docs, test, and artifact checklist into an evidence-weighted percentage. `ready_with_caveats` means the core MVP evidence is present, but warning items must still be named in status updates.
+
 Live calibration readiness:
 
 ```bash
