@@ -511,6 +511,20 @@ PYTHONPATH=src python3 -m patchsmith.cli launch-blockers \
 
 The launch blocker backlog consolidates Docker smoke, focused public issue setup-readiness, live calibration, and release hygiene into a prioritized action list. Treat `blocked` as a hard stop for public release claims and `warning` as a caveat that must stay visible.
 
+Quality gate:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli quality-gate \
+  --project-root . \
+  --artifacts-dir artifacts \
+  --output artifacts/experiments/quality_gate.md \
+  --json-output artifacts/experiments/quality_gate.json \
+  --logs-dir artifacts/experiments/quality_gate_logs \
+  --json
+```
+
+The quality gate runs local compile, whitespace, full pytest, and package-build checks, then writes a Markdown/JSON review artifact plus per-command stdout/stderr logs. Treat `failed` as a release stop and `passed_with_skips` as acceptable only for explicitly scoped local smoke checks, not final launch review.
+
 Release hygiene:
 
 ```bash
@@ -659,6 +673,9 @@ artifacts/
   experiments/demo_media.json
   experiments/demo_media.svg
   experiments/demo_media.png
+  experiments/quality_gate.md
+  experiments/quality_gate.json
+  experiments/quality_gate_logs/
   experiments/final_evaluation.md
   experiments/final_evaluation.json
   experiments/release_hygiene.md
@@ -691,6 +708,7 @@ Run:
 - demo script regeneration,
 - demo media regeneration,
 - final evaluation report regeneration,
+- quality-gate regeneration,
 - delivery audit regeneration,
 - launch blocker backlog regeneration,
 - live calibration plan regeneration,

@@ -13,6 +13,7 @@ from patchsmith.portfolio import (
     write_live_calibration_plan_report,
     write_live_calibration_report,
     write_mvp_progress_report,
+    write_quality_gate_report,
 )
 from patchsmith.portfolio import write_final_evaluation_report, write_release_hygiene_report
 
@@ -92,6 +93,8 @@ def _write_release_hygiene_fixture(project_root: Path, artifacts_dir: Path) -> N
         "experiments/demo_media.json",
         "experiments/demo_media.svg",
         "experiments/demo_media.png",
+        "experiments/quality_gate.md",
+        "experiments/quality_gate.json",
         "experiments/final_evaluation.md",
         "experiments/final_evaluation.json",
         "experiments/delivery_audit.md",
@@ -696,6 +699,8 @@ def test_demo_readiness_report_summarizes_launch_evidence(
         "experiments/demo_media.json",
         "experiments/demo_media.svg",
         "experiments/demo_media.png",
+        "experiments/quality_gate.md",
+        "experiments/quality_gate.json",
         "experiments/final_evaluation.md",
         "experiments/final_evaluation.json",
         "experiments/delivery_audit.md",
@@ -1203,6 +1208,59 @@ def test_delivery_audit_maps_objective_to_current_evidence(
     assert exit_code == 0
     cli_payload = json.loads(capsys.readouterr().out)
     assert cli_payload["delivery_status"] == "in_progress_with_blockers"
+    assert cli_output.exists()
+
+
+def test_quality_gate_report_runs_quick_verifiers(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    output_path = tmp_path / "quality_gate.md"
+    json_output_path = tmp_path / "quality_gate.json"
+    logs_dir = tmp_path / "quality_gate_logs"
+    report = write_quality_gate_report(
+        project_root=Path("."),
+        artifacts_dir=tmp_path / "artifacts",
+        output_path=output_path,
+        json_output_path=json_output_path,
+        logs_dir=logs_dir,
+        include_tests=False,
+        include_build=False,
+    )
+
+    assert report.quality_status == "passed_with_skips"
+    assert report.passed_count == 2
+    assert report.skipped_count == 2
+    assert all(check.status != "failed" for check in report.checks)
+    assert any(check.stdout_path for check in report.checks if check.status == "passed")
+    rendered = output_path.read_text(encoding="utf-8")
+    assert "# PatchSmith Quality Gate Report" in rendered
+    payload = json.loads(json_output_path.read_text(encoding="utf-8"))
+    assert payload["quality_status"] == "passed_with_skips"
+
+    cli_output = tmp_path / "cli_quality_gate.md"
+    cli_json_output = tmp_path / "cli_quality_gate.json"
+    exit_code = main(
+        [
+            "quality-gate",
+            "--project-root",
+            ".",
+            "--artifacts-dir",
+            str(tmp_path / "artifacts"),
+            "--output",
+            str(cli_output),
+            "--json-output",
+            str(cli_json_output),
+            "--logs-dir",
+            str(tmp_path / "cli_quality_gate_logs"),
+            "--skip-tests",
+            "--skip-build",
+            "--json",
+        ]
+    )
+    assert exit_code == 0
+    cli_payload = json.loads(capsys.readouterr().out)
+    assert cli_payload["quality_status"] == "passed_with_skips"
     assert cli_output.exists()
 
 

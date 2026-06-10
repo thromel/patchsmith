@@ -229,6 +229,7 @@ The MVP must record:
 - launch blocker backlog with prioritized Docker, setup-readiness, live-calibration, and release actions,
 - focused setup-execution report with dry-run, command-policy, sandbox, and blocked-execution evidence,
 - focused setup-validation report with post-setup validation dry-run/execution evidence,
+- executable quality-gate report with compile, whitespace, pytest, package-build, and per-command log evidence,
 - release hygiene report with blockers, warnings, and launch checklist status.
 
 ## Portfolio screenshots to capture
@@ -249,4 +250,5 @@ The MVP must record:
 - launch blocker backlog.
 - focused setup-execution report.
 - focused setup-validation report.
+- executable quality-gate report.
 - release hygiene report.

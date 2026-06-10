@@ -39,6 +39,7 @@ from patchsmith.portfolio import (
     write_live_calibration_plan_report,
     write_live_calibration_report,
     write_mvp_progress_report,
+    write_quality_gate_report,
     write_release_hygiene_report,
 )
 from patchsmith.retrieval import GraphRetriever, HybridRetriever, KeywordRetriever
@@ -1183,6 +1184,48 @@ def main(argv: list[str] | None = None) -> int:
             )
         return 0
 
+    if args.command == "quality-gate":
+        json_output_path = Path(args.json_output) if args.json_output else None
+        logs_dir = Path(args.logs_dir) if args.logs_dir else None
+        report = write_quality_gate_report(
+            project_root=Path(args.project_root),
+            artifacts_dir=Path(args.artifacts_dir),
+            output_path=Path(args.output),
+            json_output_path=json_output_path,
+            logs_dir=logs_dir,
+            timeout_seconds=args.timeout_seconds,
+            include_tests=not args.skip_tests,
+            include_build=not args.skip_build,
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "project_root": report.project_root,
+                        "artifacts_dir": report.artifacts_dir,
+                        "generated_at": report.generated_at,
+                        "quality_status": report.quality_status,
+                        "passed_count": report.passed_count,
+                        "failed_count": report.failed_count,
+                        "skipped_count": report.skipped_count,
+                        "report_path": str(Path(args.output)),
+                        "json_path": str(json_output_path) if json_output_path else None,
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(f"Quality gate report: {Path(args.output)}")
+            if json_output_path:
+                print(f"JSON: {json_output_path}")
+            print(
+                f"Status: {report.quality_status} "
+                f"Passed: {report.passed_count} "
+                f"Failed: {report.failed_count} "
+                f"Skipped: {report.skipped_count}"
+            )
+        return 0
+
     parser.print_help()
     return 2
 
@@ -2177,6 +2220,52 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional JSON delivery audit output path.",
     )
     delivery_audit.add_argument("--json", action="store_true", help="Print JSON summary.")
+
+    quality_gate = subparsers.add_parser(
+        "quality-gate",
+        help="Run local verification commands and save a quality-gate report.",
+    )
+    quality_gate.add_argument(
+        "--project-root",
+        default=".",
+        help="Project root where verification commands run.",
+    )
+    quality_gate.add_argument(
+        "--artifacts-dir",
+        default="artifacts",
+        help="Root artifact directory to write logs under.",
+    )
+    quality_gate.add_argument(
+        "--output",
+        default="artifacts/experiments/quality_gate.md",
+        help="Markdown quality-gate report output path.",
+    )
+    quality_gate.add_argument(
+        "--json-output",
+        default="artifacts/experiments/quality_gate.json",
+        help="Optional JSON quality-gate output path.",
+    )
+    quality_gate.add_argument(
+        "--logs-dir",
+        help="Directory for per-command stdout/stderr logs.",
+    )
+    quality_gate.add_argument(
+        "--timeout-seconds",
+        type=int,
+        default=180,
+        help="Per-command timeout in seconds.",
+    )
+    quality_gate.add_argument(
+        "--skip-tests",
+        action="store_true",
+        help="Skip the full pytest gate.",
+    )
+    quality_gate.add_argument(
+        "--skip-build",
+        action="store_true",
+        help="Skip the package build gate.",
+    )
+    quality_gate.add_argument("--json", action="store_true", help="Print JSON summary.")
 
     return parser
 
