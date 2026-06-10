@@ -97,6 +97,8 @@ def _write_release_hygiene_fixture(project_root: Path, artifacts_dir: Path) -> N
         "experiments/demo_media.json",
         "experiments/demo_media.svg",
         "experiments/demo_media.png",
+        "experiments/environment_readiness.md",
+        "experiments/environment_readiness.json",
         "experiments/quality_gate.md",
         "experiments/quality_gate.json",
         "experiments/project_status.md",
@@ -109,6 +111,18 @@ def _write_release_hygiene_fixture(project_root: Path, artifacts_dir: Path) -> N
         path = artifacts_dir / artifact_path
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("{}\n" if path.suffix == ".json" else "ok\n", encoding="utf-8")
+    (artifacts_dir / "experiments" / "environment_readiness.json").write_text(
+        json.dumps(
+            {
+                "readiness_status": "ready",
+                "passed_count": 10,
+                "warning_count": 0,
+                "blocked_count": 0,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
 
 def _git(project_root: Path, *args: str) -> None:
@@ -705,6 +719,8 @@ def test_demo_readiness_report_summarizes_launch_evidence(
         "experiments/demo_media.json",
         "experiments/demo_media.svg",
         "experiments/demo_media.png",
+        "experiments/environment_readiness.md",
+        "experiments/environment_readiness.json",
         "experiments/quality_gate.md",
         "experiments/quality_gate.json",
         "experiments/project_status.md",
@@ -717,6 +733,18 @@ def test_demo_readiness_report_summarizes_launch_evidence(
         path = artifacts_dir / artifact_path
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("{}\n" if path.suffix == ".json" else "ok\n", encoding="utf-8")
+    (artifacts_dir / "experiments" / "environment_readiness.json").write_text(
+        json.dumps(
+            {
+                "readiness_status": "ready",
+                "passed_count": 10,
+                "warning_count": 0,
+                "blocked_count": 0,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
     hygiene_output = tmp_path / "release_hygiene.md"
     hygiene_json_output = tmp_path / "release_hygiene.json"
@@ -1665,6 +1693,40 @@ def test_release_hygiene_blocks_stale_project_status(
     assert freshness_check.status == "blocked"
     assert "1 stale" in freshness_check.evidence
     assert "refresh-evidence" in freshness_check.next_action
+
+
+def test_release_hygiene_warns_on_blocked_environment_readiness(
+    tmp_path: Path,
+) -> None:
+    project_root = tmp_path / "repo"
+    artifacts_dir = tmp_path / "artifacts"
+    project_root.mkdir()
+    _write_release_hygiene_fixture(project_root, artifacts_dir)
+    (artifacts_dir / "experiments" / "environment_readiness.json").write_text(
+        json.dumps(
+            {
+                "readiness_status": "blocked",
+                "passed_count": 3,
+                "warning_count": 6,
+                "blocked_count": 1,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    report = write_release_hygiene_report(
+        project_root=project_root,
+        artifacts_dir=artifacts_dir,
+        output_path=tmp_path / "release_hygiene.md",
+    )
+
+    environment_check = next(
+        check for check in report.checks if check.name == "Environment Readiness"
+    )
+    assert environment_check.status == "warning"
+    assert "1 blocked" in environment_check.evidence
+    assert "offline evidence" in environment_check.next_action
 
 
 def test_docker_smoke_report_records_unavailable_daemon(

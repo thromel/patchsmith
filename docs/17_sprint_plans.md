@@ -863,7 +863,7 @@ Latest evidence:
 - launch blockers: 2,
 - launch warnings: 2,
 - release hygiene status: `ready_with_warnings`,
-- release hygiene checks: generated review artifacts include quality-gate, project-status freshness, live-calibration planning, launch blockers, public issue context preview, task materialization validation/readiness, focused-test planning, focused-test run, focused-test diagnosis, focused-test setup-plan, setup-readiness, setup-execution, and setup-validation evidence; live LLM calibration remains the only warning,
+- release hygiene checks: generated review artifacts include quality-gate, project-status freshness, environment readiness, live-calibration planning, launch blockers, public issue context preview, task materialization validation/readiness, focused-test planning, focused-test run, focused-test diagnosis, focused-test setup-plan, setup-readiness, setup-execution, and setup-validation evidence; live LLM calibration and blocked environment prerequisites remain warnings,
 - indexed experiments: 16,
 - indexed saved runs: 443,
 - normalized metric rows: 29,

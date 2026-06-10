@@ -4991,6 +4991,8 @@ def _release_hygiene_checks(
         "experiments/public_issue_corpus_v1/focused_test_setup_validation_summary.json",
         "experiments/demo_script.md",
         "experiments/demo_script.json",
+        "experiments/environment_readiness.md",
+        "experiments/environment_readiness.json",
         "experiments/quality_gate.md",
         "experiments/quality_gate.json",
         "experiments/project_status.md",
@@ -5016,6 +5018,7 @@ def _release_hygiene_checks(
             blocked=True,
         ),
         _project_status_freshness_check(artifacts_dir),
+        _environment_readiness_release_check(artifacts_dir),
         _release_check(
             name="Demo Readiness",
             status="passed" if readiness.readiness_status != "not_ready" else "blocked",
@@ -5838,6 +5841,49 @@ def _project_status_freshness_check(artifacts_dir: Path) -> ReleaseHygieneCheck:
         evidence=(
             f"Freshness is {freshness_status}; {stale_count} stale, "
             f"{undated_count} undated, {missing_count} missing sources."
+        ),
+        next_action=next_action,
+    )
+
+
+def _environment_readiness_release_check(artifacts_dir: Path) -> ReleaseHygieneCheck:
+    payload = _load_json_artifact(
+        artifacts_dir / "experiments" / "environment_readiness.json"
+    )
+    if payload is None:
+        return _release_check(
+            name="Environment Readiness",
+            status="blocked",
+            evidence="Environment readiness JSON is missing or invalid.",
+            next_action=(
+                "Run `environment-readiness` or `refresh-evidence` before release review."
+            ),
+        )
+    readiness_status = _payload_string(payload, "readiness_status", "missing")
+    passed_count = _payload_int(payload, "passed_count")
+    warning_count = _payload_int(payload, "warning_count")
+    blocked_count = _payload_int(payload, "blocked_count")
+    if readiness_status == "ready":
+        status = "passed"
+        next_action = "No action needed."
+    elif readiness_status == "ready_with_warnings":
+        status = "warning"
+        next_action = "Keep environment caveats visible in release notes."
+    elif readiness_status == "blocked":
+        status = "warning"
+        next_action = (
+            "Resolve environment blockers before public launch; keep launch claims "
+            "scoped to saved offline evidence."
+        )
+    else:
+        status = "blocked"
+        next_action = "Regenerate environment readiness before release review."
+    return _release_check(
+        name="Environment Readiness",
+        status=status,
+        evidence=(
+            f"Environment readiness is {readiness_status}; {passed_count} passed, "
+            f"{warning_count} warnings, {blocked_count} blocked."
         ),
         next_action=next_action,
     )
