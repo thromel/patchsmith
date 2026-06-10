@@ -31,7 +31,7 @@ from patchsmith.runtime import (
     HeuristicRuntime,
     LangGraphRuntime,
 )
-from patchsmith.sandbox import LocalSandboxRunner
+from patchsmith.sandbox import create_sandbox_runner
 from patchsmith.tracing import RunTrace
 
 
@@ -49,7 +49,6 @@ class RepairRunner:
             self.graph_retriever, provider_name="patchsmith_native_graph"
         )
         self.ctxhelm_broker = CtxhelmCliBroker()
-        self.sandbox = LocalSandboxRunner()
 
     def run(self, request: RunRequest) -> RepairRunResult:
         run_id = new_id()
@@ -239,8 +238,12 @@ class RepairRunner:
                 snapshot.test_commands[0] if snapshot.test_commands else None
             )
             test_result = None
+            sandbox = create_sandbox_runner(
+                mode=request.sandbox_mode,
+                image=request.sandbox_image,
+            )
             if command:
-                test_result = self.sandbox.run(
+                test_result = sandbox.run(
                     command=command,
                     workspace=repo_path,
                     timeout_seconds=60,
@@ -253,7 +256,13 @@ class RepairRunner:
                     status="completed" if test_result.exit_code == 0 else "failed",
                     input_summary=command,
                     output_summary=f"exit_code={test_result.exit_code}",
-                    payload=test_result.to_dict(),
+                    payload={
+                        **test_result.to_dict(),
+                        "sandbox_mode": request.sandbox_mode,
+                        "sandbox_image": (
+                            request.sandbox_image if request.sandbox_mode == "docker" else None
+                        ),
+                    },
                     latency_ms=test_result.duration_ms,
                 )
             else:
@@ -262,6 +271,7 @@ class RepairRunner:
                     event_type="sandbox_command",
                     status="skipped",
                     output_summary="no test command supplied or detected",
+                    payload={"sandbox_mode": request.sandbox_mode},
                 )
 
             final_diff = _workspace_diff(repo_path) or agent_result.final_diff

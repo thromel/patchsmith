@@ -16,6 +16,8 @@ The MVP is complete when all items below are satisfied.
 - [ ] Final diff is generated.
 - [ ] Markdown run report is generated.
 
+Note: an opt-in Docker sandbox runner exists; the MVP checkbox should stay open until a live Docker daemon/image smoke artifact proves seeded tests passing in Docker mode.
+
 ## Observability
 
 - [ ] Run status is persisted.

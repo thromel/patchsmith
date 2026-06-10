@@ -23,7 +23,7 @@ from patchsmith.models import RetrievedContext, RunRequest
 from patchsmith.patching import PatchSafetyError, apply_text_replacement
 from patchsmith.planning import HeuristicRepairPlanner, RepairPlan
 from patchsmith.retrieval import GraphRetriever, HybridRetriever, KeywordRetriever
-from patchsmith.sandbox import LocalSandboxRunner
+from patchsmith.sandbox import create_sandbox_runner
 from patchsmith.workflow import RepairRunner
 
 
@@ -392,6 +392,8 @@ def run_repair_evaluation(
     max_retries: int = 0,
     context_provider: str,
     output_dir: Path,
+    sandbox_mode: str = "local",
+    sandbox_image: str = "python:3.12-slim",
 ) -> tuple[list[RepairEvalResult], RepairEvalSummary]:
     tasks = load_seeded_tasks(dataset_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -412,6 +414,8 @@ def run_repair_evaluation(
                     max_retries=max_retries,
                     context_provider=context_provider,
                     retrieval_strategy=context_provider,
+                    sandbox_mode=sandbox_mode,
+                    sandbox_image=sandbox_image,
                 )
             )
             latency_ms = int((time.perf_counter() - started) * 1000)
@@ -489,6 +493,8 @@ def run_scaffold_comparison(
     variants: list[str],
     context_provider: str,
     output_dir: Path,
+    sandbox_mode: str = "local",
+    sandbox_image: str = "python:3.12-slim",
 ) -> list[ScaffoldComparisonResult]:
     output_dir.mkdir(parents=True, exist_ok=True)
     selected_variants = [_scaffold_variant(name) for name in variants]
@@ -502,6 +508,8 @@ def run_scaffold_comparison(
             planner=variant.planner,
             context_provider=context_provider,
             output_dir=variant_output_dir,
+            sandbox_mode=sandbox_mode,
+            sandbox_image=sandbox_image,
         )
         comparison_results.append(
             ScaffoldComparisonResult(
@@ -542,6 +550,8 @@ def run_patch_search_evaluation(
     candidate_counts: list[int],
     context_provider: str,
     output_dir: Path,
+    sandbox_mode: str = "local",
+    sandbox_image: str = "python:3.12-slim",
 ) -> tuple[list[PatchSearchEvalResult], list[PatchSearchEvalSummary]]:
     tasks = load_seeded_tasks(dataset_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -559,6 +569,8 @@ def run_patch_search_evaluation(
                     candidate_count=candidate_count,
                     context_provider=context_provider,
                     output_dir=output_dir,
+                    sandbox_mode=sandbox_mode,
+                    sandbox_image=sandbox_image,
                 )
             )
 
@@ -753,6 +765,8 @@ def evaluate_patch_search_task(
     candidate_count: int,
     context_provider: str,
     output_dir: Path,
+    sandbox_mode: str = "local",
+    sandbox_image: str = "python:3.12-slim",
 ) -> PatchSearchEvalResult:
     started = time.perf_counter()
     try:
@@ -791,7 +805,7 @@ def evaluate_patch_search_task(
 
             candidate_plans = _patch_search_candidates(plan, candidate_count)
             candidate_results: list[PatchSearchCandidateResult] = []
-            sandbox = LocalSandboxRunner()
+            sandbox = create_sandbox_runner(mode=sandbox_mode, image=sandbox_image)
             for candidate_index, candidate_plan, risk_score, reason in candidate_plans:
                 candidate_repo = tmp_path / f"candidate_{candidate_index}"
                 clone_or_copy_repository(str(task.repo), candidate_repo)

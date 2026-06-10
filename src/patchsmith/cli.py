@@ -46,6 +46,8 @@ def main(argv: list[str] | None = None) -> int:
             retrieval_strategy=args.context_provider,
             context_provider=args.context_provider,
             top_k=args.top_k,
+            sandbox_mode=args.sandbox_mode,
+            sandbox_image=args.sandbox_image,
         )
         result = RepairRunner(artifacts_dir=Path(args.artifacts_dir)).run(request)
         if args.json:
@@ -171,6 +173,8 @@ def main(argv: list[str] | None = None) -> int:
             max_retries=args.max_retries,
             context_provider=args.context_provider,
             output_dir=Path(args.output),
+            sandbox_mode=args.sandbox_mode,
+            sandbox_image=args.sandbox_image,
         )
         if args.json:
             print(
@@ -200,6 +204,8 @@ def main(argv: list[str] | None = None) -> int:
             or ["agentless", "heuristic", "langgraph", "langgraph_fake_model", "deepagents"],
             context_provider=args.context_provider,
             output_dir=Path(args.output),
+            sandbox_mode=args.sandbox_mode,
+            sandbox_image=args.sandbox_image,
         )
         if args.json:
             print(
@@ -228,6 +234,8 @@ def main(argv: list[str] | None = None) -> int:
             candidate_counts=args.candidate_count or [1, 3],
             context_provider=args.context_provider,
             output_dir=Path(args.output),
+            sandbox_mode=args.sandbox_mode,
+            sandbox_image=args.sandbox_image,
         )
         if args.json:
             print(
@@ -601,6 +609,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     run.add_argument("--top-k", type=int, default=5, help="Number of files to retrieve.")
     run.add_argument("--artifacts-dir", default="artifacts", help="Artifact output directory.")
+    _add_sandbox_args(run)
     run.add_argument("--json", action="store_true", help="Print machine-readable run summary.")
 
     index = subparsers.add_parser("index", help="Clone/copy a repository and print file index JSON.")
@@ -692,6 +701,7 @@ def build_parser() -> argparse.ArgumentParser:
         default="artifacts/experiments/repair_eval_v1",
         help="Experiment output directory.",
     )
+    _add_sandbox_args(eval_repair)
     eval_repair.add_argument("--json", action="store_true", help="Print JSON summary.")
 
     eval_scaffold = subparsers.add_parser(
@@ -720,6 +730,7 @@ def build_parser() -> argparse.ArgumentParser:
         default="artifacts/experiments/scaffold_comparison_v1",
         help="Scaffold comparison output directory.",
     )
+    _add_sandbox_args(eval_scaffold)
     eval_scaffold.add_argument("--json", action="store_true", help="Print JSON summary.")
 
     eval_patch_search = subparsers.add_parser(
@@ -748,6 +759,7 @@ def build_parser() -> argparse.ArgumentParser:
         default="artifacts/experiments/patch_search_eval_v1",
         help="Patch-search experiment output directory.",
     )
+    _add_sandbox_args(eval_patch_search)
     eval_patch_search.add_argument("--json", action="store_true", help="Print JSON summary.")
 
     index_artifacts = subparsers.add_parser(
@@ -982,6 +994,20 @@ def _add_issue_args(parser: argparse.ArgumentParser) -> None:
     issue_group.add_argument("--issue", help="Raw issue text.")
     issue_group.add_argument("--issue-file", help="Path to a file containing issue text.")
     parser.add_argument("--issue-url", help="Optional source issue URL for the run report.")
+
+
+def _add_sandbox_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--sandbox-mode",
+        choices=["local", "docker"],
+        default="local",
+        help="Sandbox runner for executing task test commands.",
+    )
+    parser.add_argument(
+        "--sandbox-image",
+        default="python:3.12-slim",
+        help="Docker image used when --sandbox-mode=docker.",
+    )
 
 
 def _load_issue_text(args: argparse.Namespace) -> str:

@@ -210,7 +210,7 @@ Focus:
 ## Resume bullets
 
 ```text
-Built PatchSmith Research, an AI software-maintenance agent that converts GitHub issues into tested patch diffs using LangGraph orchestration, hybrid code retrieval, Docker sandboxing, and evaluation-driven development.
+Built PatchSmith Research, an AI software-maintenance agent that converts GitHub issues into tested patch diffs using LangGraph orchestration, hybrid code retrieval, opt-in Docker sandboxing, and evaluation-driven development.
 
 Implemented a research harness comparing Agentless, LangGraph, a DeepAgents adapter, and patch-search scaffolds across success rate, retrieval hit rate, cost, latency, and failure modes.
 

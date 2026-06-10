@@ -37,6 +37,12 @@ def render_run_report(
         f"- Runtime: `{request.runtime}`",
         f"- Planner: `{request.planner}`",
         f"- Retrieval: `{request.retrieval_strategy}`",
+        f"- Sandbox: `{request.sandbox_mode}`",
+        (
+            f"- Sandbox image: `{request.sandbox_image}`"
+            if request.sandbox_mode == "docker"
+            else "- Sandbox image: `n/a`"
+        ),
         f"- Patch generation: `{patch_status}`",
         "",
         patch_summary
@@ -188,8 +194,8 @@ def render_run_report(
             "",
             "## Risk Notes",
             "",
-            "- The current runner is a development-only local sandbox wrapper with command policy.",
-            "- Docker isolation is documented but not implemented in this first scaffold.",
+            "- The default runner is the local command-policy sandbox for deterministic development.",
+            "- Docker sandbox mode is opt-in and requires an image with task dependencies.",
             "- No external write actions are performed.",
             "",
             "## Final Verdict",

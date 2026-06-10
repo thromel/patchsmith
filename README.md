@@ -103,7 +103,7 @@ The repository now includes a runnable Python scaffold for the first half of the
 issue input -> repo copy/clone -> context broker -> file index -> retrieval metrics -> command policy -> test run -> trace/report artifacts
 ```
 
-Deterministic patch generation is wired for seeded smoke tasks. The current runtimes are `agentless`, `heuristic`, `langgraph`, and `deepagents`; LangGraph supports planner selection with `heuristic`, `fake_model`, and `openai`, while the DeepAgents adapter currently runs in an offline compatibility mode unless the optional `deepagents` extra is installed. The `fake_model` planner exercises the prompt/JSON model-backed planning seam offline, validates that model output targets retrieved repo-relative paths, and keeps local evals credential-free. The `openai` planner uses the OpenAI Responses API only when credentials are configured. The context layer supports native keyword retrieval, native hybrid retrieval, native graph retrieval, and a ctxhelm CLI broker. Saved experiment and run artifacts can be summarized with a static artifact index for demo and review.
+Deterministic patch generation is wired for seeded smoke tasks. The current runtimes are `agentless`, `heuristic`, `langgraph`, and `deepagents`; LangGraph supports planner selection with `heuristic`, `fake_model`, and `openai`, while the DeepAgents adapter currently runs in an offline compatibility mode unless the optional `deepagents` extra is installed. The `fake_model` planner exercises the prompt/JSON model-backed planning seam offline, validates that model output targets retrieved repo-relative paths, and keeps local evals credential-free. The `openai` planner uses the OpenAI Responses API only when credentials are configured. The context layer supports native keyword retrieval, native hybrid retrieval, native graph retrieval, and a ctxhelm CLI broker. Test execution defaults to the local command-policy sandbox for developer speed, and `--sandbox-mode docker` selects the Docker runner for stronger process and environment isolation. Saved experiment and run artifacts can be summarized with a static artifact index for demo and review.
 
 ## Quickstart
 
@@ -130,6 +130,23 @@ Expected result:
 - sandbox command: `python3 -m pytest`,
 - test result: one failing seeded bug test,
 - artifacts: `artifacts/runs/{run_id}/report.md`, `traces.jsonl`, and `final.diff`.
+
+Use Docker isolation when the daemon and task image are available:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli run \
+  --repo evals/tasks/seeded_bugs_v1/task_001_logic_bug/repo \
+  --issue-file evals/tasks/seeded_bugs_v1/task_001_logic_bug/issue.md \
+  --test-command "python3 -m pytest" \
+  --runtime heuristic \
+  --context-provider native_hybrid \
+  --sandbox-mode docker \
+  --sandbox-image python:3.12-slim \
+  --artifacts-dir artifacts \
+  --json
+```
+
+Docker mode runs the policy-checked command inside a per-run container with implicit image pulls disabled, network disabled, dropped capabilities, resource limits, a mounted `/workspace`, and a sanitized host environment. The selected sandbox mode is recorded in each run trace. Use an image that already contains task dependencies such as `pytest`.
 
 Run a deterministic patch smoke task:
 

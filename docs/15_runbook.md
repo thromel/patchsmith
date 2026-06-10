@@ -160,6 +160,21 @@ PYTHONPATH=src python3 -m patchsmith.cli eval-patch-search \
 
 The patch-search report compares success@k, selected-candidate success, latency, test-run count, and deterministic candidate artifacts.
 
+Sandbox mode:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli eval-repair \
+  --dataset evals/tasks/seeded_bugs_v1 \
+  --runtime heuristic \
+  --context-provider native_hybrid \
+  --sandbox-mode docker \
+  --sandbox-image python:3.12-slim \
+  --output artifacts/experiments/repair_eval_docker_smoke_v1 \
+  --json
+```
+
+`run`, `eval-repair`, `eval-scaffold`, and `eval-patch-search` all accept `--sandbox-mode local|docker` plus `--sandbox-image`. Local mode remains the default for fast deterministic development runs. Docker mode wraps the same command-policy decision in `docker run` with implicit image pulls disabled, network disabled, dropped capabilities, a `/workspace` bind mount, resource limits, and sanitized host environment. Use a prebuilt image containing the test runner and task dependencies; otherwise the Docker run can fail even when the patch is correct.
+
 Artifact index:
 
 ```bash

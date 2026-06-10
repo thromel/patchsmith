@@ -29,6 +29,8 @@ class RunRequest:
     retrieval_strategy: str = "keyword"
     context_provider: str = "native"
     top_k: int = 5
+    sandbox_mode: str = "local"
+    sandbox_image: str = "python:3.12-slim"
 
 
 @dataclass(frozen=True)
