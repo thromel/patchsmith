@@ -1602,7 +1602,7 @@ def render_evidence_refresh_report(report: EvidenceRefreshReport) -> str:
             "## Claim Boundary",
             "",
             "- This command refreshes saved review/status artifacts.",
-            "- It does not execute Docker smoke unless that artifact is refreshed separately.",
+            "- It executes Docker smoke only when `--include-docker-smoke` is set.",
             "- It does not call live model providers.",
             "- By default it skips the full quality gate; use `--include-quality-gate` to run tests and package build.",
         ]
