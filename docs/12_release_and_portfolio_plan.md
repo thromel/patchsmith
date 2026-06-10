@@ -260,6 +260,17 @@ PYTHONPATH=src python3 -m patchsmith.cli diagnose-focused-test-runs \
 
 Current diagnosis output classifies one dependency issue, two environment issues, zero timeouts, zero blocked tasks, and zero unknown failures. Use it as a dependency/setup backlog before making public issue repair claims.
 
+Plan focused public issue setup:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli plan-focused-test-setups \
+  --diagnosis artifacts/experiments/public_issue_corpus_v1/focused_test_diagnosis_results.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+Current setup-plan output has three planned setup tasks, one dependency setup, two environment fixture setups, and three network/sandbox-required tasks. Use this to gate future public issue reproduction attempts.
+
 Generate the release hygiene report:
 
 ```bash
@@ -271,7 +282,7 @@ PYTHONPATH=src python3 -m patchsmith.cli release-hygiene \
   --json
 ```
 
-Current release hygiene output is `ready_with_warnings`: generated review artifacts now include calibration-readiness and public issue context-preview/materialization validation/readiness/focused-test plan/run/diagnosis evidence, package build metadata exists, local Git metadata exists, and the remaining release caveat is live LLM calibration.
+Current release hygiene output is `ready_with_warnings`: generated review artifacts now include calibration-readiness and public issue context-preview/materialization validation/readiness/focused-test plan/run/diagnosis/setup-plan evidence, package build metadata exists, local Git metadata exists, and the remaining release caveat is live LLM calibration.
 
 ## Example flagship demo scenario
 

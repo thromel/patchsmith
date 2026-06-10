@@ -8,6 +8,7 @@ from patchsmith.evaluation import (
     diagnose_focused_test_runs,
     load_seeded_tasks,
     materialize_issue_corpus_tasks,
+    plan_focused_test_setups,
     plan_materialized_issue_focused_tests,
     preflight_issue_corpus_repositories,
     preview_issue_corpus_context,
@@ -879,6 +880,75 @@ def test_diagnose_focused_test_runs_classifies_readiness_failures(
     )
     assert exit_code == 0
     assert (cli_output / "focused_test_diagnosis_report.md").exists()
+
+
+def test_plan_focused_test_setups_writes_setup_backlog(
+    tmp_path: Path,
+) -> None:
+    diagnosis_path = tmp_path / "focused_test_diagnosis_results.json"
+    diagnosis_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "pytest_task",
+                    "repository": "pytest-dev/pytest",
+                    "issue_url": "https://github.com/pytest-dev/pytest/issues/14552",
+                    "run_status": "failed",
+                    "command": "python3 -m pytest testing/test_config.py",
+                    "focused_files": ["testing/test_config.py"],
+                    "category": "missing_generated_version_metadata",
+                    "severity": "dependency",
+                    "evidence": ["ModuleNotFoundError: No module named '_pytest._version'"],
+                    "suggested_next_actions": [],
+                },
+                {
+                    "task_id": "requests_task",
+                    "repository": "psf/requests",
+                    "issue_url": "https://github.com/psf/requests/issues/7223",
+                    "run_status": "failed",
+                    "command": "python3 -m pytest tests/test_requests.py",
+                    "focused_files": ["tests/test_requests.py"],
+                    "category": "pytest_fixture_dependency_error",
+                    "severity": "environment",
+                    "evidence": ["recursive dependency involving fixture 'httpbin' detected"],
+                    "suggested_next_actions": [],
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    output_dir = tmp_path / "setup_plan"
+    results, summary = plan_focused_test_setups(
+        diagnosis_path=diagnosis_path,
+        output_dir=output_dir,
+    )
+
+    by_task = {result.task_id: result for result in results}
+    assert summary.planned_tasks == 2
+    assert summary.dependency_setup_tasks == 1
+    assert summary.environment_setup_tasks == 1
+    assert summary.network_required_tasks == 2
+    assert by_task["pytest_task"].setup_profile == "python_editable_install_build_metadata"
+    assert "python3 -m pip install -e ." in by_task["pytest_task"].setup_commands
+    assert by_task["requests_task"].setup_profile == "pytest_fixture_environment"
+    assert by_task["requests_task"].validation_command == "python3 -m pytest tests/test_requests.py"
+    assert (output_dir / "focused_test_setup_plan_report.md").exists()
+    assert (output_dir / "focused_test_setup_plan_results.csv").exists()
+
+    cli_output = tmp_path / "cli_setup_plan"
+    exit_code = main(
+        [
+            "plan-focused-test-setups",
+            "--diagnosis",
+            str(diagnosis_path),
+            "--output",
+            str(cli_output),
+            "--json",
+        ]
+    )
+    assert exit_code == 0
+    assert (cli_output / "focused_test_setup_plan_report.md").exists()
 
 
 def test_graph_retrieval_dataset_validates(tmp_path: Path) -> None:

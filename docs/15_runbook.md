@@ -231,6 +231,17 @@ PYTHONPATH=src python3 -m patchsmith.cli diagnose-focused-test-runs \
 
 The diagnosis report classifies saved focused-run logs and suggests setup-oriented next actions. Do not execute dependency setup suggestions outside the approved sandbox model, and do not treat diagnosis categories as repair success or failure.
 
+Public issue focused test setup plan:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli plan-focused-test-setups \
+  --diagnosis artifacts/experiments/public_issue_corpus_v1/focused_test_diagnosis_results.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+The setup plan converts diagnosis categories into explicit setup profiles, setup commands, validation commands, network flags, and sandbox-required flags. Execute those steps only in disposable sandboxes; the plan itself is not validation evidence.
+
 Scaffold comparison:
 
 ```bash

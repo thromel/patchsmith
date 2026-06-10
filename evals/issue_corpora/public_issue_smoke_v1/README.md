@@ -113,6 +113,19 @@ Focused test diagnosis classifies saved stdout/stderr logs into setup-oriented
 failure categories. It is safe planning evidence, not permission to run
 dependency setup outside the sandbox policy.
 
+Focused test setup planning command:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli plan-focused-test-setups \
+  --diagnosis artifacts/experiments/public_issue_corpus_v1/focused_test_diagnosis_results.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+Focused test setup planning records sandbox setup profiles and validation
+commands before public issue repair attempts. It does not execute dependency
+installation.
+
 Selection criteria:
 
 - public GitHub issue URL,

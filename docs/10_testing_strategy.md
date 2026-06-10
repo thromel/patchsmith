@@ -244,7 +244,18 @@ PYTHONPATH=src python3 -m patchsmith.cli diagnose-focused-test-runs \
 
 The current diagnosis classifies the three failures as one dependency setup issue and two environment fixture issues, with no unknown failures. Treat these as setup backlog items before public issue repair attempts.
 
-The corpus, preflight, context-preview, materialization, validation, run-readiness, focused-test planning, focused-test run, and focused-test diagnosis reports are planning and plumbing evidence. They are not repair-quality evidence until the issues are reproduced, patched, tested, and saved as normal PatchSmith run artifacts.
+Plan setup work from focused test diagnoses:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli plan-focused-test-setups \
+  --diagnosis artifacts/experiments/public_issue_corpus_v1/focused_test_diagnosis_results.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+The current setup plan has three planned setup tasks, all sandbox-required and network-risk-bearing. Treat it as the setup backlog before reproduction or repair runs, not as permission to install dependencies on the host.
+
+The corpus, preflight, context-preview, materialization, validation, run-readiness, focused-test planning, focused-test run, focused-test diagnosis, and focused-test setup-plan reports are planning and plumbing evidence. They are not repair-quality evidence until the issues are reproduced, patched, tested, and saved as normal PatchSmith run artifacts.
 
 ## Definition of test completion
 

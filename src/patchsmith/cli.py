@@ -9,6 +9,7 @@ from patchsmith.evaluation import (
     check_materialized_issue_run_readiness,
     diagnose_focused_test_runs,
     materialize_issue_corpus_tasks,
+    plan_focused_test_setups,
     plan_materialized_issue_focused_tests,
     preflight_issue_corpus_repositories,
     preview_issue_corpus_context,
@@ -418,6 +419,32 @@ def main(argv: list[str] | None = None) -> int:
                 f"environment={summary.environment_issue_tasks} "
                 f"dependency={summary.dependency_issue_tasks} "
                 f"unknown={summary.unknown_failure_tasks}"
+            )
+        return 0
+
+    if args.command == "plan-focused-test-setups":
+        results, summary = plan_focused_test_setups(
+            diagnosis_path=Path(args.diagnosis),
+            output_dir=Path(args.output),
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "result_count": len(results),
+                        "report_path": str(
+                            Path(args.output) / "focused_test_setup_plan_report.md"
+                        ),
+                        "summary": summary.to_dict(),
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(f"Report: {Path(args.output) / 'focused_test_setup_plan_report.md'}")
+            print(
+                f"planned={summary.planned_tasks} ready={summary.ready_tasks} "
+                f"manual_review={summary.manual_review_tasks}"
             )
         return 0
 
@@ -1268,6 +1295,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="Focused test diagnosis output directory.",
     )
     focused_test_diagnosis_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print JSON summary.",
+    )
+
+    focused_test_setup_parser = subparsers.add_parser(
+        "plan-focused-test-setups",
+        help="Plan sandbox setup steps from focused public issue test diagnoses.",
+    )
+    focused_test_setup_parser.add_argument(
+        "--diagnosis",
+        default="artifacts/experiments/public_issue_corpus_v1/focused_test_diagnosis_results.json",
+        help="Focused test diagnosis results JSON.",
+    )
+    focused_test_setup_parser.add_argument(
+        "--output",
+        default="artifacts/experiments/public_issue_corpus_v1",
+        help="Focused test setup-plan output directory.",
+    )
+    focused_test_setup_parser.add_argument(
         "--json",
         action="store_true",
         help="Print JSON summary.",
