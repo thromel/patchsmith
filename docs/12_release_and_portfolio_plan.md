@@ -214,6 +214,17 @@ PYTHONPATH=src python3 -m patchsmith.cli validate-materialized-issue-tasks \
 
 Current materialized-task validation output should report three valid tasks, zero errors, zero warnings, and source-free manifests. Use it as external-evaluation setup validation only; it does not prove public issue reproduction or repair quality.
 
+Check materialized public issue run readiness:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli check-materialized-run-readiness \
+  --tasks-dir artifacts/experiments/public_issue_corpus_v1/materialized_tasks \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+Current run-readiness output should show zero blocked tasks and three warning-classified tasks because the suggested public-repo test commands are policy-allowed but run full pytest suites on medium or large repositories.
+
 Generate the release hygiene report:
 
 ```bash
@@ -225,7 +236,7 @@ PYTHONPATH=src python3 -m patchsmith.cli release-hygiene \
   --json
 ```
 
-Current release hygiene output is `ready_with_warnings`: generated review artifacts now include calibration-readiness and public issue context-preview/materialization validation evidence, package build metadata exists, local Git metadata exists, and the remaining release caveat is live LLM calibration.
+Current release hygiene output is `ready_with_warnings`: generated review artifacts now include calibration-readiness and public issue context-preview/materialization validation/readiness evidence, package build metadata exists, local Git metadata exists, and the remaining release caveat is live LLM calibration.
 
 ## Example flagship demo scenario
 

@@ -25,6 +25,7 @@ from patchsmith.patching import PatchSafetyError, apply_text_replacement
 from patchsmith.planning import HeuristicRepairPlanner, RepairPlan
 from patchsmith.retrieval import GraphRetriever, HybridRetriever, KeywordRetriever
 from patchsmith.sandbox import create_sandbox_runner
+from patchsmith.security import CommandPolicy
 from patchsmith.workflow import RepairRunner
 
 
@@ -241,6 +242,45 @@ class IssueCorpusMaterializedTaskValidationSummary:
     warning_count: int
     error_count: int
     source_free: bool
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class IssueCorpusMaterializedRunReadinessResult:
+    task_id: str | None
+    task_dir: str
+    status: str
+    repository: str | None
+    issue_url: str | None
+    repo_path: str | None
+    repo_exists: bool
+    file_count: int | None
+    package_manager: str | None
+    test_commands: list[str]
+    allowed_test_commands: int
+    blocked_test_commands: int
+    command_checks: list[dict[str, Any]]
+    suggested_commands: list[str]
+    risk_level: str
+    risk_notes: list[str]
+    errors: list[str]
+    warnings: list[str]
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class IssueCorpusMaterializedRunReadinessSummary:
+    tasks_dir: str
+    task_count: int
+    ready_tasks: int
+    warning_tasks: int
+    blocked_tasks: int
+    allowed_test_commands: int
+    blocked_test_commands: int
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -1259,6 +1299,122 @@ def write_materialized_issue_task_validation_outputs(
                 writer.writerow(result.to_dict())
     (output_dir / "materialized_task_validation_report.md").write_text(
         render_materialized_issue_task_validation_report(
+            tasks_dir=tasks_dir,
+            results=results,
+            summary=summary,
+        ),
+        encoding="utf-8",
+    )
+
+
+def check_materialized_issue_run_readiness(
+    *,
+    tasks_dir: Path,
+    output_dir: Path,
+) -> tuple[
+    list[IssueCorpusMaterializedRunReadinessResult],
+    IssueCorpusMaterializedRunReadinessSummary,
+]:
+    if not tasks_dir.exists():
+        raise FileNotFoundError(f"materialized tasks directory does not exist: {tasks_dir}")
+    if not tasks_dir.is_dir():
+        raise ValueError(f"materialized tasks path is not a directory: {tasks_dir}")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    policy = CommandPolicy()
+    task_dirs = sorted(path for path in tasks_dir.iterdir() if path.is_dir())
+    results = [
+        _check_materialized_issue_task_run_readiness(task_dir=task_dir, policy=policy)
+        for task_dir in task_dirs
+    ]
+    summary = summarize_materialized_issue_run_readiness(
+        tasks_dir=tasks_dir,
+        results=results,
+    )
+    write_materialized_issue_run_readiness_outputs(
+        output_dir=output_dir,
+        tasks_dir=tasks_dir,
+        results=results,
+        summary=summary,
+    )
+    return results, summary
+
+
+def summarize_materialized_issue_run_readiness(
+    *,
+    tasks_dir: Path,
+    results: list[IssueCorpusMaterializedRunReadinessResult],
+) -> IssueCorpusMaterializedRunReadinessSummary:
+    return IssueCorpusMaterializedRunReadinessSummary(
+        tasks_dir=str(tasks_dir),
+        task_count=len(results),
+        ready_tasks=sum(1 for result in results if result.status == "ready"),
+        warning_tasks=sum(1 for result in results if result.status == "warning"),
+        blocked_tasks=sum(1 for result in results if result.status == "blocked"),
+        allowed_test_commands=sum(result.allowed_test_commands for result in results),
+        blocked_test_commands=sum(result.blocked_test_commands for result in results),
+    )
+
+
+def write_materialized_issue_run_readiness_outputs(
+    *,
+    output_dir: Path,
+    tasks_dir: Path,
+    results: list[IssueCorpusMaterializedRunReadinessResult],
+    summary: IssueCorpusMaterializedRunReadinessSummary,
+) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "materialized_run_readiness_results.json").write_text(
+        json.dumps([result.to_dict() for result in results], indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (output_dir / "materialized_run_readiness_summary.json").write_text(
+        json.dumps(summary.to_dict(), indent=2) + "\n",
+        encoding="utf-8",
+    )
+    with (output_dir / "materialized_run_readiness_results.csv").open(
+        "w",
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=[
+                "task_id",
+                "repository",
+                "issue_url",
+                "status",
+                "repo_exists",
+                "file_count",
+                "package_manager",
+                "allowed_test_commands",
+                "blocked_test_commands",
+                "risk_level",
+                "risk_notes",
+                "errors",
+                "warnings",
+            ],
+        )
+        writer.writeheader()
+        for result in results:
+            writer.writerow(
+                {
+                    "task_id": result.task_id,
+                    "repository": result.repository,
+                    "issue_url": result.issue_url,
+                    "status": result.status,
+                    "repo_exists": result.repo_exists,
+                    "file_count": result.file_count,
+                    "package_manager": result.package_manager,
+                    "allowed_test_commands": result.allowed_test_commands,
+                    "blocked_test_commands": result.blocked_test_commands,
+                    "risk_level": result.risk_level,
+                    "risk_notes": ";".join(result.risk_notes),
+                    "errors": ";".join(result.errors),
+                    "warnings": ";".join(result.warnings),
+                }
+            )
+    (output_dir / "materialized_run_readiness_report.md").write_text(
+        render_materialized_issue_run_readiness_report(
             tasks_dir=tasks_dir,
             results=results,
             summary=summary,
@@ -2471,6 +2627,55 @@ def render_materialized_issue_task_validation_report(
     return "\n".join(lines)
 
 
+def render_materialized_issue_run_readiness_report(
+    *,
+    tasks_dir: Path,
+    results: list[IssueCorpusMaterializedRunReadinessResult],
+    summary: IssueCorpusMaterializedRunReadinessSummary,
+) -> str:
+    lines = [
+        "# Public Issue Materialized Run Readiness",
+        "",
+        f"- Tasks directory: `{tasks_dir}`",
+        f"- Task count: `{summary.task_count}`",
+        f"- Ready tasks: `{summary.ready_tasks}`",
+        f"- Warning tasks: `{summary.warning_tasks}`",
+        f"- Blocked tasks: `{summary.blocked_tasks}`",
+        f"- Allowed test commands: `{summary.allowed_test_commands}`",
+        f"- Blocked test commands: `{summary.blocked_test_commands}`",
+        "",
+        "## Results",
+        "",
+        "| Task | Status | Risk | Repository | Files | Allowed Tests | Blocked Tests | Notes |",
+        "|---|---|---|---|---:|---:|---:|---|",
+    ]
+    for result in results:
+        notes = [*result.risk_notes, *result.errors, *result.warnings]
+        lines.append(
+            "| "
+            f"{result.task_id or result.task_dir} | "
+            f"{result.status} | "
+            f"{result.risk_level} | "
+            f"{result.repository or 'unknown'} | "
+            f"{result.file_count if result.file_count is not None else 'unknown'} | "
+            f"{result.allowed_test_commands} | "
+            f"{result.blocked_test_commands} | "
+            f"{'; '.join(notes) or 'none'} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Claim Boundary",
+            "",
+            "- This report checks run readiness without executing public repository tests.",
+            "- `warning` means the task is runnable by policy but has cost, dependency, or scope risk.",
+            "- It does not prove issue reproduction, patch generation, or test success.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def render_repair_eval_report(
     *,
     dataset_dir: Path,
@@ -3191,6 +3396,108 @@ def _validate_materialized_issue_task_dir(
     )
 
 
+def _check_materialized_issue_task_run_readiness(
+    *,
+    task_dir: Path,
+    policy: CommandPolicy,
+) -> IssueCorpusMaterializedRunReadinessResult:
+    errors: list[str] = []
+    warnings: list[str] = []
+    manifest_path = task_dir / "task_manifest.json"
+    manifest: dict[str, Any] = {}
+    if not manifest_path.exists():
+        errors.append("missing task_manifest.json")
+    else:
+        try:
+            parsed = json.loads(manifest_path.read_text(encoding="utf-8"))
+            if isinstance(parsed, dict):
+                manifest = parsed
+            else:
+                errors.append("task_manifest.json must contain a JSON object")
+        except json.JSONDecodeError as error:
+            errors.append(f"task_manifest.json is invalid JSON: {error.msg}")
+
+    task_id = manifest.get("task_id") if isinstance(manifest.get("task_id"), str) else None
+    issue = manifest.get("issue") if isinstance(manifest.get("issue"), dict) else {}
+    snapshot = (
+        manifest.get("repository_snapshot")
+        if isinstance(manifest.get("repository_snapshot"), dict)
+        else {}
+    )
+    repository = issue.get("repository") if isinstance(issue.get("repository"), str) else None
+    issue_url = issue.get("issue_url") if isinstance(issue.get("issue_url"), str) else None
+    repo_path_value = (
+        snapshot.get("repo_path") if isinstance(snapshot.get("repo_path"), str) else None
+    )
+    package_manager = (
+        snapshot.get("package_manager")
+        if isinstance(snapshot.get("package_manager"), str)
+        else None
+    )
+    file_count = snapshot.get("file_count") if isinstance(snapshot.get("file_count"), int) else None
+    test_commands = _string_list(snapshot.get("test_commands"))
+    suggested_commands = _string_list(manifest.get("suggested_commands"))
+    repo_exists = False
+    workspace = Path.cwd()
+    if repo_path_value:
+        repo_path = Path(repo_path_value)
+        repo_exists = repo_path.exists() and repo_path.is_dir()
+        if repo_exists:
+            workspace = repo_path
+        else:
+            errors.append(f"repository snapshot is not available: {repo_path_value}")
+    else:
+        errors.append("repository_snapshot.repo_path is missing")
+
+    if not test_commands:
+        errors.append("no test commands available")
+    command_checks: list[dict[str, Any]] = []
+    for command in test_commands:
+        decision = policy.evaluate(command, workspace=workspace)
+        command_checks.append(
+            {
+                "command": command,
+                "allowed": decision.allowed,
+                "reason": decision.reason,
+                "tokens": list(decision.tokens),
+            }
+        )
+        if not decision.allowed:
+            errors.append(f"test command rejected by policy: {command} ({decision.reason})")
+
+    if not suggested_commands:
+        warnings.append("no suggested patchsmith run command recorded")
+
+    risk_level, risk_notes = _materialized_run_risk(
+        file_count=file_count,
+        test_commands=test_commands,
+        package_manager=package_manager,
+    )
+    allowed_count = sum(1 for check in command_checks if check["allowed"])
+    blocked_count = sum(1 for check in command_checks if not check["allowed"])
+    status = "blocked" if errors else "warning" if warnings or risk_notes else "ready"
+    return IssueCorpusMaterializedRunReadinessResult(
+        task_id=task_id,
+        task_dir=str(task_dir),
+        status=status,
+        repository=repository,
+        issue_url=issue_url,
+        repo_path=repo_path_value,
+        repo_exists=repo_exists,
+        file_count=file_count,
+        package_manager=package_manager,
+        test_commands=test_commands,
+        allowed_test_commands=allowed_count,
+        blocked_test_commands=blocked_count,
+        command_checks=command_checks,
+        suggested_commands=suggested_commands,
+        risk_level=risk_level,
+        risk_notes=risk_notes,
+        errors=errors,
+        warnings=warnings,
+    )
+
+
 def _issue_corpus_repositories(issues: list[Any]) -> list[tuple[str, str, int]]:
     repo_urls: dict[str, str] = {}
     issue_counts: dict[str, int] = {}
@@ -3472,6 +3779,40 @@ def _render_materialized_task_runbook(*, manifest: dict[str, Any]) -> str:
 def _materialized_test_commands(preview: dict[str, Any]) -> list[str]:
     commands = _string_list(preview.get("test_commands"))
     return commands or ["python3 -m pytest"]
+
+
+def _materialized_run_risk(
+    *,
+    file_count: int | None,
+    test_commands: list[str],
+    package_manager: str | None,
+) -> tuple[str, list[str]]:
+    notes: list[str] = []
+    level = "low"
+    if file_count is None:
+        notes.append("repository size is unknown")
+        level = "medium"
+    elif file_count >= 500:
+        notes.append(f"large repository snapshot with {file_count} indexed files")
+        level = "high"
+    elif file_count >= 100:
+        notes.append(f"medium repository snapshot with {file_count} indexed files")
+        level = "medium"
+
+    full_suite_commands = [
+        command
+        for command in test_commands
+        if command.strip() in {"pytest", "python -m pytest", "python3 -m pytest"}
+    ]
+    if full_suite_commands:
+        notes.append("suggested test command runs the full pytest suite")
+        if level == "low":
+            level = "medium"
+    if package_manager is None:
+        notes.append("package manager detection is unavailable")
+        if level == "low":
+            level = "medium"
+    return level, notes
 
 
 def _source_free_preview_contexts(value: Any) -> list[dict[str, Any]]:

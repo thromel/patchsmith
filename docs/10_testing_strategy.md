@@ -202,7 +202,16 @@ PYTHONPATH=src python3 -m patchsmith.cli validate-materialized-issue-tasks \
   --json
 ```
 
-The corpus, preflight, context-preview, materialization, and materialized-task validation reports are planning and plumbing evidence. They are not repair-quality evidence until the issues are reproduced, patched, tested, and saved as normal PatchSmith run artifacts.
+Check run readiness before executing public-repo tests:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli check-materialized-run-readiness \
+  --tasks-dir artifacts/experiments/public_issue_corpus_v1/materialized_tasks \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+The corpus, preflight, context-preview, materialization, validation, and run-readiness reports are planning and plumbing evidence. They are not repair-quality evidence until the issues are reproduced, patched, tested, and saved as normal PatchSmith run artifacts.
 
 ## Definition of test completion
 

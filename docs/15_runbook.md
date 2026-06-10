@@ -185,6 +185,17 @@ PYTHONPATH=src python3 -m patchsmith.cli validate-materialized-issue-tasks \
 
 The validator checks manifest shape, source-free context summaries, task files, local repository snapshots, and suggested run commands before those manifests are used in external evaluation.
 
+Public issue run readiness:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli check-materialized-run-readiness \
+  --tasks-dir artifacts/experiments/public_issue_corpus_v1/materialized_tasks \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+The readiness report checks command-policy allowlist status and execution risk without running public-repo tests. Treat warning-classified tasks as runnable only after choosing a scoped test command or accepting full-suite cost.
+
 Scaffold comparison:
 
 ```bash

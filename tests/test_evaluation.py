@@ -4,6 +4,7 @@ from pathlib import Path
 
 from patchsmith.cli import main
 from patchsmith.evaluation import (
+    check_materialized_issue_run_readiness,
     load_seeded_tasks,
     materialize_issue_corpus_tasks,
     preflight_issue_corpus_repositories,
@@ -480,6 +481,113 @@ def test_validate_materialized_issue_tasks_flags_source_excerpt(
     assert summary.invalid_tasks == 1
     assert not summary.source_free
     assert "source-free" in ";".join(results[0].errors)
+
+
+def test_check_materialized_issue_run_readiness_reports_policy(
+    tmp_path: Path,
+) -> None:
+    fixture_repo = Path("evals/tasks/seeded_bugs_v1/task_001_logic_bug/repo").resolve()
+    corpus_path = tmp_path / "issues.json"
+    corpus_path.write_text(
+        json.dumps(
+            {
+                "corpus_id": "local_run_readiness",
+                "issues": [
+                    {
+                        "task_id": "local_simple_calc",
+                        "source": "github_issue",
+                        "repository": "local/simple_calc",
+                        "repo_url": str(fixture_repo),
+                        "issue_url": "https://github.com/example/simple-calc/issues/1",
+                        "issue_number": 1,
+                        "title": "Addition returns the wrong result in simple_calc",
+                        "language": "python",
+                        "task_type": "logic_bug",
+                        "state_at_capture": "open",
+                        "captured_at": "2026-06-10T08:16:00Z",
+                        "selection_reason": "Local fixture for run-readiness coverage.",
+                        "expected_workflow": ["retrieve simple_calc implementation"],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    output_dir = tmp_path / "run_readiness"
+    preview_issue_corpus_context(
+        corpus_path=corpus_path,
+        output_dir=output_dir,
+        context_provider="native_hybrid",
+    )
+    materialize_issue_corpus_tasks(
+        corpus_path=corpus_path,
+        output_dir=output_dir,
+    )
+
+    results, summary = check_materialized_issue_run_readiness(
+        tasks_dir=output_dir / "materialized_tasks",
+        output_dir=output_dir,
+    )
+
+    assert summary.task_count == 1
+    assert summary.blocked_tasks == 0
+    assert summary.allowed_test_commands == 1
+    assert results[0].command_checks[0]["allowed"]
+    assert (output_dir / "materialized_run_readiness_report.md").exists()
+    assert (output_dir / "materialized_run_readiness_results.csv").exists()
+
+    cli_output = tmp_path / "cli_run_readiness"
+    exit_code = main(
+        [
+            "check-materialized-run-readiness",
+            "--tasks-dir",
+            str(output_dir / "materialized_tasks"),
+            "--output",
+            str(cli_output),
+            "--json",
+        ]
+    )
+    assert exit_code == 0
+    assert (cli_output / "materialized_run_readiness_report.md").exists()
+
+
+def test_check_materialized_issue_run_readiness_blocks_unsafe_test_command(
+    tmp_path: Path,
+) -> None:
+    task_dir = tmp_path / "tasks" / "bad_task"
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir(parents=True)
+    task_dir.mkdir(parents=True)
+    (task_dir / "task_manifest.json").write_text(
+        json.dumps(
+            {
+                "task_manifest_version": 1,
+                "task_id": "bad_task",
+                "issue": {
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/1",
+                },
+                "repository_snapshot": {
+                    "repo_path": str(repo_dir),
+                    "file_count": 1,
+                    "package_manager": "python/pyproject",
+                    "test_commands": ["python3 -m pytest && printenv"],
+                },
+                "suggested_commands": ["python3 -m patchsmith.cli run --repo repo"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    results, summary = check_materialized_issue_run_readiness(
+        tasks_dir=tmp_path / "tasks",
+        output_dir=tmp_path / "readiness",
+    )
+
+    assert summary.blocked_tasks == 1
+    assert summary.blocked_test_commands == 1
+    assert results[0].status == "blocked"
+    assert "rejected by policy" in ";".join(results[0].errors)
 
 
 def test_graph_retrieval_dataset_validates(tmp_path: Path) -> None:

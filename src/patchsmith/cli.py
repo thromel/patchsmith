@@ -6,6 +6,7 @@ import tempfile
 from pathlib import Path
 
 from patchsmith.evaluation import (
+    check_materialized_issue_run_readiness,
     materialize_issue_corpus_tasks,
     preflight_issue_corpus_repositories,
     preview_issue_corpus_context,
@@ -306,6 +307,34 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f"valid={summary.valid_tasks}/{summary.task_count} "
                 f"errors={summary.error_count} warnings={summary.warning_count}"
+            )
+        return 0
+
+    if args.command == "check-materialized-run-readiness":
+        results, summary = check_materialized_issue_run_readiness(
+            tasks_dir=Path(args.tasks_dir),
+            output_dir=Path(args.output),
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "result_count": len(results),
+                        "report_path": str(
+                            Path(args.output) / "materialized_run_readiness_report.md"
+                        ),
+                        "summary": summary.to_dict(),
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(
+                f"Report: {Path(args.output) / 'materialized_run_readiness_report.md'}"
+            )
+            print(
+                f"ready={summary.ready_tasks} warning={summary.warning_tasks} "
+                f"blocked={summary.blocked_tasks}"
             )
         return 0
 
@@ -1047,6 +1076,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="Materialized task validation output directory.",
     )
     validate_materialized_issue_tasks_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print JSON summary.",
+    )
+
+    materialized_run_readiness_parser = subparsers.add_parser(
+        "check-materialized-run-readiness",
+        help="Check policy and risk readiness before running materialized public issue tasks.",
+    )
+    materialized_run_readiness_parser.add_argument(
+        "--tasks-dir",
+        default="artifacts/experiments/public_issue_corpus_v1/materialized_tasks",
+        help="Directory containing materialized task subdirectories.",
+    )
+    materialized_run_readiness_parser.add_argument(
+        "--output",
+        default="artifacts/experiments/public_issue_corpus_v1",
+        help="Materialized run readiness output directory.",
+    )
+    materialized_run_readiness_parser.add_argument(
         "--json",
         action="store_true",
         help="Print JSON summary.",
