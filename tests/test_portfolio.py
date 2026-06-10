@@ -486,6 +486,9 @@ def test_demo_readiness_report_summarizes_launch_evidence(
     assert "does not prove live model execution" in plan_text
     plan_payload = json.loads(calibration_plan_json_output.read_text(encoding="utf-8"))
     assert plan_payload["plan_status"] == "blocked"
+    assert plan_payload["run_count"] == 4
+    assert plan_payload["ready_runs"] == 0
+    assert plan_payload["blocked_runs"] == 2
 
     ready_plan = write_live_calibration_plan_report(
         artifacts_dir=artifacts_dir,
@@ -1210,9 +1213,12 @@ def test_delivery_audit_maps_objective_to_current_evidence(
         json.dumps(
             {
                 "plan_status": "blocked",
-                "run_count": 4,
-                "ready_runs": 0,
-                "blocked_runs": 2,
+                "runs": [
+                    {"status": "blocked"},
+                    {"status": "blocked"},
+                    {"status": "setup_required"},
+                    {"status": "setup_required"},
+                ],
             }
         ),
         encoding="utf-8",
@@ -1244,6 +1250,9 @@ def test_delivery_audit_maps_objective_to_current_evidence(
     assert item_statuses["Environment readiness prerequisites are captured."] == "blocked"
     assert item_statuses["Docker sandbox smoke has executable evidence."] == "blocked"
     assert item_statuses["Live LLM calibration has provider evidence."] == "blocked"
+    item_evidence = {item.requirement: item.evidence for item in report.items}
+    assert "run_count=4" in item_evidence["Live calibration execution plan is saved."]
+    assert "blocked_runs=2" in item_evidence["Live calibration execution plan is saved."]
     rendered = output_path.read_text(encoding="utf-8")
     assert "# PatchSmith Delivery Audit" in rendered
     assert "objective-to-evidence" not in rendered

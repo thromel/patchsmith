@@ -146,6 +146,7 @@ class LiveCalibrationPlanReport:
     claim_boundary: list[str]
 
     def to_dict(self) -> dict[str, Any]:
+        run_statuses = [run.status for run in self.runs]
         return {
             "artifacts_dir": self.artifacts_dir,
             "generated_at": self.generated_at,
@@ -155,6 +156,9 @@ class LiveCalibrationPlanReport:
             "credentials_configured": self.credentials_configured,
             "model": self.model,
             "cost_rates_configured": self.cost_rates_configured,
+            "run_count": len(self.runs),
+            "ready_runs": run_statuses.count("ready"),
+            "blocked_runs": run_statuses.count("blocked"),
             "runs": [run.to_dict() for run in self.runs],
             "prerequisites": [check.to_dict() for check in self.prerequisites],
             "claim_boundary": self.claim_boundary,
@@ -3549,17 +3553,34 @@ def _delivery_calibration_plan_item(payload: dict[str, Any] | None) -> DeliveryA
             next_action="Regenerate `live-calibration-plan`.",
         )
     plan_status = str(payload.get("plan_status") or "unknown")
+    run_count, ready_runs, blocked_runs = _calibration_plan_run_counts(payload)
     return _delivery_item(
         requirement="Live calibration execution plan is saved.",
         status="passed",
         evidence=(
             f"plan_status={plan_status}, "
-            f"run_count={_payload_int(payload, 'run_count')}, "
-            f"ready_runs={_payload_int(payload, 'ready_runs')}, "
-            f"blocked_runs={_payload_int(payload, 'blocked_runs')}"
+            f"run_count={run_count}, "
+            f"ready_runs={ready_runs}, "
+            f"blocked_runs={blocked_runs}"
         ),
         source="artifacts/experiments/live_calibration_plan.json",
         next_action="Run the required live smoke only after credentials and budget are available.",
+    )
+
+
+def _calibration_plan_run_counts(payload: dict[str, Any]) -> tuple[int, int, int]:
+    runs = payload.get("runs")
+    if isinstance(runs, list):
+        statuses = [
+            str(run.get("status") or "")
+            for run in runs
+            if isinstance(run, dict)
+        ]
+        return len(statuses), statuses.count("ready"), statuses.count("blocked")
+    return (
+        _payload_int(payload, "run_count"),
+        _payload_int(payload, "ready_runs"),
+        _payload_int(payload, "blocked_runs"),
     )
 
 
