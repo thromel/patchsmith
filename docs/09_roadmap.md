@@ -220,6 +220,7 @@ Publish the project as a recruiter-grade artifact.
 - public issue reproduction-plan gate,
 - public issue reproduction-execution gate,
 - public issue repair-readiness gate,
+- public issue repair-attempt gate,
 - failure analysis report,
 - blog post series,
 - stable tagged release.

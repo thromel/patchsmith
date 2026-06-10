@@ -750,6 +750,65 @@ class IssueCorpusPublicRepairReadinessSummary:
 
 
 @dataclass(frozen=True)
+class IssueCorpusPublicRepairAttemptResult:
+    task_id: str | None
+    repository: str | None
+    issue_url: str | None
+    status: str
+    readiness_status: str
+    repo_path: str | None
+    repo_exists: bool
+    repair_command: str | None
+    validation_command: str | None
+    reproduction_execution_status: str | None
+    runtime: str
+    planner: str
+    context_provider: str
+    sandbox_mode: str
+    sandbox_image: str
+    dry_run: bool
+    run_id: str | None
+    run_status: str | None
+    report_path: str | None
+    trace_path: str | None
+    final_diff_path: str | None
+    test_exit_code: int | None
+    patch_generated: bool
+    errors: list[str]
+    warnings: list[str]
+    evidence: list[str]
+    next_actions: list[str]
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class IssueCorpusPublicRepairAttemptSummary:
+    generated_at: str
+    readiness_path: str
+    tasks_dir: str | None
+    task_count: int
+    dry_run: bool
+    allow_warnings: bool
+    runtime: str
+    planner: str
+    context_provider: str
+    sandbox_mode: str
+    sandbox_image: str
+    dry_run_tasks: int
+    attempted_tasks: int
+    validated_tasks: int
+    failed_tasks: int
+    blocked_tasks: int
+    warning_tasks: int
+    reproduced_input_tasks: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class RetrievalEvalResult:
     task_id: str
     context_provider: str
@@ -3537,6 +3596,217 @@ def write_public_issue_repair_readiness_outputs(
     )
 
 
+def execute_public_issue_repairs(
+    *,
+    readiness_path: Path,
+    output_dir: Path,
+    tasks_dir: Path | None = None,
+    runtime: str = "langgraph",
+    planner: str = "fake_model",
+    context_provider: str = "native_hybrid",
+    sandbox_mode: str = "docker",
+    sandbox_image: str = "patchsmith-seeded-smoke:py312",
+    max_tasks: int | None = None,
+    dry_run: bool = True,
+    allow_warnings: bool = False,
+) -> tuple[
+    list[IssueCorpusPublicRepairAttemptResult],
+    IssueCorpusPublicRepairAttemptSummary,
+]:
+    records = _load_json_record_list(
+        readiness_path,
+        label="public issue repair readiness results",
+    )
+    selected_records = records
+    if max_tasks is not None and max_tasks > 0:
+        selected_records = records[:max_tasks]
+    manifests = _load_public_issue_task_manifests(tasks_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    runner = (
+        None
+        if dry_run
+        else RepairRunner(artifacts_dir=output_dir / "public_issue_repair_attempts")
+    )
+    results = [
+        _execute_public_issue_repair_record(
+            record=record,
+            manifest=manifests.get(_optional_string(record.get("task_id")) or ""),
+            runner=runner,
+            runtime=runtime,
+            planner=planner,
+            context_provider=context_provider,
+            sandbox_mode=sandbox_mode,
+            sandbox_image=sandbox_image,
+            dry_run=dry_run,
+            allow_warnings=allow_warnings,
+        )
+        for record in selected_records
+    ]
+    summary = summarize_public_issue_repair_attempts(
+        readiness_path=readiness_path,
+        tasks_dir=tasks_dir,
+        results=results,
+        dry_run=dry_run,
+        allow_warnings=allow_warnings,
+        runtime=runtime,
+        planner=planner,
+        context_provider=context_provider,
+        sandbox_mode=sandbox_mode,
+        sandbox_image=sandbox_image,
+    )
+    write_public_issue_repair_attempt_outputs(
+        output_dir=output_dir,
+        readiness_path=readiness_path,
+        tasks_dir=tasks_dir,
+        results=results,
+        summary=summary,
+    )
+    return results, summary
+
+
+def summarize_public_issue_repair_attempts(
+    *,
+    readiness_path: Path,
+    tasks_dir: Path | None,
+    results: list[IssueCorpusPublicRepairAttemptResult],
+    dry_run: bool,
+    allow_warnings: bool,
+    runtime: str,
+    planner: str,
+    context_provider: str,
+    sandbox_mode: str,
+    sandbox_image: str,
+) -> IssueCorpusPublicRepairAttemptSummary:
+    return IssueCorpusPublicRepairAttemptSummary(
+        generated_at=datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace(
+            "+00:00", "Z"
+        ),
+        readiness_path=str(readiness_path),
+        tasks_dir=str(tasks_dir) if tasks_dir is not None else None,
+        task_count=len(results),
+        dry_run=dry_run,
+        allow_warnings=allow_warnings,
+        runtime=runtime,
+        planner=planner,
+        context_provider=context_provider,
+        sandbox_mode=sandbox_mode,
+        sandbox_image=sandbox_image,
+        dry_run_tasks=sum(1 for result in results if result.status == "dry_run"),
+        attempted_tasks=sum(
+            1 for result in results if result.status in {"validated", "failed"}
+        ),
+        validated_tasks=sum(1 for result in results if result.status == "validated"),
+        failed_tasks=sum(1 for result in results if result.status == "failed"),
+        blocked_tasks=sum(1 for result in results if result.status == "blocked"),
+        warning_tasks=sum(1 for result in results if result.status == "warning"),
+        reproduced_input_tasks=sum(
+            1
+            for result in results
+            if result.reproduction_execution_status == "reproduced"
+        ),
+    )
+
+
+def write_public_issue_repair_attempt_outputs(
+    *,
+    output_dir: Path,
+    readiness_path: Path,
+    tasks_dir: Path | None,
+    results: list[IssueCorpusPublicRepairAttemptResult],
+    summary: IssueCorpusPublicRepairAttemptSummary,
+) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "public_issue_repair_attempt_results.json").write_text(
+        json.dumps([result.to_dict() for result in results], indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (output_dir / "public_issue_repair_attempt_summary.json").write_text(
+        json.dumps(summary.to_dict(), indent=2) + "\n",
+        encoding="utf-8",
+    )
+    with (output_dir / "public_issue_repair_attempt_results.csv").open(
+        "w",
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=[
+                "task_id",
+                "repository",
+                "issue_url",
+                "status",
+                "readiness_status",
+                "repo_path",
+                "repo_exists",
+                "repair_command",
+                "validation_command",
+                "reproduction_execution_status",
+                "runtime",
+                "planner",
+                "context_provider",
+                "sandbox_mode",
+                "sandbox_image",
+                "dry_run",
+                "run_id",
+                "run_status",
+                "report_path",
+                "trace_path",
+                "final_diff_path",
+                "test_exit_code",
+                "patch_generated",
+                "errors",
+                "warnings",
+                "evidence",
+                "next_actions",
+            ],
+        )
+        writer.writeheader()
+        for result in results:
+            writer.writerow(
+                {
+                    "task_id": result.task_id,
+                    "repository": result.repository,
+                    "issue_url": result.issue_url,
+                    "status": result.status,
+                    "readiness_status": result.readiness_status,
+                    "repo_path": result.repo_path,
+                    "repo_exists": result.repo_exists,
+                    "repair_command": result.repair_command,
+                    "validation_command": result.validation_command,
+                    "reproduction_execution_status": (
+                        result.reproduction_execution_status
+                    ),
+                    "runtime": result.runtime,
+                    "planner": result.planner,
+                    "context_provider": result.context_provider,
+                    "sandbox_mode": result.sandbox_mode,
+                    "sandbox_image": result.sandbox_image,
+                    "dry_run": result.dry_run,
+                    "run_id": result.run_id,
+                    "run_status": result.run_status,
+                    "report_path": result.report_path,
+                    "trace_path": result.trace_path,
+                    "final_diff_path": result.final_diff_path,
+                    "test_exit_code": result.test_exit_code,
+                    "patch_generated": result.patch_generated,
+                    "errors": ";".join(result.errors),
+                    "warnings": ";".join(result.warnings),
+                    "evidence": ";".join(result.evidence),
+                    "next_actions": ";".join(result.next_actions),
+                }
+            )
+    (output_dir / "public_issue_repair_attempt_report.md").write_text(
+        render_public_issue_repair_attempt_report(
+            readiness_path=readiness_path,
+            tasks_dir=tasks_dir,
+            results=results,
+            summary=summary,
+        ),
+        encoding="utf-8",
+    )
+
+
 def run_retrieval_evaluation(
     *,
     dataset_dir: Path,
@@ -5405,6 +5675,80 @@ def render_public_issue_repair_readiness_report(
             "- `warning` means repair can be attempted only with explicit caveats, usually because the saved pre-repair command passed and does not prove issue reproduction.",
             "- `blocked` means do not attempt a public issue repair until the listed prerequisite is fixed.",
             "- This report does not execute PatchSmith repair, generate a patch, call a live model provider, or prove public issue repair quality.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def render_public_issue_repair_attempt_report(
+    *,
+    readiness_path: Path,
+    tasks_dir: Path | None,
+    results: list[IssueCorpusPublicRepairAttemptResult],
+    summary: IssueCorpusPublicRepairAttemptSummary,
+) -> str:
+    lines = [
+        "# Public Issue Repair Attempts",
+        "",
+        f"- Generated at: `{summary.generated_at}`",
+        f"- Readiness path: `{readiness_path}`",
+        f"- Materialized tasks directory: `{tasks_dir or 'not provided'}`",
+        f"- Task count: `{summary.task_count}`",
+        f"- Dry run: `{summary.dry_run}`",
+        f"- Allow warnings: `{summary.allow_warnings}`",
+        f"- Runtime: `{summary.runtime}`",
+        f"- Planner: `{summary.planner}`",
+        f"- Context provider: `{summary.context_provider}`",
+        f"- Sandbox mode: `{summary.sandbox_mode}`",
+        f"- Sandbox image: `{summary.sandbox_image}`",
+        f"- Dry-run tasks: `{summary.dry_run_tasks}`",
+        f"- Attempted tasks: `{summary.attempted_tasks}`",
+        f"- Validated tasks: `{summary.validated_tasks}`",
+        f"- Failed tasks: `{summary.failed_tasks}`",
+        f"- Blocked tasks: `{summary.blocked_tasks}`",
+        f"- Warning tasks: `{summary.warning_tasks}`",
+        f"- Reproduced-input tasks: `{summary.reproduced_input_tasks}`",
+        "",
+        "## Results",
+        "",
+        (
+            "| Task | Status | Repository | Readiness | Reproduction | Runtime | "
+            "Test Exit | Patch | Run | Notes | Next Actions |"
+        ),
+        "|---|---|---|---|---|---|---|---|---|---|---|",
+    ]
+    for result in results:
+        notes = [*result.errors, *result.warnings]
+        run_refs = "; ".join(
+            path
+            for path in [result.report_path, result.trace_path, result.final_diff_path]
+            if path is not None
+        )
+        lines.append(
+            "| "
+            f"{_markdown_table_text(result.task_id or 'unknown')} | "
+            f"{_markdown_table_text(result.status)} | "
+            f"{_markdown_table_text(result.repository or 'unknown')} | "
+            f"{_markdown_table_text(result.readiness_status)} | "
+            f"{_markdown_table_text(result.reproduction_execution_status or 'missing')} | "
+            f"{_markdown_table_text(result.runtime + '/' + result.planner)} | "
+            f"{_markdown_table_text(str(result.test_exit_code) if result.test_exit_code is not None else 'not run')} | "
+            f"{_markdown_table_text(str(result.patch_generated).lower())} | "
+            f"{_markdown_table_text(run_refs or 'none')} | "
+            f"{_markdown_table_text('; '.join(notes) or 'none')} | "
+            f"{_markdown_table_text('; '.join(result.next_actions) or 'none')} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Claim Boundary",
+            "",
+            "- This gate consumes public repair-readiness evidence before launching PatchSmith runs.",
+            "- `blocked` rows were not run and must not be counted as repair attempts.",
+            "- `dry_run` rows prove only readiness and configuration checks.",
+            "- `validated` rows mean PatchSmith produced run artifacts and the configured validation command exited zero.",
+            "- This report does not prove live LLM quality unless non-offline provider metadata is present in the saved run artifacts.",
             "",
         ]
     )
@@ -7928,11 +8272,272 @@ def _check_public_issue_repair_readiness_record(
     )
 
 
+def _execute_public_issue_repair_record(
+    *,
+    record: dict[str, Any],
+    manifest: dict[str, Any] | None,
+    runner: RepairRunner | None,
+    runtime: str,
+    planner: str,
+    context_provider: str,
+    sandbox_mode: str,
+    sandbox_image: str,
+    dry_run: bool,
+    allow_warnings: bool,
+) -> IssueCorpusPublicRepairAttemptResult:
+    task_id = _optional_string(record.get("task_id"))
+    repository = _optional_string(record.get("repository"))
+    issue_url = _optional_string(record.get("issue_url"))
+    readiness_status = _optional_string(record.get("status")) or "unknown"
+    repo_path_value = _optional_string(record.get("repo_path"))
+    repair_command = _optional_string(record.get("repair_command"))
+    validation_command = _optional_string(record.get("validation_command"))
+    reproduction_execution_status = _optional_string(
+        record.get("reproduction_execution_status")
+    )
+    errors = _string_list(record.get("blockers"))
+    warnings = _string_list(record.get("warnings"))
+    evidence = _string_list(record.get("evidence"))
+    next_actions = _string_list(record.get("next_actions"))
+    run_id: str | None = None
+    run_status: str | None = None
+    report_path: str | None = None
+    trace_path: str | None = None
+    final_diff_path: str | None = None
+    test_exit_code: int | None = None
+    patch_generated = False
+
+    repo_exists = False
+    if repo_path_value:
+        repo_path = Path(repo_path_value)
+        repo_exists = repo_path.exists() and repo_path.is_dir()
+        if not repo_exists:
+            errors.append(f"repository snapshot is not available: {repo_path_value}")
+    else:
+        errors.append("repair-readiness record has no repo_path")
+
+    issue_text = _public_issue_repair_issue_text(manifest)
+    if not issue_text:
+        errors.append("materialized issue text is missing")
+    if not repair_command:
+        errors.append("repair command is missing")
+    if not validation_command:
+        errors.append("validation command is missing")
+    if reproduction_execution_status != "reproduced":
+        errors.append("public issue reproduction has not been proven")
+        next_actions.append("execute reproduction and save failing logs before repair")
+    if readiness_status == "blocked":
+        errors.append("repair readiness is blocked")
+    elif readiness_status == "warning" and not allow_warnings:
+        errors.append("repair readiness is warning and --allow-warnings was not set")
+    elif readiness_status not in {"ready", "warning"}:
+        warnings.append(f"repair readiness status is {readiness_status}")
+
+    if errors:
+        return IssueCorpusPublicRepairAttemptResult(
+            task_id=task_id,
+            repository=repository,
+            issue_url=issue_url,
+            status="blocked",
+            readiness_status=readiness_status,
+            repo_path=repo_path_value,
+            repo_exists=repo_exists,
+            repair_command=repair_command,
+            validation_command=validation_command,
+            reproduction_execution_status=reproduction_execution_status,
+            runtime=runtime,
+            planner=planner,
+            context_provider=context_provider,
+            sandbox_mode=sandbox_mode,
+            sandbox_image=sandbox_image,
+            dry_run=dry_run,
+            run_id=run_id,
+            run_status=run_status,
+            report_path=report_path,
+            trace_path=trace_path,
+            final_diff_path=final_diff_path,
+            test_exit_code=test_exit_code,
+            patch_generated=patch_generated,
+            errors=_dedupe_preserve_order(errors),
+            warnings=_dedupe_preserve_order(warnings),
+            evidence=_dedupe_preserve_order(evidence),
+            next_actions=_dedupe_preserve_order(
+                [*next_actions, "resolve public repair-attempt blockers before execution"]
+            ),
+        )
+
+    if dry_run:
+        return IssueCorpusPublicRepairAttemptResult(
+            task_id=task_id,
+            repository=repository,
+            issue_url=issue_url,
+            status="dry_run",
+            readiness_status=readiness_status,
+            repo_path=repo_path_value,
+            repo_exists=repo_exists,
+            repair_command=repair_command,
+            validation_command=validation_command,
+            reproduction_execution_status=reproduction_execution_status,
+            runtime=runtime,
+            planner=planner,
+            context_provider=context_provider,
+            sandbox_mode=sandbox_mode,
+            sandbox_image=sandbox_image,
+            dry_run=dry_run,
+            run_id=run_id,
+            run_status=run_status,
+            report_path=report_path,
+            trace_path=trace_path,
+            final_diff_path=final_diff_path,
+            test_exit_code=test_exit_code,
+            patch_generated=patch_generated,
+            errors=[],
+            warnings=_dedupe_preserve_order(warnings),
+            evidence=_dedupe_preserve_order(
+                [*evidence, "repair attempt passed dry-run gating"]
+            ),
+            next_actions=_dedupe_preserve_order(
+                [*next_actions, "rerun with --execute to launch PatchSmith repair"]
+            ),
+        )
+
+    assert runner is not None
+    assert repo_path_value is not None
+    assert issue_text is not None
+    try:
+        run_result = runner.run(
+            RunRequest(
+                repo=repo_path_value,
+                issue_text=issue_text,
+                issue_url=issue_url,
+                test_command=validation_command,
+                runtime=runtime,
+                planner=planner,
+                context_provider=context_provider,
+                sandbox_mode=sandbox_mode,
+                sandbox_image=sandbox_image,
+            )
+        )
+    except Exception as error:
+        errors.append(f"PatchSmith repair run failed: {error}")
+        return IssueCorpusPublicRepairAttemptResult(
+            task_id=task_id,
+            repository=repository,
+            issue_url=issue_url,
+            status="failed",
+            readiness_status=readiness_status,
+            repo_path=repo_path_value,
+            repo_exists=repo_exists,
+            repair_command=repair_command,
+            validation_command=validation_command,
+            reproduction_execution_status=reproduction_execution_status,
+            runtime=runtime,
+            planner=planner,
+            context_provider=context_provider,
+            sandbox_mode=sandbox_mode,
+            sandbox_image=sandbox_image,
+            dry_run=dry_run,
+            run_id=run_id,
+            run_status="failed",
+            report_path=report_path,
+            trace_path=trace_path,
+            final_diff_path=final_diff_path,
+            test_exit_code=test_exit_code,
+            patch_generated=patch_generated,
+            errors=_dedupe_preserve_order(errors),
+            warnings=_dedupe_preserve_order(warnings),
+            evidence=_dedupe_preserve_order(evidence),
+            next_actions=_dedupe_preserve_order(
+                [*next_actions, "inspect the failed PatchSmith run before retrying"]
+            ),
+        )
+
+    run_id = run_result.run_id
+    run_status = run_result.status
+    report_path = str(run_result.report_path)
+    trace_path = str(run_result.trace_path)
+    final_diff_path = str(run_result.final_diff_path)
+    test_exit_code = (
+        run_result.test_result.exit_code if run_result.test_result is not None else None
+    )
+    patch_generated = _path_has_text(run_result.final_diff_path)
+    if patch_generated:
+        evidence.append("PatchSmith generated a final diff")
+    if test_exit_code == 0 and patch_generated:
+        status = "validated"
+        evidence.append("repair validation command exited zero")
+        next_actions.append("review final diff and broaden validation before claims")
+    elif test_exit_code == 0:
+        status = "failed"
+        warnings.append("repair validation passed but no patch was generated")
+        next_actions.append("inspect saved run artifacts before claiming repair")
+    else:
+        status = "failed"
+        warnings.append(f"repair validation exit code is {test_exit_code}")
+        next_actions.append("inspect saved run artifacts before retrying or claiming repair")
+
+    return IssueCorpusPublicRepairAttemptResult(
+        task_id=task_id,
+        repository=repository,
+        issue_url=issue_url,
+        status=status,
+        readiness_status=readiness_status,
+        repo_path=repo_path_value,
+        repo_exists=repo_exists,
+        repair_command=repair_command,
+        validation_command=validation_command,
+        reproduction_execution_status=reproduction_execution_status,
+        runtime=runtime,
+        planner=planner,
+        context_provider=context_provider,
+        sandbox_mode=sandbox_mode,
+        sandbox_image=sandbox_image,
+        dry_run=dry_run,
+        run_id=run_id,
+        run_status=run_status,
+        report_path=report_path,
+        trace_path=trace_path,
+        final_diff_path=final_diff_path,
+        test_exit_code=test_exit_code,
+        patch_generated=patch_generated,
+        errors=_dedupe_preserve_order(errors),
+        warnings=_dedupe_preserve_order(warnings),
+        evidence=_dedupe_preserve_order(evidence),
+        next_actions=_dedupe_preserve_order(next_actions),
+    )
+
+
 def _first_manifest_repair_command(manifest: dict[str, Any] | None) -> str | None:
     if manifest is None:
         return None
     commands = _string_list(manifest.get("suggested_commands"))
     return commands[0] if commands else None
+
+
+def _public_issue_repair_issue_text(manifest: dict[str, Any] | None) -> str | None:
+    if manifest is None:
+        return None
+    issue_file = _optional_string(manifest.get("issue_file"))
+    if issue_file:
+        path = Path(issue_file)
+        if path.exists() and path.is_file():
+            return path.read_text(encoding="utf-8")
+    issue = manifest.get("issue") if isinstance(manifest.get("issue"), dict) else {}
+    parts = [
+        _optional_string(issue.get("title")),
+        _optional_string(issue.get("task_type")),
+        _optional_string(issue.get("selection_reason")),
+    ]
+    workflow = _string_list(issue.get("expected_workflow"))
+    text = "\n".join(part for part in [*parts, *workflow] if part)
+    return text or None
+
+
+def _path_has_text(path: Path) -> bool:
+    try:
+        return bool(path.read_text(encoding="utf-8").strip())
+    except OSError:
+        return False
 
 
 def _load_json_record_list(path: Path, *, label: str) -> list[dict[str, Any]]:

@@ -319,6 +319,18 @@ PYTHONPATH=src python3 -m patchsmith.cli check-public-issue-repair-readiness \
 
 The repair-readiness report joins focused-run, diagnosis, setup-validation, reproduction-execution, and materialized-task command evidence before a public issue repair attempt. Treat `warning` rows as runnable only with explicit caveats; a pre-repair passing focused command means validation is runnable, not that the issue has been reproduced as a failing test.
 
+Public issue repair attempts:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli execute-public-issue-repairs \
+  --readiness artifacts/experiments/public_issue_corpus_v1/public_issue_repair_readiness_results.json \
+  --tasks-dir artifacts/experiments/public_issue_corpus_v1/materialized_tasks \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+The repair-attempt command writes `public_issue_repair_attempt_*` artifacts and is dry-run by default. It blocks rows without reproduced failing evidence and only executes PatchSmith repairs when readiness is clean, or when warning rows are explicitly accepted with `--allow-warnings`.
+
 Scaffold comparison:
 
 ```bash
@@ -616,7 +628,7 @@ PYTHONPATH=src python3 -m patchsmith.cli release-hygiene \
   --json
 ```
 
-The release hygiene report checks required docs, generated review artifacts, public issue reproduction-plan, reproduction-execution, and repair-readiness evidence, project-status freshness, environment readiness, demo readiness, failure visibility, live-provider caveats, Git metadata, packaging metadata, CI, demo media, architecture diagram evidence, and README caveat markers. Treat `blocked` as a hard stop for tagged/public release claims.
+The release hygiene report checks required docs, generated review artifacts, public issue reproduction-plan, reproduction-execution, repair-readiness, and repair-attempt evidence, project-status freshness, environment readiness, demo readiness, failure visibility, live-provider caveats, Git metadata, packaging metadata, CI, demo media, architecture diagram evidence, and README caveat markers. Treat `blocked` as a hard stop for tagged/public release claims.
 
 Package build:
 
@@ -803,6 +815,7 @@ Run:
 - public issue reproduction-plan regeneration,
 - public issue reproduction-execution regeneration,
 - public issue repair-readiness regeneration,
+- public issue repair-attempt regeneration,
 - release hygiene report regeneration,
 - README quickstart validation,
 - final report review.

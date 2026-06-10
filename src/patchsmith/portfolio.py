@@ -20,6 +20,7 @@ from typing import Any
 from patchsmith.evaluation import (
     check_public_issue_repair_readiness,
     execute_public_issue_reproductions,
+    execute_public_issue_repairs,
     plan_public_issue_reproductions,
 )
 from patchsmith.observability import (
@@ -992,6 +993,10 @@ def build_project_status_report(
             "experiments/public_issue_corpus_v1/"
             "public_issue_repair_readiness_summary.json"
         ),
+        "public_repair_attempt": (
+            "experiments/public_issue_corpus_v1/"
+            "public_issue_repair_attempt_summary.json"
+        ),
         "final": "experiments/final_evaluation.json",
         "index": "experiments/index.json",
     }
@@ -1578,6 +1583,22 @@ def build_evidence_refresh_report(
                 )[1],
             )
         )
+        steps.append(
+            _run_evidence_refresh_step(
+                name="Public issue repair attempts",
+                artifact_paths=output_paths(
+                    "public_issue_corpus_v1/public_issue_repair_attempt_report.md",
+                    "public_issue_corpus_v1/public_issue_repair_attempt_summary.json",
+                ),
+                action=lambda: execute_public_issue_repairs(
+                    readiness_path=experiment_path(
+                        "public_issue_corpus_v1/public_issue_repair_readiness_results.json"
+                    ),
+                    tasks_dir=experiment_path("public_issue_corpus_v1/materialized_tasks"),
+                    output_dir=experiment_path("public_issue_corpus_v1"),
+                )[1],
+            )
+        )
     else:
         steps.append(
             EvidenceRefreshStep(
@@ -1587,6 +1608,21 @@ def build_evidence_refresh_report(
                 artifact_paths=output_paths(
                     "public_issue_corpus_v1/public_issue_repair_readiness_report.md",
                     "public_issue_corpus_v1/public_issue_repair_readiness_summary.json",
+                ),
+                summary=(
+                    "Skipped because focused public issue run, diagnosis, or setup-validation "
+                    "inputs are missing."
+                ),
+            )
+        )
+        steps.append(
+            EvidenceRefreshStep(
+                name="Public issue repair attempts",
+                status="skipped",
+                duration_ms=0,
+                artifact_paths=output_paths(
+                    "public_issue_corpus_v1/public_issue_repair_attempt_report.md",
+                    "public_issue_corpus_v1/public_issue_repair_attempt_summary.json",
                 ),
                 summary=(
                     "Skipped because focused public issue run, diagnosis, or setup-validation "
@@ -3423,6 +3459,12 @@ def _delivery_audit_items(
         / "public_issue_corpus_v1"
         / "public_issue_repair_readiness_summary.json"
     )
+    public_repair_attempt_payload = _load_json_artifact(
+        artifacts_dir
+        / "experiments"
+        / "public_issue_corpus_v1"
+        / "public_issue_repair_attempt_summary.json"
+    )
     quality_payload = _load_json_artifact(artifacts_dir / "experiments" / "quality_gate.json")
 
     return [
@@ -3535,6 +3577,7 @@ def _delivery_audit_items(
         _delivery_public_reproduction_plan_item(reproduction_plan_payload),
         _delivery_public_reproduction_execution_item(reproduction_execution_payload),
         _delivery_public_repair_readiness_item(public_repair_readiness_payload),
+        _delivery_public_repair_attempt_item(public_repair_attempt_payload),
         _delivery_payload_status_item(
             requirement="Live LLM calibration has provider evidence.",
             payload=calibration_payload,
@@ -3895,6 +3938,61 @@ def _delivery_public_repair_readiness_item(
             f"ready_tasks={ready}, warning_tasks={warning}, blocked_tasks={blocked}, "
             f"repair_command_tasks={repair_commands}, "
             f"missing_reproduction_tasks={missing_reproduction}"
+        ),
+        source=source,
+        next_action=next_action,
+    )
+
+
+def _delivery_public_repair_attempt_item(
+    payload: dict[str, Any] | None,
+) -> DeliveryAuditItem:
+    source = (
+        "artifacts/experiments/public_issue_corpus_v1/"
+        "public_issue_repair_attempt_summary.json"
+    )
+    if payload is None:
+        return _delivery_item(
+            requirement="Public issue repair attempts are safely gated.",
+            status="missing",
+            evidence="Public repair-attempt summary artifact is missing.",
+            source=source,
+            next_action="Run `execute-public-issue-repairs` after repair readiness.",
+        )
+    validated = _payload_int(payload, "validated_tasks")
+    attempted = _payload_int(payload, "attempted_tasks")
+    blocked = _payload_int(payload, "blocked_tasks")
+    failed = _payload_int(payload, "failed_tasks")
+    dry_run = _payload_int(payload, "dry_run_tasks")
+    reproduced_inputs = _payload_int(payload, "reproduced_input_tasks")
+    if failed:
+        status = "blocked"
+        next_action = "Inspect failed public repair run artifacts."
+    elif validated:
+        status = "passed"
+        next_action = "Review final diffs and broaden validation before claims."
+    elif blocked and not reproduced_inputs:
+        status = "warning"
+        next_action = "Capture reproduced failing evidence before executing repairs."
+    elif dry_run:
+        status = "warning"
+        next_action = "Use --execute only after reviewing dry-run evidence."
+    elif blocked:
+        status = "blocked"
+        next_action = "Resolve repair-attempt blockers before execution."
+    elif attempted:
+        status = "warning"
+        next_action = "Review attempted repair artifacts."
+    else:
+        status = "warning"
+        next_action = "Run repair-attempt dry-run after readiness is available."
+    return _delivery_item(
+        requirement="Public issue repair attempts are safely gated.",
+        status=status,
+        evidence=(
+            f"validated_tasks={validated}, attempted_tasks={attempted}, "
+            f"blocked_tasks={blocked}, failed_tasks={failed}, "
+            f"dry_run_tasks={dry_run}, reproduced_input_tasks={reproduced_inputs}"
         ),
         source=source,
         next_action=next_action,
@@ -5358,6 +5456,8 @@ def _release_hygiene_checks(
         "experiments/public_issue_corpus_v1/public_issue_reproduction_execution_summary.json",
         "experiments/public_issue_corpus_v1/public_issue_repair_readiness_report.md",
         "experiments/public_issue_corpus_v1/public_issue_repair_readiness_summary.json",
+        "experiments/public_issue_corpus_v1/public_issue_repair_attempt_report.md",
+        "experiments/public_issue_corpus_v1/public_issue_repair_attempt_summary.json",
         "experiments/demo_script.md",
         "experiments/demo_script.json",
         "experiments/environment_readiness.md",
@@ -6127,6 +6227,11 @@ def _evidence_refresh_summary(result: Any) -> str:
             f"dry_run={result.dry_run_tasks}, blocked={result.blocked_tasks}, "
             f"manual_specs={result.manual_spec_required_tasks}"
         )
+    if hasattr(result, "validated_tasks"):
+        return (
+            f"validated={result.validated_tasks}, "
+            f"attempted={result.attempted_tasks}, blocked={result.blocked_tasks}"
+        )
     if hasattr(result, "manual_spec_required_tasks"):
         return (
             f"planned={result.planned_tasks}, warning={result.warning_tasks}, "
@@ -6770,6 +6875,7 @@ def _final_review_artifacts() -> list[str]:
         "artifacts/experiments/public_issue_corpus_v1/focused_test_setup_execution_report.md",
         "artifacts/experiments/public_issue_corpus_v1/focused_test_setup_validation_report.md",
         "artifacts/experiments/public_issue_corpus_v1/public_issue_reproduction_execution_report.md",
+        "artifacts/experiments/public_issue_corpus_v1/public_issue_repair_attempt_report.md",
         "artifacts/experiments/demo_media.md",
         "artifacts/experiments/demo_media.svg",
         "artifacts/experiments/demo_media.png",

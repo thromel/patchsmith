@@ -12,6 +12,7 @@ from patchsmith.evaluation import (
     diagnose_focused_test_runs,
     execute_focused_test_setups,
     execute_public_issue_reproductions,
+    execute_public_issue_repairs,
     materialize_issue_corpus_tasks,
     plan_focused_test_setups,
     plan_materialized_issue_focused_tests,
@@ -654,6 +655,45 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f"ready={summary.ready_tasks} warning={summary.warning_tasks} "
                 f"blocked={summary.blocked_tasks}"
+            )
+        return 0
+
+    if args.command == "execute-public-issue-repairs":
+        tasks_dir = Path(args.tasks_dir) if args.tasks_dir else None
+        max_tasks = None if args.max_tasks == 0 else args.max_tasks
+        results, summary = execute_public_issue_repairs(
+            readiness_path=Path(args.readiness),
+            output_dir=Path(args.output),
+            tasks_dir=tasks_dir,
+            runtime=args.runtime,
+            planner=args.planner,
+            context_provider=args.context_provider,
+            sandbox_mode=args.sandbox_mode,
+            sandbox_image=args.sandbox_image,
+            max_tasks=max_tasks,
+            dry_run=not args.execute,
+            allow_warnings=args.allow_warnings,
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "result_count": len(results),
+                        "report_path": str(
+                            Path(args.output) / "public_issue_repair_attempt_report.md"
+                        ),
+                        "summary": summary.to_dict(),
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(
+                f"Report: {Path(args.output) / 'public_issue_repair_attempt_report.md'}"
+            )
+            print(
+                f"dry_run={summary.dry_run_tasks} attempted={summary.attempted_tasks} "
+                f"validated={summary.validated_tasks} blocked={summary.blocked_tasks}"
             )
         return 0
 
@@ -2119,6 +2159,79 @@ def build_parser() -> argparse.ArgumentParser:
         help="Public issue repair-readiness output directory.",
     )
     public_repair_readiness_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print JSON summary.",
+    )
+
+    public_repair_attempt_parser = subparsers.add_parser(
+        "execute-public-issue-repairs",
+        help="Dry-run or execute readiness-gated PatchSmith repairs on public issue tasks.",
+    )
+    public_repair_attempt_parser.add_argument(
+        "--readiness",
+        default=(
+            "artifacts/experiments/public_issue_corpus_v1/"
+            "public_issue_repair_readiness_results.json"
+        ),
+        help="Public issue repair-readiness results JSON.",
+    )
+    public_repair_attempt_parser.add_argument(
+        "--tasks-dir",
+        default="artifacts/experiments/public_issue_corpus_v1/materialized_tasks",
+        help="Optional directory containing materialized task manifests.",
+    )
+    public_repair_attempt_parser.add_argument(
+        "--output",
+        default="artifacts/experiments/public_issue_corpus_v1",
+        help="Public issue repair-attempt output directory.",
+    )
+    public_repair_attempt_parser.add_argument(
+        "--runtime",
+        choices=["agentless", "heuristic", "langgraph", "deepagents", "openai_agents"],
+        default="langgraph",
+        help="Runtime used for executed repair attempts.",
+    )
+    public_repair_attempt_parser.add_argument(
+        "--planner",
+        choices=["heuristic", "fake_model", "openai"],
+        default="fake_model",
+        help="Planner used for executed repair attempts.",
+    )
+    public_repair_attempt_parser.add_argument(
+        "--context-provider",
+        choices=["native", "native_hybrid", "native_graph", "ctxhelm_cli", "auto"],
+        default="native_hybrid",
+        help="Context provider used for executed repair attempts.",
+    )
+    public_repair_attempt_parser.add_argument(
+        "--sandbox-mode",
+        choices=["local", "docker"],
+        default="docker",
+        help="Sandbox runner used by PatchSmith validation when --execute is set.",
+    )
+    public_repair_attempt_parser.add_argument(
+        "--sandbox-image",
+        default="patchsmith-seeded-smoke:py312",
+        help="Docker image used when --sandbox-mode docker is selected.",
+    )
+    public_repair_attempt_parser.add_argument(
+        "--max-tasks",
+        type=int,
+        default=0,
+        help="Maximum repair-readiness records to process. Use 0 for all records.",
+    )
+    public_repair_attempt_parser.add_argument(
+        "--allow-warnings",
+        action="store_true",
+        help="Allow warning-class readiness only when reproduction evidence is already proven.",
+    )
+    public_repair_attempt_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Launch PatchSmith repairs instead of writing dry-run evidence.",
+    )
+    public_repair_attempt_parser.add_argument(
         "--json",
         action="store_true",
         help="Print JSON summary.",

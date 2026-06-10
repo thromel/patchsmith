@@ -421,6 +421,18 @@ PYTHONPATH=src python3 -m patchsmith.cli check-public-issue-repair-readiness \
   --json
 ```
 
+Dry-run or execute public issue repair attempts:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli execute-public-issue-repairs \
+  --readiness artifacts/experiments/public_issue_corpus_v1/public_issue_repair_readiness_results.json \
+  --tasks-dir artifacts/experiments/public_issue_corpus_v1/materialized_tasks \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+Current repair-attempt execution is a safety gate: rows without reproduced failing evidence are blocked, and `--execute` is reserved for reviewed readiness rows.
+
 Generate the release hygiene report:
 
 ```bash
@@ -432,7 +444,7 @@ PYTHONPATH=src python3 -m patchsmith.cli release-hygiene \
   --json
 ```
 
-Current release hygiene output is `ready_with_warnings`: generated review artifacts now include quality-gate, project-status, project-status freshness, environment-readiness, calibration-readiness, live-calibration plan, delivery audit, launch-blocker, and public issue context-preview/materialization validation/readiness/focused-test plan/run/diagnosis/setup-plan/setup-readiness/setup-execution/setup-validation/reproduction-plan/reproduction-execution/repair-readiness evidence, package build metadata exists, local Git metadata exists, and the remaining release caveats are unproven live LLM calibration plus warning-class environment/setup/reproduction evidence.
+Current release hygiene output is `ready_with_warnings`: generated review artifacts now include quality-gate, project-status, project-status freshness, environment-readiness, calibration-readiness, live-calibration plan, delivery audit, launch-blocker, and public issue context-preview/materialization validation/readiness/focused-test plan/run/diagnosis/setup-plan/setup-readiness/setup-execution/setup-validation/reproduction-plan/reproduction-execution/repair-readiness/repair-attempt evidence, package build metadata exists, local Git metadata exists, and the remaining release caveats are unproven live LLM calibration plus warning-class environment/setup/reproduction evidence.
 
 ## Example flagship demo scenario
 

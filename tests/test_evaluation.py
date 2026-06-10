@@ -10,6 +10,7 @@ from patchsmith.evaluation import (
     diagnose_focused_test_runs,
     execute_focused_test_setups,
     execute_public_issue_reproductions,
+    execute_public_issue_repairs,
     load_seeded_tasks,
     materialize_issue_corpus_tasks,
     plan_focused_test_setups,
@@ -2178,6 +2179,207 @@ def test_check_public_issue_repair_readiness_blocks_missing_setup_validation(
     assert summary.blocked_tasks == 1
     assert results[0].status == "blocked"
     assert "setup validation record is missing" in ";".join(results[0].blockers)
+
+
+def test_execute_public_issue_repairs_blocks_without_reproduction(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    readiness_path = tmp_path / "public_issue_repair_readiness_results.json"
+    readiness_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "public_task",
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/10",
+                    "status": "warning",
+                    "repo_path": str(repo_dir),
+                    "repo_exists": True,
+                    "repair_command": "PYTHONPATH=src python3 -m patchsmith.cli run --json",
+                    "validation_command": "python3 -m pytest tests/test_bug.py",
+                    "reproduction_execution_status": "blocked",
+                    "blockers": [],
+                    "warnings": ["public issue reproduction execution is blocked"],
+                    "evidence": ["saved PatchSmith repair command is available"],
+                    "next_actions": [],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    output_dir = tmp_path / "repair_attempts"
+    results, summary = execute_public_issue_repairs(
+        readiness_path=readiness_path,
+        output_dir=output_dir,
+    )
+
+    assert summary.blocked_tasks == 1
+    assert summary.attempted_tasks == 0
+    assert results[0].status == "blocked"
+    assert "public issue reproduction has not been proven" in ";".join(results[0].errors)
+    assert (output_dir / "public_issue_repair_attempt_report.md").exists()
+    assert (output_dir / "public_issue_repair_attempt_results.csv").exists()
+
+    cli_output = tmp_path / "cli_repair_attempts"
+    exit_code = main(
+        [
+            "execute-public-issue-repairs",
+            "--readiness",
+            str(readiness_path),
+            "--output",
+            str(cli_output),
+            "--json",
+        ]
+    )
+    assert exit_code == 0
+    assert (cli_output / "public_issue_repair_attempt_report.md").exists()
+
+
+def test_execute_public_issue_repairs_dry_runs_ready_task(tmp_path: Path) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    tasks_dir = tmp_path / "materialized_tasks"
+    task_dir = tasks_dir / "public_task"
+    task_dir.mkdir(parents=True)
+    issue_path = task_dir / "issue.md"
+    issue_path.write_text("add returns wrong result\n", encoding="utf-8")
+    (task_dir / "task_manifest.json").write_text(
+        json.dumps(
+            {
+                "task_id": "public_task",
+                "issue_file": str(issue_path),
+                "suggested_commands": ["PYTHONPATH=src python3 -m patchsmith.cli run --json"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    readiness_path = tmp_path / "public_issue_repair_readiness_results.json"
+    readiness_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "public_task",
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/10",
+                    "status": "ready",
+                    "repo_path": str(repo_dir),
+                    "repo_exists": True,
+                    "repair_command": "PYTHONPATH=src python3 -m patchsmith.cli run --json",
+                    "validation_command": "python3 -m pytest tests/test_bug.py",
+                    "reproduction_execution_status": "reproduced",
+                    "blockers": [],
+                    "warnings": [],
+                    "evidence": ["public issue reproduction execution saved failing evidence"],
+                    "next_actions": [],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    results, summary = execute_public_issue_repairs(
+        readiness_path=readiness_path,
+        output_dir=tmp_path / "repair_attempts",
+        tasks_dir=tasks_dir,
+        runtime="heuristic",
+        planner="heuristic",
+        sandbox_mode="local",
+    )
+
+    assert summary.dry_run_tasks == 1
+    assert summary.blocked_tasks == 0
+    assert summary.reproduced_input_tasks == 1
+    assert results[0].status == "dry_run"
+    assert "repair attempt passed dry-run gating" in ";".join(results[0].evidence)
+
+
+def test_execute_public_issue_repairs_executes_local_heuristic_repair(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    src_dir = repo_dir / "src"
+    tests_dir = repo_dir / "tests"
+    src_dir.mkdir(parents=True)
+    tests_dir.mkdir()
+    (repo_dir / "pyproject.toml").write_text(
+        "\n".join(
+            [
+                "[tool.pytest.ini_options]",
+                'pythonpath = ["src"]',
+                'testpaths = ["tests"]',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (src_dir / "simple_calc.py").write_text(
+        "def add(left: int, right: int) -> int:\n    return left - right\n",
+        encoding="utf-8",
+    )
+    (tests_dir / "test_simple_calc.py").write_text(
+        "from simple_calc import add\n\n\ndef test_add():\n    assert add(2, 3) == 5\n",
+        encoding="utf-8",
+    )
+    tasks_dir = tmp_path / "materialized_tasks"
+    task_dir = tasks_dir / "public_task"
+    task_dir.mkdir(parents=True)
+    issue_path = task_dir / "issue.md"
+    issue_path.write_text("add returns wrong result\n", encoding="utf-8")
+    (task_dir / "task_manifest.json").write_text(
+        json.dumps(
+            {
+                "task_id": "public_task",
+                "issue_file": str(issue_path),
+                "suggested_commands": ["PYTHONPATH=src python3 -m patchsmith.cli run --json"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    readiness_path = tmp_path / "public_issue_repair_readiness_results.json"
+    readiness_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "public_task",
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/10",
+                    "status": "ready",
+                    "repo_path": str(repo_dir),
+                    "repo_exists": True,
+                    "repair_command": "PYTHONPATH=src python3 -m patchsmith.cli run --json",
+                    "validation_command": "python3 -m pytest tests/test_simple_calc.py",
+                    "reproduction_execution_status": "reproduced",
+                    "blockers": [],
+                    "warnings": [],
+                    "evidence": ["public issue reproduction execution saved failing evidence"],
+                    "next_actions": [],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    output_dir = tmp_path / "repair_attempts"
+    results, summary = execute_public_issue_repairs(
+        readiness_path=readiness_path,
+        output_dir=output_dir,
+        tasks_dir=tasks_dir,
+        runtime="heuristic",
+        planner="heuristic",
+        sandbox_mode="local",
+        dry_run=False,
+    )
+
+    assert summary.attempted_tasks == 1
+    assert summary.validated_tasks == 1
+    assert results[0].status == "validated"
+    assert results[0].patch_generated
+    assert results[0].test_exit_code == 0
+    assert results[0].report_path is not None
+    assert Path(results[0].report_path).exists()
 
 
 def test_graph_retrieval_dataset_validates(tmp_path: Path) -> None:
