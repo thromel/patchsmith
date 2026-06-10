@@ -92,6 +92,7 @@ Required when command execution, sandboxing, patching, or external tools change:
 - command allowlist tests pass,
 - path traversal tests pass,
 - Docker runner command construction and environment filtering tests pass when Docker mode changes,
+- `docker-smoke` is regenerated when Docker sandbox evidence changes,
 - no host secrets are intentionally mounted,
 - unsafe commands are rejected before execution.
 

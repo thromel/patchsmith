@@ -143,6 +143,20 @@ PYTHONPATH=src python3 -m patchsmith.cli mvp-progress \
 
 Current MVP progress output is `ready_with_caveats` at `95.0%`: 27 evidence-backed checklist items pass, three are warnings, and no item is blocked or missing. Use it as the snapshot answer for "how far are we?" while keeping the live-calibration warning explicit.
 
+Generate the Docker smoke report:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli docker-smoke \
+  --project-root . \
+  --artifacts-dir artifacts \
+  --image patchsmith-seeded-smoke:py312 \
+  --output artifacts/experiments/docker_smoke.md \
+  --json-output artifacts/experiments/docker_smoke.json \
+  --json
+```
+
+Current Docker smoke output records `not_available` when Docker is not reachable. A passing Docker smoke artifact is required before claiming Docker-sandboxed seeded tests.
+
 Generate the release hygiene report:
 
 ```bash

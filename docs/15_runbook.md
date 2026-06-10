@@ -180,17 +180,33 @@ The patch-search report compares success@k, selected-candidate success, latency,
 Sandbox mode:
 
 ```bash
+docker build -f docker/seeded-smoke.Dockerfile -t patchsmith-seeded-smoke:py312 .
+
 PYTHONPATH=src python3 -m patchsmith.cli eval-repair \
   --dataset evals/tasks/seeded_bugs_v1 \
   --runtime heuristic \
   --context-provider native_hybrid \
   --sandbox-mode docker \
-  --sandbox-image python:3.12-slim \
+  --sandbox-image patchsmith-seeded-smoke:py312 \
   --output artifacts/experiments/repair_eval_docker_smoke_v1 \
   --json
 ```
 
 `run`, `eval-repair`, `eval-scaffold`, and `eval-patch-search` all accept `--sandbox-mode local|docker` plus `--sandbox-image`. Local mode remains the default for fast deterministic development runs. Docker mode wraps the same command-policy decision in `docker run` with implicit image pulls disabled, network disabled, dropped capabilities, a `/workspace` bind mount, resource limits, and sanitized host environment. Use a prebuilt image containing the test runner and task dependencies; otherwise the Docker run can fail even when the patch is correct.
+
+Docker smoke report:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli docker-smoke \
+  --project-root . \
+  --artifacts-dir artifacts \
+  --image patchsmith-seeded-smoke:py312 \
+  --output artifacts/experiments/docker_smoke.md \
+  --json-output artifacts/experiments/docker_smoke.json \
+  --json
+```
+
+The Docker smoke report preserves daemon, image, and seeded-run evidence. `not_available` means Docker was not reachable in the current shell; it does not satisfy the MVP Docker checkbox.
 
 Artifact index:
 

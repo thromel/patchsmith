@@ -135,7 +135,7 @@ Acceptance criteria:
 
 Current status:
 
-Implemented as the first development slice. The default runner remains the local command-policy sandbox for fast deterministic development. An opt-in Docker runner now exists for `run`, `eval-repair`, `eval-scaffold`, and `eval-patch-search`; it disables implicit image pulls and container networking, drops capabilities, applies resource limits, mounts the task workspace at `/workspace`, and records the selected sandbox mode in traces. A live Docker daemon/image smoke is still separate evidence because Docker mode requires an image with task dependencies installed.
+Implemented as the first development slice. The default runner remains the local command-policy sandbox for fast deterministic development. An opt-in Docker runner now exists for `run`, `eval-repair`, `eval-scaffold`, and `eval-patch-search`; it disables implicit image pulls and container networking, drops capabilities, applies resource limits, mounts the task workspace at `/workspace`, and records the selected sandbox mode in traces. The `docker-smoke` command now records daemon, image, and seeded-run evidence. A passing live Docker daemon/image smoke is still separate evidence because Docker mode requires a reachable daemon and an image with task dependencies installed.
 
 ### Sprint 2: Context Broker and Retrieval Evaluation
 

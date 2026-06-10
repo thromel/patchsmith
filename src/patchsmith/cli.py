@@ -19,6 +19,7 @@ from patchsmith.portfolio import (
     write_demo_readiness_report,
     write_demo_media_assets,
     write_demo_script_report,
+    write_docker_smoke_report,
     write_final_evaluation_report,
     write_live_calibration_report,
     write_mvp_progress_report,
@@ -553,6 +554,51 @@ def main(argv: list[str] | None = None) -> int:
             )
         return 0
 
+    if args.command == "docker-smoke":
+        json_output_path = Path(args.json_output) if args.json_output else None
+        report = write_docker_smoke_report(
+            project_root=Path(args.project_root),
+            artifacts_dir=Path(args.artifacts_dir),
+            output_path=Path(args.output),
+            json_output_path=json_output_path,
+            image=args.image,
+            task_dir=Path(args.task_dir),
+            test_command=args.test_command,
+            runtime=args.runtime,
+            context_provider=args.context_provider,
+            docker_binary=args.docker_binary,
+            run_seeded=not args.skip_run,
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "project_root": report.project_root,
+                        "artifacts_dir": report.artifacts_dir,
+                        "generated_at": report.generated_at,
+                        "smoke_status": report.smoke_status,
+                        "image": report.image,
+                        "task_dir": report.task_dir,
+                        "run_id": report.run_id,
+                        "test_exit_code": report.test_exit_code,
+                        "report_path": str(Path(args.output)),
+                        "json_path": str(json_output_path) if json_output_path else None,
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(f"Docker smoke report: {Path(args.output)}")
+            if json_output_path:
+                print(f"JSON: {json_output_path}")
+            print(
+                f"Status: {report.smoke_status} "
+                f"Image: {report.image} "
+                f"Run: {report.run_id or 'n/a'} "
+                f"Test exit: {report.test_exit_code if report.test_exit_code is not None else 'n/a'}"
+            )
+        return 0
+
     if args.command == "release-hygiene":
         json_output_path = Path(args.json_output) if args.json_output else None
         max_failure_runs = None if args.max_failure_runs == 0 else args.max_failure_runs
@@ -1020,6 +1066,69 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional JSON live calibration readiness report output path.",
     )
     live_calibration.add_argument("--json", action="store_true", help="Print JSON summary.")
+
+    docker_smoke = subparsers.add_parser(
+        "docker-smoke",
+        help="Generate Docker sandbox preflight and seeded-smoke evidence.",
+    )
+    docker_smoke.add_argument(
+        "--project-root",
+        default=".",
+        help="Project root containing the seeded task and Dockerfile.",
+    )
+    docker_smoke.add_argument(
+        "--artifacts-dir",
+        default="artifacts",
+        help="Root artifact directory to write smoke evidence.",
+    )
+    docker_smoke.add_argument(
+        "--output",
+        default="artifacts/experiments/docker_smoke.md",
+        help="Markdown Docker smoke report output path.",
+    )
+    docker_smoke.add_argument(
+        "--json-output",
+        default="artifacts/experiments/docker_smoke.json",
+        help="Optional JSON Docker smoke report output path.",
+    )
+    docker_smoke.add_argument(
+        "--image",
+        default="patchsmith-seeded-smoke:py312",
+        help="Local Docker image containing Python and seeded-suite test dependencies.",
+    )
+    docker_smoke.add_argument(
+        "--task-dir",
+        default="evals/tasks/seeded_bugs_v1/task_001_logic_bug",
+        help="Seeded task directory to run inside Docker.",
+    )
+    docker_smoke.add_argument(
+        "--test-command",
+        default="python3 -m pytest",
+        help="Policy-allowed test command to run inside Docker.",
+    )
+    docker_smoke.add_argument(
+        "--runtime",
+        choices=["heuristic", "langgraph", "deepagents", "openai_agents"],
+        default="heuristic",
+        help="Runtime to use for the smoke repair.",
+    )
+    docker_smoke.add_argument(
+        "--context-provider",
+        choices=["native", "native_hybrid", "native_graph", "ctxhelm_cli", "auto"],
+        default="native_hybrid",
+        help="Context provider to use for the smoke repair.",
+    )
+    docker_smoke.add_argument(
+        "--docker-binary",
+        default="docker",
+        help="Docker CLI binary to use for preflight checks.",
+    )
+    docker_smoke.add_argument(
+        "--skip-run",
+        action="store_true",
+        help="Only run Docker daemon and image preflight checks.",
+    )
+    docker_smoke.add_argument("--json", action="store_true", help="Print JSON summary.")
 
     release_hygiene = subparsers.add_parser(
         "release-hygiene",
