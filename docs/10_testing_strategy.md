@@ -278,7 +278,18 @@ PYTHONPATH=src python3 -m patchsmith.cli execute-focused-test-setups \
 
 The setup executor keeps dependency installation blocked by default. The narrow editable-install setup policy requires Docker mode, `--allow-dependency-installs`, and explicit network selection such as `--sandbox-network bridge`; use `--execute` only after the dry-run report and sandbox decision are approved.
 
-The corpus, preflight, context-preview, materialization, validation, run-readiness, focused-test planning, focused-test run, focused-test diagnosis, focused-test setup-plan, setup-readiness, and setup-execution reports are planning and plumbing evidence. They are not repair-quality evidence until the issues are reproduced, patched, tested, and saved as normal PatchSmith run artifacts.
+Dry-run setup validation after setup execution:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli validate-focused-test-setups \
+  --setup-execution artifacts/experiments/public_issue_corpus_v1/focused_test_setup_execution_results.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+Setup validation remains blocked until setup execution passes or is skipped because no setup was needed. Passing setup validation proves only that the focused validation command runs after setup, not that PatchSmith repaired the issue.
+
+The corpus, preflight, context-preview, materialization, validation, run-readiness, focused-test planning, focused-test run, focused-test diagnosis, focused-test setup-plan, setup-readiness, setup-execution, and setup-validation reports are planning and plumbing evidence. They are not repair-quality evidence until the issues are reproduced, patched, tested, and saved as normal PatchSmith run artifacts.
 
 ## Definition of test completion
 

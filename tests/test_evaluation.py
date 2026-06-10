@@ -20,6 +20,7 @@ from patchsmith.evaluation import (
     run_repair_evaluation,
     run_scaffold_comparison,
     run_retrieval_evaluation,
+    validate_focused_test_setups,
     top_k_recall,
     validate_issue_corpus,
     validate_materialized_issue_tasks,
@@ -1307,6 +1308,149 @@ def test_execute_focused_test_setups_runs_policy_allowed_local_command(
     assert results[0].command_results[0].exit_code == 0
     assert results[0].command_results[0].stdout_path is not None
     assert Path(results[0].command_results[0].stdout_path).exists()
+
+
+def test_validate_focused_test_setups_blocks_until_setup_execution_passes(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    setup_execution_path = tmp_path / "focused_test_setup_execution_results.json"
+    setup_execution_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "blocked_setup",
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/6",
+                    "status": "blocked",
+                    "setup_profile": "python_dependency_install",
+                    "repo_path": str(repo_dir),
+                    "validation_command": "python3 -m pytest tests/test_ok.py",
+                    "warnings": [],
+                    "next_actions": [],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    output_dir = tmp_path / "validation"
+    results, summary = validate_focused_test_setups(
+        setup_execution_path=setup_execution_path,
+        output_dir=output_dir,
+    )
+
+    assert summary.blocked_tasks == 1
+    assert summary.attempted_tasks == 0
+    assert results[0].status == "blocked"
+    assert "setup execution status is blocked" in ";".join(results[0].errors)
+    assert (output_dir / "focused_test_setup_validation_report.md").exists()
+    assert (output_dir / "focused_test_setup_validation_results.csv").exists()
+
+    cli_output = tmp_path / "cli_validation"
+    exit_code = main(
+        [
+            "validate-focused-test-setups",
+            "--setup-execution",
+            str(setup_execution_path),
+            "--output",
+            str(cli_output),
+            "--json",
+        ]
+    )
+    assert exit_code == 0
+    assert (cli_output / "focused_test_setup_validation_report.md").exists()
+
+
+def test_validate_focused_test_setups_dry_runs_after_setup_passes(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    tests_dir = repo_dir / "tests"
+    tests_dir.mkdir(parents=True)
+    (tests_dir / "test_ok.py").write_text(
+        "def test_ok():\n    assert True\n",
+        encoding="utf-8",
+    )
+    setup_execution_path = tmp_path / "focused_test_setup_execution_results.json"
+    setup_execution_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "passed_setup",
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/7",
+                    "status": "passed",
+                    "setup_profile": "metadata_check",
+                    "repo_path": str(repo_dir),
+                    "validation_command": "python3 -m pytest tests/test_ok.py",
+                    "warnings": [],
+                    "next_actions": [],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    results, summary = validate_focused_test_setups(
+        setup_execution_path=setup_execution_path,
+        output_dir=tmp_path / "validation",
+        sandbox_mode="local",
+    )
+
+    assert summary.dry_run_tasks == 1
+    assert summary.blocked_tasks == 0
+    assert results[0].status == "dry_run"
+    assert results[0].command_result is not None
+    assert results[0].command_result.policy_allowed
+
+
+def test_validate_focused_test_setups_runs_policy_allowed_local_command(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    tests_dir = repo_dir / "tests"
+    tests_dir.mkdir(parents=True)
+    (tests_dir / "test_ok.py").write_text(
+        "def test_ok():\n    assert 2 + 2 == 4\n",
+        encoding="utf-8",
+    )
+    setup_execution_path = tmp_path / "focused_test_setup_execution_results.json"
+    setup_execution_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "passed_setup",
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/8",
+                    "status": "passed",
+                    "setup_profile": "metadata_check",
+                    "repo_path": str(repo_dir),
+                    "validation_command": "python3 -m pytest tests/test_ok.py",
+                    "warnings": [],
+                    "next_actions": [],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    results, summary = validate_focused_test_setups(
+        setup_execution_path=setup_execution_path,
+        output_dir=tmp_path / "validation",
+        sandbox_mode="local",
+        dry_run=False,
+        timeout_seconds=30,
+    )
+
+    assert summary.attempted_tasks == 1
+    assert summary.passed_tasks == 1
+    assert results[0].status == "passed"
+    assert results[0].command_result is not None
+    assert results[0].command_result.exit_code == 0
+    assert results[0].command_result.stdout_path is not None
+    assert Path(results[0].command_result.stdout_path).exists()
 
 
 def test_graph_retrieval_dataset_validates(tmp_path: Path) -> None:

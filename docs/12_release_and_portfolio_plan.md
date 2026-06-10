@@ -308,6 +308,17 @@ Current setup-execution output remains blocked for all three tasks because setup
 
 The default command policy still blocks dependency installation. Setup execution only permits the narrow editable-install setup policy when `--allow-dependency-installs` is set with Docker mode; networked dependency setup must also use an explicit sandbox network such as `--sandbox-network bridge` and remain labeled in reports.
 
+Dry-run focused public issue setup validation:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli validate-focused-test-setups \
+  --setup-execution artifacts/experiments/public_issue_corpus_v1/focused_test_setup_execution_results.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+Current setup-validation output remains blocked for all three tasks because setup execution is blocked. This is the expected stop condition before claiming public issue reproduction evidence.
+
 Generate the release hygiene report:
 
 ```bash
@@ -319,7 +330,7 @@ PYTHONPATH=src python3 -m patchsmith.cli release-hygiene \
   --json
 ```
 
-Current release hygiene output is `ready_with_warnings`: generated review artifacts now include calibration-readiness, launch-blocker, and public issue context-preview/materialization validation/readiness/focused-test plan/run/diagnosis/setup-plan/setup-readiness/setup-execution evidence, package build metadata exists, local Git metadata exists, and the remaining release caveat is live LLM calibration.
+Current release hygiene output is `ready_with_warnings`: generated review artifacts now include calibration-readiness, launch-blocker, and public issue context-preview/materialization validation/readiness/focused-test plan/run/diagnosis/setup-plan/setup-readiness/setup-execution/setup-validation evidence, package build metadata exists, local Git metadata exists, and the remaining release caveat is live LLM calibration.
 
 ## Example flagship demo scenario
 

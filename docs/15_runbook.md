@@ -267,6 +267,17 @@ The setup-execution report defaults to dry-run and records readiness, command-po
 
 Dependency installs are not part of the default command policy. The setup executor can dry-run the narrow editable-install policy with `--allow-dependency-installs --sandbox-mode docker --sandbox-network bridge`; combine that with `--execute` only after Docker smoke passes and the network-enabled sandbox decision is approved.
 
+Public issue focused test setup validation:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli validate-focused-test-setups \
+  --setup-execution artifacts/experiments/public_issue_corpus_v1/focused_test_setup_execution_results.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+The setup-validation report defaults to dry-run and records whether validation commands can run after setup execution. Blocked rows mean setup did not complete and must not be counted as issue reproduction or repair evidence.
+
 Scaffold comparison:
 
 ```bash
@@ -657,6 +668,7 @@ Run:
 - final evaluation report regeneration,
 - launch blocker backlog regeneration,
 - focused public issue setup-execution regeneration,
+- focused public issue setup-validation regeneration,
 - release hygiene report regeneration,
 - README quickstart validation,
 - final report review.

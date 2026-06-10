@@ -20,6 +20,7 @@ from patchsmith.evaluation import (
     run_repair_evaluation,
     run_scaffold_comparison,
     run_retrieval_evaluation,
+    validate_focused_test_setups,
     validate_issue_corpus,
     validate_materialized_issue_tasks,
     validate_seeded_dataset,
@@ -510,6 +511,39 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f"dry_run={summary.dry_run_tasks} attempted={summary.attempted_tasks} "
                 f"passed={summary.completed_tasks} blocked={summary.blocked_tasks}"
+            )
+        return 0
+
+    if args.command == "validate-focused-test-setups":
+        max_tasks = None if args.max_tasks == 0 else args.max_tasks
+        results, summary = validate_focused_test_setups(
+            setup_execution_path=Path(args.setup_execution),
+            output_dir=Path(args.output),
+            sandbox_mode=args.sandbox_mode,
+            sandbox_image=args.sandbox_image,
+            sandbox_network=args.sandbox_network,
+            timeout_seconds=args.timeout_seconds,
+            max_tasks=max_tasks,
+            dry_run=not args.execute,
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "result_count": len(results),
+                        "report_path": str(
+                            Path(args.output) / "focused_test_setup_validation_report.md"
+                        ),
+                        "summary": summary.to_dict(),
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(f"Report: {Path(args.output) / 'focused_test_setup_validation_report.md'}")
+            print(
+                f"dry_run={summary.dry_run_tasks} attempted={summary.attempted_tasks} "
+                f"passed={summary.passed_tasks} blocked={summary.blocked_tasks}"
             )
         return 0
 
@@ -1508,6 +1542,63 @@ def build_parser() -> argparse.ArgumentParser:
         help="Permit the narrow editable-install setup policy; requires --sandbox-mode docker.",
     )
     focused_test_setup_execution_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print JSON summary.",
+    )
+
+    focused_test_setup_validation_parser = subparsers.add_parser(
+        "validate-focused-test-setups",
+        help="Dry-run or run validation commands after focused public issue setup execution.",
+    )
+    focused_test_setup_validation_parser.add_argument(
+        "--setup-execution",
+        default=(
+            "artifacts/experiments/public_issue_corpus_v1/"
+            "focused_test_setup_execution_results.json"
+        ),
+        help="Focused test setup-execution results JSON.",
+    )
+    focused_test_setup_validation_parser.add_argument(
+        "--output",
+        default="artifacts/experiments/public_issue_corpus_v1",
+        help="Focused test setup-validation output directory.",
+    )
+    focused_test_setup_validation_parser.add_argument(
+        "--sandbox-mode",
+        choices=["local", "docker"],
+        default="docker",
+        help="Sandbox runner to use when --execute is set.",
+    )
+    focused_test_setup_validation_parser.add_argument(
+        "--sandbox-image",
+        default="python:3.12-slim",
+        help="Docker image used when --sandbox-mode docker is selected.",
+    )
+    focused_test_setup_validation_parser.add_argument(
+        "--sandbox-network",
+        choices=["none", "bridge"],
+        default="none",
+        help="Docker network mode used when --execute and --sandbox-mode docker are selected.",
+    )
+    focused_test_setup_validation_parser.add_argument(
+        "--timeout-seconds",
+        type=int,
+        default=300,
+        help="Per-validation-command timeout when --execute is set.",
+    )
+    focused_test_setup_validation_parser.add_argument(
+        "--max-tasks",
+        type=int,
+        default=0,
+        help="Maximum setup-execution records to process. Use 0 for all records.",
+    )
+    focused_test_setup_validation_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Execute validation commands instead of writing dry-run evidence.",
+    )
+    focused_test_setup_validation_parser.add_argument(
         "--json",
         action="store_true",
         help="Print JSON summary.",
