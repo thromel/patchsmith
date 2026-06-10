@@ -423,6 +423,19 @@ PYTHONPATH=src python3 -m patchsmith.cli delivery-audit \
 
 The delivery audit maps the original planning/development objective to concrete evidence across docs, sprint plans, Git, tests, saved artifacts, release hygiene, Docker, public issue setup validation, and live calibration. `in_progress_with_blockers` means delivery has evidence-backed progress but still has blocker-class gaps.
 
+Project status:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli project-status \
+  --project-root . \
+  --artifacts-dir artifacts \
+  --output artifacts/experiments/project_status.md \
+  --json-output artifacts/experiments/project_status.json \
+  --json
+```
+
+The project-status report is the concise briefing surface for progress percentage, delivery percentage, quality gate, launch blockers, Docker smoke, live calibration, adapter evidence, release hygiene, and saved-evidence counts. It summarizes saved artifacts; rerun the underlying gates when evidence needs to be refreshed.
+
 Live calibration readiness:
 
 ```bash
@@ -676,6 +689,8 @@ artifacts/
   experiments/quality_gate.md
   experiments/quality_gate.json
   experiments/quality_gate_logs/
+  experiments/project_status.md
+  experiments/project_status.json
   experiments/final_evaluation.md
   experiments/final_evaluation.json
   experiments/release_hygiene.md
@@ -709,6 +724,7 @@ Run:
 - demo media regeneration,
 - final evaluation report regeneration,
 - quality-gate regeneration,
+- project-status regeneration,
 - delivery audit regeneration,
 - launch blocker backlog regeneration,
 - live calibration plan regeneration,

@@ -546,6 +546,75 @@ class LaunchBlockerReport:
         }
 
 
+@dataclass(frozen=True)
+class ProjectStatusSurface:
+    name: str
+    status: str
+    evidence: str
+    source: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ProjectStatusReport:
+    project_root: str
+    artifacts_dir: str
+    generated_at: str
+    overall_status: str
+    mvp_status: str
+    mvp_completion_percent: float
+    delivery_status: str
+    delivery_completion_percent: float
+    quality_status: str
+    launch_status: str
+    release_status: str
+    docker_smoke_status: str
+    live_calibration_status: str
+    saved_live_provider_count: int
+    deepagents_package_run_count: int
+    deepagents_compatibility_run_count: int
+    openai_agents_package_run_count: int
+    openai_agents_compatibility_run_count: int
+    experiment_count: int
+    run_count: int
+    metric_count: int
+    blocker_count: int
+    warning_count: int
+    missing_sources: list[str]
+    surfaces: list[ProjectStatusSurface]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "project_root": self.project_root,
+            "artifacts_dir": self.artifacts_dir,
+            "generated_at": self.generated_at,
+            "overall_status": self.overall_status,
+            "mvp_status": self.mvp_status,
+            "mvp_completion_percent": self.mvp_completion_percent,
+            "delivery_status": self.delivery_status,
+            "delivery_completion_percent": self.delivery_completion_percent,
+            "quality_status": self.quality_status,
+            "launch_status": self.launch_status,
+            "release_status": self.release_status,
+            "docker_smoke_status": self.docker_smoke_status,
+            "live_calibration_status": self.live_calibration_status,
+            "saved_live_provider_count": self.saved_live_provider_count,
+            "deepagents_package_run_count": self.deepagents_package_run_count,
+            "deepagents_compatibility_run_count": self.deepagents_compatibility_run_count,
+            "openai_agents_package_run_count": self.openai_agents_package_run_count,
+            "openai_agents_compatibility_run_count": self.openai_agents_compatibility_run_count,
+            "experiment_count": self.experiment_count,
+            "run_count": self.run_count,
+            "metric_count": self.metric_count,
+            "blocker_count": self.blocker_count,
+            "warning_count": self.warning_count,
+            "missing_sources": self.missing_sources,
+            "surfaces": [surface.to_dict() for surface in self.surfaces],
+        }
+
+
 def build_demo_readiness_report(
     *,
     artifacts_dir: Path,
@@ -617,6 +686,7 @@ def build_release_hygiene_report(
             "artifacts/experiments/demo_media.svg",
             "artifacts/experiments/demo_media.png",
             "artifacts/experiments/quality_gate.md",
+            "artifacts/experiments/project_status.md",
             "artifacts/experiments/final_evaluation.md",
             "artifacts/experiments/delivery_audit.md",
             "artifacts/experiments/release_hygiene.md",
@@ -769,6 +839,281 @@ def render_launch_blocker_report(report: LaunchBlockerReport) -> str:
             lines.append("No command needed.")
         lines.append("")
     lines.extend(["## Decision", "", _launch_blocker_decision(report)])
+    return "\n".join(lines) + "\n"
+
+
+def build_project_status_report(
+    *,
+    project_root: Path,
+    artifacts_dir: Path,
+) -> ProjectStatusReport:
+    project_root = project_root.resolve()
+    artifacts_dir = artifacts_dir.resolve()
+    sources = {
+        "mvp": "experiments/mvp_progress.json",
+        "delivery": "experiments/delivery_audit.json",
+        "quality": "experiments/quality_gate.json",
+        "launch": "experiments/launch_blockers.json",
+        "docker": "experiments/docker_smoke.json",
+        "release": "experiments/release_hygiene.json",
+        "calibration": "experiments/calibration_readiness.json",
+        "final": "experiments/final_evaluation.json",
+        "index": "experiments/index.json",
+    }
+    payloads = {
+        name: _load_json_artifact(artifacts_dir / source)
+        for name, source in sources.items()
+    }
+    missing_sources = [
+        source for name, source in sources.items() if payloads[name] is None
+    ]
+    mvp = payloads["mvp"] or {}
+    delivery = payloads["delivery"] or {}
+    quality = payloads["quality"] or {}
+    launch = payloads["launch"] or {}
+    docker = payloads["docker"] or {}
+    release = payloads["release"] or {}
+    calibration = payloads["calibration"] or {}
+    final = payloads["final"] or {}
+    index = payloads["index"] or {}
+
+    mvp_status = _payload_string(mvp, "status", "missing")
+    mvp_completion = _payload_float(mvp, "completion_percent")
+    delivery_status = _payload_string(delivery, "delivery_status", "missing")
+    delivery_completion = _payload_float(delivery, "completion_percent")
+    quality_status = _payload_string(quality, "quality_status", "missing")
+    launch_status = _payload_string(launch, "launch_status", "missing")
+    release_status = _payload_string(release, "release_status", "missing")
+    docker_status = _payload_string(docker, "smoke_status", "missing")
+    calibration_status = _payload_string(calibration, "calibration_status", "missing")
+    blocker_count = _payload_int(launch, "blocked_count")
+    warning_count = _payload_int(launch, "warning_count")
+    experiment_count = _payload_int(final, "experiment_count") or _payload_int(
+        index, "experiment_count"
+    )
+    run_count = _payload_int(final, "run_count") or _payload_int(index, "run_count")
+    metric_count = _payload_int(final, "metric_count") or _payload_int(
+        index, "metric_count"
+    )
+    model_providers = calibration.get("model_providers")
+    model_provider_counts = model_providers if isinstance(model_providers, dict) else {}
+    surfaces = [
+        _project_status_surface(
+            name="MVP Progress",
+            status=mvp_status,
+            evidence=(
+                f"{mvp_completion:.1f}% complete; "
+                f"{_payload_int(mvp, 'passed_count')} passed, "
+                f"{_payload_int(mvp, 'warning_count')} warnings, "
+                f"{_payload_int(mvp, 'blocked_count')} blocked."
+            ),
+            source=sources["mvp"],
+        ),
+        _project_status_surface(
+            name="Delivery Audit",
+            status=delivery_status,
+            evidence=(
+                f"{delivery_completion:.1f}% evidence-weighted; "
+                f"{_payload_int(delivery, 'passed_count')} passed, "
+                f"{_payload_int(delivery, 'warning_count')} warnings, "
+                f"{_payload_int(delivery, 'blocked_count')} blockers."
+            ),
+            source=sources["delivery"],
+        ),
+        _project_status_surface(
+            name="Quality Gate",
+            status=quality_status,
+            evidence=(
+                f"{_payload_int(quality, 'passed_count')} passed, "
+                f"{_payload_int(quality, 'failed_count')} failed, "
+                f"{_payload_int(quality, 'skipped_count')} skipped."
+            ),
+            source=sources["quality"],
+        ),
+        _project_status_surface(
+            name="Launch Blockers",
+            status=launch_status,
+            evidence=(
+                f"{blocker_count} blockers, {warning_count} warnings, "
+                f"{_payload_int(launch, 'ready_count')} ready items."
+            ),
+            source=sources["launch"],
+        ),
+        _project_status_surface(
+            name="Docker Smoke",
+            status=docker_status,
+            evidence=(
+                f"Image `{_payload_string(docker, 'image', 'unknown')}`; "
+                f"run_id `{_payload_string(docker, 'run_id', 'none') or 'none'}`; "
+                f"test_exit_code `{docker.get('test_exit_code')}`."
+            ),
+            source=sources["docker"],
+        ),
+        _project_status_surface(
+            name="Live LLM Calibration",
+            status=calibration_status,
+            evidence=(
+                f"{_payload_int(calibration, 'saved_live_provider_count')} live-provider runs; "
+                f"providers {_provider_summary(model_provider_counts)}."
+            ),
+            source=sources["calibration"],
+        ),
+        _project_status_surface(
+            name="Adapter Evidence",
+            status="recorded" if calibration else "missing",
+            evidence=(
+                f"{_payload_int(calibration, 'deepagents_package_run_count')} DeepAgents package-backed, "
+                f"{_payload_int(calibration, 'deepagents_compatibility_run_count')} DeepAgents compatibility, "
+                f"{_payload_int(calibration, 'openai_agents_package_run_count')} OpenAI Agents package-backed, "
+                f"{_payload_int(calibration, 'openai_agents_compatibility_run_count')} OpenAI Agents compatibility."
+            ),
+            source=sources["calibration"],
+        ),
+        _project_status_surface(
+            name="Release Hygiene",
+            status=release_status,
+            evidence=(
+                f"{_payload_int(release, 'passed_count')} passed, "
+                f"{_payload_int(release, 'warning_count')} warnings, "
+                f"{_payload_int(release, 'blocked_count')} blocked."
+            ),
+            source=sources["release"],
+        ),
+        _project_status_surface(
+            name="Saved Evidence Index",
+            status="available" if experiment_count or run_count else "missing",
+            evidence=(
+                f"{experiment_count} experiments, {run_count} runs, "
+                f"{metric_count} metric rows."
+            ),
+            source=sources["final"] if final else sources["index"],
+        ),
+    ]
+    return ProjectStatusReport(
+        project_root=str(project_root),
+        artifacts_dir=str(artifacts_dir),
+        generated_at=_utc_now(),
+        overall_status=_project_overall_status(
+            missing_sources=missing_sources,
+            delivery_status=delivery_status,
+            launch_status=launch_status,
+            quality_status=quality_status,
+            release_status=release_status,
+            mvp_status=mvp_status,
+            calibration_status=calibration_status,
+        ),
+        mvp_status=mvp_status,
+        mvp_completion_percent=mvp_completion,
+        delivery_status=delivery_status,
+        delivery_completion_percent=delivery_completion,
+        quality_status=quality_status,
+        launch_status=launch_status,
+        release_status=release_status,
+        docker_smoke_status=docker_status,
+        live_calibration_status=calibration_status,
+        saved_live_provider_count=_payload_int(calibration, "saved_live_provider_count"),
+        deepagents_package_run_count=_payload_int(
+            calibration, "deepagents_package_run_count"
+        ),
+        deepagents_compatibility_run_count=_payload_int(
+            calibration, "deepagents_compatibility_run_count"
+        ),
+        openai_agents_package_run_count=_payload_int(
+            calibration, "openai_agents_package_run_count"
+        ),
+        openai_agents_compatibility_run_count=_payload_int(
+            calibration, "openai_agents_compatibility_run_count"
+        ),
+        experiment_count=experiment_count,
+        run_count=run_count,
+        metric_count=metric_count,
+        blocker_count=blocker_count,
+        warning_count=warning_count,
+        missing_sources=missing_sources,
+        surfaces=surfaces,
+    )
+
+
+def write_project_status_report(
+    *,
+    project_root: Path,
+    artifacts_dir: Path,
+    output_path: Path,
+    json_output_path: Path | None = None,
+) -> ProjectStatusReport:
+    report = build_project_status_report(
+        project_root=project_root,
+        artifacts_dir=artifacts_dir,
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(render_project_status_report(report), encoding="utf-8")
+    if json_output_path is not None:
+        json_output_path.parent.mkdir(parents=True, exist_ok=True)
+        json_output_path.write_text(
+            json.dumps(report.to_dict(), indent=2) + "\n",
+            encoding="utf-8",
+        )
+    return report
+
+
+def render_project_status_report(report: ProjectStatusReport) -> str:
+    lines = [
+        "# PatchSmith Project Status Report",
+        "",
+        f"- Generated at: `{report.generated_at}`",
+        f"- Project root: `{report.project_root}`",
+        f"- Artifacts directory: `{report.artifacts_dir}`",
+        f"- Overall status: `{report.overall_status}`",
+        f"- MVP progress: `{report.mvp_completion_percent:.1f}%` (`{report.mvp_status}`)",
+        (
+            f"- Delivery audit: `{report.delivery_completion_percent:.1f}%` "
+            f"(`{report.delivery_status}`)"
+        ),
+        f"- Quality gate: `{report.quality_status}`",
+        f"- Launch status: `{report.launch_status}`",
+        f"- Release status: `{report.release_status}`",
+        f"- Docker smoke: `{report.docker_smoke_status}`",
+        f"- Live calibration: `{report.live_calibration_status}`",
+        f"- Saved live-provider runs: `{report.saved_live_provider_count}`",
+        f"- DeepAgents package-backed runs: `{report.deepagents_package_run_count}`",
+        f"- DeepAgents compatibility-mode runs: `{report.deepagents_compatibility_run_count}`",
+        f"- OpenAI Agents package-backed runs: `{report.openai_agents_package_run_count}`",
+        f"- OpenAI Agents compatibility-mode runs: `{report.openai_agents_compatibility_run_count}`",
+        f"- Indexed experiments: `{report.experiment_count}`",
+        f"- Indexed runs: `{report.run_count}`",
+        f"- Metric rows: `{report.metric_count}`",
+        f"- Launch blockers: `{report.blocker_count}`",
+        f"- Launch warnings: `{report.warning_count}`",
+        "",
+        "## Status Surfaces",
+        "",
+        "| Surface | Status | Evidence | Source |",
+        "|---|---|---|---|",
+    ]
+    for surface in report.surfaces:
+        lines.append(
+            "| "
+            f"{surface.name} | "
+            f"{surface.status} | "
+            f"{_markdown_cell(surface.evidence)} | "
+            f"`{surface.source}` |"
+        )
+    lines.extend(["", "## Missing Sources", ""])
+    if report.missing_sources:
+        lines.extend(f"- `{source}`" for source in report.missing_sources)
+    else:
+        lines.append("- None.")
+    lines.extend(
+        [
+            "",
+            "## Claim Boundary",
+            "",
+            "- This report summarizes saved evidence artifacts; it does not rerun checks.",
+            "- Use `quality-gate` for executable verification.",
+            "- Use `docker-smoke` for Docker sandbox evidence.",
+            "- Use `live-calibration` for live model-provider evidence.",
+        ]
+    )
     return "\n".join(lines) + "\n"
 
 
@@ -3868,6 +4213,8 @@ def _release_hygiene_checks(
         "experiments/demo_script.json",
         "experiments/quality_gate.md",
         "experiments/quality_gate.json",
+        "experiments/project_status.md",
+        "experiments/project_status.json",
         "experiments/final_evaluation.md",
         "experiments/final_evaluation.json",
         "experiments/delivery_audit.md",
@@ -4288,9 +4635,59 @@ def _payload_int(payload: dict[str, Any], key: str, default: int = 0) -> int:
     return value if isinstance(value, int) else default
 
 
+def _payload_float(payload: dict[str, Any], key: str, default: float = 0.0) -> float:
+    value = payload.get(key)
+    if isinstance(value, int | float):
+        return float(value)
+    return default
+
+
 def _payload_string(payload: dict[str, Any], key: str, default: str = "") -> str:
     value = payload.get(key)
     return value if isinstance(value, str) else default
+
+
+def _project_status_surface(
+    *,
+    name: str,
+    status: str,
+    evidence: str,
+    source: str,
+) -> ProjectStatusSurface:
+    return ProjectStatusSurface(
+        name=name,
+        status=status,
+        evidence=evidence,
+        source=source,
+    )
+
+
+def _project_overall_status(
+    *,
+    missing_sources: list[str],
+    delivery_status: str,
+    launch_status: str,
+    quality_status: str,
+    release_status: str,
+    mvp_status: str,
+    calibration_status: str,
+) -> str:
+    if missing_sources:
+        return "incomplete_evidence"
+    if (
+        delivery_status == "in_progress_with_blockers"
+        or launch_status == "blocked"
+        or quality_status == "failed"
+        or release_status == "blocked"
+    ):
+        return "in_progress_with_blockers"
+    if (
+        mvp_status == "ready_with_caveats"
+        or release_status == "ready_with_warnings"
+        or calibration_status == "not_configured"
+    ):
+        return "ready_with_caveats"
+    return "ready"
 
 
 def _payload_string_list(payload: dict[str, Any], key: str) -> list[str]:
@@ -4842,6 +5239,7 @@ def _final_review_artifacts() -> list[str]:
         "artifacts/experiments/demo_media.svg",
         "artifacts/experiments/demo_media.png",
         "artifacts/experiments/quality_gate.md",
+        "artifacts/experiments/project_status.md",
         "artifacts/experiments/delivery_audit.md",
         "artifacts/experiments/scaffold_comparison_v1/scaffold_report.md",
         "artifacts/experiments/patch_search_eval_v1/patch_search_report.md",

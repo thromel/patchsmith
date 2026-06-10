@@ -13,6 +13,7 @@ from patchsmith.portfolio import (
     write_live_calibration_plan_report,
     write_live_calibration_report,
     write_mvp_progress_report,
+    write_project_status_report,
     write_quality_gate_report,
 )
 from patchsmith.portfolio import write_final_evaluation_report, write_release_hygiene_report
@@ -95,6 +96,8 @@ def _write_release_hygiene_fixture(project_root: Path, artifacts_dir: Path) -> N
         "experiments/demo_media.png",
         "experiments/quality_gate.md",
         "experiments/quality_gate.json",
+        "experiments/project_status.md",
+        "experiments/project_status.json",
         "experiments/final_evaluation.md",
         "experiments/final_evaluation.json",
         "experiments/delivery_audit.md",
@@ -701,6 +704,8 @@ def test_demo_readiness_report_summarizes_launch_evidence(
         "experiments/demo_media.png",
         "experiments/quality_gate.md",
         "experiments/quality_gate.json",
+        "experiments/project_status.md",
+        "experiments/project_status.json",
         "experiments/final_evaluation.md",
         "experiments/final_evaluation.json",
         "experiments/delivery_audit.md",
@@ -1274,6 +1279,126 @@ def test_quality_gate_report_runs_quick_verifiers(
     assert exit_code == 0
     cli_payload = json.loads(capsys.readouterr().out)
     assert cli_payload["quality_status"] == "passed_with_skips"
+    assert cli_output.exists()
+
+
+def test_project_status_report_summarizes_saved_evidence(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    artifacts_dir = tmp_path / "artifacts"
+    experiments_dir = artifacts_dir / "experiments"
+    experiments_dir.mkdir(parents=True)
+    payloads = {
+        "mvp_progress.json": {
+            "status": "ready_with_caveats",
+            "completion_percent": 96.7,
+            "passed_count": 28,
+            "warning_count": 2,
+            "blocked_count": 0,
+        },
+        "delivery_audit.json": {
+            "delivery_status": "in_progress_with_blockers",
+            "completion_percent": 71.4,
+            "passed_count": 9,
+            "warning_count": 2,
+            "blocked_count": 3,
+        },
+        "quality_gate.json": {
+            "quality_status": "passed",
+            "passed_count": 4,
+            "failed_count": 0,
+            "skipped_count": 0,
+        },
+        "launch_blockers.json": {
+            "launch_status": "blocked",
+            "blocked_count": 2,
+            "warning_count": 2,
+            "ready_count": 0,
+        },
+        "docker_smoke.json": {
+            "smoke_status": "not_available",
+            "image": "patchsmith-seeded-smoke:py312",
+            "run_id": None,
+            "test_exit_code": None,
+        },
+        "release_hygiene.json": {
+            "release_status": "ready_with_warnings",
+            "passed_count": 10,
+            "warning_count": 1,
+            "blocked_count": 0,
+        },
+        "calibration_readiness.json": {
+            "calibration_status": "not_configured",
+            "saved_live_provider_count": 0,
+            "deepagents_package_run_count": 10,
+            "deepagents_compatibility_run_count": 30,
+            "openai_agents_package_run_count": 10,
+            "openai_agents_compatibility_run_count": 20,
+            "model_providers": {"offline_fake_model": 23},
+        },
+        "final_evaluation.json": {
+            "readiness_status": "ready_with_caveats",
+            "experiment_count": 17,
+            "run_count": 443,
+            "metric_count": 29,
+        },
+        "index.json": {
+            "experiment_count": 17,
+            "run_count": 443,
+            "metric_count": 29,
+        },
+    }
+    for name, payload in payloads.items():
+        (experiments_dir / name).write_text(
+            json.dumps(payload) + "\n",
+            encoding="utf-8",
+        )
+
+    output_path = tmp_path / "project_status.md"
+    json_output_path = tmp_path / "project_status.json"
+    report = write_project_status_report(
+        project_root=Path("."),
+        artifacts_dir=artifacts_dir,
+        output_path=output_path,
+        json_output_path=json_output_path,
+    )
+
+    assert report.overall_status == "in_progress_with_blockers"
+    assert report.mvp_completion_percent == 96.7
+    assert report.delivery_completion_percent == 71.4
+    assert report.quality_status == "passed"
+    assert report.launch_status == "blocked"
+    assert report.docker_smoke_status == "not_available"
+    assert report.saved_live_provider_count == 0
+    assert report.deepagents_package_run_count == 10
+    assert report.missing_sources == []
+    rendered = output_path.read_text(encoding="utf-8")
+    assert "# PatchSmith Project Status Report" in rendered
+    assert "Live LLM Calibration" in rendered
+    payload = json.loads(json_output_path.read_text(encoding="utf-8"))
+    assert payload["overall_status"] == "in_progress_with_blockers"
+
+    cli_output = tmp_path / "cli_project_status.md"
+    cli_json_output = tmp_path / "cli_project_status.json"
+    exit_code = main(
+        [
+            "project-status",
+            "--project-root",
+            ".",
+            "--artifacts-dir",
+            str(artifacts_dir),
+            "--output",
+            str(cli_output),
+            "--json-output",
+            str(cli_json_output),
+            "--json",
+        ]
+    )
+    assert exit_code == 0
+    cli_payload = json.loads(capsys.readouterr().out)
+    assert cli_payload["overall_status"] == "in_progress_with_blockers"
+    assert cli_payload["missing_source_count"] == 0
     assert cli_output.exists()
 
 

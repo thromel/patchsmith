@@ -39,6 +39,7 @@ from patchsmith.portfolio import (
     write_live_calibration_plan_report,
     write_live_calibration_report,
     write_mvp_progress_report,
+    write_project_status_report,
     write_quality_gate_report,
     write_release_hygiene_report,
 )
@@ -1226,6 +1227,54 @@ def main(argv: list[str] | None = None) -> int:
             )
         return 0
 
+    if args.command == "project-status":
+        json_output_path = Path(args.json_output) if args.json_output else None
+        report = write_project_status_report(
+            project_root=Path(args.project_root),
+            artifacts_dir=Path(args.artifacts_dir),
+            output_path=Path(args.output),
+            json_output_path=json_output_path,
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "project_root": report.project_root,
+                        "artifacts_dir": report.artifacts_dir,
+                        "generated_at": report.generated_at,
+                        "overall_status": report.overall_status,
+                        "mvp_status": report.mvp_status,
+                        "mvp_completion_percent": report.mvp_completion_percent,
+                        "delivery_status": report.delivery_status,
+                        "delivery_completion_percent": report.delivery_completion_percent,
+                        "quality_status": report.quality_status,
+                        "launch_status": report.launch_status,
+                        "release_status": report.release_status,
+                        "docker_smoke_status": report.docker_smoke_status,
+                        "live_calibration_status": report.live_calibration_status,
+                        "saved_live_provider_count": report.saved_live_provider_count,
+                        "blocker_count": report.blocker_count,
+                        "warning_count": report.warning_count,
+                        "missing_source_count": len(report.missing_sources),
+                        "report_path": str(Path(args.output)),
+                        "json_path": str(json_output_path) if json_output_path else None,
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(f"Project status report: {Path(args.output)}")
+            if json_output_path:
+                print(f"JSON: {json_output_path}")
+            print(
+                f"Status: {report.overall_status} "
+                f"MVP: {report.mvp_completion_percent:.1f}% "
+                f"Delivery: {report.delivery_completion_percent:.1f}% "
+                f"Launch: {report.launch_status} "
+                f"Quality: {report.quality_status}"
+            )
+        return 0
+
     parser.print_help()
     return 2
 
@@ -2266,6 +2315,32 @@ def build_parser() -> argparse.ArgumentParser:
         help="Skip the package build gate.",
     )
     quality_gate.add_argument("--json", action="store_true", help="Print JSON summary.")
+
+    project_status = subparsers.add_parser(
+        "project-status",
+        help="Generate a consolidated status report from saved evidence artifacts.",
+    )
+    project_status.add_argument(
+        "--project-root",
+        default=".",
+        help="Project root to include in the status report.",
+    )
+    project_status.add_argument(
+        "--artifacts-dir",
+        default="artifacts",
+        help="Root artifact directory to scan.",
+    )
+    project_status.add_argument(
+        "--output",
+        default="artifacts/experiments/project_status.md",
+        help="Markdown project status report output path.",
+    )
+    project_status.add_argument(
+        "--json-output",
+        default="artifacts/experiments/project_status.json",
+        help="Optional JSON project status output path.",
+    )
+    project_status.add_argument("--json", action="store_true", help="Print JSON summary.")
 
     return parser
 

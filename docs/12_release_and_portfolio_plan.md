@@ -167,6 +167,19 @@ PYTHONPATH=src python3 -m patchsmith.cli mvp-progress \
 
 Current MVP progress output is `ready_with_caveats` at `96.7%`: 28 evidence-backed checklist items pass, two are warnings, and no item is blocked or missing. Use it as the snapshot answer for "how far are we?" while keeping the live-calibration warning explicit.
 
+Generate the consolidated project status report:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli project-status \
+  --project-root . \
+  --artifacts-dir artifacts \
+  --output artifacts/experiments/project_status.md \
+  --json-output artifacts/experiments/project_status.json \
+  --json
+```
+
+Current project-status output is the status briefing artifact. It reads saved evidence from the MVP progress, delivery audit, quality gate, launch blocker, Docker smoke, live calibration, final evaluation, artifact index, and release hygiene reports without rerunning those checks.
+
 Run the executable quality gate:
 
 ```bash
@@ -369,7 +382,7 @@ PYTHONPATH=src python3 -m patchsmith.cli release-hygiene \
   --json
 ```
 
-Current release hygiene output is `ready_with_warnings`: generated review artifacts now include quality-gate, calibration-readiness, live-calibration plan, delivery audit, launch-blocker, and public issue context-preview/materialization validation/readiness/focused-test plan/run/diagnosis/setup-plan/setup-readiness/setup-execution/setup-validation evidence, package build metadata exists, local Git metadata exists, and the remaining release caveat is live LLM calibration.
+Current release hygiene output is `ready_with_warnings`: generated review artifacts now include quality-gate, project-status, calibration-readiness, live-calibration plan, delivery audit, launch-blocker, and public issue context-preview/materialization validation/readiness/focused-test plan/run/diagnosis/setup-plan/setup-readiness/setup-execution/setup-validation evidence, package build metadata exists, local Git metadata exists, and the remaining release caveat is live LLM calibration.
 
 ## Example flagship demo scenario
 

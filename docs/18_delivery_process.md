@@ -146,6 +146,8 @@ Generated artifacts:
 - `artifacts/experiments/demo_media.png`,
 - `artifacts/experiments/quality_gate.md`,
 - `artifacts/experiments/quality_gate.json`,
+- `artifacts/experiments/project_status.md`,
+- `artifacts/experiments/project_status.json`,
 - `artifacts/experiments/final_evaluation.md`,
 - `artifacts/experiments/release_hygiene.md`.
 
@@ -189,4 +191,4 @@ Use the risk register when:
 
 ## Current delivery decision
 
-The active implementation work is Sprint 10 portfolio launch execution. Static artifact indexing, failure inspection, demo-readiness reporting, live-calibration readiness reporting and execution planning, objective-to-evidence delivery auditing, launch-blocker reporting with dependency-chain remediation commands, focused setup-execution gating, focused setup-validation gating, Docker-only setup dependency policy, demo-script generation, demo-media generation, final-evaluation reporting, executable quality-gate reporting, release-hygiene reporting, package build metadata, CI workflow coverage, demo media, architecture evidence, and local Git metadata now provide the review surface. The next implementation work should focus on resolving Docker smoke availability, unblocking focused public issue setup-readiness, and running live-provider calibration only when credentials and budget are available while keeping offline seeded-suite claims separate from live LLM quality claims.
+The active implementation work is Sprint 10 portfolio launch execution. Static artifact indexing, failure inspection, demo-readiness reporting, live-calibration readiness reporting and execution planning, objective-to-evidence delivery auditing, consolidated project-status reporting, launch-blocker reporting with dependency-chain remediation commands, focused setup-execution gating, focused setup-validation gating, Docker-only setup dependency policy, demo-script generation, demo-media generation, final-evaluation reporting, executable quality-gate reporting, release-hygiene reporting, package build metadata, CI workflow coverage, demo media, architecture evidence, and local Git metadata now provide the review surface. The next implementation work should focus on resolving Docker smoke availability, unblocking focused public issue setup-readiness, and running live-provider calibration only when credentials and budget are available while keeping offline seeded-suite claims separate from live LLM quality claims.
