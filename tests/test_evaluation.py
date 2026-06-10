@@ -1454,7 +1454,118 @@ def test_validate_focused_test_setups_runs_policy_allowed_local_command(
     assert results[0].command_result is not None
     assert results[0].command_result.exit_code == 0
     assert results[0].command_result.stdout_path is not None
+    assert results[0].failure_category is None
     assert Path(results[0].command_result.stdout_path).exists()
+
+
+def test_validate_focused_test_setups_classifies_pytest_minversion_failure(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    tests_dir = repo_dir / "tests"
+    tests_dir.mkdir(parents=True)
+    (repo_dir / "pyproject.toml").write_text(
+        '[tool.pytest.ini_options]\nminversion = "999.0"\n',
+        encoding="utf-8",
+    )
+    (tests_dir / "test_ok.py").write_text(
+        "def test_ok():\n    assert True\n",
+        encoding="utf-8",
+    )
+    setup_execution_path = tmp_path / "focused_test_setup_execution_results.json"
+    setup_execution_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "pytest_version_gap",
+                    "repository": "pytest-dev/pytest",
+                    "issue_url": "https://github.com/pytest-dev/pytest/issues/14552",
+                    "status": "passed",
+                    "setup_profile": "python_editable_install_build_metadata",
+                    "repo_path": str(repo_dir),
+                    "validation_command": "python3 -m pytest tests/test_ok.py",
+                    "warnings": [],
+                    "next_actions": [],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    results, summary = validate_focused_test_setups(
+        setup_execution_path=setup_execution_path,
+        output_dir=tmp_path / "validation",
+        sandbox_mode="local",
+        dry_run=False,
+        timeout_seconds=30,
+    )
+
+    assert summary.failed_tasks == 1
+    assert summary.failure_category_counts == {"pytest_in_tree_version_metadata": 1}
+    assert results[0].status == "failed"
+    assert results[0].failure_category == "pytest_in_tree_version_metadata"
+    assert results[0].failure_summary is not None
+    assert "minversion" in ";".join(results[0].failure_evidence)
+    assert "tox/nox" in ";".join(results[0].next_actions)
+    report = (tmp_path / "validation" / "focused_test_setup_validation_report.md").read_text(
+        encoding="utf-8"
+    )
+    assert "pytest_in_tree_version_metadata" in report
+
+
+def test_validate_focused_test_setups_classifies_httpbin_fixture_failure(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    tests_dir = repo_dir / "tests"
+    tests_dir.mkdir(parents=True)
+    (tests_dir / "conftest.py").write_text(
+        "import pytest\n\n"
+        "@pytest.fixture\n"
+        "def httpbin(httpbin):\n"
+        "    return httpbin\n",
+        encoding="utf-8",
+    )
+    (tests_dir / "test_requests.py").write_text(
+        "def test_needs_httpbin(httpbin):\n"
+        "    assert httpbin\n",
+        encoding="utf-8",
+    )
+    setup_execution_path = tmp_path / "focused_test_setup_execution_results.json"
+    setup_execution_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "requests_fixture_gap",
+                    "repository": "psf/requests",
+                    "issue_url": "https://github.com/psf/requests/issues/7223",
+                    "status": "passed",
+                    "setup_profile": "pytest_fixture_environment",
+                    "repo_path": str(repo_dir),
+                    "validation_command": "python3 -m pytest tests/test_requests.py",
+                    "warnings": [],
+                    "next_actions": [],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    results, summary = validate_focused_test_setups(
+        setup_execution_path=setup_execution_path,
+        output_dir=tmp_path / "validation",
+        sandbox_mode="local",
+        dry_run=False,
+        timeout_seconds=30,
+    )
+
+    assert summary.failed_tasks == 1
+    assert summary.failure_category_counts == {"missing_httpbin_fixture_provider": 1}
+    assert results[0].status == "failed"
+    assert results[0].failure_category == "missing_httpbin_fixture_provider"
+    assert results[0].failure_summary is not None
+    assert "httpbin" in ";".join(results[0].failure_evidence)
+    assert "controlled httpbin fixture provider" in ";".join(results[0].next_actions)
 
 
 def test_graph_retrieval_dataset_validates(tmp_path: Path) -> None:

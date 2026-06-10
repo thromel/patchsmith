@@ -439,6 +439,7 @@ Latest expected evidence:
 - focused public issue setup-validation attempted tasks: 3,
 - focused public issue setup-validation failed tasks: 3,
 - focused public issue setup-validation blocked tasks: 0,
+- focused public issue setup-validation failure categories: `pytest_in_tree_version_metadata` 1, `missing_httpbin_fixture_provider` 2,
 - invalid entries: 0,
 - repositories: `psf/requests`, `pytest-dev/pytest`.
 
@@ -900,7 +901,7 @@ Reason:
 
 - Sprints 1 through 9 now have working code paths and saved evidence artifacts.
 - Static review surfaces now cover aggregate metrics, run details, and failure cases without adding a web stack.
-- The remaining gap is launch execution: resolve public issue setup-validation failures and run live-provider calibration only when credentials and budget are available.
+- The remaining gap is launch execution: resolve categorized public issue setup-validation failures and run live-provider calibration only when credentials and budget are available.
 
 ## Sprint 10 task breakdown
 

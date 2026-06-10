@@ -560,6 +560,9 @@ class IssueCorpusFocusedTestSetupValidationResult:
     sandbox_image: str
     sandbox_network: str
     dry_run: bool
+    failure_category: str | None
+    failure_summary: str | None
+    failure_evidence: list[str]
     command_result: IssueCorpusFocusedTestSetupCommandResult | None
     errors: list[str]
     warnings: list[str]
@@ -589,6 +592,7 @@ class IssueCorpusFocusedTestSetupValidationSummary:
     timed_out_tasks: int
     blocked_tasks: int
     skipped_tasks: int
+    failure_category_counts: dict[str, int]
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -2694,6 +2698,12 @@ def summarize_focused_test_setup_validation(
     sandbox_network: str,
     timeout_seconds: int,
 ) -> IssueCorpusFocusedTestSetupValidationSummary:
+    failure_category_counts: dict[str, int] = {}
+    for result in results:
+        if result.failure_category:
+            failure_category_counts[result.failure_category] = (
+                failure_category_counts.get(result.failure_category, 0) + 1
+            )
     return IssueCorpusFocusedTestSetupValidationSummary(
         setup_execution_path=str(setup_execution_path),
         task_count=len(results),
@@ -2711,6 +2721,7 @@ def summarize_focused_test_setup_validation(
         timed_out_tasks=sum(1 for result in results if result.status == "timed_out"),
         blocked_tasks=sum(1 for result in results if result.status == "blocked"),
         skipped_tasks=sum(1 for result in results if result.status == "skipped"),
+        failure_category_counts=failure_category_counts,
     )
 
 
@@ -2750,6 +2761,9 @@ def write_focused_test_setup_validation_outputs(
                 "sandbox_image",
                 "sandbox_network",
                 "dry_run",
+                "failure_category",
+                "failure_summary",
+                "failure_evidence",
                 "command_result",
                 "errors",
                 "warnings",
@@ -2772,6 +2786,9 @@ def write_focused_test_setup_validation_outputs(
                     "sandbox_image": result.sandbox_image,
                     "sandbox_network": result.sandbox_network,
                     "dry_run": result.dry_run,
+                    "failure_category": result.failure_category,
+                    "failure_summary": result.failure_summary,
+                    "failure_evidence": ";".join(result.failure_evidence),
                     "command_result": (
                         json.dumps(result.command_result.to_dict(), sort_keys=True)
                         if result.command_result is not None
@@ -4424,11 +4441,12 @@ def render_focused_test_setup_validation_report(
         f"- Timed-out tasks: `{summary.timed_out_tasks}`",
         f"- Blocked tasks: `{summary.blocked_tasks}`",
         f"- Skipped tasks: `{summary.skipped_tasks}`",
+        f"- Failure categories: `{json.dumps(summary.failure_category_counts, sort_keys=True)}`",
         "",
         "## Results",
         "",
-        "| Task | Status | Setup Status | Profile | Image | Validation Command | Command Status | Notes | Next Actions |",
-        "|---|---|---|---|---|---|---|---|---|",
+        "| Task | Status | Setup Status | Profile | Image | Validation Command | Command Status | Failure | Notes | Next Actions |",
+        "|---|---|---|---|---|---|---|---|---|---|",
     ]
     for result in results:
         notes = [*result.errors, *result.warnings]
@@ -4446,6 +4464,7 @@ def render_focused_test_setup_validation_report(
             f"{_markdown_table_text(result.sandbox_image)} | "
             f"{_markdown_table_text(result.validation_command or 'none')} | "
             f"{_markdown_table_text(command_status)} | "
+            f"{_markdown_table_text(result.failure_category or 'none')} | "
             f"{_markdown_table_text('; '.join(notes) or 'none')} | "
             f"{_markdown_table_text('; '.join(result.next_actions) or 'none')} |"
         )
@@ -6129,6 +6148,100 @@ def _execute_focused_test_setup_record(
     )
 
 
+def _classify_focused_test_setup_validation_failure(
+    *,
+    status: str,
+    stdout: str,
+    stderr: str,
+    exit_code: int | None,
+) -> tuple[str | None, str | None, list[str], list[str]]:
+    if status in {"passed", "dry_run", "skipped"}:
+        return None, None, [], []
+    if status == "timed_out":
+        return (
+            "validation_timeout",
+            "validation command timed out before producing a stable setup signal",
+            [],
+            ["raise or split the timeout only after confirming the command scope is focused"],
+        )
+    if status == "blocked":
+        return (
+            "validation_policy_or_setup_blocker",
+            "validation command could not run because setup or command policy blocked it",
+            [],
+            ["resolve setup and command-policy blockers before interpreting validation output"],
+        )
+
+    combined = "\n".join(part for part in [stderr, stdout] if part)
+    combined_lower = combined.lower()
+    if "minversion" in combined_lower and "actual pytest-" in combined_lower:
+        return (
+            "pytest_in_tree_version_metadata",
+            "pytest validation imported the repository development version below pyproject minversion",
+            _diagnostic_lines(
+                combined,
+                ["minversion", "actual pytest-"],
+            ),
+            [
+                "refresh the pytest setup recipe to run through the repository's supported tox/nox workflow or generated version metadata",
+            ],
+        )
+    if "recursive dependency involving fixture 'httpbin'" in combined_lower:
+        return (
+            "missing_httpbin_fixture_provider",
+            "requests validation requires an external httpbin fixture provider instead of the recursive local fixture alias",
+            _diagnostic_lines(
+                combined,
+                ["recursive dependency involving fixture 'httpbin'", "tests/conftest.py"],
+            ),
+            [
+                "narrow requests validation to issue-specific tests that do not require httpbin or add a controlled httpbin fixture provider",
+            ],
+        )
+    if "no module named" in combined_lower:
+        return (
+            "missing_python_dependency",
+            "validation failed because a required Python dependency was not importable",
+            _diagnostic_lines(combined, ["no module named"]),
+            ["extend the disposable setup recipe with the missing dependency only after review"],
+        )
+    if "file or directory not found" in combined_lower or "not found:" in combined_lower:
+        return (
+            "invalid_validation_target",
+            "validation command references a test path or selector that pytest cannot find",
+            _diagnostic_lines(combined, ["file or directory not found", "not found:"]),
+            ["regenerate the focused validation command from current repository paths"],
+        )
+    if exit_code is not None:
+        return (
+            "unknown_validation_failure",
+            f"validation command exited {exit_code} without a recognized setup diagnostic",
+            _diagnostic_lines(combined, ["error", "failed", "traceback"]),
+            ["inspect captured stdout/stderr and add a specific setup recipe or diagnostic"],
+        )
+    return (
+        "unknown_validation_failure",
+        "validation command failed without an exit code or recognized setup diagnostic",
+        _diagnostic_lines(combined, ["error", "failed", "traceback"]),
+        ["inspect captured stdout/stderr and add a specific setup recipe or diagnostic"],
+    )
+
+
+def _diagnostic_lines(text: str, patterns: list[str], *, limit: int = 3) -> list[str]:
+    lowered_patterns = [pattern.lower() for pattern in patterns]
+    evidence: list[str] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        lowered = stripped.lower()
+        if any(pattern in lowered for pattern in lowered_patterns):
+            evidence.append(stripped[:240])
+        if len(evidence) >= limit:
+            break
+    return evidence
+
+
 def _validate_focused_test_setup_record(
     *,
     record: dict[str, Any],
@@ -6198,10 +6311,20 @@ def _validate_focused_test_setup_record(
             sandbox_image=sandbox_image,
             sandbox_network=sandbox_network,
             dry_run=dry_run,
+            failure_category="validation_policy_or_setup_blocker",
+            failure_summary=(
+                "validation command could not run because setup or command policy blocked it"
+            ),
+            failure_evidence=_dedupe_preserve_order(errors),
             command_result=command_result_payload,
             errors=_dedupe_preserve_order(errors),
             warnings=_dedupe_preserve_order(warnings),
-            next_actions=_dedupe_preserve_order(next_actions),
+            next_actions=_dedupe_preserve_order(
+                [
+                    *next_actions,
+                    "resolve setup and command-policy blockers before interpreting validation output",
+                ]
+            ),
         )
 
     if dry_run:
@@ -6218,6 +6341,9 @@ def _validate_focused_test_setup_record(
             sandbox_image=sandbox_image,
             sandbox_network=sandbox_network,
             dry_run=dry_run,
+            failure_category=None,
+            failure_summary=None,
+            failure_evidence=[],
             command_result=command_result_payload,
             errors=[],
             warnings=_dedupe_preserve_order(warnings),
@@ -6252,6 +6378,16 @@ def _validate_focused_test_setup_record(
     else:
         status = "failed"
         warnings.append(f"validation command exited {command_result.exit_code}")
+    failure_category, failure_summary, failure_evidence, failure_next_actions = (
+        _classify_focused_test_setup_validation_failure(
+            status=status,
+            stdout=command_result.stdout,
+            stderr=command_result.stderr,
+            exit_code=command_result.exit_code,
+        )
+    )
+    if failure_summary:
+        warnings.append(failure_summary)
 
     command_result_payload = IssueCorpusFocusedTestSetupCommandResult(
         command=validation_command,
@@ -6277,11 +6413,18 @@ def _validate_focused_test_setup_record(
         sandbox_image=sandbox_image,
         sandbox_network=sandbox_network,
         dry_run=dry_run,
+        failure_category=failure_category,
+        failure_summary=failure_summary,
+        failure_evidence=failure_evidence,
         command_result=command_result_payload,
         errors=_dedupe_preserve_order(errors),
         warnings=_dedupe_preserve_order(warnings),
         next_actions=_dedupe_preserve_order(
-            [*next_actions, "use validation result as setup-readiness evidence only"]
+            [
+                *next_actions,
+                *failure_next_actions,
+                "use validation result as setup-readiness evidence only",
+            ]
         ),
     )
 

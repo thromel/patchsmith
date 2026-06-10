@@ -382,7 +382,7 @@ PYTHONPATH=src python3 -m patchsmith.cli validate-focused-test-setups \
   --json
 ```
 
-Current setup-validation output executes all three validation commands and fails all three on upstream test-environment issues: the pytest snapshot reports its own dev version below its configured `minversion`, and the requests snapshots hit a recursive `httpbin` fixture dependency. This is setup/reproduction evidence, not repair-quality evidence.
+Current setup-validation output executes all three validation commands and records structured failure categories: one `pytest_in_tree_version_metadata` failure and two `missing_httpbin_fixture_provider` failures. This is setup/reproduction evidence, not repair-quality evidence.
 
 Generate the release hygiene report:
 
