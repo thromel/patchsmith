@@ -560,9 +560,13 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "plan-public-issue-reproductions":
         focused_plan = Path(args.focused_plan) if args.focused_plan else None
+        reproduction_specs = (
+            Path(args.reproduction_specs) if args.reproduction_specs else None
+        )
         results, summary = plan_public_issue_reproductions(
             tasks_dir=Path(args.tasks_dir),
             focused_plan_path=focused_plan,
+            reproduction_specs_path=reproduction_specs,
             output_dir=Path(args.output),
         )
         if args.json:
@@ -2043,6 +2047,14 @@ def build_parser() -> argparse.ArgumentParser:
             "focused_test_plan_results.json"
         ),
         help="Focused public issue test-plan results JSON.",
+    )
+    public_reproduction_plan_parser.add_argument(
+        "--reproduction-specs",
+        default=None,
+        help=(
+            "Optional reviewed JSON file containing task_id, command, and "
+            "expected_failure_signals overrides for public issue reproduction."
+        ),
     )
     public_reproduction_plan_parser.add_argument(
         "--output",

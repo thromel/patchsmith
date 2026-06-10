@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "claim_boundary": [
+    "This template is for reviewed public issue reproduction criteria.",
+    "Do not count a task as reproduced until execute-public-issue-reproductions records a nonzero exit and matches every expected failure signal.",
+    "Keep commands within the normal PatchSmith command policy, such as python3 -m pytest."
+  ],
+  "specs": [
+    {
+      "task_id": "pytest_14552_moved_file_filename",
+      "command": null,
+      "expected_failure_signals": [],
+      "review_notes": "Fill after reviewing the issue-specific failing traceback, assertion, or behavior mismatch."
+    },
+    {
+      "task_id": "requests_7223_chardet_extra",
+      "command": null,
+      "expected_failure_signals": [],
+      "review_notes": "Fill after reviewing the issue-specific failing traceback, assertion, or behavior mismatch."
+    },
+    {
+      "task_id": "requests_7341_chunked_encoding_docs",
+      "command": null,
+      "expected_failure_signals": [],
+      "review_notes": "Fill after reviewing the issue-specific failing traceback, assertion, or behavior mismatch."
+    }
+  ]
+}

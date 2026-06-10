@@ -410,7 +410,7 @@ PYTHONPATH=src python3 -m patchsmith.cli plan-public-issue-reproductions \
   --json
 ```
 
-The reproduction-plan report records candidate commands before public issue repair attempts and marks tasks that still need explicit expected-failure signals. Current public issue reproduction planning is warning-class: all three tasks have candidate commands, but all three still need manual failing-signal specs before reproduction can be claimed.
+The reproduction-plan report records candidate commands before public issue repair attempts and marks tasks that still need explicit expected-failure signals. Add `--reproduction-specs <reviewed-specs.json>` when reviewed criteria are available; the specs file accepts `task_id`, optional `command`, and `expected_failure_signals`, and the corpus includes `evals/issue_corpora/public_issue_smoke_v1/reproduction_specs.template.json` as the source-controlled authoring template. Current public issue reproduction planning is warning-class: all three tasks have candidate commands, but all three still need manual failing-signal specs before reproduction can be claimed.
 
 Dry-run or execute public issue reproduction checks:
 

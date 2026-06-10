@@ -3032,6 +3032,7 @@ def plan_public_issue_reproductions(
     tasks_dir: Path,
     output_dir: Path,
     focused_plan_path: Path | None = None,
+    reproduction_specs_path: Path | None = None,
 ) -> tuple[
     list[IssueCorpusPublicReproductionPlanResult],
     IssueCorpusPublicReproductionPlanSummary,
@@ -3046,12 +3047,18 @@ def plan_public_issue_reproductions(
         else []
     )
     focused_by_task = _records_by_task_id(focused_records)
+    reproduction_specs_by_task = (
+        _load_public_issue_reproduction_specs(reproduction_specs_path)
+        if reproduction_specs_path is not None
+        else {}
+    )
     policy = CommandPolicy()
     task_dirs = sorted(path for path in tasks_dir.iterdir() if path.is_dir())
     results = [
         _plan_public_issue_reproduction_record(
             task_dir=task_dir,
             focused_record=focused_by_task.get(task_dir.name),
+            reproduction_spec=reproduction_specs_by_task.get(task_dir.name),
             policy=policy,
         )
         for task_dir in task_dirs
@@ -7705,6 +7712,7 @@ def _plan_public_issue_reproduction_record(
     *,
     task_dir: Path,
     focused_record: dict[str, Any] | None,
+    reproduction_spec: dict[str, Any] | None,
     policy: CommandPolicy,
 ) -> IssueCorpusPublicReproductionPlanResult:
     manifest_path = task_dir / "task_manifest.json"
@@ -7744,6 +7752,7 @@ def _plan_public_issue_reproduction_record(
         if isinstance(manifest.get("reproduction"), dict)
         else {}
     )
+    spec_reproduction = reproduction_spec if isinstance(reproduction_spec, dict) else {}
     repository = _optional_string(issue.get("repository"))
     issue_url = _optional_string(issue.get("issue_url"))
     repo_path = _optional_string(snapshot.get("repo_path")) or (
@@ -7758,12 +7767,17 @@ def _plan_public_issue_reproduction_record(
             for path in _string_list(retrieval.get("retrieved_files"))
             if _is_materialized_test_candidate_path(path)
         ][:2]
+    spec_command = _optional_string(spec_reproduction.get("command"))
     explicit_command = _optional_string(reproduction.get("command"))
     focused_command = (
         _optional_string(focused_record.get("command")) if focused_record else None
     )
     test_commands = _string_list(snapshot.get("test_commands"))
-    if explicit_command:
+    if spec_command:
+        command = spec_command
+        command_source = "reproduction_spec"
+        evidence.append("reproduction spec provides an explicit command")
+    elif explicit_command:
         command = explicit_command
         command_source = "manifest_reproduction"
         evidence.append("manifest contains an explicit reproduction command")
@@ -7780,10 +7794,19 @@ def _plan_public_issue_reproduction_record(
         command_source = "missing"
         blockers.append("no reproduction or focused test command is available")
 
-    expected_failure_signals = _string_list(reproduction.get("expected_failure_signals"))
+    spec_failure_signals = _string_list(
+        spec_reproduction.get("expected_failure_signals")
+    )
+    manifest_failure_signals = _string_list(
+        reproduction.get("expected_failure_signals")
+    )
+    expected_failure_signals = spec_failure_signals or manifest_failure_signals
     manual_spec_required = not expected_failure_signals
     if expected_failure_signals:
-        evidence.append("expected failing signal is encoded in the task manifest")
+        if spec_failure_signals:
+            evidence.append("expected failing signal is encoded in the reproduction spec")
+        else:
+            evidence.append("expected failing signal is encoded in the task manifest")
     else:
         warnings.append("expected failing signal is not encoded")
         next_actions.append(
@@ -7814,7 +7837,10 @@ def _plan_public_issue_reproduction_record(
         else:
             blockers.append(f"reproduction command rejected by policy: {decision.reason}")
 
-    if focused_record is None and command_source != "manifest_reproduction":
+    if focused_record is None and command_source not in {
+        "manifest_reproduction",
+        "reproduction_spec",
+    }:
         warnings.append("focused test plan record is missing")
         next_actions.append("regenerate `plan-materialized-focused-tests` before execution")
     if command and not blockers and not manual_spec_required:
@@ -8552,6 +8578,40 @@ def _load_json_record_list(path: Path, *, label: str) -> list[dict[str, Any]]:
     if len(records) != len(parsed):
         raise ValueError(f"{label} records must be JSON objects")
     return records
+
+
+def _load_public_issue_reproduction_specs(path: Path) -> dict[str, dict[str, Any]]:
+    if not path.exists():
+        raise FileNotFoundError(f"public issue reproduction specs do not exist: {path}")
+    if not path.is_file():
+        raise ValueError(f"public issue reproduction specs path is not a file: {path}")
+    parsed = json.loads(path.read_text(encoding="utf-8"))
+    if isinstance(parsed, dict) and isinstance(parsed.get("specs"), list):
+        raw_records = parsed["specs"]
+    elif isinstance(parsed, list):
+        raw_records = parsed
+    elif isinstance(parsed, dict):
+        raw_records = []
+        for task_id, record in parsed.items():
+            if not isinstance(record, dict):
+                raise ValueError(
+                    "task-id keyed reproduction specs must map every task id to an object"
+                )
+            raw_records.append({**record, "task_id": task_id})
+    else:
+        raise ValueError("public issue reproduction specs must contain an object or list")
+
+    specs: dict[str, dict[str, Any]] = {}
+    for index, raw_record in enumerate(raw_records, start=1):
+        if not isinstance(raw_record, dict):
+            raise ValueError(f"reproduction spec #{index} must be a JSON object")
+        task_id = _optional_string(raw_record.get("task_id"))
+        if task_id is None:
+            raise ValueError(f"reproduction spec #{index} is missing task_id")
+        if task_id in specs:
+            raise ValueError(f"duplicate reproduction spec for task_id: {task_id}")
+        specs[task_id] = raw_record
+    return specs
 
 
 def _records_by_task_id(records: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:

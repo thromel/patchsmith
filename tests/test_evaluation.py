@@ -1711,6 +1711,94 @@ def test_plan_public_issue_reproductions_plans_explicit_failure_spec(
     assert results[0].command_source == "manifest_reproduction"
 
 
+def test_plan_public_issue_reproductions_merges_reviewed_spec_file(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    tests_dir = repo_dir / "tests"
+    tests_dir.mkdir(parents=True)
+    (tests_dir / "test_bug.py").write_text("def test_bug():\n    assert True\n", encoding="utf-8")
+    tasks_dir = tmp_path / "materialized_tasks"
+    task_dir = tasks_dir / "public_task"
+    task_dir.mkdir(parents=True)
+    (task_dir / "task_manifest.json").write_text(
+        json.dumps(
+            {
+                "task_id": "public_task",
+                "issue": {
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/12",
+                },
+                "repository_snapshot": {
+                    "repo_path": str(repo_dir),
+                    "test_commands": ["python3 -m pytest"],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    specs_path = tmp_path / "reproduction_specs.json"
+    specs_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "specs": [
+                    {
+                        "task_id": "public_task",
+                        "command": "python3 -m pytest tests/test_bug.py",
+                        "expected_failure_signals": [
+                            "AssertionError: reviewed public issue signal"
+                        ],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    output_dir = tmp_path / "reproduction_plan"
+    results, summary = plan_public_issue_reproductions(
+        tasks_dir=tasks_dir,
+        reproduction_specs_path=specs_path,
+        output_dir=output_dir,
+    )
+
+    assert summary.planned_tasks == 1
+    assert summary.manual_spec_required_tasks == 0
+    assert results[0].status == "planned"
+    assert results[0].command_source == "reproduction_spec"
+    assert results[0].expected_failure_signals == [
+        "AssertionError: reviewed public issue signal"
+    ]
+    assert "reproduction spec provides an explicit command" in ";".join(
+        results[0].evidence
+    )
+    assert "expected failing signal is encoded in the reproduction spec" in ";".join(
+        results[0].evidence
+    )
+
+    cli_output = tmp_path / "cli_reproduction_plan"
+    exit_code = main(
+        [
+            "plan-public-issue-reproductions",
+            "--tasks-dir",
+            str(tasks_dir),
+            "--reproduction-specs",
+            str(specs_path),
+            "--output",
+            str(cli_output),
+            "--json",
+        ]
+    )
+    assert exit_code == 0
+    cli_results = json.loads(
+        (cli_output / "public_issue_reproduction_plan_results.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert cli_results[0]["command_source"] == "reproduction_spec"
+
+
 def test_execute_public_issue_reproductions_blocks_missing_failure_spec(
     tmp_path: Path,
 ) -> None:
