@@ -164,6 +164,15 @@ PYTHONPATH=src python3 -m patchsmith.cli validate-issue-corpus \
   --json
 ```
 
+Preflight repository reachability before cloning:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli preflight-issue-corpus \
+  --corpus evals/issue_corpora/public_issue_smoke_v1/issues.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
 The corpus report is planning evidence. It is not repair-quality evidence until the issues are cloned, reproduced, run, and saved as normal PatchSmith artifacts.
 
 ## Definition of test completion

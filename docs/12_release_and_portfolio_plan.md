@@ -168,6 +168,17 @@ PYTHONPATH=src python3 -m patchsmith.cli validate-issue-corpus \
 
 Current corpus output should validate three public GitHub issue candidates. Use it to show real-world task-breadth planning, not solved issue quality.
 
+Preflight the public issue repositories:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli preflight-issue-corpus \
+  --corpus evals/issue_corpora/public_issue_smoke_v1/issues.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+Current preflight output should show both public repositories reachable. Use it before converting corpus entries into executable eval tasks.
+
 Generate the release hygiene report:
 
 ```bash

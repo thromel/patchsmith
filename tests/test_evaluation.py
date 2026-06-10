@@ -1,9 +1,11 @@
 import json
+import subprocess
 from pathlib import Path
 
 from patchsmith.cli import main
 from patchsmith.evaluation import (
     load_seeded_tasks,
+    preflight_issue_corpus_repositories,
     recall,
     run_patch_search_evaluation,
     run_repair_evaluation,
@@ -148,6 +150,66 @@ def test_validate_issue_corpus_flags_bad_metadata(tmp_path: Path) -> None:
     assert "task_id contains unsafe characters" in ";".join(results[0].errors)
     assert "repository must use owner/name format" in ";".join(results[0].errors)
     assert "repo_url must be a GitHub URL" in ";".join(results[0].errors)
+
+
+def test_preflight_issue_corpus_repositories_writes_outputs(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    calls: list[list[str]] = []
+
+    def fake_run(command: list[str], **_kwargs) -> subprocess.CompletedProcess[str]:
+        calls.append(command)
+        if command[3] == "https://github.com/pytest-dev/pytest":
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                stdout=(
+                    "ref: refs/heads/main\tHEAD\n"
+                    "abc123\tHEAD\n"
+                ),
+                stderr="",
+            )
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=(
+                "ref: refs/heads/main\tHEAD\n"
+                "def456\tHEAD\n"
+            ),
+            stderr="",
+        )
+
+    monkeypatch.setattr("patchsmith.evaluation.subprocess.run", fake_run)
+
+    output_dir = tmp_path / "preflight"
+    results, summary = preflight_issue_corpus_repositories(
+        corpus_path=Path("evals/issue_corpora/public_issue_smoke_v1/issues.json"),
+        output_dir=output_dir,
+    )
+
+    assert len(results) == 2
+    assert summary.repository_count == 2
+    assert summary.reachable_repositories == 2
+    assert summary.issue_count == 3
+    assert all(result.default_branch == "main" for result in results)
+    assert (output_dir / "repo_preflight_report.md").exists()
+    assert (output_dir / "repo_preflight_results.csv").exists()
+    assert calls and calls[0][:3] == ["git", "ls-remote", "--symref"]
+
+    cli_output = tmp_path / "cli_preflight"
+    exit_code = main(
+        [
+            "preflight-issue-corpus",
+            "--corpus",
+            "evals/issue_corpora/public_issue_smoke_v1/issues.json",
+            "--output",
+            str(cli_output),
+            "--json",
+        ]
+    )
+    assert exit_code == 0
+    assert (cli_output / "repo_preflight_report.md").exists()
 
 
 def test_graph_retrieval_dataset_validates(tmp_path: Path) -> None:

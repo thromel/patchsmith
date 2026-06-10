@@ -139,6 +139,17 @@ PYTHONPATH=src python3 -m patchsmith.cli validate-issue-corpus \
 
 The public issue corpus records real GitHub issue candidates for future external runs. Treat a valid corpus as task-breadth evidence only; it is not solved-run evidence.
 
+Public issue repository preflight:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli preflight-issue-corpus \
+  --corpus evals/issue_corpora/public_issue_smoke_v1/issues.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+The preflight checks repository reachability and records current branch/HEAD metadata before any source clone or repair attempt.
+
 Scaffold comparison:
 
 ```bash

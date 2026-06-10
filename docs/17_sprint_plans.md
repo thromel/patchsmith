@@ -302,10 +302,19 @@ PYTHONPATH=src python3 -m patchsmith.cli validate-issue-corpus \
   --json
 ```
 
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli preflight-issue-corpus \
+  --corpus evals/issue_corpora/public_issue_smoke_v1/issues.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
 Latest expected evidence:
 
 - `artifacts/experiments/public_issue_corpus_v1/corpus_report.md`,
+- `artifacts/experiments/public_issue_corpus_v1/repo_preflight_report.md`,
 - valid public issue candidates: 3,
+- reachable public repositories: 2,
 - invalid entries: 0,
 - repositories: `psf/requests`, `pytest-dev/pytest`.
 

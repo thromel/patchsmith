@@ -6,6 +6,7 @@ import tempfile
 from pathlib import Path
 
 from patchsmith.evaluation import (
+    preflight_issue_corpus_repositories,
     run_patch_search_evaluation,
     run_repair_evaluation,
     run_scaffold_comparison,
@@ -189,6 +190,31 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f"valid={summary.valid_entries}/{summary.entry_count} "
                 f"errors={summary.error_count} warnings={summary.warning_count}"
+            )
+        return 0
+
+    if args.command == "preflight-issue-corpus":
+        results, summary = preflight_issue_corpus_repositories(
+            corpus_path=Path(args.corpus),
+            output_dir=Path(args.output),
+            timeout_seconds=args.timeout_seconds,
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "result_count": len(results),
+                        "report_path": str(Path(args.output) / "repo_preflight_report.md"),
+                        "summary": summary.to_dict(),
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(f"Report: {Path(args.output) / 'repo_preflight_report.md'}")
+            print(
+                f"reachable={summary.reachable_repositories}/{summary.repository_count} "
+                f"issues={summary.issue_count}"
             )
         return 0
 
@@ -815,6 +841,32 @@ def build_parser() -> argparse.ArgumentParser:
         help="Issue corpus validation output directory.",
     )
     validate_issue_corpus_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print JSON summary.",
+    )
+
+    preflight_issue_corpus_parser = subparsers.add_parser(
+        "preflight-issue-corpus",
+        help="Check repository reachability for public issue-corpus entries.",
+    )
+    preflight_issue_corpus_parser.add_argument(
+        "--corpus",
+        default="evals/issue_corpora/public_issue_smoke_v1/issues.json",
+        help="Issue corpus JSON manifest.",
+    )
+    preflight_issue_corpus_parser.add_argument(
+        "--output",
+        default="artifacts/experiments/public_issue_corpus_v1",
+        help="Issue corpus preflight output directory.",
+    )
+    preflight_issue_corpus_parser.add_argument(
+        "--timeout-seconds",
+        type=int,
+        default=20,
+        help="Per-repository git ls-remote timeout.",
+    )
+    preflight_issue_corpus_parser.add_argument(
         "--json",
         action="store_true",
         help="Print JSON summary.",

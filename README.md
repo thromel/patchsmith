@@ -258,6 +258,17 @@ PYTHONPATH=src python3 -m patchsmith.cli validate-issue-corpus \
 
 The corpus report validates curated public GitHub issue candidates for the next external evaluation lane. It proves task-breadth planning evidence, not solved real-world repair quality.
 
+Preflight the public issue repositories:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli preflight-issue-corpus \
+  --corpus evals/issue_corpora/public_issue_smoke_v1/issues.json \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+The preflight report checks repository reachability and records current default branch and HEAD metadata with `git ls-remote`. It does not clone source or run repairs.
+
 Run the seeded repair evaluation:
 
 ```bash
