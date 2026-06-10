@@ -231,6 +231,7 @@ The MVP must record:
 - focused setup-validation report with post-setup validation dry-run/execution evidence,
 - executable quality-gate report with compile, whitespace, pytest, package-build, and per-command log evidence,
 - consolidated project-status report with progress, delivery, launch, Docker, live-provider, adapter, and release evidence,
+- evidence-refresh report with review-artifact regeneration order, step durations, skips, and output paths,
 - release hygiene report with blockers, warnings, and launch checklist status.
 
 ## Portfolio screenshots to capture
@@ -253,4 +254,5 @@ The MVP must record:
 - focused setup-validation report.
 - executable quality-gate report.
 - consolidated project-status report.
+- evidence-refresh report.
 - release hygiene report.

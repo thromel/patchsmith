@@ -180,6 +180,19 @@ PYTHONPATH=src python3 -m patchsmith.cli project-status \
 
 Current project-status output is the status briefing artifact. It reads saved evidence from the MVP progress, delivery audit, quality gate, launch blocker, Docker smoke, live calibration, final evaluation, artifact index, and release hygiene reports without rerunning those checks.
 
+Refresh the lightweight review evidence bundle:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli refresh-evidence \
+  --project-root . \
+  --artifacts-dir artifacts \
+  --output artifacts/experiments/evidence_refresh.md \
+  --json-output artifacts/experiments/evidence_refresh.json \
+  --json
+```
+
+Current evidence-refresh output records the review-artifact regeneration order, per-step status, duration, output paths, and skipped quality-gate status. Use it after code/doc changes to refresh portfolio evidence without accidentally running Docker or live-provider work.
+
 Run the executable quality gate:
 
 ```bash

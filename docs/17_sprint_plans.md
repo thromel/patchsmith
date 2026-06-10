@@ -738,7 +738,7 @@ Acceptance criteria:
 
 Current status:
 
-Started. The README now surfaces current seeded-suite metrics, limitations, scaffold comparison, artifact dashboard generation, failure report generation, demo readiness generation, live calibration readiness generation, demo script generation, demo media generation, final evaluation generation, executable quality-gate generation, consolidated project-status generation, launch-blocker remediation commands, and release hygiene generation. The failure-analysis surface is generated from saved traces through `inspect-failures`, the launch review surface is generated through `demo-readiness`, the live-provider readiness surface is generated through `live-calibration`, the timed recording script is generated through `demo-script`, demo media is generated through `demo-media`, the portfolio-facing evaluation narrative is generated through `final-evaluation`, the executable verification surface is generated through `quality-gate`, the status briefing surface is generated through `project-status`, the blocker backlog is generated through `launch-blockers`, and release checks are generated through `release-hygiene`. Current readiness is `ready_with_caveats`: offline seeded-suite evidence is coherent, but live LLM calibration is not present beyond `offline_fake_model` metadata. Current live calibration readiness is `not_configured`: no `OPENAI_API_KEY`, 10 saved DeepAgents package-backed adapter runs, 30 compatibility-mode runs, OpenAI Agents adapter smoke evidence in offline compatibility mode, and no saved non-offline provider rows. Current release hygiene is `ready_with_warnings` after restoring local Git metadata. CI workflow coverage, a Mermaid architecture diagram, SVG/PNG demo media, an executable quality-gate report, consolidated project-status report, and dependency-chain launch remediation now exist. The remaining Sprint 10 work is running live-provider calibration when credentials and budget are available.
+Started. The README now surfaces current seeded-suite metrics, limitations, scaffold comparison, artifact dashboard generation, failure report generation, demo readiness generation, live calibration readiness generation, demo script generation, demo media generation, final evaluation generation, executable quality-gate generation, consolidated project-status generation, evidence-refresh orchestration, launch-blocker remediation commands, and release hygiene generation. The failure-analysis surface is generated from saved traces through `inspect-failures`, the launch review surface is generated through `demo-readiness`, the live-provider readiness surface is generated through `live-calibration`, the timed recording script is generated through `demo-script`, demo media is generated through `demo-media`, the portfolio-facing evaluation narrative is generated through `final-evaluation`, the executable verification surface is generated through `quality-gate`, the status briefing surface is generated through `project-status`, the review refresh surface is generated through `refresh-evidence`, the blocker backlog is generated through `launch-blockers`, and release checks are generated through `release-hygiene`. Current readiness is `ready_with_caveats`: offline seeded-suite evidence is coherent, but live LLM calibration is not present beyond `offline_fake_model` metadata. Current live calibration readiness is `not_configured`: no `OPENAI_API_KEY`, 10 saved DeepAgents package-backed adapter runs, 30 compatibility-mode runs, OpenAI Agents adapter smoke evidence in offline compatibility mode, and no saved non-offline provider rows. Current release hygiene is `ready_with_warnings` after restoring local Git metadata. CI workflow coverage, a Mermaid architecture diagram, SVG/PNG demo media, an executable quality-gate report, consolidated project-status report, evidence-refresh orchestration, and dependency-chain launch remediation now exist. The remaining Sprint 10 work is running live-provider calibration when credentials and budget are available.
 
 Latest verification command:
 
@@ -796,6 +796,13 @@ PYTHONPATH=src python3 -m patchsmith.cli project-status \
   --json-output artifacts/experiments/project_status.json \
   --json
 
+PYTHONPATH=src python3 -m patchsmith.cli refresh-evidence \
+  --project-root . \
+  --artifacts-dir artifacts \
+  --output artifacts/experiments/evidence_refresh.md \
+  --json-output artifacts/experiments/evidence_refresh.json \
+  --json
+
 PYTHONPATH=src python3 -m patchsmith.cli delivery-audit \
   --project-root . \
   --artifacts-dir artifacts \
@@ -832,6 +839,8 @@ Latest evidence:
 - `artifacts/experiments/quality_gate_logs/`,
 - `artifacts/experiments/project_status.md`,
 - `artifacts/experiments/project_status.json`,
+- `artifacts/experiments/evidence_refresh.md`,
+- `artifacts/experiments/evidence_refresh.json`,
 - `artifacts/experiments/delivery_audit.md`,
 - `artifacts/experiments/delivery_audit.json`,
 - `artifacts/experiments/launch_blockers.md`,
@@ -848,6 +857,7 @@ Latest evidence:
 - delivery audit: `in_progress_with_blockers`,
 - quality gate: `passed`,
 - project status: `in_progress_with_blockers`,
+- evidence refresh: `passed_with_skips`,
 - launch blocker status: `blocked`,
 - launch blockers: 2,
 - launch warnings: 2,
@@ -903,6 +913,7 @@ Reason:
 | S10-T12 | Delivery audit | PatchSmith | `delivery-audit` command plus objective-to-evidence status report |
 | S10-T13 | Quality gate | PatchSmith | `quality-gate` command plus compile, diff, pytest, package-build, and log evidence |
 | S10-T14 | Status briefing | PatchSmith | `project-status` command plus consolidated progress, verification, launch, model, and adapter evidence |
+| S10-T15 | Evidence refresh | PatchSmith | `refresh-evidence` command plus ordered review-artifact regeneration audit |
 
 ## Completed Sprint 9 task breakdown
 

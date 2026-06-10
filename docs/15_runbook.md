@@ -436,6 +436,19 @@ PYTHONPATH=src python3 -m patchsmith.cli project-status \
 
 The project-status report is the concise briefing surface for progress percentage, delivery percentage, quality gate, launch blockers, Docker smoke, live calibration, adapter evidence, release hygiene, and saved-evidence counts. It summarizes saved artifacts; rerun the underlying gates when evidence needs to be refreshed.
 
+Evidence refresh:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli refresh-evidence \
+  --project-root . \
+  --artifacts-dir artifacts \
+  --output artifacts/experiments/evidence_refresh.md \
+  --json-output artifacts/experiments/evidence_refresh.json \
+  --json
+```
+
+The evidence refresh command regenerates the lightweight review/status reports in dependency order: artifact index, failure report, demo readiness, live-calibration readiness and plan, demo script/media, final evaluation, launch blockers, MVP progress, delivery audit, project status, and release hygiene. It skips the full quality gate by default; pass `--include-quality-gate` only when the refresh should also run compile, pytest, and package build.
+
 Live calibration readiness:
 
 ```bash
@@ -691,6 +704,8 @@ artifacts/
   experiments/quality_gate_logs/
   experiments/project_status.md
   experiments/project_status.json
+  experiments/evidence_refresh.md
+  experiments/evidence_refresh.json
   experiments/final_evaluation.md
   experiments/final_evaluation.json
   experiments/release_hygiene.md
@@ -725,6 +740,7 @@ Run:
 - final evaluation report regeneration,
 - quality-gate regeneration,
 - project-status regeneration,
+- evidence-refresh regeneration,
 - delivery audit regeneration,
 - launch blocker backlog regeneration,
 - live calibration plan regeneration,

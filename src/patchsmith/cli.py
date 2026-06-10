@@ -34,6 +34,7 @@ from patchsmith.portfolio import (
     write_demo_script_report,
     write_delivery_audit_report,
     write_docker_smoke_report,
+    write_evidence_refresh_report,
     write_final_evaluation_report,
     write_launch_blocker_report,
     write_live_calibration_plan_report,
@@ -1275,6 +1276,50 @@ def main(argv: list[str] | None = None) -> int:
             )
         return 0
 
+    if args.command == "refresh-evidence":
+        json_output_path = Path(args.json_output) if args.json_output else None
+        max_failure_runs = None if args.max_failure_runs == 0 else args.max_failure_runs
+        report = write_evidence_refresh_report(
+            project_root=Path(args.project_root),
+            artifacts_dir=Path(args.artifacts_dir),
+            output_path=Path(args.output),
+            json_output_path=json_output_path,
+            max_failure_runs=max_failure_runs,
+            include_quality_gate=args.include_quality_gate,
+            quality_timeout_seconds=args.quality_timeout_seconds,
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "project_root": report.project_root,
+                        "artifacts_dir": report.artifacts_dir,
+                        "generated_at": report.generated_at,
+                        "refresh_status": report.refresh_status,
+                        "step_count": report.step_count,
+                        "passed_count": report.passed_count,
+                        "failed_count": report.failed_count,
+                        "skipped_count": report.skipped_count,
+                        "quality_gate_refreshed": report.quality_gate_refreshed,
+                        "report_path": str(Path(args.output)),
+                        "json_path": str(json_output_path) if json_output_path else None,
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(f"Evidence refresh report: {Path(args.output)}")
+            if json_output_path:
+                print(f"JSON: {json_output_path}")
+            print(
+                f"Status: {report.refresh_status} "
+                f"Steps: {report.step_count} "
+                f"Passed: {report.passed_count} "
+                f"Failed: {report.failed_count} "
+                f"Skipped: {report.skipped_count}"
+            )
+        return 0
+
     parser.print_help()
     return 2
 
@@ -2341,6 +2386,49 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional JSON project status output path.",
     )
     project_status.add_argument("--json", action="store_true", help="Print JSON summary.")
+
+    refresh_evidence = subparsers.add_parser(
+        "refresh-evidence",
+        help="Regenerate saved review/status evidence artifacts in dependency order.",
+    )
+    refresh_evidence.add_argument(
+        "--project-root",
+        default=".",
+        help="Project root to inspect for docs, Git metadata, and quality-gate context.",
+    )
+    refresh_evidence.add_argument(
+        "--artifacts-dir",
+        default="artifacts",
+        help="Root artifact directory to refresh.",
+    )
+    refresh_evidence.add_argument(
+        "--output",
+        default="artifacts/experiments/evidence_refresh.md",
+        help="Markdown evidence-refresh report output path.",
+    )
+    refresh_evidence.add_argument(
+        "--json-output",
+        default="artifacts/experiments/evidence_refresh.json",
+        help="Optional JSON evidence-refresh output path.",
+    )
+    refresh_evidence.add_argument(
+        "--max-failure-runs",
+        type=int,
+        default=0,
+        help="Maximum recent runs to scan for failure visibility. Use 0 to scan all runs.",
+    )
+    refresh_evidence.add_argument(
+        "--include-quality-gate",
+        action="store_true",
+        help="Also run the full quality gate during refresh.",
+    )
+    refresh_evidence.add_argument(
+        "--quality-timeout-seconds",
+        type=int,
+        default=180,
+        help="Per-command timeout for quality-gate steps when included.",
+    )
+    refresh_evidence.add_argument("--json", action="store_true", help="Print JSON summary.")
 
     return parser
 

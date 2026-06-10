@@ -9,6 +9,7 @@ from patchsmith.portfolio import (
     write_demo_script_report,
     write_delivery_audit_report,
     write_docker_smoke_report,
+    write_evidence_refresh_report,
     write_launch_blocker_report,
     write_live_calibration_plan_report,
     write_live_calibration_report,
@@ -1399,6 +1400,60 @@ def test_project_status_report_summarizes_saved_evidence(
     cli_payload = json.loads(capsys.readouterr().out)
     assert cli_payload["overall_status"] == "in_progress_with_blockers"
     assert cli_payload["missing_source_count"] == 0
+    assert cli_output.exists()
+
+
+def test_evidence_refresh_report_runs_lightweight_status_refresh(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    artifacts_dir = tmp_path / "artifacts"
+    output_path = tmp_path / "evidence_refresh.md"
+    json_output_path = tmp_path / "evidence_refresh.json"
+
+    report = write_evidence_refresh_report(
+        project_root=Path("."),
+        artifacts_dir=artifacts_dir,
+        output_path=output_path,
+        json_output_path=json_output_path,
+        max_failure_runs=5,
+        include_quality_gate=False,
+    )
+
+    assert report.refresh_status == "passed_with_skips"
+    assert report.failed_count == 0
+    assert report.skipped_count == 1
+    assert any(step.name == "Quality gate" and step.status == "skipped" for step in report.steps)
+    assert (artifacts_dir / "experiments" / "project_status.json").exists()
+    assert (artifacts_dir / "experiments" / "release_hygiene.json").exists()
+    rendered = output_path.read_text(encoding="utf-8")
+    assert "# PatchSmith Evidence Refresh Report" in rendered
+    assert "--include-quality-gate" in rendered
+    payload = json.loads(json_output_path.read_text(encoding="utf-8"))
+    assert payload["refresh_status"] == "passed_with_skips"
+
+    cli_output = tmp_path / "cli_evidence_refresh.md"
+    cli_json_output = tmp_path / "cli_evidence_refresh.json"
+    exit_code = main(
+        [
+            "refresh-evidence",
+            "--project-root",
+            ".",
+            "--artifacts-dir",
+            str(artifacts_dir),
+            "--output",
+            str(cli_output),
+            "--json-output",
+            str(cli_json_output),
+            "--max-failure-runs",
+            "5",
+            "--json",
+        ]
+    )
+    assert exit_code == 0
+    cli_payload = json.loads(capsys.readouterr().out)
+    assert cli_payload["refresh_status"] == "passed_with_skips"
+    assert cli_payload["skipped_count"] == 1
     assert cli_output.exists()
 
 
