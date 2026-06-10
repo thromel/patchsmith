@@ -281,6 +281,20 @@ PYTHONPATH=src python3 -m patchsmith.cli validate-focused-test-setups \
 
 The setup-validation report defaults to dry-run and records whether validation commands can run after setup execution. Blocked rows mean setup did not complete and must not be counted as issue reproduction or repair evidence.
 
+Public issue repair readiness:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli check-public-issue-repair-readiness \
+  --focused-run artifacts/experiments/public_issue_corpus_v1/focused_test_run_results.json \
+  --diagnosis artifacts/experiments/public_issue_corpus_v1/focused_test_diagnosis_results.json \
+  --setup-validation artifacts/experiments/public_issue_corpus_v1/focused_test_setup_validation_results.json \
+  --tasks-dir artifacts/experiments/public_issue_corpus_v1/materialized_tasks \
+  --output artifacts/experiments/public_issue_corpus_v1 \
+  --json
+```
+
+The repair-readiness report joins focused-run, diagnosis, setup-validation, and materialized-task command evidence before a public issue repair attempt. Treat `warning` rows as runnable only with explicit caveats; a pre-repair passing focused command means validation is runnable, not that the issue has been reproduced as a failing test.
+
 Scaffold comparison:
 
 ```bash
@@ -551,7 +565,7 @@ PYTHONPATH=src python3 -m patchsmith.cli launch-blockers \
   --json
 ```
 
-The launch blocker backlog consolidates Docker smoke, focused public issue setup-readiness, live calibration, and release hygiene into a prioritized action list. It also renders each item's upstream dependencies and remediation commands so recovery steps are reviewable without reverse-engineering prior reports. Treat `blocked` as a hard stop for public release claims and `warning` as a caveat that must stay visible.
+The launch blocker backlog consolidates Docker smoke, focused public issue setup-readiness, public issue repair-readiness, live calibration, and release hygiene into a prioritized action list. It also renders each item's upstream dependencies and remediation commands so recovery steps are reviewable without reverse-engineering prior reports. Treat `blocked` as a hard stop for public release claims and `warning` as a caveat that must stay visible.
 
 Quality gate:
 
@@ -578,7 +592,7 @@ PYTHONPATH=src python3 -m patchsmith.cli release-hygiene \
   --json
 ```
 
-The release hygiene report checks required docs, generated review artifacts, project-status freshness, environment readiness, demo readiness, failure visibility, live-provider caveats, Git metadata, packaging metadata, CI, demo media, architecture diagram evidence, and README caveat markers. Treat `blocked` as a hard stop for tagged/public release claims.
+The release hygiene report checks required docs, generated review artifacts, public issue repair-readiness evidence, project-status freshness, environment readiness, demo readiness, failure visibility, live-provider caveats, Git metadata, packaging metadata, CI, demo media, architecture diagram evidence, and README caveat markers. Treat `blocked` as a hard stop for tagged/public release claims.
 
 Package build:
 
@@ -762,6 +776,7 @@ Run:
 - live calibration plan regeneration,
 - focused public issue setup-execution regeneration,
 - focused public issue setup-validation regeneration,
+- public issue repair-readiness regeneration,
 - release hygiene report regeneration,
 - README quickstart validation,
 - final report review.

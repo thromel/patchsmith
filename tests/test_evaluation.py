@@ -6,6 +6,7 @@ from patchsmith.cli import main
 from patchsmith.evaluation import (
     check_focused_test_setup_readiness,
     check_materialized_issue_run_readiness,
+    check_public_issue_repair_readiness,
     diagnose_focused_test_runs,
     execute_focused_test_setups,
     load_seeded_tasks,
@@ -1589,6 +1590,168 @@ def test_validate_focused_test_setups_classifies_httpbin_fixture_failure(
     assert results[0].failure_summary is not None
     assert "httpbin" in ";".join(results[0].failure_evidence)
     assert "controlled httpbin fixture provider" in ";".join(results[0].next_actions)
+
+
+def test_check_public_issue_repair_readiness_warns_without_reproduction(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    task_id = "public_task"
+    focused_run_path = tmp_path / "focused_test_run_results.json"
+    diagnosis_path = tmp_path / "focused_test_diagnosis_results.json"
+    setup_validation_path = tmp_path / "focused_test_setup_validation_results.json"
+    tasks_dir = tmp_path / "materialized_tasks"
+    task_dir = tasks_dir / task_id
+    task_dir.mkdir(parents=True)
+    focused_run_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": task_id,
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/10",
+                    "status": "passed",
+                    "command": "python3 -m pytest tests/test_bug.py",
+                    "repo_path": str(repo_dir),
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    diagnosis_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": task_id,
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/10",
+                    "category": "focused_test_passed",
+                    "severity": "info",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    setup_validation_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": task_id,
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/10",
+                    "status": "passed",
+                    "setup_execution_status": "passed",
+                    "repo_path": str(repo_dir),
+                    "validation_command": "python3 -m pytest tests/test_bug.py",
+                    "sandbox_mode": "docker",
+                    "sandbox_network": "bridge",
+                    "failure_category": None,
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (task_dir / "task_manifest.json").write_text(
+        json.dumps(
+            {
+                "task_id": task_id,
+                "suggested_commands": [
+                    "PYTHONPATH=src python3 -m patchsmith.cli run --repo repo --json"
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    output_dir = tmp_path / "repair_readiness"
+    results, summary = check_public_issue_repair_readiness(
+        focused_run_path=focused_run_path,
+        diagnosis_path=diagnosis_path,
+        setup_validation_path=setup_validation_path,
+        output_dir=output_dir,
+        tasks_dir=tasks_dir,
+    )
+
+    assert summary.task_count == 1
+    assert summary.warning_tasks == 1
+    assert summary.blocked_tasks == 0
+    assert summary.repair_command_tasks == 1
+    assert summary.missing_reproduction_tasks == 1
+    assert results[0].status == "warning"
+    assert not results[0].blockers
+    assert "issue reproduction is not proven" in ";".join(results[0].warnings)
+    assert (output_dir / "public_issue_repair_readiness_report.md").exists()
+    assert (output_dir / "public_issue_repair_readiness_results.csv").exists()
+
+    cli_output = tmp_path / "cli_repair_readiness"
+    exit_code = main(
+        [
+            "check-public-issue-repair-readiness",
+            "--focused-run",
+            str(focused_run_path),
+            "--diagnosis",
+            str(diagnosis_path),
+            "--setup-validation",
+            str(setup_validation_path),
+            "--tasks-dir",
+            str(tasks_dir),
+            "--output",
+            str(cli_output),
+            "--json",
+        ]
+    )
+    assert exit_code == 0
+    assert (cli_output / "public_issue_repair_readiness_report.md").exists()
+
+
+def test_check_public_issue_repair_readiness_blocks_missing_setup_validation(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    focused_run_path = tmp_path / "focused_test_run_results.json"
+    diagnosis_path = tmp_path / "focused_test_diagnosis_results.json"
+    setup_validation_path = tmp_path / "focused_test_setup_validation_results.json"
+    focused_run_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "public_task",
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/11",
+                    "status": "passed",
+                    "command": "python3 -m pytest tests/test_bug.py",
+                    "repo_path": str(repo_dir),
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    diagnosis_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "public_task",
+                    "category": "focused_test_passed",
+                    "severity": "info",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    setup_validation_path.write_text("[]", encoding="utf-8")
+
+    results, summary = check_public_issue_repair_readiness(
+        focused_run_path=focused_run_path,
+        diagnosis_path=diagnosis_path,
+        setup_validation_path=setup_validation_path,
+        output_dir=tmp_path / "repair_readiness",
+    )
+
+    assert summary.blocked_tasks == 1
+    assert results[0].status == "blocked"
+    assert "setup validation record is missing" in ";".join(results[0].blockers)
 
 
 def test_graph_retrieval_dataset_validates(tmp_path: Path) -> None:

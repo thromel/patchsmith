@@ -88,10 +88,12 @@ def _write_release_hygiene_fixture(project_root: Path, artifacts_dir: Path) -> N
         "experiments/public_issue_corpus_v1/focused_test_setup_readiness_report.md",
         "experiments/public_issue_corpus_v1/focused_test_setup_readiness_summary.json",
         "experiments/public_issue_corpus_v1/focused_test_setup_execution_report.md",
-        "experiments/public_issue_corpus_v1/focused_test_setup_execution_summary.json",
-        "experiments/public_issue_corpus_v1/focused_test_setup_validation_report.md",
-        "experiments/public_issue_corpus_v1/focused_test_setup_validation_summary.json",
-        "experiments/demo_script.md",
+            "experiments/public_issue_corpus_v1/focused_test_setup_execution_summary.json",
+            "experiments/public_issue_corpus_v1/focused_test_setup_validation_report.md",
+            "experiments/public_issue_corpus_v1/focused_test_setup_validation_summary.json",
+            "experiments/public_issue_corpus_v1/public_issue_repair_readiness_report.md",
+            "experiments/public_issue_corpus_v1/public_issue_repair_readiness_summary.json",
+            "experiments/demo_script.md",
         "experiments/demo_script.json",
         "experiments/demo_media.md",
         "experiments/demo_media.json",
@@ -716,6 +718,8 @@ def test_demo_readiness_report_summarizes_launch_evidence(
         "experiments/public_issue_corpus_v1/focused_test_setup_execution_summary.json",
         "experiments/public_issue_corpus_v1/focused_test_setup_validation_report.md",
         "experiments/public_issue_corpus_v1/focused_test_setup_validation_summary.json",
+        "experiments/public_issue_corpus_v1/public_issue_repair_readiness_report.md",
+        "experiments/public_issue_corpus_v1/public_issue_repair_readiness_summary.json",
         "experiments/demo_script.md",
         "experiments/demo_script.json",
         "experiments/demo_media.md",
@@ -858,7 +862,7 @@ def test_launch_blocker_report_prioritizes_readiness_artifacts(
     )
 
     assert report.launch_status == "blocked"
-    assert report.blocked_count == 2
+    assert report.blocked_count == 3
     assert report.warning_count == 2
     assert report.ready_count == 0
     assert [item.blocker_id for item in report.items[:2]] == [
@@ -868,6 +872,7 @@ def test_launch_blocker_report_prioritizes_readiness_artifacts(
     assert {item.blocker_id for item in report.items} == {
         "docker_smoke",
         "focused_setup_readiness",
+        "public_repair_readiness",
         "live_calibration",
         "release_hygiene",
     }
@@ -879,9 +884,12 @@ def test_launch_blocker_report_prioritizes_readiness_artifacts(
     assert "check-focused-test-setup-readiness" in rendered
     payload = json.loads(json_output_path.read_text(encoding="utf-8"))
     assert payload["launch_status"] == "blocked"
-    assert payload["blocked_count"] == 2
+    assert payload["blocked_count"] == 3
     payload_items = {item["blocker_id"]: item for item in payload["items"]}
     assert payload_items["focused_setup_readiness"]["dependencies"] == ["docker_smoke"]
+    assert payload_items["public_repair_readiness"]["dependencies"] == [
+        "focused_setup_readiness"
+    ]
     assert any(
         "docker build -f docker/seeded-smoke.Dockerfile" in command
         for command in payload_items["docker_smoke"]["remediation_commands"]
@@ -908,7 +916,7 @@ def test_launch_blocker_report_prioritizes_readiness_artifacts(
     assert exit_code == 0
     cli_payload = json.loads(capsys.readouterr().out)
     assert cli_payload["launch_status"] == "blocked"
-    assert cli_payload["blocked_count"] == 2
+    assert cli_payload["blocked_count"] == 3
     assert cli_payload["warning_count"] == 2
     assert cli_output.exists()
     assert cli_json_output.exists()
@@ -1407,6 +1415,14 @@ def test_project_status_report_summarizes_saved_evidence(
             "openai_agents_compatibility_run_count": 20,
             "model_providers": {"offline_fake_model": 23},
         },
+        "public_issue_corpus_v1/public_issue_repair_readiness_summary.json": {
+            "task_count": 3,
+            "ready_tasks": 0,
+            "warning_tasks": 3,
+            "blocked_tasks": 0,
+            "repair_command_tasks": 3,
+            "missing_reproduction_tasks": 3,
+        },
         "final_evaluation.json": {
             "readiness_status": "ready_with_caveats",
             "experiment_count": 17,
@@ -1423,7 +1439,9 @@ def test_project_status_report_summarizes_saved_evidence(
         payload["generated_at"] = fresh_generated_at
     payloads["docker_smoke.json"]["generated_at"] = stale_generated_at
     for name, payload in payloads.items():
-        (experiments_dir / name).write_text(
+        path = experiments_dir / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
             json.dumps(payload) + "\n",
             encoding="utf-8",
         )
@@ -1505,10 +1523,14 @@ def test_evidence_refresh_report_runs_lightweight_status_refresh(
 
     assert report.refresh_status == "passed_with_skips"
     assert report.failed_count == 0
-    assert report.skipped_count == 2
+    assert report.skipped_count == 3
     assert report.docker_smoke_refreshed is False
     assert any(step.name == "Docker smoke" and step.status == "skipped" for step in report.steps)
     assert any(step.name == "Quality gate" and step.status == "skipped" for step in report.steps)
+    assert any(
+        step.name == "Public issue repair readiness" and step.status == "skipped"
+        for step in report.steps
+    )
     assert any(step.name == "Environment readiness" and step.status == "passed" for step in report.steps)
     assert (artifacts_dir / "experiments" / "project_status.json").exists()
     assert (artifacts_dir / "experiments" / "release_hygiene.json").exists()
@@ -1542,7 +1564,7 @@ def test_evidence_refresh_report_runs_lightweight_status_refresh(
     assert exit_code == 0
     cli_payload = json.loads(capsys.readouterr().out)
     assert cli_payload["refresh_status"] == "passed_with_skips"
-    assert cli_payload["skipped_count"] == 2
+    assert cli_payload["skipped_count"] == 3
     assert cli_payload["docker_smoke_refreshed"] is False
     assert cli_output.exists()
 
@@ -1577,7 +1599,7 @@ def test_evidence_refresh_can_refresh_docker_smoke(
 
     assert report.refresh_status == "passed_with_skips"
     assert report.failed_count == 0
-    assert report.skipped_count == 1
+    assert report.skipped_count == 2
     assert report.docker_smoke_refreshed is True
     docker_step = next(step for step in report.steps if step.name == "Docker smoke")
     assert docker_step.status == "passed"
@@ -1612,7 +1634,7 @@ def test_evidence_refresh_can_refresh_docker_smoke(
     assert exit_code == 0
     cli_payload = json.loads(capsys.readouterr().out)
     assert cli_payload["docker_smoke_refreshed"] is True
-    assert cli_payload["skipped_count"] == 1
+    assert cli_payload["skipped_count"] == 2
     assert cli_output.exists()
 
 

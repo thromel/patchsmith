@@ -8,6 +8,7 @@ from pathlib import Path
 from patchsmith.evaluation import (
     check_materialized_issue_run_readiness,
     check_focused_test_setup_readiness,
+    check_public_issue_repair_readiness,
     diagnose_focused_test_runs,
     execute_focused_test_setups,
     materialize_issue_corpus_tasks,
@@ -551,6 +552,38 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f"dry_run={summary.dry_run_tasks} attempted={summary.attempted_tasks} "
                 f"passed={summary.passed_tasks} blocked={summary.blocked_tasks}"
+            )
+        return 0
+
+    if args.command == "check-public-issue-repair-readiness":
+        tasks_dir = Path(args.tasks_dir) if args.tasks_dir else None
+        results, summary = check_public_issue_repair_readiness(
+            focused_run_path=Path(args.focused_run),
+            diagnosis_path=Path(args.diagnosis),
+            setup_validation_path=Path(args.setup_validation),
+            output_dir=Path(args.output),
+            tasks_dir=tasks_dir,
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "result_count": len(results),
+                        "report_path": str(
+                            Path(args.output) / "public_issue_repair_readiness_report.md"
+                        ),
+                        "summary": summary.to_dict(),
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(
+                f"Report: {Path(args.output) / 'public_issue_repair_readiness_report.md'}"
+            )
+            print(
+                f"ready={summary.ready_tasks} warning={summary.warning_tasks} "
+                f"blocked={summary.blocked_tasks}"
             )
         return 0
 
@@ -1879,6 +1912,50 @@ def build_parser() -> argparse.ArgumentParser:
         help="Execute validation commands instead of writing dry-run evidence.",
     )
     focused_test_setup_validation_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print JSON summary.",
+    )
+
+    public_repair_readiness_parser = subparsers.add_parser(
+        "check-public-issue-repair-readiness",
+        help="Gate readiness before attempting PatchSmith repairs on public issue tasks.",
+    )
+    public_repair_readiness_parser.add_argument(
+        "--focused-run",
+        default=(
+            "artifacts/experiments/public_issue_corpus_v1/"
+            "focused_test_run_results.json"
+        ),
+        help="Focused public issue test-run results JSON.",
+    )
+    public_repair_readiness_parser.add_argument(
+        "--diagnosis",
+        default=(
+            "artifacts/experiments/public_issue_corpus_v1/"
+            "focused_test_diagnosis_results.json"
+        ),
+        help="Focused public issue test-diagnosis results JSON.",
+    )
+    public_repair_readiness_parser.add_argument(
+        "--setup-validation",
+        default=(
+            "artifacts/experiments/public_issue_corpus_v1/"
+            "focused_test_setup_validation_results.json"
+        ),
+        help="Focused public issue setup-validation results JSON.",
+    )
+    public_repair_readiness_parser.add_argument(
+        "--tasks-dir",
+        default="artifacts/experiments/public_issue_corpus_v1/materialized_tasks",
+        help="Optional directory containing materialized task manifests.",
+    )
+    public_repair_readiness_parser.add_argument(
+        "--output",
+        default="artifacts/experiments/public_issue_corpus_v1",
+        help="Public issue repair-readiness output directory.",
+    )
+    public_repair_readiness_parser.add_argument(
         "--json",
         action="store_true",
         help="Print JSON summary.",

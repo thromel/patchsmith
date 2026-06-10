@@ -8,6 +8,7 @@ import tempfile
 import time
 import tomllib
 from dataclasses import asdict, dataclass, replace
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -595,6 +596,51 @@ class IssueCorpusFocusedTestSetupValidationSummary:
     blocked_tasks: int
     skipped_tasks: int
     failure_category_counts: dict[str, int]
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class IssueCorpusPublicRepairReadinessResult:
+    task_id: str | None
+    repository: str | None
+    issue_url: str | None
+    status: str
+    repo_path: str | None
+    repo_exists: bool
+    repair_command: str | None
+    validation_command: str | None
+    focused_run_status: str | None
+    diagnosis_category: str | None
+    setup_validation_status: str | None
+    setup_failure_category: str | None
+    sandbox_mode: str | None
+    sandbox_network: str | None
+    evidence: list[str]
+    blockers: list[str]
+    warnings: list[str]
+    next_actions: list[str]
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class IssueCorpusPublicRepairReadinessSummary:
+    generated_at: str
+    tasks_dir: str | None
+    focused_run_path: str
+    diagnosis_path: str
+    setup_validation_path: str
+    task_count: int
+    ready_tasks: int
+    warning_tasks: int
+    blocked_tasks: int
+    repair_command_tasks: int
+    passed_focused_tasks: int
+    passed_setup_validation_tasks: int
+    missing_reproduction_tasks: int
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -2819,6 +2865,178 @@ def write_focused_test_setup_validation_outputs(
     )
 
 
+def check_public_issue_repair_readiness(
+    *,
+    focused_run_path: Path,
+    diagnosis_path: Path,
+    setup_validation_path: Path,
+    output_dir: Path,
+    tasks_dir: Path | None = None,
+) -> tuple[
+    list[IssueCorpusPublicRepairReadinessResult],
+    IssueCorpusPublicRepairReadinessSummary,
+]:
+    focused_records = _load_json_record_list(
+        focused_run_path, label="focused test run results"
+    )
+    diagnosis_records = _load_json_record_list(
+        diagnosis_path, label="focused test diagnosis results"
+    )
+    setup_validation_records = _load_json_record_list(
+        setup_validation_path, label="focused test setup validation results"
+    )
+    manifests = _load_public_issue_task_manifests(tasks_dir)
+    diagnosis_by_task = _records_by_task_id(diagnosis_records)
+    setup_validation_by_task = _records_by_task_id(setup_validation_records)
+    results = [
+        _check_public_issue_repair_readiness_record(
+            focused_record=record,
+            diagnosis_record=diagnosis_by_task.get(_optional_string(record.get("task_id")) or ""),
+            setup_validation_record=setup_validation_by_task.get(
+                _optional_string(record.get("task_id")) or ""
+            ),
+            manifest=manifests.get(_optional_string(record.get("task_id")) or ""),
+        )
+        for record in focused_records
+    ]
+    summary = summarize_public_issue_repair_readiness(
+        tasks_dir=tasks_dir,
+        focused_run_path=focused_run_path,
+        diagnosis_path=diagnosis_path,
+        setup_validation_path=setup_validation_path,
+        results=results,
+    )
+    write_public_issue_repair_readiness_outputs(
+        output_dir=output_dir,
+        tasks_dir=tasks_dir,
+        focused_run_path=focused_run_path,
+        diagnosis_path=diagnosis_path,
+        setup_validation_path=setup_validation_path,
+        results=results,
+        summary=summary,
+    )
+    return results, summary
+
+
+def summarize_public_issue_repair_readiness(
+    *,
+    tasks_dir: Path | None,
+    focused_run_path: Path,
+    diagnosis_path: Path,
+    setup_validation_path: Path,
+    results: list[IssueCorpusPublicRepairReadinessResult],
+) -> IssueCorpusPublicRepairReadinessSummary:
+    return IssueCorpusPublicRepairReadinessSummary(
+        generated_at=datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace(
+            "+00:00", "Z"
+        ),
+        tasks_dir=str(tasks_dir) if tasks_dir is not None else None,
+        focused_run_path=str(focused_run_path),
+        diagnosis_path=str(diagnosis_path),
+        setup_validation_path=str(setup_validation_path),
+        task_count=len(results),
+        ready_tasks=sum(1 for result in results if result.status == "ready"),
+        warning_tasks=sum(1 for result in results if result.status == "warning"),
+        blocked_tasks=sum(1 for result in results if result.status == "blocked"),
+        repair_command_tasks=sum(1 for result in results if result.repair_command),
+        passed_focused_tasks=sum(
+            1 for result in results if result.focused_run_status == "passed"
+        ),
+        passed_setup_validation_tasks=sum(
+            1 for result in results if result.setup_validation_status == "passed"
+        ),
+        missing_reproduction_tasks=sum(
+            1
+            for result in results
+            if any("issue reproduction" in warning for warning in result.warnings)
+        ),
+    )
+
+
+def write_public_issue_repair_readiness_outputs(
+    *,
+    output_dir: Path,
+    tasks_dir: Path | None,
+    focused_run_path: Path,
+    diagnosis_path: Path,
+    setup_validation_path: Path,
+    results: list[IssueCorpusPublicRepairReadinessResult],
+    summary: IssueCorpusPublicRepairReadinessSummary,
+) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "public_issue_repair_readiness_results.json").write_text(
+        json.dumps([result.to_dict() for result in results], indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (output_dir / "public_issue_repair_readiness_summary.json").write_text(
+        json.dumps(summary.to_dict(), indent=2) + "\n",
+        encoding="utf-8",
+    )
+    with (output_dir / "public_issue_repair_readiness_results.csv").open(
+        "w",
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=[
+                "task_id",
+                "repository",
+                "issue_url",
+                "status",
+                "repo_path",
+                "repo_exists",
+                "repair_command",
+                "validation_command",
+                "focused_run_status",
+                "diagnosis_category",
+                "setup_validation_status",
+                "setup_failure_category",
+                "sandbox_mode",
+                "sandbox_network",
+                "evidence",
+                "blockers",
+                "warnings",
+                "next_actions",
+            ],
+        )
+        writer.writeheader()
+        for result in results:
+            writer.writerow(
+                {
+                    "task_id": result.task_id,
+                    "repository": result.repository,
+                    "issue_url": result.issue_url,
+                    "status": result.status,
+                    "repo_path": result.repo_path,
+                    "repo_exists": result.repo_exists,
+                    "repair_command": result.repair_command,
+                    "validation_command": result.validation_command,
+                    "focused_run_status": result.focused_run_status,
+                    "diagnosis_category": result.diagnosis_category,
+                    "setup_validation_status": result.setup_validation_status,
+                    "setup_failure_category": result.setup_failure_category,
+                    "sandbox_mode": result.sandbox_mode,
+                    "sandbox_network": result.sandbox_network,
+                    "evidence": ";".join(result.evidence),
+                    "blockers": ";".join(result.blockers),
+                    "warnings": ";".join(result.warnings),
+                    "next_actions": ";".join(result.next_actions),
+                }
+            )
+    (output_dir / "public_issue_repair_readiness_report.md").write_text(
+        render_public_issue_repair_readiness_report(
+            tasks_dir=tasks_dir,
+            focused_run_path=focused_run_path,
+            diagnosis_path=diagnosis_path,
+            setup_validation_path=setup_validation_path,
+            results=results,
+            summary=summary,
+        ),
+        encoding="utf-8",
+    )
+
+
 def run_retrieval_evaluation(
     *,
     dataset_dir: Path,
@@ -4488,6 +4706,71 @@ def render_focused_test_setup_validation_report(
             "- Blocked rows mean setup has not reached a state where validation can run.",
             "- Passed validation proves the focused validation command runs after setup, not that a PatchSmith repair succeeded.",
             "- Repair-quality claims still require issue reproduction, patch generation, and saved normal PatchSmith run artifacts.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def render_public_issue_repair_readiness_report(
+    *,
+    tasks_dir: Path | None,
+    focused_run_path: Path,
+    diagnosis_path: Path,
+    setup_validation_path: Path,
+    results: list[IssueCorpusPublicRepairReadinessResult],
+    summary: IssueCorpusPublicRepairReadinessSummary,
+) -> str:
+    lines = [
+        "# Public Issue Repair Readiness",
+        "",
+        f"- Generated at: `{summary.generated_at}`",
+        f"- Materialized tasks directory: `{tasks_dir or 'not provided'}`",
+        f"- Focused run path: `{focused_run_path}`",
+        f"- Diagnosis path: `{diagnosis_path}`",
+        f"- Setup validation path: `{setup_validation_path}`",
+        f"- Task count: `{summary.task_count}`",
+        f"- Ready tasks: `{summary.ready_tasks}`",
+        f"- Warning tasks: `{summary.warning_tasks}`",
+        f"- Blocked tasks: `{summary.blocked_tasks}`",
+        f"- Repair-command tasks: `{summary.repair_command_tasks}`",
+        f"- Passed focused tasks: `{summary.passed_focused_tasks}`",
+        f"- Passed setup-validation tasks: `{summary.passed_setup_validation_tasks}`",
+        f"- Missing reproduction tasks: `{summary.missing_reproduction_tasks}`",
+        "",
+        "## Results",
+        "",
+        (
+            "| Task | Status | Repository | Focused Run | Diagnosis | Setup Validation | "
+            "Repair Command | Evidence | Blockers | Warnings | Next Actions |"
+        ),
+        "|---|---|---|---|---|---|---|---|---|---|---|",
+    ]
+    for result in results:
+        lines.append(
+            "| "
+            f"{_markdown_table_text(result.task_id or 'unknown')} | "
+            f"{_markdown_table_text(result.status)} | "
+            f"{_markdown_table_text(result.repository or 'unknown')} | "
+            f"{_markdown_table_text(result.focused_run_status or 'missing')} | "
+            f"{_markdown_table_text(result.diagnosis_category or 'missing')} | "
+            f"{_markdown_table_text(result.setup_validation_status or 'missing')} | "
+            f"{_markdown_table_text(result.repair_command or 'missing')} | "
+            f"{_markdown_table_text('; '.join(result.evidence) or 'none')} | "
+            f"{_markdown_table_text('; '.join(result.blockers) or 'none')} | "
+            f"{_markdown_table_text('; '.join(result.warnings) or 'none')} | "
+            f"{_markdown_table_text('; '.join(result.next_actions) or 'none')} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Claim Boundary",
+            "",
+            "- This report gates readiness for a later PatchSmith public issue repair attempt.",
+            "- `ready` means focused validation, setup validation, repository snapshot, and a saved repair command are available.",
+            "- `warning` means repair can be attempted only with explicit caveats, usually because the saved pre-repair command passed and does not prove issue reproduction.",
+            "- `blocked` means do not attempt a public issue repair until the listed prerequisite is fixed.",
+            "- This report does not execute PatchSmith repair, generate a patch, call a live model provider, or prove public issue repair quality.",
             "",
         ]
     )
@@ -6438,6 +6721,209 @@ def _validate_focused_test_setup_record(
             ]
         ),
     )
+
+
+def _check_public_issue_repair_readiness_record(
+    *,
+    focused_record: dict[str, Any],
+    diagnosis_record: dict[str, Any] | None,
+    setup_validation_record: dict[str, Any] | None,
+    manifest: dict[str, Any] | None,
+) -> IssueCorpusPublicRepairReadinessResult:
+    task_id = _optional_string(focused_record.get("task_id"))
+    repository = _optional_string(focused_record.get("repository"))
+    issue_url = _optional_string(focused_record.get("issue_url"))
+    repo_path = _optional_string(focused_record.get("repo_path"))
+    focused_status = _optional_string(focused_record.get("status"))
+    focused_command = _optional_string(focused_record.get("command"))
+    diagnosis_category = (
+        _optional_string(diagnosis_record.get("category"))
+        if diagnosis_record is not None
+        else None
+    )
+    diagnosis_severity = (
+        _optional_string(diagnosis_record.get("severity"))
+        if diagnosis_record is not None
+        else None
+    )
+    setup_status = (
+        _optional_string(setup_validation_record.get("status"))
+        if setup_validation_record is not None
+        else None
+    )
+    setup_failure_category = (
+        _optional_string(setup_validation_record.get("failure_category"))
+        if setup_validation_record is not None
+        else None
+    )
+    validation_command = (
+        _optional_string(setup_validation_record.get("validation_command"))
+        if setup_validation_record is not None
+        else focused_command
+    )
+    sandbox_mode = (
+        _optional_string(setup_validation_record.get("sandbox_mode"))
+        if setup_validation_record is not None
+        else None
+    )
+    sandbox_network = (
+        _optional_string(setup_validation_record.get("sandbox_network"))
+        if setup_validation_record is not None
+        else None
+    )
+    repair_command = _first_manifest_repair_command(manifest)
+
+    evidence: list[str] = []
+    blockers: list[str] = []
+    warnings: list[str] = []
+    next_actions: list[str] = []
+
+    if not task_id:
+        blockers.append("focused run record has no task_id")
+    if repo_path:
+        repo_exists = Path(repo_path).is_dir()
+        if repo_exists:
+            evidence.append("repository snapshot exists")
+        else:
+            blockers.append(f"repository snapshot is missing: {repo_path}")
+    else:
+        repo_exists = False
+        blockers.append("focused run record has no repo_path")
+
+    if focused_status == "passed":
+        evidence.append("focused validation command passed before repair")
+        warnings.append(
+            "pre-repair focused command passed; issue reproduction is not proven by saved evidence"
+        )
+        next_actions.append(
+            "record an issue-specific failing reproduction or keep repair-quality claims scoped"
+        )
+    elif focused_status in {"failed", "timed_out"}:
+        if diagnosis_category == "nonzero_exit":
+            evidence.append("focused command failed with an unclassified nonzero exit")
+            warnings.append(
+                "focused command failed; confirm the failure reproduces the public issue before repair"
+            )
+            next_actions.append(
+                "capture the expected failing assertion or traceback before using this as a repair target"
+            )
+        else:
+            blockers.append(f"focused run status is {focused_status}")
+            next_actions.append("resolve focused test execution before repair attempts")
+    else:
+        blockers.append(f"focused run status is {focused_status or 'missing'}")
+
+    if diagnosis_record is None:
+        blockers.append("focused diagnosis record is missing")
+    elif diagnosis_category == "focused_test_passed":
+        evidence.append("focused diagnosis confirms runnable validation")
+    elif diagnosis_severity in {"dependency", "environment", "blocked"}:
+        blockers.append(
+            f"focused diagnosis is {diagnosis_category or 'unknown'} with {diagnosis_severity} severity"
+        )
+    else:
+        warnings.append(f"focused diagnosis is {diagnosis_category or 'unknown'}")
+
+    if setup_validation_record is None:
+        blockers.append("setup validation record is missing")
+    elif setup_status == "passed":
+        evidence.append("post-setup validation command passed")
+    elif setup_status == "dry_run":
+        blockers.append("setup validation was only dry-run")
+        next_actions.append("execute setup validation before repair attempts")
+    else:
+        blockers.append(f"setup validation status is {setup_status or 'missing'}")
+        if setup_failure_category:
+            blockers.append(f"setup validation failure category is {setup_failure_category}")
+
+    if repair_command:
+        evidence.append("saved PatchSmith repair command is available")
+    else:
+        blockers.append("saved PatchSmith repair command is missing")
+        next_actions.append("regenerate materialized public issue tasks with suggested commands")
+
+    if validation_command:
+        evidence.append("focused validation command is available")
+    else:
+        blockers.append("focused validation command is missing")
+
+    if sandbox_mode == "docker":
+        evidence.append(f"setup validation used Docker network {sandbox_network or 'unknown'}")
+    if sandbox_network == "bridge":
+        warnings.append("repair validation depends on Docker bridge networking")
+
+    if not blockers and not next_actions:
+        next_actions.append("run a bounded PatchSmith repair attempt and save normal run artifacts")
+    elif not blockers:
+        next_actions.append("run repair only after accepting the listed caveats")
+
+    status = "blocked" if blockers else "warning" if warnings else "ready"
+    return IssueCorpusPublicRepairReadinessResult(
+        task_id=task_id,
+        repository=repository,
+        issue_url=issue_url,
+        status=status,
+        repo_path=repo_path,
+        repo_exists=repo_exists,
+        repair_command=repair_command,
+        validation_command=validation_command,
+        focused_run_status=focused_status,
+        diagnosis_category=diagnosis_category,
+        setup_validation_status=setup_status,
+        setup_failure_category=setup_failure_category,
+        sandbox_mode=sandbox_mode,
+        sandbox_network=sandbox_network,
+        evidence=_dedupe_preserve_order(evidence),
+        blockers=_dedupe_preserve_order(blockers),
+        warnings=_dedupe_preserve_order(warnings),
+        next_actions=_dedupe_preserve_order(next_actions),
+    )
+
+
+def _first_manifest_repair_command(manifest: dict[str, Any] | None) -> str | None:
+    if manifest is None:
+        return None
+    commands = _string_list(manifest.get("suggested_commands"))
+    return commands[0] if commands else None
+
+
+def _load_json_record_list(path: Path, *, label: str) -> list[dict[str, Any]]:
+    if not path.exists():
+        raise FileNotFoundError(f"{label} does not exist: {path}")
+    if not path.is_file():
+        raise ValueError(f"{label} path is not a file: {path}")
+    parsed = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(parsed, list):
+        raise ValueError(f"{label} must contain a JSON list")
+    records = [record for record in parsed if isinstance(record, dict)]
+    if len(records) != len(parsed):
+        raise ValueError(f"{label} records must be JSON objects")
+    return records
+
+
+def _records_by_task_id(records: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    by_task: dict[str, dict[str, Any]] = {}
+    for record in records:
+        task_id = _optional_string(record.get("task_id"))
+        if task_id:
+            by_task[task_id] = record
+    return by_task
+
+
+def _load_public_issue_task_manifests(tasks_dir: Path | None) -> dict[str, dict[str, Any]]:
+    if tasks_dir is None or not tasks_dir.exists() or not tasks_dir.is_dir():
+        return {}
+    manifests: dict[str, dict[str, Any]] = {}
+    for manifest_path in sorted(tasks_dir.glob("*/task_manifest.json")):
+        try:
+            parsed = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(parsed, dict):
+            continue
+        task_id = _optional_string(parsed.get("task_id")) or manifest_path.parent.name
+        manifests[task_id] = parsed
+    return manifests
 
 
 def _docker_smoke_status_from_file(path: Path) -> str:
