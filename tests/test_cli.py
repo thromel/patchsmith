@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from patchsmith.cli import _build_parser_and_handlers, build_parser, main
+from patchsmith.portfolio.quality_gate import DEFAULT_QUALITY_GATE_TIMEOUT_SECONDS
 
 pytestmark = pytest.mark.unit
 
@@ -97,3 +98,12 @@ def test_unknown_command_is_rejected() -> None:
     parser = build_parser()
     with pytest.raises(SystemExit):
         parser.parse_args(["no-such-command"])
+
+
+def test_quality_gate_cli_defaults_use_production_timeout() -> None:
+    parser = build_parser()
+    quality_args = parser.parse_args(["quality-gate"])
+    refresh_args = parser.parse_args(["refresh-evidence"])
+
+    assert quality_args.timeout_seconds == DEFAULT_QUALITY_GATE_TIMEOUT_SECONDS
+    assert refresh_args.quality_timeout_seconds == DEFAULT_QUALITY_GATE_TIMEOUT_SECONDS

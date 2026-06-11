@@ -19,6 +19,7 @@ from patchsmith.cli.commands.portfolio_handlers import (
     _refresh_evidence_command,
     _release_hygiene_command,
 )
+from patchsmith.portfolio.quality_gate import DEFAULT_QUALITY_GATE_TIMEOUT_SECONDS
 
 
 def register(subparsers: argparse._SubParsersAction) -> dict[str, CommandHandler]:
@@ -300,7 +301,7 @@ def register(subparsers: argparse._SubParsersAction) -> dict[str, CommandHandler
     quality_gate.add_argument(
         "--timeout-seconds",
         type=int,
-        default=180,
+        default=DEFAULT_QUALITY_GATE_TIMEOUT_SECONDS,
         help="Per-command timeout in seconds.",
     )
     quality_gate.add_argument(
@@ -379,7 +380,7 @@ def register(subparsers: argparse._SubParsersAction) -> dict[str, CommandHandler
     refresh_evidence.add_argument(
         "--quality-timeout-seconds",
         type=int,
-        default=180,
+        default=DEFAULT_QUALITY_GATE_TIMEOUT_SECONDS,
         help="Per-command timeout for quality-gate steps when included.",
     )
     refresh_evidence.add_argument(

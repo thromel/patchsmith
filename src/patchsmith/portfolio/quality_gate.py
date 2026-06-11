@@ -13,13 +13,15 @@ from patchsmith.artifacts import safe_artifact_name, write_json, write_markdown
 from patchsmith.portfolio._helpers import _markdown_cell, _utc_now
 from patchsmith.portfolio.models import QualityGateCheck, QualityGateReport
 
+DEFAULT_QUALITY_GATE_TIMEOUT_SECONDS = 300
+
 
 def build_quality_gate_report(
     *,
     project_root: Path,
     artifacts_dir: Path,
     logs_dir: Path | None = None,
-    timeout_seconds: int = 180,
+    timeout_seconds: int = DEFAULT_QUALITY_GATE_TIMEOUT_SECONDS,
     include_tests: bool = True,
     include_build: bool = True,
 ) -> QualityGateReport:
@@ -99,7 +101,7 @@ def write_quality_gate_report(
     output_path: Path,
     json_output_path: Path | None = None,
     logs_dir: Path | None = None,
-    timeout_seconds: int = 180,
+    timeout_seconds: int = DEFAULT_QUALITY_GATE_TIMEOUT_SECONDS,
     include_tests: bool = True,
     include_build: bool = True,
 ) -> QualityGateReport:
