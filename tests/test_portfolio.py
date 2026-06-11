@@ -2086,7 +2086,7 @@ def test_evidence_refresh_can_refresh_docker_smoke(
             stderr="Cannot connect to the Docker daemon",
         )
 
-    monkeypatch.setattr("patchsmith.portfolio.subprocess.run", fake_run)
+    monkeypatch.setattr(subprocess, "run", fake_run)
 
     artifacts_dir = tmp_path / "artifacts"
     output_path = tmp_path / "evidence_refresh.md"
@@ -2300,7 +2300,7 @@ def test_docker_smoke_report_records_unavailable_daemon(
             stderr="Cannot connect to the Docker daemon",
         )
 
-    monkeypatch.setattr("patchsmith.portfolio.subprocess.run", fake_run)
+    monkeypatch.setattr(subprocess, "run", fake_run)
 
     report = write_docker_smoke_report(
         project_root=Path("."),
@@ -2364,7 +2364,7 @@ def test_docker_smoke_report_can_stop_after_preflight(
             return subprocess.CompletedProcess(command, 0, stdout="[]\n", stderr="")
         raise AssertionError(f"unexpected subprocess call: {command}")
 
-    monkeypatch.setattr("patchsmith.portfolio.subprocess.run", fake_run)
+    monkeypatch.setattr(subprocess, "run", fake_run)
 
     report = write_docker_smoke_report(
         project_root=Path("."),
