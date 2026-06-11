@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from patchsmith.artifacts import write_json
 from patchsmith.evaluation._helpers import (
     _duplicate_task_ids,
     _expected_string,
@@ -112,11 +113,8 @@ def write_seeded_dataset_validation_outputs(
     summary_json = output_dir / "validation_summary.json"
     report_path = output_dir / "validation_report.md"
 
-    results_json.write_text(
-        json.dumps([result.to_dict() for result in results], indent=2),
-        encoding="utf-8",
-    )
-    summary_json.write_text(json.dumps(summary.to_dict(), indent=2), encoding="utf-8")
+    write_json(results_json, [result.to_dict() for result in results])
+    write_json(summary_json, summary.to_dict())
 
     with results_csv.open("w", newline="", encoding="utf-8") as handle:
         fieldnames = list(results[0].to_dict()) if results else []

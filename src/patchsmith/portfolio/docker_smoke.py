@@ -8,6 +8,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from patchsmith.artifacts import write_json, write_markdown
 from patchsmith.portfolio._helpers import _markdown_cell, _utc_now
 from patchsmith.portfolio.models import DockerSmokeCheck, DockerSmokeReport
 
@@ -164,14 +165,10 @@ def write_docker_smoke_report(
         docker_binary=docker_binary,
         run_seeded=run_seeded,
     )
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(render_docker_smoke_report(report), encoding="utf-8")
+    write_markdown(output_path, render_docker_smoke_report(report))
     if json_output_path is not None:
         json_output_path.parent.mkdir(parents=True, exist_ok=True)
-        json_output_path.write_text(
-            json.dumps(report.to_dict(), indent=2) + "\n",
-            encoding="utf-8",
-        )
+        write_json(json_output_path, report.to_dict(), trailing_newline=True)
     return report
 
 

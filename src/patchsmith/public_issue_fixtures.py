@@ -4,6 +4,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from patchsmith.artifacts import write_markdown
+
 PUBLIC_ISSUE_FIXTURE_FILE_MAX_BYTES = 64_000
 SOURCE_HINT_SYMBOL_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_.]*$")
 
@@ -183,8 +185,7 @@ def write_public_issue_fixture_files(
             raise IsADirectoryError(
                 f"fixture file target is an existing directory: {fixture['path']}"
             )
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(fixture["content"], encoding="utf-8")
+        write_markdown(target, fixture["content"])
 
 
 def _optional_string(value: Any) -> str | None:

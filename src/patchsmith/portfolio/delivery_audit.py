@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import json
 from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from patchsmith.artifacts import write_json, write_markdown
 from patchsmith.observability import (
     ArtifactIndex,
     build_artifact_index,
@@ -62,14 +62,10 @@ def write_delivery_audit_report(
         project_root=project_root,
         artifacts_dir=artifacts_dir,
     )
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(render_delivery_audit_report(report), encoding="utf-8")
+    write_markdown(output_path, render_delivery_audit_report(report))
     if json_output_path is not None:
         json_output_path.parent.mkdir(parents=True, exist_ok=True)
-        json_output_path.write_text(
-            json.dumps(report.to_dict(), indent=2) + "\n",
-            encoding="utf-8",
-        )
+        write_json(json_output_path, report.to_dict(), trailing_newline=True)
     return report
 
 

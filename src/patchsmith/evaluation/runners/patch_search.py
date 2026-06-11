@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import csv
-import json
 import tempfile
 import time
 from pathlib import Path
 from typing import Any
 
+from patchsmith.artifacts import write_json
 from patchsmith.context import SupportsRetrieve
 from patchsmith.evaluation._helpers import _average
 from patchsmith.evaluation.seeded import load_seeded_tasks
@@ -257,14 +257,8 @@ def write_patch_search_eval_outputs(
     summary_json = output_dir / "patch_search_summary.json"
     report_path = output_dir / "patch_search_report.md"
 
-    results_json.write_text(
-        json.dumps([result.to_dict() for result in results], indent=2),
-        encoding="utf-8",
-    )
-    summary_json.write_text(
-        json.dumps([summary.to_dict() for summary in summaries], indent=2),
-        encoding="utf-8",
-    )
+    write_json(results_json, [result.to_dict() for result in results])
+    write_json(summary_json, [summary.to_dict() for summary in summaries])
 
     with results_csv.open("w", newline="", encoding="utf-8") as handle:
         fieldnames = (
@@ -381,7 +375,4 @@ def _write_patch_search_task_artifact(
     task_dir = output_dir / "task_artifacts" / variant
     task_dir.mkdir(parents=True, exist_ok=True)
     artifact_path = task_dir / f"{task_id}.json"
-    artifact_path.write_text(
-        json.dumps([candidate.to_dict() for candidate in candidate_results], indent=2),
-        encoding="utf-8",
-    )
+    write_json(artifact_path, [candidate.to_dict() for candidate in candidate_results])

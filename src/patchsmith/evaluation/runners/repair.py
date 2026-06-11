@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import csv
-import json
 import time
 from pathlib import Path
 
 from patchsmith.artifacts import sum_optional_float as _sum_optional_float
+from patchsmith.artifacts import write_json
 from patchsmith.evaluation._helpers import (
     _average,
     _model_usage_from_trace,
@@ -178,11 +178,8 @@ def write_repair_eval_outputs(
     summary_json = output_dir / "repair_summary.json"
     report_path = output_dir / "repair_report.md"
 
-    results_json.write_text(
-        json.dumps([result.to_dict() for result in results], indent=2),
-        encoding="utf-8",
-    )
-    summary_json.write_text(json.dumps(summary.to_dict(), indent=2), encoding="utf-8")
+    write_json(results_json, [result.to_dict() for result in results])
+    write_json(summary_json, summary.to_dict())
 
     with results_csv.open("w", newline="", encoding="utf-8") as handle:
         fieldnames = list(results[0].to_dict()) if results else []

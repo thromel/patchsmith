@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import csv
-import json
 from pathlib import Path
 
+from patchsmith.artifacts import write_json
 from patchsmith.evaluation.runners.repair import run_repair_evaluation
 from patchsmith.evaluation_models import (
     SCAFFOLD_VARIANTS,
@@ -84,10 +84,7 @@ def write_scaffold_comparison_outputs(
     results_csv = output_dir / "scaffold_results.csv"
     report_path = output_dir / "scaffold_report.md"
 
-    results_json.write_text(
-        json.dumps([result.to_dict() for result in results], indent=2),
-        encoding="utf-8",
-    )
+    write_json(results_json, [result.to_dict() for result in results])
 
     with results_csv.open("w", newline="", encoding="utf-8") as handle:
         fieldnames = list(results[0].to_dict()) if results else []

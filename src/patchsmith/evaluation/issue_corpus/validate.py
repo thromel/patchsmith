@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from patchsmith.artifacts import write_json
 from patchsmith.evaluation._helpers import _entry_string_list, _required_entry_string
 from patchsmith.evaluation_models import (
     IssueCorpusEntryValidationResult,
@@ -92,14 +93,12 @@ def write_issue_corpus_validation_outputs(
     summary: IssueCorpusValidationSummary,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "corpus_results.json").write_text(
-        json.dumps([result.to_dict() for result in results], indent=2) + "\n",
-        encoding="utf-8",
+    write_json(
+        output_dir / "corpus_results.json",
+        [result.to_dict() for result in results],
+        trailing_newline=True,
     )
-    (output_dir / "corpus_summary.json").write_text(
-        json.dumps(summary.to_dict(), indent=2) + "\n",
-        encoding="utf-8",
-    )
+    write_json(output_dir / "corpus_summary.json", summary.to_dict(), trailing_newline=True)
     with (output_dir / "corpus_results.csv").open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(
             handle,

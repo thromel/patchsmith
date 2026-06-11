@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import json
 import os
 from pathlib import Path
 from typing import Any
 
+from patchsmith.artifacts import write_json, write_markdown
 from patchsmith.model_config import DEFAULT_OPENAI_MODEL, openai_model_pricing
 from patchsmith.portfolio._helpers import (
     _discover_deepagents_adapter_modes,
@@ -74,14 +74,10 @@ def write_live_calibration_report(
         environment=environment,
         package_availability=package_availability,
     )
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(render_live_calibration_report(report), encoding="utf-8")
+    write_markdown(output_path, render_live_calibration_report(report))
     if json_output_path is not None:
         json_output_path.parent.mkdir(parents=True, exist_ok=True)
-        json_output_path.write_text(
-            json.dumps(report.to_dict(), indent=2) + "\n",
-            encoding="utf-8",
-        )
+        write_json(json_output_path, report.to_dict(), trailing_newline=True)
     return report
 
 
@@ -191,14 +187,10 @@ def write_live_calibration_plan_report(
         environment=environment,
         package_availability=package_availability,
     )
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(render_live_calibration_plan_report(report), encoding="utf-8")
+    write_markdown(output_path, render_live_calibration_plan_report(report))
     if json_output_path is not None:
         json_output_path.parent.mkdir(parents=True, exist_ok=True)
-        json_output_path.write_text(
-            json.dumps(report.to_dict(), indent=2) + "\n",
-            encoding="utf-8",
-        )
+        write_json(json_output_path, report.to_dict(), trailing_newline=True)
     return report
 
 

@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import json
 import time
 from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from patchsmith.artifacts import write_json, write_markdown
 from patchsmith.evaluation import (
     check_public_issue_repair_readiness,
     discover_public_issue_failure_signals,
@@ -662,14 +662,10 @@ def write_evidence_refresh_report(
         docker_smoke_image=docker_smoke_image,
         docker_binary=docker_binary,
     )
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(render_evidence_refresh_report(report), encoding="utf-8")
+    write_markdown(output_path, render_evidence_refresh_report(report))
     if json_output_path is not None:
         json_output_path.parent.mkdir(parents=True, exist_ok=True)
-        json_output_path.write_text(
-            json.dumps(report.to_dict(), indent=2) + "\n",
-            encoding="utf-8",
-        )
+        write_json(json_output_path, report.to_dict(), trailing_newline=True)
     return report
 
 

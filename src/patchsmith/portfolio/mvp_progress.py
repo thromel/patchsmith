@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from patchsmith.artifacts import write_json, write_markdown
 from patchsmith.observability import (
     ArtifactIndex,
     FailureArtifactReport,
@@ -100,14 +101,10 @@ def write_mvp_progress_report(
         artifacts_dir=artifacts_dir,
         max_failure_runs=max_failure_runs,
     )
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(render_mvp_progress_report(report), encoding="utf-8")
+    write_markdown(output_path, render_mvp_progress_report(report))
     if json_output_path is not None:
         json_output_path.parent.mkdir(parents=True, exist_ok=True)
-        json_output_path.write_text(
-            json.dumps(report.to_dict(), indent=2) + "\n",
-            encoding="utf-8",
-        )
+        write_json(json_output_path, report.to_dict(), trailing_newline=True)
     return report
 
 

@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import json
 import shlex
 import subprocess
 import time
 from collections import Counter
 from pathlib import Path
 
-from patchsmith.artifacts import safe_artifact_name
+from patchsmith.artifacts import safe_artifact_name, write_json, write_markdown
 from patchsmith.portfolio._helpers import _markdown_cell, _utc_now
 from patchsmith.portfolio.models import QualityGateCheck, QualityGateReport
 
@@ -111,14 +110,10 @@ def write_quality_gate_report(
         include_tests=include_tests,
         include_build=include_build,
     )
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(render_quality_gate_report(report), encoding="utf-8")
+    write_markdown(output_path, render_quality_gate_report(report))
     if json_output_path is not None:
         json_output_path.parent.mkdir(parents=True, exist_ok=True)
-        json_output_path.write_text(
-            json.dumps(report.to_dict(), indent=2) + "\n",
-            encoding="utf-8",
-        )
+        write_json(json_output_path, report.to_dict(), trailing_newline=True)
     return report
 
 

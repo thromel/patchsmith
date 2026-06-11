@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import json
 from datetime import UTC, datetime
 from pathlib import Path
 
+from patchsmith.artifacts import write_json, write_markdown
 from patchsmith.observability.discovery import (
     _discover_runs,
     _experiment_kind,
@@ -98,29 +98,24 @@ def write_artifact_index(
             output_dir=run_detail_output_dir,
             dashboard_path=html_output_path,
         )
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
+    write_markdown(
+        output_path,
         render_artifact_index(
             index,
             run_detail_output_dir=run_detail_output_dir,
         ),
-        encoding="utf-8",
     )
     if json_output_path is not None:
         json_output_path.parent.mkdir(parents=True, exist_ok=True)
-        json_output_path.write_text(
-            json.dumps(index.to_dict(), indent=2) + "\n",
-            encoding="utf-8",
-        )
+        write_json(json_output_path, index.to_dict(), trailing_newline=True)
     if html_output_path is not None:
-        html_output_path.parent.mkdir(parents=True, exist_ok=True)
-        html_output_path.write_text(
+        write_markdown(
+            html_output_path,
             render_artifact_dashboard(
                 index,
                 output_path=html_output_path,
                 run_detail_output_dir=run_detail_output_dir,
             ),
-            encoding="utf-8",
         )
     return index
 

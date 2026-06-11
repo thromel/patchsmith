@@ -8,7 +8,7 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-from patchsmith.artifacts import dict_or_empty
+from patchsmith.artifacts import dict_or_empty, write_json
 from patchsmith.artifacts import safe_artifact_name as _safe_artifact_name
 from patchsmith.evaluation._helpers import (
     _dedupe_preserve_order,
@@ -106,13 +106,13 @@ def write_materialized_issue_focused_test_plan_outputs(
     summary: IssueCorpusFocusedTestPlanSummary,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "focused_test_plan_results.json").write_text(
-        json.dumps([result.to_dict() for result in results], indent=2) + "\n",
-        encoding="utf-8",
+    write_json(
+        output_dir / "focused_test_plan_results.json",
+        [result.to_dict() for result in results],
+        trailing_newline=True,
     )
-    (output_dir / "focused_test_plan_summary.json").write_text(
-        json.dumps(summary.to_dict(), indent=2) + "\n",
-        encoding="utf-8",
+    write_json(
+        output_dir / "focused_test_plan_summary.json", summary.to_dict(), trailing_newline=True
     )
     with (output_dir / "focused_test_plan_results.csv").open(
         "w",
@@ -253,13 +253,13 @@ def write_materialized_issue_focused_test_run_outputs(
     summary: IssueCorpusFocusedTestRunSummary,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "focused_test_run_results.json").write_text(
-        json.dumps([result.to_dict() for result in results], indent=2) + "\n",
-        encoding="utf-8",
+    write_json(
+        output_dir / "focused_test_run_results.json",
+        [result.to_dict() for result in results],
+        trailing_newline=True,
     )
-    (output_dir / "focused_test_run_summary.json").write_text(
-        json.dumps(summary.to_dict(), indent=2) + "\n",
-        encoding="utf-8",
+    write_json(
+        output_dir / "focused_test_run_summary.json", summary.to_dict(), trailing_newline=True
     )
     with (output_dir / "focused_test_run_results.csv").open(
         "w",
@@ -382,13 +382,13 @@ def write_focused_test_diagnosis_outputs(
     summary: IssueCorpusFocusedTestDiagnosisSummary,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "focused_test_diagnosis_results.json").write_text(
-        json.dumps([result.to_dict() for result in results], indent=2) + "\n",
-        encoding="utf-8",
+    write_json(
+        output_dir / "focused_test_diagnosis_results.json",
+        [result.to_dict() for result in results],
+        trailing_newline=True,
     )
-    (output_dir / "focused_test_diagnosis_summary.json").write_text(
-        json.dumps(summary.to_dict(), indent=2) + "\n",
-        encoding="utf-8",
+    write_json(
+        output_dir / "focused_test_diagnosis_summary.json", summary.to_dict(), trailing_newline=True
     )
     with (output_dir / "focused_test_diagnosis_results.csv").open(
         "w",
@@ -508,13 +508,15 @@ def write_focused_test_setup_plan_outputs(
     summary: IssueCorpusFocusedTestSetupPlanSummary,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "focused_test_setup_plan_results.json").write_text(
-        json.dumps([result.to_dict() for result in results], indent=2) + "\n",
-        encoding="utf-8",
+    write_json(
+        output_dir / "focused_test_setup_plan_results.json",
+        [result.to_dict() for result in results],
+        trailing_newline=True,
     )
-    (output_dir / "focused_test_setup_plan_summary.json").write_text(
-        json.dumps(summary.to_dict(), indent=2) + "\n",
-        encoding="utf-8",
+    write_json(
+        output_dir / "focused_test_setup_plan_summary.json",
+        summary.to_dict(),
+        trailing_newline=True,
     )
     with (output_dir / "focused_test_setup_plan_results.csv").open(
         "w",
@@ -648,13 +650,15 @@ def write_focused_test_setup_readiness_outputs(
     summary: IssueCorpusFocusedTestSetupReadinessSummary,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "focused_test_setup_readiness_results.json").write_text(
-        json.dumps([result.to_dict() for result in results], indent=2) + "\n",
-        encoding="utf-8",
+    write_json(
+        output_dir / "focused_test_setup_readiness_results.json",
+        [result.to_dict() for result in results],
+        trailing_newline=True,
     )
-    (output_dir / "focused_test_setup_readiness_summary.json").write_text(
-        json.dumps(summary.to_dict(), indent=2) + "\n",
-        encoding="utf-8",
+    write_json(
+        output_dir / "focused_test_setup_readiness_summary.json",
+        summary.to_dict(),
+        trailing_newline=True,
     )
     with (output_dir / "focused_test_setup_readiness_results.csv").open(
         "w",
@@ -844,13 +848,15 @@ def write_focused_test_setup_execution_outputs(
     summary: IssueCorpusFocusedTestSetupExecutionSummary,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "focused_test_setup_execution_results.json").write_text(
-        json.dumps([result.to_dict() for result in results], indent=2) + "\n",
-        encoding="utf-8",
+    write_json(
+        output_dir / "focused_test_setup_execution_results.json",
+        [result.to_dict() for result in results],
+        trailing_newline=True,
     )
-    (output_dir / "focused_test_setup_execution_summary.json").write_text(
-        json.dumps(summary.to_dict(), indent=2) + "\n",
-        encoding="utf-8",
+    write_json(
+        output_dir / "focused_test_setup_execution_summary.json",
+        summary.to_dict(),
+        trailing_newline=True,
     )
     with (output_dir / "focused_test_setup_execution_results.csv").open(
         "w",
@@ -1042,13 +1048,15 @@ def write_focused_test_setup_validation_outputs(
     summary: IssueCorpusFocusedTestSetupValidationSummary,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "focused_test_setup_validation_results.json").write_text(
-        json.dumps([result.to_dict() for result in results], indent=2) + "\n",
-        encoding="utf-8",
+    write_json(
+        output_dir / "focused_test_setup_validation_results.json",
+        [result.to_dict() for result in results],
+        trailing_newline=True,
     )
-    (output_dir / "focused_test_setup_validation_summary.json").write_text(
-        json.dumps(summary.to_dict(), indent=2) + "\n",
-        encoding="utf-8",
+    write_json(
+        output_dir / "focused_test_setup_validation_summary.json",
+        summary.to_dict(),
+        trailing_newline=True,
     )
     with (output_dir / "focused_test_setup_validation_results.csv").open(
         "w",

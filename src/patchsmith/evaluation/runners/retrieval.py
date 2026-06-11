@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import csv
-import json
 import subprocess
 import tempfile
 import time
 from pathlib import Path
 
+from patchsmith.artifacts import write_json
 from patchsmith.context import (
     ContextBrokerError,
     ContextBrokerRequest,
@@ -261,14 +261,8 @@ def write_retrieval_eval_outputs(
     summary_json = output_dir / "summary.json"
     report_path = output_dir / "report.md"
 
-    results_json.write_text(
-        json.dumps([result.to_dict() for result in results], indent=2),
-        encoding="utf-8",
-    )
-    summary_json.write_text(
-        json.dumps([summary.to_dict() for summary in summaries], indent=2),
-        encoding="utf-8",
-    )
+    write_json(results_json, [result.to_dict() for result in results])
+    write_json(summary_json, [summary.to_dict() for summary in summaries])
 
     with results_csv.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=list(results[0].to_dict()) if results else [])

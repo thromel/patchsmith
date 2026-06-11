@@ -9,6 +9,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from patchsmith.artifacts import write_json
 from patchsmith.evaluation_models import (
     IssueCorpusRepoPreflightResult,
     IssueCorpusRepoPreflightSummary,
@@ -77,14 +78,12 @@ def write_issue_corpus_repo_preflight_outputs(
     summary: IssueCorpusRepoPreflightSummary,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "repo_preflight_results.json").write_text(
-        json.dumps([result.to_dict() for result in results], indent=2) + "\n",
-        encoding="utf-8",
+    write_json(
+        output_dir / "repo_preflight_results.json",
+        [result.to_dict() for result in results],
+        trailing_newline=True,
     )
-    (output_dir / "repo_preflight_summary.json").write_text(
-        json.dumps(summary.to_dict(), indent=2) + "\n",
-        encoding="utf-8",
-    )
+    write_json(output_dir / "repo_preflight_summary.json", summary.to_dict(), trailing_newline=True)
     with (output_dir / "repo_preflight_results.csv").open(
         "w",
         encoding="utf-8",

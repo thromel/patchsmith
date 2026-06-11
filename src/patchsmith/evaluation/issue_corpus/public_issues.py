@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from patchsmith.artifacts import dict_or_empty
+from patchsmith.artifacts import dict_or_empty, write_json
 from patchsmith.artifacts import safe_artifact_name as _safe_artifact_name
 from patchsmith.evaluation._helpers import (
     _dedupe_preserve_order,
@@ -146,21 +146,20 @@ def write_public_issue_reproduction_plan_outputs(
     summary: IssueCorpusPublicReproductionPlanSummary,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "public_issue_reproduction_plan_results.json").write_text(
-        json.dumps([result.to_dict() for result in results], indent=2) + "\n",
-        encoding="utf-8",
+    write_json(
+        output_dir / "public_issue_reproduction_plan_results.json",
+        [result.to_dict() for result in results],
+        trailing_newline=True,
     )
-    (output_dir / "public_issue_reproduction_plan_summary.json").write_text(
-        json.dumps(summary.to_dict(), indent=2) + "\n",
-        encoding="utf-8",
+    write_json(
+        output_dir / "public_issue_reproduction_plan_summary.json",
+        summary.to_dict(),
+        trailing_newline=True,
     )
-    (output_dir / "public_issue_reproduction_specs_template.json").write_text(
-        json.dumps(
-            _public_issue_reproduction_specs_template(results),
-            indent=2,
-        )
-        + "\n",
-        encoding="utf-8",
+    write_json(
+        output_dir / "public_issue_reproduction_specs_template.json",
+        _public_issue_reproduction_specs_template(results),
+        trailing_newline=True,
     )
     with (output_dir / "public_issue_reproduction_plan_results.csv").open(
         "w",
@@ -353,13 +352,15 @@ def write_public_issue_reproduction_spec_validation_outputs(
     summary: IssueCorpusPublicReproductionSpecValidationSummary,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "public_issue_reproduction_spec_validation_results.json").write_text(
-        json.dumps([result.to_dict() for result in results], indent=2) + "\n",
-        encoding="utf-8",
+    write_json(
+        output_dir / "public_issue_reproduction_spec_validation_results.json",
+        [result.to_dict() for result in results],
+        trailing_newline=True,
     )
-    (output_dir / "public_issue_reproduction_spec_validation_summary.json").write_text(
-        json.dumps(summary.to_dict(), indent=2) + "\n",
-        encoding="utf-8",
+    write_json(
+        output_dir / "public_issue_reproduction_spec_validation_summary.json",
+        summary.to_dict(),
+        trailing_newline=True,
     )
     with (output_dir / "public_issue_reproduction_spec_validation_results.csv").open(
         "w",
@@ -528,13 +529,15 @@ def write_public_issue_failure_signal_discovery_outputs(
     summary: IssueCorpusPublicFailureSignalDiscoverySummary,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "public_issue_failure_signal_discovery_results.json").write_text(
-        json.dumps([result.to_dict() for result in results], indent=2) + "\n",
-        encoding="utf-8",
+    write_json(
+        output_dir / "public_issue_failure_signal_discovery_results.json",
+        [result.to_dict() for result in results],
+        trailing_newline=True,
     )
-    (output_dir / "public_issue_failure_signal_discovery_summary.json").write_text(
-        json.dumps(summary.to_dict(), indent=2) + "\n",
-        encoding="utf-8",
+    write_json(
+        output_dir / "public_issue_failure_signal_discovery_summary.json",
+        summary.to_dict(),
+        trailing_newline=True,
     )
     with (output_dir / "public_issue_failure_signal_discovery_results.csv").open(
         "w",
@@ -745,13 +748,15 @@ def write_public_issue_reproduction_execution_outputs(
     summary: IssueCorpusPublicReproductionExecutionSummary,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "public_issue_reproduction_execution_results.json").write_text(
-        json.dumps([result.to_dict() for result in results], indent=2) + "\n",
-        encoding="utf-8",
+    write_json(
+        output_dir / "public_issue_reproduction_execution_results.json",
+        [result.to_dict() for result in results],
+        trailing_newline=True,
     )
-    (output_dir / "public_issue_reproduction_execution_summary.json").write_text(
-        json.dumps(summary.to_dict(), indent=2) + "\n",
-        encoding="utf-8",
+    write_json(
+        output_dir / "public_issue_reproduction_execution_summary.json",
+        summary.to_dict(),
+        trailing_newline=True,
     )
     with (output_dir / "public_issue_reproduction_execution_results.csv").open(
         "w",
@@ -949,13 +954,15 @@ def write_public_issue_repair_readiness_outputs(
     summary: IssueCorpusPublicRepairReadinessSummary,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "public_issue_repair_readiness_results.json").write_text(
-        json.dumps([result.to_dict() for result in results], indent=2) + "\n",
-        encoding="utf-8",
+    write_json(
+        output_dir / "public_issue_repair_readiness_results.json",
+        [result.to_dict() for result in results],
+        trailing_newline=True,
     )
-    (output_dir / "public_issue_repair_readiness_summary.json").write_text(
-        json.dumps(summary.to_dict(), indent=2) + "\n",
-        encoding="utf-8",
+    write_json(
+        output_dir / "public_issue_repair_readiness_summary.json",
+        summary.to_dict(),
+        trailing_newline=True,
     )
     with (output_dir / "public_issue_repair_readiness_results.csv").open(
         "w",
@@ -1150,13 +1157,15 @@ def write_public_issue_repair_attempt_outputs(
     summary: IssueCorpusPublicRepairAttemptSummary,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "public_issue_repair_attempt_results.json").write_text(
-        json.dumps([result.to_dict() for result in results], indent=2) + "\n",
-        encoding="utf-8",
+    write_json(
+        output_dir / "public_issue_repair_attempt_results.json",
+        [result.to_dict() for result in results],
+        trailing_newline=True,
     )
-    (output_dir / "public_issue_repair_attempt_summary.json").write_text(
-        json.dumps(summary.to_dict(), indent=2) + "\n",
-        encoding="utf-8",
+    write_json(
+        output_dir / "public_issue_repair_attempt_summary.json",
+        summary.to_dict(),
+        trailing_newline=True,
     )
     with (output_dir / "public_issue_repair_attempt_results.csv").open(
         "w",
