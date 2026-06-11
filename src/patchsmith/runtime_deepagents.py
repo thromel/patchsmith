@@ -65,9 +65,7 @@ class DeepAgentsRuntime:
             "node": "plan",
             "status": "completed" if plan else "no_match",
             "summary": (
-                plan.summary
-                if plan
-                else "DeepAgents adapter produced no bounded repair plan."
+                plan.summary if plan else "DeepAgents adapter produced no bounded repair plan."
             ),
         }
         metadata = _plan_or_planner_metadata(plan, self.planner)

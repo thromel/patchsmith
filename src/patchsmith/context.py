@@ -4,9 +4,9 @@ import json
 import shutil
 import subprocess
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Literal, Protocol, Any
+from typing import Any, Literal, Protocol
 
 from patchsmith.models import RepositoryIndex, RetrievedContext
 from patchsmith.retrieval import KeywordRetriever
@@ -82,9 +82,23 @@ class ContextBroker(Protocol):
         """Return normalized context evidence for an issue."""
 
 
+class SupportsRetrieve(Protocol):
+    def retrieve(
+        self,
+        *,
+        repo_path: Path,
+        repo_index: RepositoryIndex,
+        issue_text: str,
+        top_k: int = 5,
+    ) -> list[RetrievedContext]:
+        """Return ranked retrieved contexts for an issue."""
+
+
 class PatchSmithNativeBroker:
-    def __init__(self, retriever: object | None = None, *, provider_name: str = "patchsmith_native") -> None:
-        self.retriever = retriever or KeywordRetriever()
+    def __init__(
+        self, retriever: SupportsRetrieve | None = None, *, provider_name: str = "patchsmith_native"
+    ) -> None:
+        self.retriever: SupportsRetrieve = retriever or KeywordRetriever()
         self.provider_name = provider_name
 
     def prepare(
@@ -206,7 +220,9 @@ class CtxhelmCliBroker:
             detail = stderr or stdout or f"exit code {error.returncode}"
             raise ContextBrokerError(f"ctxhelm command failed: {detail}") from error
         except subprocess.TimeoutExpired as error:
-            raise ContextBrokerError(f"ctxhelm command timed out: {' '.join(command[:3])}") from error
+            raise ContextBrokerError(
+                f"ctxhelm command timed out: {' '.join(command[:3])}"
+            ) from error
         return completed
 
 

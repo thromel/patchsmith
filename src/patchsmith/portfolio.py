@@ -2,16 +2,16 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import shlex
-import subprocess
+import shutil
 import struct
+import subprocess
 import time
 import tomllib
 import zlib
 from collections import Counter
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from html import escape
 from importlib.util import find_spec
 from pathlib import Path
@@ -20,8 +20,8 @@ from typing import Any
 from patchsmith.evaluation import (
     check_public_issue_repair_readiness,
     discover_public_issue_failure_signals,
-    execute_public_issue_reproductions,
     execute_public_issue_repairs,
+    execute_public_issue_reproductions,
     plan_public_issue_reproductions,
     validate_public_issue_reproduction_specs,
 )
@@ -114,9 +114,7 @@ class LiveCalibrationReport:
             "deepagents_package_run_count": self.deepagents_package_run_count,
             "deepagents_compatibility_run_count": self.deepagents_compatibility_run_count,
             "openai_agents_package_run_count": self.openai_agents_package_run_count,
-            "openai_agents_compatibility_run_count": (
-                self.openai_agents_compatibility_run_count
-            ),
+            "openai_agents_compatibility_run_count": (self.openai_agents_compatibility_run_count),
             "model_providers": self.model_providers,
             "checks": [check.to_dict() for check in self.checks],
             "smoke_commands": self.smoke_commands,
@@ -373,9 +371,7 @@ class FinalEvaluationReport:
             "deepagents_package_run_count": self.deepagents_package_run_count,
             "deepagents_compatibility_run_count": self.deepagents_compatibility_run_count,
             "openai_agents_package_run_count": self.openai_agents_package_run_count,
-            "openai_agents_compatibility_run_count": (
-                self.openai_agents_compatibility_run_count
-            ),
+            "openai_agents_compatibility_run_count": (self.openai_agents_compatibility_run_count),
             "metrics": [metric.to_dict() for metric in self.metrics],
             "decisions": self.decisions,
             "limitations": self.limitations,
@@ -690,9 +686,7 @@ class ProjectStatusReport:
             "undated_source_count": self.undated_source_count,
             "missing_sources": self.missing_sources,
             "surfaces": [surface.to_dict() for surface in self.surfaces],
-            "evidence_freshness": [
-                freshness.to_dict() for freshness in self.evidence_freshness
-            ],
+            "evidence_freshness": [freshness.to_dict() for freshness in self.evidence_freshness],
         }
 
 
@@ -973,7 +967,7 @@ def build_project_status_report(
 ) -> ProjectStatusReport:
     project_root = project_root.resolve()
     artifacts_dir = artifacts_dir.resolve()
-    generated_at_dt = datetime.now(timezone.utc).replace(microsecond=0)
+    generated_at_dt = datetime.now(UTC).replace(microsecond=0)
     generated_at = _format_utc(generated_at_dt)
     sources = {
         "mvp": "experiments/mvp_progress.json",
@@ -985,47 +979,37 @@ def build_project_status_report(
         "release": "experiments/release_hygiene.json",
         "calibration": "experiments/calibration_readiness.json",
         "public_reproduction": (
-            "experiments/public_issue_corpus_v1/"
-            "public_issue_reproduction_plan_summary.json"
+            "experiments/public_issue_corpus_v1/public_issue_reproduction_plan_summary.json"
         ),
         "public_reproduction_spec_validation": (
             "experiments/public_issue_corpus_v1/"
             "public_issue_reproduction_spec_validation_summary.json"
         ),
         "public_failure_signal_discovery": (
-            "experiments/public_issue_corpus_v1/"
-            "public_issue_failure_signal_discovery_summary.json"
+            "experiments/public_issue_corpus_v1/public_issue_failure_signal_discovery_summary.json"
         ),
         "public_reproduction_execution": (
-            "experiments/public_issue_corpus_v1/"
-            "public_issue_reproduction_execution_summary.json"
+            "experiments/public_issue_corpus_v1/public_issue_reproduction_execution_summary.json"
         ),
         "public_repair": (
-            "experiments/public_issue_corpus_v1/"
-            "public_issue_repair_readiness_summary.json"
+            "experiments/public_issue_corpus_v1/public_issue_repair_readiness_summary.json"
         ),
         "public_repair_attempt": (
-            "experiments/public_issue_corpus_v1/"
-            "public_issue_repair_attempt_summary.json"
+            "experiments/public_issue_corpus_v1/public_issue_repair_attempt_summary.json"
         ),
         "final": "experiments/final_evaluation.json",
         "index": "experiments/index.json",
     }
     payloads = {
-        name: _load_json_artifact(artifacts_dir / source)
-        for name, source in sources.items()
+        name: _load_json_artifact(artifacts_dir / source) for name, source in sources.items()
     }
-    missing_sources = [
-        source for name, source in sources.items() if payloads[name] is None
-    ]
+    missing_sources = [source for name, source in sources.items() if payloads[name] is None]
     evidence_freshness = _project_evidence_freshness(
         sources=sources,
         payloads=payloads,
         as_of=generated_at_dt,
     )
-    stale_source_count = sum(
-        1 for freshness in evidence_freshness if freshness.status == "stale"
-    )
+    stale_source_count = sum(1 for freshness in evidence_freshness if freshness.status == "stale")
     undated_source_count = sum(
         1 for freshness in evidence_freshness if freshness.status == "undated"
     )
@@ -1048,9 +1032,7 @@ def build_project_status_report(
     launch_status = _payload_string(launch, "launch_status", "missing")
     release_status = _payload_string(release, "release_status", "missing")
     docker_status = _payload_string(docker, "smoke_status", "missing")
-    environment_status = _payload_string(
-        environment, "readiness_status", "missing"
-    )
+    environment_status = _payload_string(environment, "readiness_status", "missing")
     calibration_status = _payload_string(calibration, "calibration_status", "missing")
     blocker_count = _payload_int(launch, "blocked_count")
     warning_count = _payload_int(launch, "warning_count")
@@ -1058,9 +1040,7 @@ def build_project_status_report(
         index, "experiment_count"
     )
     run_count = _payload_int(final, "run_count") or _payload_int(index, "run_count")
-    metric_count = _payload_int(final, "metric_count") or _payload_int(
-        index, "metric_count"
-    )
+    metric_count = _payload_int(final, "metric_count") or _payload_int(index, "metric_count")
     model_providers = calibration.get("model_providers")
     model_provider_counts = model_providers if isinstance(model_providers, dict) else {}
     surfaces = [
@@ -1159,8 +1139,7 @@ def build_project_status_report(
             name="Saved Evidence Index",
             status="available" if experiment_count or run_count else "missing",
             evidence=(
-                f"{experiment_count} experiments, {run_count} runs, "
-                f"{metric_count} metric rows."
+                f"{experiment_count} experiments, {run_count} runs, {metric_count} metric rows."
             ),
             source=sources["final"] if final else sources["index"],
         ),
@@ -1190,9 +1169,7 @@ def build_project_status_report(
         environment_readiness_status=environment_status,
         live_calibration_status=calibration_status,
         saved_live_provider_count=_payload_int(calibration, "saved_live_provider_count"),
-        deepagents_package_run_count=_payload_int(
-            calibration, "deepagents_package_run_count"
-        ),
+        deepagents_package_run_count=_payload_int(calibration, "deepagents_package_run_count"),
         deepagents_compatibility_run_count=_payload_int(
             calibration, "deepagents_compatibility_run_count"
         ),
@@ -1207,9 +1184,7 @@ def build_project_status_report(
         metric_count=metric_count,
         blocker_count=blocker_count,
         warning_count=warning_count,
-        evidence_freshness_status=_project_evidence_freshness_status(
-            evidence_freshness
-        ),
+        evidence_freshness_status=_project_evidence_freshness_status(evidence_freshness),
         stale_source_count=stale_source_count,
         undated_source_count=undated_source_count,
         missing_sources=missing_sources,
@@ -1533,9 +1508,7 @@ def build_evidence_refresh_report(
                 action=lambda: plan_public_issue_reproductions(
                     tasks_dir=public_tasks_dir,
                     focused_plan_path=(
-                        public_focused_plan_path
-                        if public_focused_plan_path.exists()
-                        else None
+                        public_focused_plan_path if public_focused_plan_path.exists() else None
                     ),
                     reproduction_specs_path=(
                         public_reviewed_reproduction_specs_path
@@ -1577,9 +1550,7 @@ def build_evidence_refresh_report(
                         specs_path=public_reproduction_specs_path,
                         tasks_dir=public_tasks_dir,
                         focused_plan_path=(
-                            public_focused_plan_path
-                            if public_focused_plan_path.exists()
-                            else None
+                            public_focused_plan_path if public_focused_plan_path.exists() else None
                         ),
                         output_dir=experiment_path("public_issue_corpus_v1"),
                     )[1],
@@ -1607,9 +1578,7 @@ def build_evidence_refresh_report(
         public_reproduction_execution_summary_path = experiment_path(
             "public_issue_corpus_v1/public_issue_reproduction_execution_summary.json"
         )
-        if _has_executed_public_reproduction_evidence(
-            public_reproduction_execution_summary_path
-        ):
+        if _has_executed_public_reproduction_evidence(public_reproduction_execution_summary_path):
             steps.append(
                 EvidenceRefreshStep(
                     name="Public issue reproduction execution",
@@ -1617,10 +1586,7 @@ def build_evidence_refresh_report(
                     duration_ms=0,
                     artifact_paths=output_paths(
                         "public_issue_corpus_v1/public_issue_reproduction_execution_report.md",
-                        (
-                            "public_issue_corpus_v1/"
-                            "public_issue_reproduction_execution_summary.json"
-                        ),
+                        ("public_issue_corpus_v1/public_issue_reproduction_execution_summary.json"),
                     ),
                     summary=(
                         "Preserved existing executed reproduction evidence; rerun "
@@ -1634,10 +1600,7 @@ def build_evidence_refresh_report(
                     name="Public issue reproduction execution",
                     artifact_paths=output_paths(
                         "public_issue_corpus_v1/public_issue_reproduction_execution_report.md",
-                        (
-                            "public_issue_corpus_v1/"
-                            "public_issue_reproduction_execution_summary.json"
-                        ),
+                        ("public_issue_corpus_v1/public_issue_reproduction_execution_summary.json"),
                     ),
                     action=lambda: execute_public_issue_reproductions(
                         plan_path=public_reproduction_plan_path,
@@ -1688,10 +1651,7 @@ def build_evidence_refresh_report(
                 status="skipped",
                 duration_ms=0,
                 artifact_paths=output_paths(
-                    (
-                        "public_issue_corpus_v1/"
-                        "public_issue_reproduction_spec_validation_report.md"
-                    ),
+                    ("public_issue_corpus_v1/public_issue_reproduction_spec_validation_report.md"),
                     (
                         "public_issue_corpus_v1/"
                         "public_issue_reproduction_spec_validation_summary.json"
@@ -1731,40 +1691,36 @@ def build_evidence_refresh_report(
             )
         )
         steps.append(
-            (
-                EvidenceRefreshStep(
-                    name="Public issue repair attempts",
-                    status="passed",
-                    duration_ms=0,
-                    artifact_paths=output_paths(
-                        "public_issue_corpus_v1/public_issue_repair_attempt_report.md",
-                        "public_issue_corpus_v1/public_issue_repair_attempt_summary.json",
+            EvidenceRefreshStep(
+                name="Public issue repair attempts",
+                status="passed",
+                duration_ms=0,
+                artifact_paths=output_paths(
+                    "public_issue_corpus_v1/public_issue_repair_attempt_report.md",
+                    "public_issue_corpus_v1/public_issue_repair_attempt_summary.json",
+                ),
+                summary=(
+                    "Preserved existing executed repair-attempt evidence; rerun "
+                    "`execute-public-issue-repairs --execute` explicitly to refresh it."
+                ),
+            )
+            if _has_executed_public_repair_attempt_evidence(
+                experiment_path("public_issue_corpus_v1/public_issue_repair_attempt_summary.json")
+            )
+            else _run_evidence_refresh_step(
+                name="Public issue repair attempts",
+                artifact_paths=output_paths(
+                    "public_issue_corpus_v1/public_issue_repair_attempt_report.md",
+                    "public_issue_corpus_v1/public_issue_repair_attempt_summary.json",
+                ),
+                action=lambda: execute_public_issue_repairs(
+                    readiness_path=experiment_path(
+                        "public_issue_corpus_v1/public_issue_repair_readiness_results.json"
                     ),
-                    summary=(
-                        "Preserved existing executed repair-attempt evidence; rerun "
-                        "`execute-public-issue-repairs --execute` explicitly to refresh it."
-                    ),
-                )
-                if _has_executed_public_repair_attempt_evidence(
-                    experiment_path(
-                        "public_issue_corpus_v1/public_issue_repair_attempt_summary.json"
-                    )
-                )
-                else _run_evidence_refresh_step(
-                    name="Public issue repair attempts",
-                    artifact_paths=output_paths(
-                        "public_issue_corpus_v1/public_issue_repair_attempt_report.md",
-                        "public_issue_corpus_v1/public_issue_repair_attempt_summary.json",
-                    ),
-                    action=lambda: execute_public_issue_repairs(
-                        readiness_path=experiment_path(
-                            "public_issue_corpus_v1/public_issue_repair_readiness_results.json"
-                        ),
-                        tasks_dir=experiment_path("public_issue_corpus_v1/materialized_tasks"),
-                        output_dir=experiment_path("public_issue_corpus_v1"),
-                        allow_warnings=True,
-                    )[1],
-                )
+                    tasks_dir=experiment_path("public_issue_corpus_v1/materialized_tasks"),
+                    output_dir=experiment_path("public_issue_corpus_v1"),
+                    allow_warnings=True,
+                )[1],
             )
         )
     else:
@@ -2046,9 +2002,7 @@ def build_live_calibration_report(
         deepagents_package_run_count=deepagents_modes.get("package_available", 0),
         deepagents_compatibility_run_count=deepagents_modes.get("compatibility_mode", 0),
         openai_agents_package_run_count=openai_agents_modes.get("package_available", 0),
-        openai_agents_compatibility_run_count=openai_agents_modes.get(
-            "compatibility_mode", 0
-        ),
+        openai_agents_compatibility_run_count=openai_agents_modes.get("compatibility_mode", 0),
         model_providers=model_providers,
         checks=checks,
         smoke_commands=_live_calibration_commands(),
@@ -2351,14 +2305,8 @@ def build_docker_smoke_report(
                 )
             )
 
-    build_command = (
-        f"{docker_binary} build -f docker/seeded-smoke.Dockerfile "
-        f"-t {image} ."
-    )
-    smoke_command = (
-        "PYTHONPATH=src python3 -m patchsmith.cli docker-smoke "
-        f"--image {image} --json"
-    )
+    build_command = f"{docker_binary} build -f docker/seeded-smoke.Dockerfile -t {image} ."
+    smoke_command = f"PYTHONPATH=src python3 -m patchsmith.cli docker-smoke --image {image} --json"
     environment_snapshot = _docker_environment_snapshot(docker_binary)
     return DockerSmokeReport(
         project_root=str(project_root),
@@ -2514,9 +2462,7 @@ def build_environment_readiness_report(
         environment=environment,
         package_availability=package_availability,
     )
-    docker_payload = _load_json_artifact(
-        artifacts_dir / "experiments" / "docker_smoke.json"
-    )
+    docker_payload = _load_json_artifact(artifacts_dir / "experiments" / "docker_smoke.json")
     checks = _environment_readiness_checks(
         docker_payload=docker_payload,
         calibration=calibration,
@@ -2634,16 +2580,12 @@ def build_final_evaluation_report(
         deepagents_package_run_count=deepagents_modes.get("package_available", 0),
         deepagents_compatibility_run_count=deepagents_modes.get("compatibility_mode", 0),
         openai_agents_package_run_count=openai_agents_modes.get("package_available", 0),
-        openai_agents_compatibility_run_count=openai_agents_modes.get(
-            "compatibility_mode", 0
-        ),
+        openai_agents_compatibility_run_count=openai_agents_modes.get("compatibility_mode", 0),
         metrics=metrics,
         decisions=_final_evaluation_decisions(
             readiness, metrics, deepagents_modes, openai_agents_modes
         ),
-        limitations=_final_evaluation_limitations(
-            readiness, deepagents_modes, openai_agents_modes
-        ),
+        limitations=_final_evaluation_limitations(readiness, deepagents_modes, openai_agents_modes),
         review_artifacts=_final_review_artifacts(),
     )
 
@@ -3214,34 +3156,34 @@ def write_demo_media_assets(
 
 
 def render_demo_media_report(report: DemoMediaReport) -> str:
-    return "\n".join(
-        [
-            "# PatchSmith Demo Media",
-            "",
-            f"- Generated at: `{report.generated_at}`",
-            f"- Readiness status: `{report.readiness_status}`",
-            f"- SVG asset: `{report.svg_path}`",
-            f"- PNG asset: `{report.png_path}`",
-            f"- Dimensions: `{report.width}x{report.height}`",
-            f"- Caveat: {report.caveat}",
-            "",
-            "## Highlights",
-            "",
-            *[f"- {highlight}" for highlight in report.highlights],
-            "",
-            "## Usage",
-            "",
-            "Use the SVG for readable README or portfolio embedding. Use the PNG as a compact social or presentation preview.",
-        ]
-    ) + "\n"
+    return (
+        "\n".join(
+            [
+                "# PatchSmith Demo Media",
+                "",
+                f"- Generated at: `{report.generated_at}`",
+                f"- Readiness status: `{report.readiness_status}`",
+                f"- SVG asset: `{report.svg_path}`",
+                f"- PNG asset: `{report.png_path}`",
+                f"- Dimensions: `{report.width}x{report.height}`",
+                f"- Caveat: {report.caveat}",
+                "",
+                "## Highlights",
+                "",
+                *[f"- {highlight}" for highlight in report.highlights],
+                "",
+                "## Usage",
+                "",
+                "Use the SVG for readable README or portfolio embedding. Use the PNG as a compact social or presentation preview.",
+            ]
+        )
+        + "\n"
+    )
 
 
 def render_demo_media_svg(report: DemoMediaReport) -> str:
     highlight_items = "\n".join(
-        (
-            f'<text x="92" y="{258 + index * 54}" class="metric">'
-            f"{escape(highlight)}</text>"
-        )
+        (f'<text x="92" y="{258 + index * 54}" class="metric">{escape(highlight)}</text>')
         for index, highlight in enumerate(report.highlights)
     )
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{report.width}" height="{report.height}" viewBox="0 0 {report.width} {report.height}" role="img" aria-labelledby="title desc">
@@ -3508,9 +3450,7 @@ def _demo_readiness_gates(
             )
         )
     live_providers = [
-        provider
-        for provider in model_providers
-        if provider and not provider.startswith("offline_")
+        provider for provider in model_providers if provider and not provider.startswith("offline_")
     ]
     if live_providers:
         gates.append(
@@ -3559,13 +3499,9 @@ def _kind_gate(
     missing_action: str,
     alternate_kind: str | None = None,
 ) -> DemoReadinessGate:
-    passed = kind in metric_kinds or (
-        alternate_kind is not None and alternate_kind in metric_kinds
-    )
+    passed = kind in metric_kinds or (alternate_kind is not None and alternate_kind in metric_kinds)
     evidence_kind = (
-        kind
-        if kind in metric_kinds
-        else alternate_kind if alternate_kind in metric_kinds else kind
+        kind if kind in metric_kinds else alternate_kind if alternate_kind in metric_kinds else kind
     )
     return _gate(
         name=name,
@@ -3683,7 +3619,9 @@ def _delivery_audit_items(
         ),
         _delivery_item(
             requirement="Saved evaluation artifacts exist.",
-            status="passed" if index.experiment_count and index.run_count and index.metrics else "missing",
+            status="passed"
+            if index.experiment_count and index.run_count and index.metrics
+            else "missing",
             evidence=(
                 f"{index.experiment_count} experiments, {index.run_count} runs, "
                 f"{len(index.metrics)} normalized metric rows."
@@ -3755,12 +3693,8 @@ def _delivery_audit_items(
         ),
         _delivery_setup_validation_item(setup_validation_payload),
         _delivery_public_reproduction_plan_item(reproduction_plan_payload),
-        _delivery_public_failure_signal_discovery_item(
-            failure_signal_discovery_payload
-        ),
-        _delivery_public_reproduction_spec_validation_item(
-            reproduction_spec_validation_payload
-        ),
+        _delivery_public_failure_signal_discovery_item(failure_signal_discovery_payload),
+        _delivery_public_reproduction_spec_validation_item(reproduction_spec_validation_payload),
         _delivery_public_reproduction_execution_item(reproduction_execution_payload),
         _delivery_public_repair_readiness_item(public_repair_readiness_payload),
         _delivery_public_repair_attempt_item(public_repair_attempt_payload),
@@ -3771,7 +3705,11 @@ def _delivery_audit_items(
             pass_values={"calibrated"},
             warning_values={"ready_to_run", "needs_review"},
             blocked_values={"not_configured"},
-            evidence_keys=["saved_live_provider_count", "deepagents_package_run_count", "openai_agents_package_run_count"],
+            evidence_keys=[
+                "saved_live_provider_count",
+                "deepagents_package_run_count",
+                "openai_agents_package_run_count",
+            ],
             source="artifacts/experiments/calibration_readiness.json",
             missing_action="Configure credentials and run the required live-provider smoke.",
         ),
@@ -3951,11 +3889,7 @@ def _delivery_calibration_plan_item(payload: dict[str, Any] | None) -> DeliveryA
 def _calibration_plan_run_counts(payload: dict[str, Any]) -> tuple[int, int, int]:
     runs = payload.get("runs")
     if isinstance(runs, list):
-        statuses = [
-            str(run.get("status") or "")
-            for run in runs
-            if isinstance(run, dict)
-        ]
+        statuses = [str(run.get("status") or "") for run in runs if isinstance(run, dict)]
         return len(statuses), statuses.count("ready"), statuses.count("blocked")
     return (
         _payload_int(payload, "run_count"),
@@ -3980,9 +3914,7 @@ def _delivery_setup_validation_item(payload: dict[str, Any] | None) -> DeliveryA
     return _delivery_item(
         requirement="Public issue setup validation has a safe gate.",
         status=status,
-        evidence=(
-            f"blocked_tasks={blocked}, attempted_tasks={attempted}, passed_tasks={passed}"
-        ),
+        evidence=(f"blocked_tasks={blocked}, attempted_tasks={attempted}, passed_tasks={passed}"),
         source="artifacts/experiments/public_issue_corpus_v1/focused_test_setup_validation_summary.json",
         next_action=(
             "No action needed."
@@ -3996,8 +3928,7 @@ def _delivery_public_reproduction_plan_item(
     payload: dict[str, Any] | None,
 ) -> DeliveryAuditItem:
     source = (
-        "artifacts/experiments/public_issue_corpus_v1/"
-        "public_issue_reproduction_plan_summary.json"
+        "artifacts/experiments/public_issue_corpus_v1/public_issue_reproduction_plan_summary.json"
     )
     if payload is None:
         return _delivery_item(
@@ -4168,7 +4099,9 @@ def _delivery_public_reproduction_execution_item(
         next_action = "Resolve reproduction execution blockers."
     elif attempted and not_reproduced:
         status = "warning"
-        next_action = "Confirm whether selected public issues are already fixed or adjust reproductions."
+        next_action = (
+            "Confirm whether selected public issues are already fixed or adjust reproductions."
+        )
     else:
         status = "warning"
         next_action = "Run reproduction execution after reviewing planned commands."
@@ -4190,8 +4123,7 @@ def _delivery_public_repair_readiness_item(
     payload: dict[str, Any] | None,
 ) -> DeliveryAuditItem:
     source = (
-        "artifacts/experiments/public_issue_corpus_v1/"
-        "public_issue_repair_readiness_summary.json"
+        "artifacts/experiments/public_issue_corpus_v1/public_issue_repair_readiness_summary.json"
     )
     if payload is None:
         return _delivery_item(
@@ -4235,10 +4167,7 @@ def _delivery_public_repair_readiness_item(
 def _delivery_public_repair_attempt_item(
     payload: dict[str, Any] | None,
 ) -> DeliveryAuditItem:
-    source = (
-        "artifacts/experiments/public_issue_corpus_v1/"
-        "public_issue_repair_attempt_summary.json"
-    )
+    source = "artifacts/experiments/public_issue_corpus_v1/public_issue_repair_attempt_summary.json"
     if payload is None:
         return _delivery_item(
             requirement="Public issue repair attempts are safely gated.",
@@ -4455,21 +4384,29 @@ def _mvp_progress_items(
         _mvp_item(
             "Core flow",
             "System clones repository into isolated workspace.",
-            "passed" if _file_contains(project_root / "src" / "patchsmith" / "ingest.py", "clone_or_copy_repository") else "missing",
+            "passed"
+            if _file_contains(
+                project_root / "src" / "patchsmith" / "ingest.py", "clone_or_copy_repository"
+            )
+            else "missing",
             "`clone_or_copy_repository` exists in the ingest layer.",
             "Keep clone/copy behavior covered by workflow tests.",
         ),
         _mvp_item(
             "Core flow",
             "System records commit hash.",
-            "passed" if _file_contains(project_root / "src" / "patchsmith" / "models.py", "commit_hash") else "missing",
+            "passed"
+            if _file_contains(project_root / "src" / "patchsmith" / "models.py", "commit_hash")
+            else "missing",
             "Repository snapshots include `commit_hash`.",
             "Keep commit metadata visible in reports.",
         ),
         _mvp_item(
             "Core flow",
             "System builds basic file index.",
-            "passed" if _file_contains(project_root / "src" / "patchsmith" / "ingest.py", "index_repository") else "missing",
+            "passed"
+            if _file_contains(project_root / "src" / "patchsmith" / "ingest.py", "index_repository")
+            else "missing",
             "`index_repository` exists and is used by CLI/evaluation flows.",
             "Keep index output covered by tests.",
         ),
@@ -4500,7 +4437,12 @@ def _mvp_progress_items(
         _mvp_item(
             "Core flow",
             "Agent can apply patch through controlled tool.",
-            "passed" if has_repair and _file_contains(project_root / "src" / "patchsmith" / "patching.py", "apply_text_replacement") else "missing",
+            "passed"
+            if has_repair
+            and _file_contains(
+                project_root / "src" / "patchsmith" / "patching.py", "apply_text_replacement"
+            )
+            else "missing",
             "`apply_text_replacement` and repair/scaffold metrics exist.",
             "Keep patch application path-validated and tested.",
         ),
@@ -4565,7 +4507,9 @@ def _mvp_progress_items(
         _mvp_item(
             "Observability",
             "Test output is saved.",
-            "passed" if any(run.stdout_path or run.stderr_path for run in index.runs) else "missing",
+            "passed"
+            if any(run.stdout_path or run.stderr_path for run in index.runs)
+            else "missing",
             "Saved runs include stdout/stderr artifacts.",
             "Ensure sandbox command output stays persisted.",
         ),
@@ -4590,35 +4534,51 @@ def _mvp_progress_items(
         _mvp_item(
             "Safety",
             "No host secrets are mounted.",
-            "passed" if has_docker_runner and _file_contains(project_root / "src" / "patchsmith" / "sandbox.py", "_docker_host_env") else "missing",
+            "passed"
+            if has_docker_runner
+            and _file_contains(
+                project_root / "src" / "patchsmith" / "sandbox.py", "_docker_host_env"
+            )
+            else "missing",
             "Docker and local runners use sanitized environment helpers.",
             "Keep env filtering covered by security tests.",
         ),
         _mvp_item(
             "Safety",
             "Command allowlist exists.",
-            "passed" if _file_contains(project_root / "src" / "patchsmith" / "security.py", "CommandPolicy") else "missing",
+            "passed"
+            if _file_contains(project_root / "src" / "patchsmith" / "security.py", "CommandPolicy")
+            else "missing",
             "`CommandPolicy` exists.",
             "Keep command policy narrow.",
         ),
         _mvp_item(
             "Safety",
             "Timeout exists.",
-            "passed" if _file_contains(project_root / "src" / "patchsmith" / "sandbox.py", "timeout_seconds") else "missing",
+            "passed"
+            if _file_contains(project_root / "src" / "patchsmith" / "sandbox.py", "timeout_seconds")
+            else "missing",
             "Sandbox runners enforce `timeout_seconds`.",
             "Keep timeout tests for local and Docker paths.",
         ),
         _mvp_item(
             "Safety",
             "Workspace path validation exists.",
-            "passed" if _file_contains(project_root / "src" / "patchsmith" / "security.py", "absolute path outside workspace") else "missing",
+            "passed"
+            if _file_contains(
+                project_root / "src" / "patchsmith" / "security.py",
+                "absolute path outside workspace",
+            )
+            else "missing",
             "Command policy rejects absolute paths outside the workspace.",
             "Keep path traversal tests passing.",
         ),
         _mvp_item(
             "Safety",
             "Unsafe command rejection test exists.",
-            "passed" if _file_contains(project_root / "tests" / "test_security.py", "rejects_shell_chaining") else "missing",
+            "passed"
+            if _file_contains(project_root / "tests" / "test_security.py", "rejects_shell_chaining")
+            else "missing",
             "Security tests cover shell chaining rejection.",
             "Keep unsafe-command tests in CI.",
         ),
@@ -4667,7 +4627,11 @@ def _mvp_progress_items(
         _mvp_item(
             "Portfolio",
             "Real-world task breadth is proven.",
-            "passed" if issue_corpus_count >= 3 else "warning" if seeded_task_count >= 5 and has_repair else "missing",
+            "passed"
+            if issue_corpus_count >= 3
+            else "warning"
+            if seeded_task_count >= 5 and has_repair
+            else "missing",
             (
                 f"{issue_corpus_count} validated public issue candidate(s) found."
                 if issue_corpus_count
@@ -4681,7 +4645,9 @@ def _mvp_progress_items(
         _mvp_item(
             "Portfolio",
             "Architecture diagram exists.",
-            "passed" if _file_contains(project_root / "docs" / "03_architecture.md", "```mermaid") else "missing",
+            "passed"
+            if _file_contains(project_root / "docs" / "03_architecture.md", "```mermaid")
+            else "missing",
             "Architecture doc includes a Mermaid diagram.",
             "Keep architecture docs synchronized with runtime adapters.",
         ),
@@ -4756,7 +4722,7 @@ def _cli_has_run_inputs(project_root: Path) -> bool:
     if not cli_path.exists():
         return False
     text = cli_path.read_text(encoding="utf-8")
-    return "run = subparsers.add_parser(\"run\"" in text and "--repo" in text
+    return 'run = subparsers.add_parser("run"' in text and "--repo" in text
 
 
 def _seeded_task_count(project_root: Path) -> int:
@@ -5153,7 +5119,9 @@ def _live_calibration_checks(
     deepagents_package_runs = deepagents_modes.get("package_available", 0)
     deepagents_compatibility_runs = deepagents_modes.get("compatibility_mode", 0)
     deepagents_live_runs = model_providers.get("deepagents_openai_chat", 0)
-    deepagents_package_next_action = "Run the DeepAgents adapter with the optional extra installed and save traces."
+    deepagents_package_next_action = (
+        "Run the DeepAgents adapter with the optional extra installed and save traces."
+    )
     if deepagents_package_runs:
         deepagents_package_next_action = (
             "Use package-backed traces for adapter-import claims; use saved "
@@ -5182,7 +5150,9 @@ def _live_calibration_checks(
         LiveCalibrationCheck(
             name="OpenAI Credentials",
             status="passed" if openai_key_present else "missing",
-            evidence="OPENAI_API_KEY is configured." if openai_key_present else "OPENAI_API_KEY is not set.",
+            evidence="OPENAI_API_KEY is configured."
+            if openai_key_present
+            else "OPENAI_API_KEY is not set.",
             next_action=(
                 "Run the live smoke command and save artifacts."
                 if openai_key_present
@@ -5323,7 +5293,9 @@ def _live_calibration_checks(
             name="Saved Live Provider Evidence",
             status="passed" if live_providers else "missing",
             evidence=(
-                _provider_summary({provider: model_providers[provider] for provider in live_providers})
+                _provider_summary(
+                    {provider: model_providers[provider] for provider in live_providers}
+                )
                 if live_providers
                 else "No non-offline model provider metadata found in saved artifacts."
             ),
@@ -5343,10 +5315,7 @@ def _live_calibration_status(
     if live_providers:
         return "calibrated"
     statuses = {check.name: check.status for check in checks}
-    if (
-        statuses.get("OpenAI SDK") == "passed"
-        and statuses.get("OpenAI Credentials") == "passed"
-    ):
+    if statuses.get("OpenAI SDK") == "passed" and statuses.get("OpenAI Credentials") == "passed":
         return "ready_to_run"
     if "missing" in statuses.values():
         return "not_configured"
@@ -5361,11 +5330,7 @@ def _live_calibration_plan_runs(
     openai_agents_available: bool,
     saved_live_provider_count: int,
 ) -> list[LiveCalibrationPlanRun]:
-    live_smoke_status = (
-        "ready"
-        if openai_sdk_available and credentials_configured
-        else "blocked"
-    )
+    live_smoke_status = "ready" if openai_sdk_available and credentials_configured else "blocked"
     live_suite_status = (
         "ready"
         if saved_live_provider_count
@@ -5387,7 +5352,7 @@ def _live_calibration_plan_runs(
                 "PYTHONPATH=src python3 -m patchsmith.cli run "
                 "--repo evals/tasks/seeded_bugs_v1/task_001_logic_bug/repo "
                 "--issue-file evals/tasks/seeded_bugs_v1/task_001_logic_bug/issue.md "
-                "--test-command \"python3 -m pytest\" "
+                '--test-command "python3 -m pytest" '
                 "--runtime langgraph --planner openai --context-provider native_hybrid "
                 "--artifacts-dir artifacts --json"
             ),
@@ -5540,11 +5505,7 @@ def _discover_adapter_modes(artifacts_dir: Path, *, framework: str) -> dict[str,
             run_id = str(event.get("run_id") or trace_path.parent.name)
             if mode in modes:
                 modes[mode].add(run_id)
-    return {
-        mode: len(run_ids)
-        for mode, run_ids in sorted(modes.items())
-        if run_ids
-    }
+    return {mode: len(run_ids) for mode, run_ids in sorted(modes.items()) if run_ids}
 
 
 def _discover_model_providers(artifacts_dir: Path) -> dict[str, int]:
@@ -5690,10 +5651,7 @@ def _stroke_rect(
 
 def _rgb(hex_color: str) -> bytes:
     normalized = hex_color.lstrip("#")
-    return bytes(
-        int(normalized[index : index + 2], 16)
-        for index in range(0, 6, 2)
-    )
+    return bytes(int(normalized[index : index + 2], 16) for index in range(0, 6, 2))
 
 
 def _release_hygiene_checks(
@@ -5821,9 +5779,7 @@ def _release_hygiene_checks(
         ),
         _release_check(
             name="Live LLM Claim Boundary",
-            status="warning"
-            if not _live_providers(readiness.model_providers)
-            else "passed",
+            status="warning" if not _live_providers(readiness.model_providers) else "passed",
             evidence=_provider_summary(readiness.model_providers),
             next_action=(
                 "Do not claim live LLM calibration in release materials."
@@ -5835,9 +5791,7 @@ def _release_hygiene_checks(
         _packaging_config_check(project_root),
         _release_check(
             name="CI Workflow",
-            status="passed"
-            if (project_root / ".github" / "workflows").exists()
-            else "warning",
+            status="passed" if (project_root / ".github" / "workflows").exists() else "warning",
             evidence=(
                 ".github/workflows exists."
                 if (project_root / ".github" / "workflows").exists()
@@ -5930,9 +5884,7 @@ def _docker_smoke_launch_item(artifacts_dir: Path) -> LaunchBlockerItem:
     checks = payload.get("checks")
     actionable_check = _first_actionable_check(checks if isinstance(checks, list) else [])
     next_action = (
-        actionable_check.get("next_action")
-        if actionable_check
-        else payload.get("smoke_command")
+        actionable_check.get("next_action") if actionable_check else payload.get("smoke_command")
     )
     evidence = (
         actionable_check.get("evidence")
@@ -5960,7 +5912,9 @@ def _docker_smoke_launch_item(artifacts_dir: Path) -> LaunchBlockerItem:
         next_action=(
             "No action needed."
             if smoke_status == "passed"
-            else str(next_action or "Start Docker, build the smoke image, and rerun `docker-smoke`.")
+            else str(
+                next_action or "Start Docker, build the smoke image, and rerun `docker-smoke`."
+            )
         ),
         source_artifact=source,
         remediation_commands=[] if smoke_status == "passed" else commands,
@@ -6162,7 +6116,9 @@ def _live_calibration_launch_item(artifacts_dir: Path) -> LaunchBlockerItem:
             else "Configure credentials and budget, then run a live calibration smoke before claiming live LLM quality."
         ),
         source_artifact=source,
-        remediation_commands=[] if live_runs else [
+        remediation_commands=[]
+        if live_runs
+        else [
             "export OPENAI_API_KEY=...",
             "export PATCHSMITH_OPENAI_MODEL=<model>",
             (
@@ -6511,8 +6467,7 @@ def _evidence_refresh_summary(result: Any) -> str:
         )
     if hasattr(result, "delivery_status"):
         return (
-            f"delivery_status={result.delivery_status}, "
-            f"completion={result.completion_percent:.1f}%"
+            f"delivery_status={result.delivery_status}, completion={result.completion_percent:.1f}%"
         )
     if hasattr(result, "completion_percent") and hasattr(result, "status"):
         return f"status={result.status}, completion={result.completion_percent:.1f}%"
@@ -6543,10 +6498,7 @@ def _evidence_refresh_summary(result: Any) -> str:
             f"live_runs={getattr(result, 'saved_live_provider_count', 0)}"
         )
     if hasattr(result, "plan_status"):
-        return (
-            f"plan_status={result.plan_status}, "
-            f"ready_runs={getattr(result, 'ready_runs', 0)}"
-        )
+        return f"plan_status={result.plan_status}, ready_runs={getattr(result, 'ready_runs', 0)}"
     if hasattr(result, "repair_command_tasks"):
         return (
             f"ready={result.ready_tasks}, warning={result.warning_tasks}, "
@@ -6712,9 +6664,7 @@ def _project_status_freshness_check(artifacts_dir: Path) -> ReleaseHygieneCheck:
             next_action="Run `project-status` or `refresh-evidence` before release review.",
         )
 
-    freshness_status = _payload_string(
-        payload, "evidence_freshness_status", "undated"
-    )
+    freshness_status = _payload_string(payload, "evidence_freshness_status", "undated")
     stale_count = _payload_int(payload, "stale_source_count")
     undated_count = _payload_int(payload, "undated_source_count")
     missing_count = len(_payload_string_list(payload, "missing_sources"))
@@ -6726,9 +6676,7 @@ def _project_status_freshness_check(artifacts_dir: Path) -> ReleaseHygieneCheck:
         )
     elif freshness_status == "undated" or undated_count:
         status = "warning"
-        next_action = (
-            "Regenerate undated evidence so release claims have timestamped sources."
-        )
+        next_action = "Regenerate undated evidence so release claims have timestamped sources."
     else:
         status = "passed"
         next_action = "No action needed."
@@ -6744,9 +6692,7 @@ def _project_status_freshness_check(artifacts_dir: Path) -> ReleaseHygieneCheck:
 
 
 def _environment_readiness_release_check(artifacts_dir: Path) -> ReleaseHygieneCheck:
-    payload = _load_json_artifact(
-        artifacts_dir / "experiments" / "environment_readiness.json"
-    )
+    payload = _load_json_artifact(artifacts_dir / "experiments" / "environment_readiness.json")
     if payload is None:
         return _release_check(
             name="Environment Readiness",
@@ -6951,11 +6897,7 @@ def _release_decision(report: ReleaseHygieneReport) -> str:
 
 
 def _live_providers(providers: dict[str, int]) -> list[str]:
-    return [
-        provider
-        for provider in providers
-        if provider and not provider.startswith("offline_")
-    ]
+    return [provider for provider in providers if provider and not provider.startswith("offline_")]
 
 
 def _has_demo_media(project_root: Path) -> bool:
@@ -7029,17 +6971,20 @@ def _metric_value(label: str, value: int | float | str | None) -> str:
         if isinstance(value, int) or float(value).is_integer():
             return str(int(value))
         return f"{value:.2f}"
-    if any(
-        token in normalized_label
-        for token in (
-            "recall",
-            "related tests",
-            "passed",
-            "generated",
-            "success",
-            "valid",
+    if (
+        any(
+            token in normalized_label
+            for token in (
+                "recall",
+                "related tests",
+                "passed",
+                "generated",
+                "success",
+                "valid",
+            )
         )
-    ) and 0 <= value <= 1:
+        and 0 <= value <= 1
+    ):
         return f"{value * 100:.0f}%"
     if isinstance(value, int) or float(value).is_integer():
         return str(int(value))
@@ -7066,9 +7011,7 @@ def _final_evaluation_decisions(
     retrieval_rows = [metric for metric in metrics if metric.kind == "retrieval"]
     if retrieval_rows:
         lanes = ", ".join(sorted({metric.lane for metric in retrieval_rows}))
-        decisions.append(
-            f"Retrieval evidence is available for these lanes: {lanes}."
-        )
+        decisions.append(f"Retrieval evidence is available for these lanes: {lanes}.")
     repair_rows = [
         metric
         for metric in metrics
@@ -7089,9 +7032,7 @@ def _final_evaluation_decisions(
                 continue
             seen_test_run_lanes.add(metric.lane)
             test_run_parts.append(f"{metric.lane} {metric.secondary_metric}")
-        test_runs = "; ".join(
-            test_run_parts
-        )
+        test_runs = "; ".join(test_run_parts)
         decisions.append(
             "Patch-search evidence should be framed as a cost tradeoff; "
             f"current candidate lanes report {test_runs}."
@@ -7506,7 +7447,7 @@ def _live_calibration_commands() -> list[str]:
             "PYTHONPATH=src python3 -m patchsmith.cli run "
             "--repo evals/tasks/seeded_bugs_v1/task_001_logic_bug/repo "
             "--issue-file evals/tasks/seeded_bugs_v1/task_001_logic_bug/issue.md "
-            "--test-command \"python3 -m pytest\" "
+            '--test-command "python3 -m pytest" '
             "--runtime langgraph --planner openai --context-provider native_hybrid "
             "--artifacts-dir artifacts --json"
         ),
@@ -7571,16 +7512,11 @@ def _markdown_cell(value: str) -> str:
 
 
 def _utc_now() -> str:
-    return _format_utc(datetime.now(timezone.utc).replace(microsecond=0))
+    return _format_utc(datetime.now(UTC).replace(microsecond=0))
 
 
 def _format_utc(value: datetime) -> str:
-    return (
-        value.astimezone(timezone.utc)
-        .replace(microsecond=0)
-        .isoformat()
-        .replace("+00:00", "Z")
-    )
+    return value.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def _parse_utc_datetime(value: str) -> datetime | None:
@@ -7591,8 +7527,8 @@ def _parse_utc_datetime(value: str) -> datetime | None:
     except ValueError:
         return None
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc).replace(microsecond=0)
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC).replace(microsecond=0)
 
 
 def _format_age_seconds(seconds: int) -> str:

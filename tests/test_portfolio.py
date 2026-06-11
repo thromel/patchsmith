@@ -1,25 +1,26 @@
 import json
 import subprocess
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from patchsmith.cli import main
 from patchsmith.portfolio import (
+    write_delivery_audit_report,
     write_demo_media_assets,
     write_demo_readiness_report,
     write_demo_script_report,
-    write_delivery_audit_report,
     write_docker_smoke_report,
     write_environment_readiness_report,
     write_evidence_refresh_report,
+    write_final_evaluation_report,
     write_launch_blocker_report,
     write_live_calibration_plan_report,
     write_live_calibration_report,
     write_mvp_progress_report,
     write_project_status_report,
     write_quality_gate_report,
+    write_release_hygiene_report,
 )
-from patchsmith.portfolio import write_final_evaluation_report, write_release_hygiene_report
 
 
 def _write_release_hygiene_fixture(project_root: Path, artifacts_dir: Path) -> None:
@@ -307,13 +308,7 @@ def test_demo_readiness_report_summarizes_launch_evidence(
         ),
         encoding="utf-8",
     )
-    failed_run = (
-        scaffold_dir
-        / "agentless"
-        / "run_artifacts"
-        / "runs"
-        / "run-fail"
-    )
+    failed_run = scaffold_dir / "agentless" / "run_artifacts" / "runs" / "run-fail"
     failed_run.mkdir(parents=True)
     (failed_run / "report.md").write_text("# Failed Run\n", encoding="utf-8")
     (failed_run / "traces.jsonl").write_text(
@@ -783,9 +778,15 @@ def test_demo_readiness_report_summarizes_launch_evidence(
     )
     assert hygiene.release_status == "blocked"
     assert hygiene.blocked_count == 1
-    assert any(check.name == "Git Repository" and check.status == "blocked" for check in hygiene.checks)
-    assert any(check.name == "Packaging Config" and check.status == "passed" for check in hygiene.checks)
-    assert any(check.name == "Planning Docs" and check.status == "passed" for check in hygiene.checks)
+    assert any(
+        check.name == "Git Repository" and check.status == "blocked" for check in hygiene.checks
+    )
+    assert any(
+        check.name == "Packaging Config" and check.status == "passed" for check in hygiene.checks
+    )
+    assert any(
+        check.name == "Planning Docs" and check.status == "passed" for check in hygiene.checks
+    )
     hygiene_text = hygiene_output.read_text(encoding="utf-8")
     assert "# PatchSmith Release Hygiene Report" in hygiene_text
     assert "No .git directory found" in hygiene_text
@@ -812,9 +813,7 @@ def test_demo_readiness_report_summarizes_launch_evidence(
     assert cli_hygiene_output.exists()
 
 
-def test_launch_blocker_report_prioritizes_readiness_artifacts(
-    tmp_path: Path, capsys
-) -> None:
+def test_launch_blocker_report_prioritizes_readiness_artifacts(tmp_path: Path, capsys) -> None:
     artifacts_dir = tmp_path / "artifacts"
     experiments_dir = artifacts_dir / "experiments"
     public_issue_dir = experiments_dir / "public_issue_corpus_v1"
@@ -907,9 +906,7 @@ def test_launch_blocker_report_prioritizes_readiness_artifacts(
     assert payload["blocked_count"] == 3
     payload_items = {item["blocker_id"]: item for item in payload["items"]}
     assert payload_items["focused_setup_readiness"]["dependencies"] == ["docker_smoke"]
-    assert payload_items["public_repair_readiness"]["dependencies"] == [
-        "focused_setup_readiness"
-    ]
+    assert payload_items["public_repair_readiness"]["dependencies"] == ["focused_setup_readiness"]
     assert any(
         "docker build -f docker/seeded-smoke.Dockerfile" in command
         for command in payload_items["docker_smoke"]["remediation_commands"]
@@ -1084,8 +1081,7 @@ def test_live_calibration_report_counts_saved_deepagents_package_runs(tmp_path: 
     assert final.openai_agents_package_run_count == 1
     assert any("package-backed" in decision for decision in final.decisions)
     assert any(
-        "live DeepAgents model execution remains uncalibrated" in item
-        for item in final.limitations
+        "live DeepAgents model execution remains uncalibrated" in item for item in final.limitations
     )
     assert any(
         "live OpenAI Agents model execution remains uncalibrated" in item
@@ -1408,14 +1404,8 @@ def test_delivery_audit_maps_objective_to_current_evidence(
     assert item_statuses["Roadmap is decomposed into sprint plans."] == "passed"
     assert item_statuses["Environment readiness prerequisites are captured."] == "blocked"
     assert item_statuses["Docker sandbox smoke has executable evidence."] == "blocked"
-    assert (
-        item_statuses["Public issue reproduction execution is safely gated."]
-        == "warning"
-    )
-    assert (
-        item_statuses["Public issue failure-signal discovery is available."]
-        == "warning"
-    )
+    assert item_statuses["Public issue reproduction execution is safely gated."] == "warning"
+    assert item_statuses["Public issue failure-signal discovery is available."] == "warning"
     assert item_statuses["Public issue reproduction specs are validated."] == "blocked"
     assert item_statuses["Public issue repair attempts are safely gated."] == "warning"
     assert item_statuses["Live LLM calibration has provider evidence."] == "blocked"
@@ -1510,14 +1500,9 @@ def test_project_status_report_summarizes_saved_evidence(
     artifacts_dir = tmp_path / "artifacts"
     experiments_dir = artifacts_dir / "experiments"
     experiments_dir.mkdir(parents=True)
-    fresh_generated_at = (
-        datetime.now(timezone.utc)
-        .replace(microsecond=0)
-        .isoformat()
-        .replace("+00:00", "Z")
-    )
+    fresh_generated_at = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     stale_generated_at = (
-        (datetime.now(timezone.utc) - timedelta(days=2))
+        (datetime.now(UTC) - timedelta(days=2))
         .replace(microsecond=0)
         .isoformat()
         .replace("+00:00", "Z")
@@ -1748,20 +1733,20 @@ def test_evidence_refresh_report_runs_lightweight_status_refresh(
         for step in report.steps
     )
     assert any(
-        step.name == "Public issue failure-signal discovery"
-        and step.status == "skipped"
+        step.name == "Public issue failure-signal discovery" and step.status == "skipped"
         for step in report.steps
     )
     assert any(
-        step.name == "Public issue reproduction spec validation"
-        and step.status == "skipped"
+        step.name == "Public issue reproduction spec validation" and step.status == "skipped"
         for step in report.steps
     )
     assert any(
         step.name == "Public issue reproduction execution" and step.status == "skipped"
         for step in report.steps
     )
-    assert any(step.name == "Environment readiness" and step.status == "passed" for step in report.steps)
+    assert any(
+        step.name == "Environment readiness" and step.status == "passed" for step in report.steps
+    )
     assert (artifacts_dir / "experiments" / "project_status.json").exists()
     assert (artifacts_dir / "experiments" / "release_hygiene.json").exists()
     assert (artifacts_dir / "experiments" / "environment_readiness.json").exists()
@@ -1879,14 +1864,12 @@ def test_evidence_refresh_prefers_reviewed_public_reproduction_specs(
 
     assert report.failed_count == 0
     plan_summary = json.loads(
-        (public_dir / "public_issue_reproduction_plan_summary.json").read_text(
-            encoding="utf-8"
-        )
+        (public_dir / "public_issue_reproduction_plan_summary.json").read_text(encoding="utf-8")
     )
     validation_summary = json.loads(
-        (
-            public_dir / "public_issue_reproduction_spec_validation_summary.json"
-        ).read_text(encoding="utf-8")
+        (public_dir / "public_issue_reproduction_spec_validation_summary.json").read_text(
+            encoding="utf-8"
+        )
     )
     execution_summary = json.loads(
         (public_dir / "public_issue_reproduction_execution_summary.json").read_text(
@@ -2084,9 +2067,7 @@ def test_evidence_refresh_preserves_executed_public_repair_attempt_evidence(
     assert preserved_step.status == "passed"
     assert "Preserved existing executed repair-attempt evidence" in preserved_step.summary
     attempt_summary = json.loads(
-        (public_dir / "public_issue_repair_attempt_summary.json").read_text(
-            encoding="utf-8"
-        )
+        (public_dir / "public_issue_repair_attempt_summary.json").read_text(encoding="utf-8")
     )
     assert attempt_summary["dry_run"] is False
     assert attempt_summary["attempted_tasks"] == 3
@@ -2128,9 +2109,7 @@ def test_evidence_refresh_can_refresh_docker_smoke(
     assert docker_step.status == "passed"
     assert "smoke_status=not_available" in docker_step.summary
     docker_payload = json.loads(
-        (artifacts_dir / "experiments" / "docker_smoke.json").read_text(
-            encoding="utf-8"
-        )
+        (artifacts_dir / "experiments" / "docker_smoke.json").read_text(encoding="utf-8")
     )
     assert docker_payload["smoke_status"] == "not_available"
 

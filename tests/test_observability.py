@@ -146,8 +146,7 @@ def test_build_artifact_index_summarizes_experiments_and_runs(tmp_path: Path) ->
     assert by_run["run-b"].experiment == "scaffold_comparison_v1"
     assert by_run["run-b"].variant == "heuristic"
     assert by_run["run-b"].stdout_path == (
-        "experiments/scaffold_comparison_v1/heuristic/run_artifacts/runs/"
-        "run-b/logs/stdout.txt"
+        "experiments/scaffold_comparison_v1/heuristic/run_artifacts/runs/run-b/logs/stdout.txt"
     )
     assert len(index.metrics) == 2
     by_metric = {(metric.experiment, metric.lane): metric for metric in index.metrics}
@@ -156,9 +155,7 @@ def test_build_artifact_index_summarizes_experiments_and_runs(tmp_path: Path) ->
     assert retrieval_metric.primary_value == 1.0
     assert retrieval_metric.secondary_label == "Related Tests"
     assert retrieval_metric.secondary_value == 0.5
-    assert retrieval_metric.risk_note == (
-        "0 failed; 0 fallback; 0 source-free violations"
-    )
+    assert retrieval_metric.risk_note == ("0 failed; 0 fallback; 0 source-free violations")
     scaffold_metric = by_metric[("scaffold_comparison_v1", "agentless")]
     assert scaffold_metric.primary_label == "Targeted Tests Passed"
     assert scaffold_metric.completed_count == 1
@@ -304,19 +301,17 @@ def test_index_artifacts_cli_writes_markdown_and_json(
     assert str(run_detail_output_dir.relative_to(tmp_path)) in output_path.read_text(
         encoding="utf-8"
     )
-    assert "PatchSmith Artifact Dashboard" in html_output_path.read_text(
-        encoding="utf-8"
-    )
+    assert "PatchSmith Artifact Dashboard" in html_output_path.read_text(encoding="utf-8")
     assert "Success@k: 100%" in html_output_path.read_text(encoding="utf-8")
-    assert "Run run-c" in (run_detail_output_dir / "run-c.html").read_text(
-        encoding="utf-8"
+    assert "Run run-c" in (run_detail_output_dir / "run-c.html").read_text(encoding="utf-8")
+    assert (
+        json.loads(json_output_path.read_text(encoding="utf-8"))["metrics"][0]["lane"]
+        == "candidates_3"
     )
-    assert json.loads(json_output_path.read_text(encoding="utf-8"))["metrics"][0][
-        "lane"
-    ] == "candidates_3"
-    assert json.loads(json_output_path.read_text(encoding="utf-8"))["experiments"][0][
-        "kind"
-    ] == "patch_search"
+    assert (
+        json.loads(json_output_path.read_text(encoding="utf-8"))["experiments"][0]["kind"]
+        == "patch_search"
+    )
 
 
 def test_failure_report_summarizes_failed_run_traces(tmp_path: Path, capsys) -> None:

@@ -4,11 +4,10 @@ import json
 import os
 import urllib.error
 import urllib.request
+from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass, field
-from typing import Callable, Mapping
 
 from patchsmith.model_config import DEFAULT_OPENAI_MODEL
-
 
 OPENAI_MODELS_ENDPOINT = "https://api.openai.com/v1/models"
 
@@ -72,9 +71,7 @@ def openai_model_preflight(
     )
     try:
         response_bytes = (
-            opener(request, timeout_seconds)
-            if opener
-            else _open_url(request, timeout_seconds)
+            opener(request, timeout_seconds) if opener else _open_url(request, timeout_seconds)
         )
     except urllib.error.HTTPError as error:
         return ModelPreflightResult(

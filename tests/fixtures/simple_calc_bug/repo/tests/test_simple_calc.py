@@ -7,4 +7,3 @@ def test_adds_numbers() -> None:
 
 def test_subtracts_numbers() -> None:
     assert subtract(5, 3) == 2
-

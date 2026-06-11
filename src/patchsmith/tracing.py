@@ -70,4 +70,3 @@ class RunTrace:
             error=error,
             latency_ms=latency_ms,
         )
-

@@ -8,7 +8,7 @@ import tempfile
 import time
 import tomllib
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +21,60 @@ from patchsmith.context import (
     retrieved_context_from_bundle,
 )
 from patchsmith.context_packing import summarize_context_pack
+from patchsmith.evaluation_models import (
+    SCAFFOLD_VARIANTS,
+    IssueCorpusContextPreviewResult,
+    IssueCorpusContextPreviewSummary,
+    IssueCorpusEntryValidationResult,
+    IssueCorpusFocusedTestDiagnosisResult,
+    IssueCorpusFocusedTestDiagnosisSummary,
+    IssueCorpusFocusedTestPlanResult,
+    IssueCorpusFocusedTestPlanSummary,
+    IssueCorpusFocusedTestRunResult,
+    IssueCorpusFocusedTestRunSummary,
+    IssueCorpusFocusedTestSetupCommandResult,
+    IssueCorpusFocusedTestSetupExecutionResult,
+    IssueCorpusFocusedTestSetupExecutionSummary,
+    IssueCorpusFocusedTestSetupPlanResult,
+    IssueCorpusFocusedTestSetupPlanSummary,
+    IssueCorpusFocusedTestSetupReadinessResult,
+    IssueCorpusFocusedTestSetupReadinessSummary,
+    IssueCorpusFocusedTestSetupValidationResult,
+    IssueCorpusFocusedTestSetupValidationSummary,
+    IssueCorpusMaterializedRunReadinessResult,
+    IssueCorpusMaterializedRunReadinessSummary,
+    IssueCorpusMaterializedTaskResult,
+    IssueCorpusMaterializedTaskSummary,
+    IssueCorpusMaterializedTaskValidationResult,
+    IssueCorpusMaterializedTaskValidationSummary,
+    IssueCorpusPublicFailureSignalDiscoveryResult,
+    IssueCorpusPublicFailureSignalDiscoverySummary,
+    IssueCorpusPublicRepairAttemptResult,
+    IssueCorpusPublicRepairAttemptSummary,
+    IssueCorpusPublicRepairReadinessResult,
+    IssueCorpusPublicRepairReadinessSummary,
+    IssueCorpusPublicReproductionExecutionResult,
+    IssueCorpusPublicReproductionExecutionSummary,
+    IssueCorpusPublicReproductionPlanResult,
+    IssueCorpusPublicReproductionPlanSummary,
+    IssueCorpusPublicReproductionSpecValidationResult,
+    IssueCorpusPublicReproductionSpecValidationSummary,
+    IssueCorpusRepoPreflightResult,
+    IssueCorpusRepoPreflightSummary,
+    IssueCorpusValidationSummary,
+    PatchSearchCandidateResult,
+    PatchSearchEvalResult,
+    PatchSearchEvalSummary,
+    RepairEvalResult,
+    RepairEvalSummary,
+    RetrievalEvalResult,
+    RetrievalEvalSummary,
+    ScaffoldComparisonResult,
+    ScaffoldVariant,
+    SeededDatasetValidationSummary,
+    SeededTask,
+    SeededTaskValidationResult,
+)
 from patchsmith.evaluation_reports import (
     render_focused_test_diagnosis_report,
     render_focused_test_setup_execution_report,
@@ -74,61 +128,6 @@ from patchsmith.retrieval import GraphRetriever, HybridRetriever, KeywordRetriev
 from patchsmith.sandbox import create_sandbox_runner
 from patchsmith.security import CommandPolicy, FocusedSetupCommandPolicy
 from patchsmith.workflow import RepairRunner
-
-from patchsmith.evaluation_models import (
-    SeededTask,
-    SeededTaskValidationResult,
-    SeededDatasetValidationSummary,
-    IssueCorpusEntryValidationResult,
-    IssueCorpusValidationSummary,
-    IssueCorpusRepoPreflightResult,
-    IssueCorpusRepoPreflightSummary,
-    IssueCorpusContextPreviewResult,
-    IssueCorpusContextPreviewSummary,
-    IssueCorpusMaterializedTaskResult,
-    IssueCorpusMaterializedTaskSummary,
-    IssueCorpusMaterializedTaskValidationResult,
-    IssueCorpusMaterializedTaskValidationSummary,
-    IssueCorpusMaterializedRunReadinessResult,
-    IssueCorpusMaterializedRunReadinessSummary,
-    IssueCorpusFocusedTestPlanResult,
-    IssueCorpusFocusedTestPlanSummary,
-    IssueCorpusFocusedTestRunResult,
-    IssueCorpusFocusedTestRunSummary,
-    IssueCorpusFocusedTestDiagnosisResult,
-    IssueCorpusFocusedTestDiagnosisSummary,
-    IssueCorpusFocusedTestSetupPlanResult,
-    IssueCorpusFocusedTestSetupPlanSummary,
-    IssueCorpusFocusedTestSetupReadinessResult,
-    IssueCorpusFocusedTestSetupReadinessSummary,
-    IssueCorpusFocusedTestSetupCommandResult,
-    IssueCorpusFocusedTestSetupExecutionResult,
-    IssueCorpusFocusedTestSetupExecutionSummary,
-    IssueCorpusFocusedTestSetupValidationResult,
-    IssueCorpusFocusedTestSetupValidationSummary,
-    IssueCorpusPublicReproductionPlanResult,
-    IssueCorpusPublicReproductionPlanSummary,
-    IssueCorpusPublicReproductionSpecValidationResult,
-    IssueCorpusPublicReproductionSpecValidationSummary,
-    IssueCorpusPublicFailureSignalDiscoveryResult,
-    IssueCorpusPublicFailureSignalDiscoverySummary,
-    IssueCorpusPublicReproductionExecutionResult,
-    IssueCorpusPublicReproductionExecutionSummary,
-    IssueCorpusPublicRepairReadinessResult,
-    IssueCorpusPublicRepairReadinessSummary,
-    IssueCorpusPublicRepairAttemptResult,
-    IssueCorpusPublicRepairAttemptSummary,
-    RetrievalEvalResult,
-    RetrievalEvalSummary,
-    RepairEvalResult,
-    RepairEvalSummary,
-    ScaffoldComparisonResult,
-    ScaffoldVariant,
-    PatchSearchCandidateResult,
-    PatchSearchEvalResult,
-    PatchSearchEvalSummary,
-    SCAFFOLD_VARIANTS,
-)
 
 
 def load_seeded_tasks(dataset_dir: Path) -> list[SeededTask]:
@@ -225,8 +224,7 @@ def validate_issue_corpus(
     if not isinstance(entries_payload, list):
         raise ValueError("issue corpus missing list field: issues")
     results = [
-        _validate_issue_corpus_entry(entry, index)
-        for index, entry in enumerate(entries_payload)
+        _validate_issue_corpus_entry(entry, index) for index, entry in enumerate(entries_payload)
     ]
     duplicate_task_ids = _duplicate_issue_corpus_task_ids(results)
     if duplicate_task_ids:
@@ -257,13 +255,7 @@ def summarize_issue_corpus_validation(
     corpus_id: str | None,
     results: list[IssueCorpusEntryValidationResult],
 ) -> IssueCorpusValidationSummary:
-    repositories = sorted(
-        {
-            result.repository
-            for result in results
-            if result.repository
-        }
-    )
+    repositories = sorted({result.repository for result in results if result.repository})
     languages = sorted({result.language for result in results if result.language})
     task_types = sorted({result.task_type for result in results if result.task_type})
     return IssueCorpusValidationSummary(
@@ -498,7 +490,7 @@ def preview_issue_corpus_context(
                     top_contexts=[_source_free_context(context) for context in contexts],
                 )
             )
-        except Exception as error:  # noqa: BLE001 - report all corpus materialization failures.
+        except Exception as error:
             results.append(
                 IssueCorpusContextPreviewResult(
                     task_id=task_id,
@@ -554,9 +546,7 @@ def summarize_issue_corpus_context_preview(
             else 0.0
         ),
         source_free=all(
-            "excerpt" not in context
-            for result in results
-            for context in result.top_contexts
+            "excerpt" not in context for result in results for context in result.top_contexts
         ),
     )
 
@@ -643,9 +633,7 @@ def materialize_issue_corpus_tasks(
         raise FileNotFoundError(f"issue corpus does not exist: {corpus_path}")
     context_preview_path = context_preview_path or output_dir / "context_preview_results.json"
     if not context_preview_path.exists():
-        raise FileNotFoundError(
-            f"context preview results do not exist: {context_preview_path}"
-        )
+        raise FileNotFoundError(f"context preview results do not exist: {context_preview_path}")
 
     payload = json.loads(corpus_path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict) or not isinstance(payload.get("issues"), list):
@@ -726,7 +714,7 @@ def materialize_issue_corpus_tasks(
                     source_free=source_free,
                 )
             )
-        except Exception as error:  # noqa: BLE001 - keep materialization reports complete.
+        except Exception as error:
             results.append(
                 IssueCorpusMaterializedTaskResult(
                     task_id=task_id,
@@ -781,8 +769,7 @@ def summarize_issue_corpus_materialized_tasks(
         failed_tasks=sum(1 for result in results if result.status != "materialized"),
         repository_count=len({result.repository for result in results}),
         source_free=all(
-            result.status == "materialized" and result.source_free
-            for result in results
+            result.status == "materialized" and result.source_free for result in results
         ),
     )
 
@@ -1351,10 +1338,7 @@ def diagnose_focused_test_runs(
         raise ValueError("focused test run result records must be JSON objects")
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    results = [
-        _diagnose_focused_test_run_record(record=record)
-        for record in records
-    ]
+    results = [_diagnose_focused_test_run_record(record=record) for record in records]
     summary = summarize_focused_test_diagnosis(
         results_path=results_path,
         results=results,
@@ -1745,13 +1729,9 @@ def execute_focused_test_setups(
     IssueCorpusFocusedTestSetupExecutionSummary,
 ]:
     if not readiness_path.exists():
-        raise FileNotFoundError(
-            f"focused test setup readiness does not exist: {readiness_path}"
-        )
+        raise FileNotFoundError(f"focused test setup readiness does not exist: {readiness_path}")
     if not readiness_path.is_file():
-        raise ValueError(
-            f"focused test setup readiness path is not a file: {readiness_path}"
-        )
+        raise ValueError(f"focused test setup readiness path is not a file: {readiness_path}")
     parsed = json.loads(readiness_path.read_text(encoding="utf-8"))
     if not isinstance(parsed, list):
         raise ValueError("focused test setup readiness must contain a JSON list")
@@ -1767,11 +1747,7 @@ def execute_focused_test_setups(
     output_dir.mkdir(parents=True, exist_ok=True)
     run_logs_dir = output_dir / "focused_test_setup_execution"
     run_logs_dir.mkdir(parents=True, exist_ok=True)
-    policy = (
-        FocusedSetupCommandPolicy()
-        if allow_dependency_installs
-        else CommandPolicy()
-    )
+    policy = FocusedSetupCommandPolicy() if allow_dependency_installs else CommandPolicy()
     runner = (
         None
         if dry_run
@@ -1963,9 +1939,7 @@ def validate_focused_test_setups(
             f"focused test setup execution does not exist: {setup_execution_path}"
         )
     if not setup_execution_path.is_file():
-        raise ValueError(
-            f"focused test setup execution path is not a file: {setup_execution_path}"
-        )
+        raise ValueError(f"focused test setup execution path is not a file: {setup_execution_path}")
     parsed = json.loads(setup_execution_path.read_text(encoding="utf-8"))
     if not isinstance(parsed, list):
         raise ValueError("focused test setup execution must contain a JSON list")
@@ -2201,9 +2175,7 @@ def summarize_public_issue_reproduction_plan(
     results: list[IssueCorpusPublicReproductionPlanResult],
 ) -> IssueCorpusPublicReproductionPlanSummary:
     return IssueCorpusPublicReproductionPlanSummary(
-        generated_at=datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace(
-            "+00:00", "Z"
-        ),
+        generated_at=datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         tasks_dir=str(tasks_dir),
         focused_plan_path=str(focused_plan_path) if focused_plan_path is not None else None,
         task_count=len(results),
@@ -2286,9 +2258,7 @@ def write_public_issue_reproduction_plan_outputs(
                     "policy_allowed": result.policy_allowed,
                     "policy_reason": result.policy_reason,
                     "focused_files": ";".join(result.focused_files),
-                    "fixture_paths": ";".join(
-                        _public_issue_fixture_paths(result.fixture_files)
-                    ),
+                    "fixture_paths": ";".join(_public_issue_fixture_paths(result.fixture_files)),
                     "expected_failure_signals": ";".join(result.expected_failure_signals),
                     "manual_spec_required": result.manual_spec_required,
                     "evidence": ";".join(result.evidence),
@@ -2345,17 +2315,13 @@ def validate_public_issue_reproduction_specs(
         results.append(
             IssueCorpusPublicReproductionSpecValidationResult(
                 task_id=extra_task_id,
-                repository=_optional_string(
-                    specs_by_task[extra_task_id].get("repository")
-                ),
+                repository=_optional_string(specs_by_task[extra_task_id].get("repository")),
                 issue_url=_optional_string(specs_by_task[extra_task_id].get("issue_url")),
                 status="blocked",
                 spec_present=True,
                 repo_path=None,
                 repo_exists=False,
-                reproduction_command=_optional_string(
-                    specs_by_task[extra_task_id].get("command")
-                ),
+                reproduction_command=_optional_string(specs_by_task[extra_task_id].get("command")),
                 command_source="reproduction_spec",
                 policy_allowed=False,
                 policy_reason=None,
@@ -2403,9 +2369,7 @@ def summarize_public_issue_reproduction_spec_validation(
     results: list[IssueCorpusPublicReproductionSpecValidationResult],
 ) -> IssueCorpusPublicReproductionSpecValidationSummary:
     return IssueCorpusPublicReproductionSpecValidationSummary(
-        generated_at=datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace(
-            "+00:00", "Z"
-        ),
+        generated_at=datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         specs_path=str(specs_path),
         tasks_dir=str(tasks_dir),
         focused_plan_path=str(focused_plan_path) if focused_plan_path is not None else None,
@@ -2415,13 +2379,9 @@ def summarize_public_issue_reproduction_spec_validation(
         warning_tasks=sum(1 for result in results if result.status == "warning"),
         blocked_tasks=sum(1 for result in results if result.status == "blocked"),
         missing_spec_tasks=sum(1 for result in results if not result.spec_present),
-        empty_signal_tasks=sum(
-            1 for result in results if not result.expected_failure_signals
-        ),
+        empty_signal_tasks=sum(1 for result in results if not result.expected_failure_signals),
         policy_blocked_tasks=sum(
-            1
-            for result in results
-            if result.reproduction_command and not result.policy_allowed
+            1 for result in results if result.reproduction_command and not result.policy_allowed
         ),
         extra_spec_tasks=sum(
             1
@@ -2431,9 +2391,7 @@ def summarize_public_issue_reproduction_spec_validation(
         fixture_file_tasks=sum(1 for result in results if result.fixture_files),
         fixture_file_count=sum(len(result.fixture_files) for result in results),
         unsafe_fixture_tasks=sum(
-            1
-            for result in results
-            if any("fixture_files" in error for error in result.errors)
+            1 for result in results if any("fixture_files" in error for error in result.errors)
         ),
     )
 
@@ -2498,12 +2456,8 @@ def write_public_issue_reproduction_spec_validation_outputs(
                     "command_source": result.command_source,
                     "policy_allowed": result.policy_allowed,
                     "policy_reason": result.policy_reason,
-                    "fixture_paths": ";".join(
-                        _public_issue_fixture_paths(result.fixture_files)
-                    ),
-                    "expected_failure_signals": ";".join(
-                        result.expected_failure_signals
-                    ),
+                    "fixture_paths": ";".join(_public_issue_fixture_paths(result.fixture_files)),
+                    "expected_failure_signals": ";".join(result.expected_failure_signals),
                     "errors": ";".join(result.errors),
                     "warnings": ";".join(result.warnings),
                     "evidence": ";".join(result.evidence),
@@ -2595,9 +2549,7 @@ def summarize_public_issue_failure_signal_discovery(
     timeout_seconds: int,
 ) -> IssueCorpusPublicFailureSignalDiscoverySummary:
     return IssueCorpusPublicFailureSignalDiscoverySummary(
-        generated_at=datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace(
-            "+00:00", "Z"
-        ),
+        generated_at=datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         reproduction_plan_path=str(plan_path),
         task_count=len(results),
         dry_run=dry_run,
@@ -2611,16 +2563,12 @@ def summarize_public_issue_failure_signal_discovery(
             for result in results
             if result.status in {"observed_failure", "passed", "timed_out", "failed"}
         ),
-        observed_failure_tasks=sum(
-            1 for result in results if result.status == "observed_failure"
-        ),
+        observed_failure_tasks=sum(1 for result in results if result.status == "observed_failure"),
         passed_tasks=sum(1 for result in results if result.status == "passed"),
         timed_out_tasks=sum(1 for result in results if result.status == "timed_out"),
         blocked_tasks=sum(1 for result in results if result.status == "blocked"),
         policy_allowed_commands=sum(1 for result in results if result.policy_allowed),
-        candidate_signal_tasks=sum(
-            1 for result in results if result.candidate_failure_signals
-        ),
+        candidate_signal_tasks=sum(1 for result in results if result.candidate_failure_signals),
         fixture_file_tasks=sum(1 for result in results if result.fixture_paths),
     )
 
@@ -2697,9 +2645,7 @@ def write_public_issue_failure_signal_discovery_outputs(
                     "stdout_path": result.stdout_path,
                     "stderr_path": result.stderr_path,
                     "fixture_paths": ";".join(result.fixture_paths),
-                    "candidate_failure_signals": ";".join(
-                        result.candidate_failure_signals
-                    ),
+                    "candidate_failure_signals": ";".join(result.candidate_failure_signals),
                     "errors": ";".join(result.errors),
                     "warnings": ";".join(result.warnings),
                     "next_actions": ";".join(result.next_actions),
@@ -2819,9 +2765,7 @@ def summarize_public_issue_reproduction_execution(
     timeout_seconds: int,
 ) -> IssueCorpusPublicReproductionExecutionSummary:
     return IssueCorpusPublicReproductionExecutionSummary(
-        generated_at=datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace(
-            "+00:00", "Z"
-        ),
+        generated_at=datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         reproduction_plan_path=str(plan_path),
         task_count=len(results),
         dry_run=dry_run,
@@ -2836,15 +2780,11 @@ def summarize_public_issue_reproduction_execution(
             if result.status in {"reproduced", "not_reproduced", "failed", "timed_out"}
         ),
         reproduced_tasks=sum(1 for result in results if result.status == "reproduced"),
-        not_reproduced_tasks=sum(
-            1 for result in results if result.status == "not_reproduced"
-        ),
+        not_reproduced_tasks=sum(1 for result in results if result.status == "not_reproduced"),
         failed_tasks=sum(1 for result in results if result.status == "failed"),
         timed_out_tasks=sum(1 for result in results if result.status == "timed_out"),
         blocked_tasks=sum(1 for result in results if result.status == "blocked"),
-        manual_spec_required_tasks=sum(
-            1 for result in results if result.manual_spec_required
-        ),
+        manual_spec_required_tasks=sum(1 for result in results if result.manual_spec_required),
         policy_allowed_commands=sum(1 for result in results if result.policy_allowed),
         fixture_file_tasks=sum(1 for result in results if result.fixture_paths),
     )
@@ -2913,9 +2853,7 @@ def write_public_issue_reproduction_execution_outputs(
                     "reproduction_plan_status": result.reproduction_plan_status,
                     "repo_path": result.repo_path,
                     "reproduction_command": result.reproduction_command,
-                    "expected_failure_signals": ";".join(
-                        result.expected_failure_signals
-                    ),
+                    "expected_failure_signals": ";".join(result.expected_failure_signals),
                     "manual_spec_required": result.manual_spec_required,
                     "sandbox_mode": result.sandbox_mode,
                     "sandbox_image": result.sandbox_image,
@@ -2929,12 +2867,8 @@ def write_public_issue_reproduction_execution_outputs(
                     "stdout_path": result.stdout_path,
                     "stderr_path": result.stderr_path,
                     "fixture_paths": ";".join(result.fixture_paths),
-                    "matched_failure_signals": ";".join(
-                        result.matched_failure_signals
-                    ),
-                    "missing_failure_signals": ";".join(
-                        result.missing_failure_signals
-                    ),
+                    "matched_failure_signals": ";".join(result.matched_failure_signals),
+                    "missing_failure_signals": ";".join(result.missing_failure_signals),
                     "errors": ";".join(result.errors),
                     "warnings": ";".join(result.warnings),
                     "next_actions": ";".join(result.next_actions),
@@ -2962,9 +2896,7 @@ def check_public_issue_repair_readiness(
     list[IssueCorpusPublicRepairReadinessResult],
     IssueCorpusPublicRepairReadinessSummary,
 ]:
-    focused_records = _load_json_record_list(
-        focused_run_path, label="focused test run results"
-    )
+    focused_records = _load_json_record_list(focused_run_path, label="focused test run results")
     diagnosis_records = _load_json_record_list(
         diagnosis_path, label="focused test diagnosis results"
     )
@@ -2976,8 +2908,7 @@ def check_public_issue_repair_readiness(
             reproduction_execution_path,
             label="public issue reproduction execution results",
         )
-        if reproduction_execution_path is not None
-        and reproduction_execution_path.exists()
+        if reproduction_execution_path is not None and reproduction_execution_path.exists()
         else []
     )
     manifests = _load_public_issue_task_manifests(tasks_dir)
@@ -3004,9 +2935,7 @@ def check_public_issue_repair_readiness(
         diagnosis_path=diagnosis_path,
         setup_validation_path=setup_validation_path,
         reproduction_execution_path=(
-            reproduction_execution_path
-            if reproduction_execution_records
-            else None
+            reproduction_execution_path if reproduction_execution_records else None
         ),
         results=results,
     )
@@ -3017,9 +2946,7 @@ def check_public_issue_repair_readiness(
         diagnosis_path=diagnosis_path,
         setup_validation_path=setup_validation_path,
         reproduction_execution_path=(
-            reproduction_execution_path
-            if reproduction_execution_records
-            else None
+            reproduction_execution_path if reproduction_execution_records else None
         ),
         results=results,
         summary=summary,
@@ -3037,38 +2964,28 @@ def summarize_public_issue_repair_readiness(
     results: list[IssueCorpusPublicRepairReadinessResult],
 ) -> IssueCorpusPublicRepairReadinessSummary:
     return IssueCorpusPublicRepairReadinessSummary(
-        generated_at=datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace(
-            "+00:00", "Z"
-        ),
+        generated_at=datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         tasks_dir=str(tasks_dir) if tasks_dir is not None else None,
         focused_run_path=str(focused_run_path),
         diagnosis_path=str(diagnosis_path),
         setup_validation_path=str(setup_validation_path),
         reproduction_execution_path=(
-            str(reproduction_execution_path)
-            if reproduction_execution_path is not None
-            else None
+            str(reproduction_execution_path) if reproduction_execution_path is not None else None
         ),
         task_count=len(results),
         ready_tasks=sum(1 for result in results if result.status == "ready"),
         warning_tasks=sum(1 for result in results if result.status == "warning"),
         blocked_tasks=sum(1 for result in results if result.status == "blocked"),
         repair_command_tasks=sum(1 for result in results if result.repair_command),
-        passed_focused_tasks=sum(
-            1 for result in results if result.focused_run_status == "passed"
-        ),
+        passed_focused_tasks=sum(1 for result in results if result.focused_run_status == "passed"),
         passed_setup_validation_tasks=sum(
             1 for result in results if result.setup_validation_status == "passed"
         ),
         reproduced_tasks=sum(
-            1
-            for result in results
-            if result.reproduction_execution_status == "reproduced"
+            1 for result in results if result.reproduction_execution_status == "reproduced"
         ),
         missing_reproduction_tasks=sum(
-            1
-            for result in results
-            if result.reproduction_execution_status != "reproduced"
+            1 for result in results if result.reproduction_execution_status != "reproduced"
         ),
     )
 
@@ -3138,21 +3055,15 @@ def write_public_issue_repair_readiness_outputs(
                     "repo_exists": result.repo_exists,
                     "repair_command": result.repair_command,
                     "validation_command": result.validation_command,
-                    "validation_fixture_paths": ";".join(
-                        result.validation_fixture_paths
-                    ),
+                    "validation_fixture_paths": ";".join(result.validation_fixture_paths),
                     "focused_run_status": result.focused_run_status,
                     "diagnosis_category": result.diagnosis_category,
                     "setup_validation_status": result.setup_validation_status,
                     "setup_failure_category": result.setup_failure_category,
-                    "reproduction_execution_status": (
-                        result.reproduction_execution_status
-                    ),
+                    "reproduction_execution_status": (result.reproduction_execution_status),
                     "reproduction_stdout_path": result.reproduction_stdout_path,
                     "reproduction_stderr_path": result.reproduction_stderr_path,
-                    "matched_failure_signals": ";".join(
-                        result.matched_failure_signals
-                    ),
+                    "matched_failure_signals": ";".join(result.matched_failure_signals),
                     "sandbox_mode": result.sandbox_mode,
                     "sandbox_network": result.sandbox_network,
                     "evidence": ";".join(result.evidence),
@@ -3203,9 +3114,7 @@ def execute_public_issue_repairs(
     manifests = _load_public_issue_task_manifests(tasks_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     runner = (
-        None
-        if dry_run
-        else RepairRunner(artifacts_dir=output_dir / "public_issue_repair_attempts")
+        None if dry_run else RepairRunner(artifacts_dir=output_dir / "public_issue_repair_attempts")
     )
     results = [
         _execute_public_issue_repair_record(
@@ -3261,9 +3170,7 @@ def summarize_public_issue_repair_attempts(
     max_retries: int,
 ) -> IssueCorpusPublicRepairAttemptSummary:
     return IssueCorpusPublicRepairAttemptSummary(
-        generated_at=datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace(
-            "+00:00", "Z"
-        ),
+        generated_at=datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         readiness_path=str(readiness_path),
         tasks_dir=str(tasks_dir) if tasks_dir is not None else None,
         task_count=len(results),
@@ -3276,17 +3183,13 @@ def summarize_public_issue_repair_attempts(
         sandbox_image=sandbox_image,
         max_retries=max_retries,
         dry_run_tasks=sum(1 for result in results if result.status == "dry_run"),
-        attempted_tasks=sum(
-            1 for result in results if result.status in {"validated", "failed"}
-        ),
+        attempted_tasks=sum(1 for result in results if result.status in {"validated", "failed"}),
         validated_tasks=sum(1 for result in results if result.status == "validated"),
         failed_tasks=sum(1 for result in results if result.status == "failed"),
         blocked_tasks=sum(1 for result in results if result.status == "blocked"),
         warning_tasks=sum(1 for result in results if result.status == "warning"),
         reproduced_input_tasks=sum(
-            1
-            for result in results
-            if result.reproduction_execution_status == "reproduced"
+            1 for result in results if result.reproduction_execution_status == "reproduced"
         ),
     )
 
@@ -3359,12 +3262,8 @@ def write_public_issue_repair_attempt_outputs(
                     "repo_exists": result.repo_exists,
                     "repair_command": result.repair_command,
                     "validation_command": result.validation_command,
-                    "validation_fixture_paths": ";".join(
-                        result.validation_fixture_paths
-                    ),
-                    "reproduction_execution_status": (
-                        result.reproduction_execution_status
-                    ),
+                    "validation_fixture_paths": ";".join(result.validation_fixture_paths),
+                    "reproduction_execution_status": (result.reproduction_execution_status),
                     "runtime": result.runtime,
                     "planner": result.planner,
                     "context_provider": result.context_provider,
@@ -3976,9 +3875,7 @@ def summarize_retrieval_results(
                 avg_source_context_count=_average(
                     result.source_context_count for result in completed
                 ),
-                avg_test_context_count=_average(
-                    result.test_context_count for result in completed
-                ),
+                avg_test_context_count=_average(result.test_context_count for result in completed),
                 avg_context_excerpt_chars=_average(
                     result.context_excerpt_chars for result in completed
                 ),
@@ -4016,8 +3913,7 @@ def summarize_patch_search_results(
                     1.0 if result.success_at_k else 0.0 for result in completed
                 ),
                 selected_success_rate=_average(
-                    1.0 if result.selected_candidate_passed else 0.0
-                    for result in completed
+                    1.0 if result.selected_candidate_passed else 0.0 for result in completed
                 ),
                 avg_latency_ms=_average(result.latency_ms for result in completed),
                 avg_test_runs=_average(result.test_runs for result in completed),
@@ -4154,9 +4050,9 @@ def write_patch_search_eval_outputs(
     )
 
     with results_csv.open("w", newline="", encoding="utf-8") as handle:
-        fieldnames = [
-            key for key in results[0].to_dict() if key != "candidate_results"
-        ] if results else []
+        fieldnames = (
+            [key for key in results[0].to_dict() if key != "candidate_results"] if results else []
+        )
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
         if results:
             writer.writeheader()
@@ -4214,8 +4110,6 @@ def write_seeded_dataset_validation_outputs(
         ),
         encoding="utf-8",
     )
-
-
 
 
 def top_k_recall(retrieved: list[str], expected: list[str], k: int) -> float:
@@ -4401,7 +4295,7 @@ def _validate_seeded_task_dir(task_dir: Path) -> SeededTaskValidationResult:
     task_id = _expected_string(expected, "task_id", errors)
     test_command = _expected_string(expected, "test_command", errors)
     language = _expected_string(expected, "language", errors)
-    failure_type = _expected_string(expected, "failure_type", errors)
+    _expected_string(expected, "failure_type", errors)
     expected_touched_files = _expected_string_list(expected, "expected_touched_files", errors)
     expected_related_tests = _expected_string_list(expected, "expected_related_tests", errors)
 
@@ -4790,9 +4684,7 @@ def _plan_materialized_issue_focused_test(
     fallback_command = test_commands[0] if test_commands else None
     retrieved_files = _string_list(retrieval.get("retrieved_files"))
     focused_files = [
-        path
-        for path in retrieved_files
-        if _is_materialized_test_candidate_path(path)
+        path for path in retrieved_files if _is_materialized_test_candidate_path(path)
     ][: max(max_paths, 0)]
 
     repo_exists = False
@@ -5028,9 +4920,8 @@ def _diagnose_focused_test_run_record(
             category="execution_blocked",
             severity="blocked",
             summary="Focused test command was blocked before meaningful test execution.",
-            evidence=_string_list(record.get("errors")) or _matching_lines(
-                logs, ["blocked", "policy", "exit code"], limit=3
-            ),
+            evidence=_string_list(record.get("errors"))
+            or _matching_lines(logs, ["blocked", "policy", "exit code"], limit=3),
             suggested_next_actions=[
                 "Fix the focused test plan or sandbox availability before running public issue repairs.",
             ],
@@ -5810,7 +5701,9 @@ def _validate_focused_test_setup_record(
 
     if not command_result.policy_decision.allowed:
         status = "blocked"
-        errors.append(f"validation command rejected by policy: {command_result.policy_decision.reason}")
+        errors.append(
+            f"validation command rejected by policy: {command_result.policy_decision.reason}"
+        )
     elif command_result.timed_out:
         status = "timed_out"
         warnings.append(f"validation command timed out after {timeout_seconds}s")
@@ -5910,9 +5803,7 @@ def _plan_public_issue_reproduction_record(
         else {}
     )
     reproduction = (
-        manifest.get("reproduction")
-        if isinstance(manifest.get("reproduction"), dict)
-        else {}
+        manifest.get("reproduction") if isinstance(manifest.get("reproduction"), dict) else {}
     )
     spec_reproduction = reproduction_spec if isinstance(reproduction_spec, dict) else {}
     repository = _optional_string(issue.get("repository"))
@@ -5920,9 +5811,7 @@ def _plan_public_issue_reproduction_record(
     repo_path = _optional_string(snapshot.get("repo_path")) or (
         _optional_string(focused_record.get("repo_path")) if focused_record else None
     )
-    focused_files = (
-        _string_list(focused_record.get("focused_files")) if focused_record else []
-    )
+    focused_files = _string_list(focused_record.get("focused_files")) if focused_record else []
     if not focused_files:
         focused_files = [
             path
@@ -5931,9 +5820,7 @@ def _plan_public_issue_reproduction_record(
         ][:2]
     spec_command = _optional_string(spec_reproduction.get("command"))
     explicit_command = _optional_string(reproduction.get("command"))
-    focused_command = (
-        _optional_string(focused_record.get("command")) if focused_record else None
-    )
+    focused_command = _optional_string(focused_record.get("command")) if focused_record else None
     test_commands = _string_list(snapshot.get("test_commands"))
     if spec_command:
         command = spec_command
@@ -5956,12 +5843,8 @@ def _plan_public_issue_reproduction_record(
         command_source = "missing"
         blockers.append("no reproduction or focused test command is available")
 
-    spec_failure_signals = _string_list(
-        spec_reproduction.get("expected_failure_signals")
-    )
-    manifest_failure_signals = _string_list(
-        reproduction.get("expected_failure_signals")
-    )
+    spec_failure_signals = _string_list(spec_reproduction.get("expected_failure_signals"))
+    manifest_failure_signals = _string_list(reproduction.get("expected_failure_signals"))
     expected_failure_signals = spec_failure_signals or manifest_failure_signals
     if "fixture_files" in spec_reproduction:
         fixture_files, fixture_errors = _normalize_public_issue_fixture_files(
@@ -5976,18 +5859,14 @@ def _plan_public_issue_reproduction_record(
     if fixture_errors:
         blockers.extend(fixture_errors)
     elif fixture_files:
-        evidence.append(
-            f"{fixture_source} provides {len(fixture_files)} temporary fixture file(s)"
-        )
+        evidence.append(f"{fixture_source} provides {len(fixture_files)} temporary fixture file(s)")
     source_hints, source_hint_errors = _normalize_public_issue_source_hints(
         spec_reproduction.get("source_hints")
     )
     if source_hint_errors:
         blockers.extend(source_hint_errors)
     elif source_hints:
-        evidence.append(
-            f"reproduction spec provides {len(source_hints)} reviewed source hint(s)"
-        )
+        evidence.append(f"reproduction spec provides {len(source_hints)} reviewed source hint(s)")
     manual_spec_required = not expected_failure_signals
     if expected_failure_signals:
         if spec_failure_signals:
@@ -6152,7 +6031,7 @@ def _discover_public_issue_failure_signal_record(
         record.get("fixture_files")
     )
     fixture_paths = _public_issue_fixture_paths(fixture_files)
-    source_hints, source_hint_errors = _normalize_public_issue_source_hints(
+    _source_hints, source_hint_errors = _normalize_public_issue_source_hints(
         record.get("source_hints")
     )
     errors.extend(fixture_errors)
@@ -6252,9 +6131,7 @@ def _discover_public_issue_failure_signal_record(
     run_dir.mkdir(parents=True, exist_ok=True)
     try:
         if fixture_files:
-            with tempfile.TemporaryDirectory(
-                prefix="patchsmith-public-repro-fixtures-"
-            ) as tmp_dir:
+            with tempfile.TemporaryDirectory(prefix="patchsmith-public-repro-fixtures-") as tmp_dir:
                 fixture_workspace = Path(tmp_dir) / "repo"
                 snapshot = clone_or_copy_repository(str(workspace), fixture_workspace)
                 _write_public_issue_fixture_files(
@@ -6313,9 +6190,7 @@ def _discover_public_issue_failure_signal_record(
 
     if not policy_allowed:
         status = "blocked"
-        errors.append(
-            f"reproduction command rejected by policy: {policy_reason or 'unknown'}"
-        )
+        errors.append(f"reproduction command rejected by policy: {policy_reason or 'unknown'}")
         next_actions.append("resolve command-policy blockers before discovery")
     elif command_result.timed_out:
         status = "timed_out"
@@ -6514,9 +6389,7 @@ def _execute_public_issue_reproduction_record(
     run_dir.mkdir(parents=True, exist_ok=True)
     try:
         if fixture_files:
-            with tempfile.TemporaryDirectory(
-                prefix="patchsmith-public-repro-fixtures-"
-            ) as tmp_dir:
+            with tempfile.TemporaryDirectory(prefix="patchsmith-public-repro-fixtures-") as tmp_dir:
                 fixture_workspace = Path(tmp_dir) / "repo"
                 snapshot = clone_or_copy_repository(str(workspace), fixture_workspace)
                 _write_public_issue_fixture_files(
@@ -6593,9 +6466,7 @@ def _execute_public_issue_reproduction_record(
 
     if not policy_allowed:
         status = "blocked"
-        errors.append(
-            f"reproduction command rejected by policy: {policy_reason or 'unknown'}"
-        )
+        errors.append(f"reproduction command rejected by policy: {policy_reason or 'unknown'}")
         next_actions.append("resolve command-policy blockers before execution")
     elif timed_out:
         status = "timed_out"
@@ -6664,14 +6535,10 @@ def _check_public_issue_repair_readiness_record(
     focused_status = _optional_string(focused_record.get("status"))
     focused_command = _optional_string(focused_record.get("command"))
     diagnosis_category = (
-        _optional_string(diagnosis_record.get("category"))
-        if diagnosis_record is not None
-        else None
+        _optional_string(diagnosis_record.get("category")) if diagnosis_record is not None else None
     )
     diagnosis_severity = (
-        _optional_string(diagnosis_record.get("severity"))
-        if diagnosis_record is not None
-        else None
+        _optional_string(diagnosis_record.get("severity")) if diagnosis_record is not None else None
     )
     setup_status = (
         _optional_string(setup_validation_record.get("status"))
@@ -6724,17 +6591,13 @@ def _check_public_issue_repair_readiness_record(
         else None
     )
     validation_fixture_files, fixture_errors = (
-        _normalize_public_issue_fixture_files(
-            reproduction_execution_record.get("fixture_files")
-        )
+        _normalize_public_issue_fixture_files(reproduction_execution_record.get("fixture_files"))
         if reproduction_execution_record is not None
         else ([], [])
     )
     validation_fixture_paths = _public_issue_fixture_paths(validation_fixture_files)
     validation_source_hints, source_hint_errors = (
-        _normalize_public_issue_source_hints(
-            reproduction_execution_record.get("source_hints")
-        )
+        _normalize_public_issue_source_hints(reproduction_execution_record.get("source_hints"))
         if reproduction_execution_record is not None
         else ([], [])
     )
@@ -6822,21 +6685,16 @@ def _check_public_issue_repair_readiness_record(
             evidence.append("issue-specific reproduction command selected for repair validation")
         if validation_fixture_paths:
             evidence.append(
-                "repair validation fixtures selected: "
-                + ", ".join(validation_fixture_paths)
+                "repair validation fixtures selected: " + ", ".join(validation_fixture_paths)
             )
         if validation_source_hints:
-            evidence.append(
-                "reviewed source hints selected: " + ", ".join(validation_source_hints)
-            )
+            evidence.append("reviewed source hints selected: " + ", ".join(validation_source_hints))
         if reproduction_stdout_path:
             evidence.append(f"reproduction stdout saved: {reproduction_stdout_path}")
         if reproduction_stderr_path:
             evidence.append(f"reproduction stderr saved: {reproduction_stderr_path}")
         if matched_failure_signals:
-            evidence.append(
-                "matched reproduction signal: " + "; ".join(matched_failure_signals)
-            )
+            evidence.append("matched reproduction signal: " + "; ".join(matched_failure_signals))
     elif reproduction_execution_status == "dry_run":
         warnings.append("public issue reproduction execution is only dry-run")
         next_actions.append("rerun reproduction execution with --execute after review")
@@ -6934,9 +6792,7 @@ def _execute_public_issue_repair_record(
     validation_source_hints, source_hint_errors = _normalize_public_issue_source_hints(
         record.get("validation_source_hints")
     )
-    reproduction_execution_status = _optional_string(
-        record.get("reproduction_execution_status")
-    )
+    reproduction_execution_status = _optional_string(record.get("reproduction_execution_status"))
     errors = _string_list(record.get("blockers"))
     errors.extend(fixture_errors)
     errors.extend(source_hint_errors)
@@ -7039,9 +6895,7 @@ def _execute_public_issue_repair_record(
             patch_generated=patch_generated,
             errors=[],
             warnings=_dedupe_preserve_order(warnings),
-            evidence=_dedupe_preserve_order(
-                [*evidence, "repair attempt passed dry-run gating"]
-            ),
+            evidence=_dedupe_preserve_order([*evidence, "repair attempt passed dry-run gating"]),
             next_actions=_dedupe_preserve_order(
                 [*next_actions, "rerun with --execute to launch PatchSmith repair"]
             ),
@@ -7629,12 +7483,12 @@ def _issue_corpus_task_manifest(
         "suggested_commands": [
             (
                 "PYTHONPATH=src python3 -m patchsmith.cli run "
-                f"--repo \"{repo_ref}\" "
-                f"--issue-file \"{issue_path}\" "
+                f'--repo "{repo_ref}" '
+                f'--issue-file "{issue_path}" '
                 "--runtime langgraph "
                 "--planner fake_model "
                 "--context-provider native_hybrid "
-                f"--test-command \"{test_commands[0]}\" "
+                f'--test-command "{test_commands[0]}" '
                 "--json"
             )
         ],
@@ -7798,8 +7652,7 @@ def _source_free_preview_contexts(value: Any) -> list[dict[str, Any]]:
 def _manifest_is_source_free(value: Any) -> bool:
     if isinstance(value, dict):
         return all(
-            key != "excerpt" and _manifest_is_source_free(child)
-            for key, child in value.items()
+            key != "excerpt" and _manifest_is_source_free(child) for key, child in value.items()
         )
     if isinstance(value, list):
         return all(_manifest_is_source_free(item) for item in value)
@@ -7814,8 +7667,6 @@ def _string_list(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
     return [item for item in value if isinstance(item, str)]
-
-
 
 
 def _supplement_context_preview_source_neighbors(
@@ -7870,7 +7721,6 @@ def _supplement_context_preview_source_neighbors(
 
 def _source_neighbor_candidates(test_path: str, source_paths: set[str]) -> list[str]:
     path = Path(test_path)
-    name = path.name
     stem = path.stem
     normalized_stem = stem
     if normalized_stem.startswith("test_"):
@@ -7879,9 +7729,7 @@ def _source_neighbor_candidates(test_path: str, source_paths: set[str]) -> list[
         normalized_stem = normalized_stem[: -len("_test")]
 
     stripped_parts = [
-        part
-        for part in path.parts
-        if part not in {"tests", "test", "unit", "integration"}
+        part for part in path.parts if part not in {"tests", "test", "unit", "integration"}
     ]
     if stripped_parts:
         stripped_parts[-1] = f"{normalized_stem}{path.suffix}"
@@ -7897,9 +7745,7 @@ def _source_neighbor_candidates(test_path: str, source_paths: set[str]) -> list[
     ]
     candidates.extend(
         sorted(
-            source_path
-            for source_path in source_paths
-            if Path(source_path).stem == normalized_stem
+            source_path for source_path in source_paths if Path(source_path).stem == normalized_stem
         )
     )
     deduped: list[str] = []
@@ -7913,10 +7759,7 @@ def _is_issue_corpus_test_path(path: str) -> bool:
     parts = Path(path).parts
     name = Path(path).name
     return (
-        "tests" in parts
-        or "test" in parts
-        or name.startswith("test_")
-        or name.endswith("_test.py")
+        "tests" in parts or "test" in parts or name.startswith("test_") or name.endswith("_test.py")
     )
 
 
@@ -7925,8 +7768,7 @@ def _is_materialized_test_candidate_path(path: str) -> bool:
     parts = path_obj.parts
     name = path_obj.name
     return (
-        bool(parts)
-        and parts[0] in {"tests", "test", "testing"}
+        (bool(parts) and parts[0] in {"tests", "test", "testing"})
         or name.startswith("test_")
         or name.endswith("_test.py")
     )
@@ -8191,14 +8033,10 @@ def _model_usage_from_trace(trace_path: Path) -> dict[str, Any]:
 def _trace_metrics_from_trace(trace_path: Path) -> dict[str, Any]:
     events = _trace_events(trace_path)
     node_names = {
-        str(event.get("node_name"))
-        for event in events
-        if isinstance(event.get("node_name"), str)
+        str(event.get("node_name")) for event in events if isinstance(event.get("node_name"), str)
     }
     event_types = {
-        str(event.get("event_type"))
-        for event in events
-        if isinstance(event.get("event_type"), str)
+        str(event.get("event_type")) for event in events if isinstance(event.get("event_type"), str)
     }
     runtime_node_count = sum(
         1 for event in events if str(event.get("node_name", "")).startswith("runtime.")

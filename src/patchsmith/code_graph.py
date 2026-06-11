@@ -51,9 +51,7 @@ class CodeContextGraph:
             "nodes": [node.to_dict() for node in self.nodes.values()],
             "edges": [edge.to_dict() for edge in self.edges],
             "file_terms": {path: sorted(terms) for path, terms in self.file_terms.items()},
-            "related_paths": {
-                path: sorted(paths) for path, paths in self.related_paths.items()
-            },
+            "related_paths": {path: sorted(paths) for path, paths in self.related_paths.items()},
         }
 
 
@@ -219,11 +217,7 @@ def _imports_from_text(text: str) -> set[str]:
 
 
 def _path_terms(path: str) -> set[str]:
-    return {
-        token.lower()
-        for token in re.split(r"[^A-Za-z0-9_]+|_", path)
-        if len(token) > 2
-    }
+    return {token.lower() for token in re.split(r"[^A-Za-z0-9_]+|_", path) if len(token) > 2}
 
 
 def _name_terms(name: str) -> set[str]:

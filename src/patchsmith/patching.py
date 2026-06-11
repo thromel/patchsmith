@@ -62,4 +62,3 @@ def unified_diff(*, relative_path: str, before: str, after: str) -> str:
             tofile=f"b/{relative_path}",
         )
     )
-

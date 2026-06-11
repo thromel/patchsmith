@@ -1,8 +1,8 @@
 import subprocess
 from pathlib import Path
 
-from patchsmith.security import CommandPolicy, FocusedSetupCommandPolicy
 from patchsmith.sandbox import DockerSandboxRunner
+from patchsmith.security import CommandPolicy, FocusedSetupCommandPolicy
 
 
 def test_command_policy_allows_pytest(workspace: Path | None = None) -> None:

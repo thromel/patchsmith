@@ -16,7 +16,9 @@ from patchsmith.evaluation_models import (
     IssueCorpusPublicReproductionSpecValidationResult,
     IssueCorpusPublicReproductionSpecValidationSummary,
 )
-from patchsmith.public_issue_fixtures import public_issue_fixture_paths as _public_issue_fixture_paths
+from patchsmith.public_issue_fixtures import (
+    public_issue_fixture_paths as _public_issue_fixture_paths,
+)
 
 
 def _markdown_table_text(value: object) -> str:
@@ -192,11 +194,7 @@ def render_public_issue_failure_signal_discovery_report(
     ]
     for result in results:
         notes = [*result.errors, *result.warnings]
-        log_paths = "; ".join(
-            path
-            for path in [result.stdout_path, result.stderr_path]
-            if path
-        )
+        log_paths = "; ".join(path for path in [result.stdout_path, result.stderr_path] if path)
         lines.append(
             "| "
             f"{_markdown_table_text(result.task_id or 'unknown')} | "
@@ -265,9 +263,7 @@ def render_public_issue_reproduction_execution_report(
     for result in results:
         notes = [*result.errors, *result.warnings]
         log_paths = "; ".join(
-            path
-            for path in [result.stdout_path, result.stderr_path]
-            if path is not None
+            path for path in [result.stdout_path, result.stderr_path] if path is not None
         )
         lines.append(
             "| "

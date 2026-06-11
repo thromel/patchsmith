@@ -3,12 +3,11 @@ from __future__ import annotations
 import json
 from collections import Counter
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from html import escape
 from os.path import relpath
 from pathlib import Path
 from typing import Any
-
 
 REPORT_FILENAMES = (
     "report.md",
@@ -162,9 +161,7 @@ def build_artifact_index(*, artifacts_dir: Path) -> ArtifactIndex:
     entries: list[ExperimentArtifactIndexEntry] = []
     metrics: list[ExperimentMetricIndexEntry] = []
     if experiments_dir.exists():
-        for experiment_dir in sorted(
-            path for path in experiments_dir.iterdir() if path.is_dir()
-        ):
+        for experiment_dir in sorted(path for path in experiments_dir.iterdir() if path.is_dir()):
             if experiment_dir.name in GENERATED_EXPERIMENT_DIR_NAMES:
                 continue
             report_path = _first_existing(experiment_dir, REPORT_FILENAMES)
@@ -200,7 +197,7 @@ def build_artifact_index(*, artifacts_dir: Path) -> ArtifactIndex:
     runs = _discover_runs(artifacts_dir)
     return ArtifactIndex(
         artifacts_dir=str(artifacts_dir),
-        generated_at=_utc_timestamp(datetime.now(timezone.utc).timestamp()),
+        generated_at=_utc_timestamp(datetime.now(UTC).timestamp()),
         experiment_count=len(entries),
         run_count=len(runs),
         experiments=entries,
@@ -224,7 +221,7 @@ def build_failure_report(
     category_counts = Counter(insight.failure_category for insight in insights)
     return FailureArtifactReport(
         artifacts_dir=index.artifacts_dir,
-        generated_at=_utc_timestamp(datetime.now(timezone.utc).timestamp()),
+        generated_at=_utc_timestamp(datetime.now(UTC).timestamp()),
         runs_scanned=len(runs),
         runs_requiring_attention=len(insights),
         failed_event_count=sum(insight.failed_event_count for insight in insights),
@@ -413,10 +410,7 @@ def render_artifact_index(
         "",
         "## Experiments",
         "",
-        (
-            "| Experiment | Kind | Report | Summary | Results | Result Count | "
-            "Runs | Updated |"
-        ),
+        ("| Experiment | Kind | Report | Summary | Results | Result Count | Runs | Updated |"),
         "|---|---|---|---|---|---:|---:|---|",
     ]
     for entry in index.experiments:
@@ -850,22 +844,12 @@ def render_run_detail_page(
     dashboard_path: Path | None = None,
 ) -> str:
     events = _load_trace_events(run, artifacts_dir)
-    failed_events = [
-        event
-        for event in events
-        if _is_failure_status(event.get("status"))
-    ]
+    failed_events = [event for event in events if _is_failure_status(event.get("status"))]
     latency_ms = sum(
-        value
-        for event in events
-        if isinstance((value := event.get("latency_ms")), int | float)
+        value for event in events if isinstance((value := event.get("latency_ms")), int | float)
     )
     nodes = sorted(
-        {
-            str(event.get("node_name"))
-            for event in events
-            if event.get("node_name") is not None
-        }
+        {str(event.get("node_name")) for event in events if event.get("node_name") is not None}
     )
     artifact_links = _run_detail_artifact_links(
         run,
@@ -879,7 +863,9 @@ def render_run_detail_page(
         else ""
     )
     timeline_rows = "\n".join(_trace_event_row(event) for event in events)
-    retrieval_rows = "\n".join(_retrieval_context_row(context) for context in _trace_contexts(events))
+    retrieval_rows = "\n".join(
+        _retrieval_context_row(context) for context in _trace_contexts(events)
+    )
     target_rows = "\n".join(_context_target_row(target) for target in _trace_targets(events))
     diff_preview = _text_preview(run.diff_path, artifacts_dir=artifacts_dir, max_lines=140)
     stdout_preview = _text_preview(run.stdout_path, artifacts_dir=artifacts_dir, max_lines=80)
@@ -1147,9 +1133,7 @@ def _failure_run_insight(
     artifacts_dir: Path,
 ) -> FailureRunInsight | None:
     events = _load_trace_events(run, artifacts_dir)
-    failed_events = [
-        event for event in events if _is_failure_status(event.get("status"))
-    ]
+    failed_events = [event for event in events if _is_failure_status(event.get("status"))]
     outcome = _last_repair_outcome_event(events)
     outcome_payload = (
         outcome.get("payload")
@@ -1773,11 +1757,7 @@ def _metric_entry_from_row(
     if "valid_tasks" in row and "task_count" in row:
         task_count = _int_or_none(row.get("task_count"))
         valid_tasks = _int_or_none(row.get("valid_tasks"))
-        valid_rate = (
-            valid_tasks / task_count
-            if valid_tasks is not None and task_count
-            else None
-        )
+        valid_rate = valid_tasks / task_count if valid_tasks is not None and task_count else None
         return ExperimentMetricIndexEntry(
             experiment=experiment,
             kind=kind,
@@ -1891,11 +1871,7 @@ def _dashboard_metric_row(
         artifacts_dir=artifacts_dir,
         output_path=output_path,
     )
-    latency = (
-        _format_latency(metric.avg_latency_ms)
-        if metric.avg_latency_ms is not None
-        else ""
-    )
+    latency = _format_latency(metric.avg_latency_ms) if metric.avg_latency_ms is not None else ""
     data_name = f"{metric.experiment} {metric.lane}".lower()
     return f"""        <tr data-name="{escape(data_name)}" data-kind="{escape(metric.kind)}">
           <td><strong>{escape(metric.experiment)}</strong></td>
@@ -1912,11 +1888,7 @@ def _dashboard_metric_row(
 
 
 def _count_note(counts: tuple[tuple[int | None, str], ...]) -> str | None:
-    parts = [
-        f"{count} {label}"
-        for count, label in counts
-        if count is not None
-    ]
+    parts = [f"{count} {label}" for count, label in counts if count is not None]
     return "; ".join(parts) if parts else None
 
 
@@ -1952,9 +1924,7 @@ def _discover_runs(artifacts_dir: Path) -> list[RunArtifactIndexEntry]:
     experiments_dir = artifacts_dir / "experiments"
     if experiments_dir.exists():
         run_dirs.extend(
-            path
-            for path in experiments_dir.glob("**/run_artifacts/runs/*")
-            if path.is_dir()
+            path for path in experiments_dir.glob("**/run_artifacts/runs/*") if path.is_dir()
         )
     runs = [_run_entry(artifacts_dir, run_dir) for run_dir in run_dirs]
     return sorted(
@@ -2066,20 +2036,12 @@ def _run_count(artifacts_dir: Path) -> int:
         count += sum(1 for path in direct_runs.iterdir() if path.is_dir())
     experiments_dir = artifacts_dir / "experiments"
     if experiments_dir.exists():
-        count += sum(
-            1
-            for path in experiments_dir.glob("**/run_artifacts/runs/*")
-            if path.is_dir()
-        )
+        count += sum(1 for path in experiments_dir.glob("**/run_artifacts/runs/*") if path.is_dir())
     return count
 
 
 def _experiment_run_count(experiment_dir: Path) -> int:
-    return sum(
-        1
-        for path in experiment_dir.glob("**/run_artifacts/runs/*")
-        if path.is_dir()
-    )
+    return sum(1 for path in experiment_dir.glob("**/run_artifacts/runs/*") if path.is_dir())
 
 
 def _updated_at(
@@ -2109,7 +2071,7 @@ def _updated_at_from_paths(
 
 def _utc_timestamp(epoch_seconds: float) -> str:
     return (
-        datetime.fromtimestamp(epoch_seconds, tz=timezone.utc)
+        datetime.fromtimestamp(epoch_seconds, tz=UTC)
         .replace(microsecond=0)
         .isoformat()
         .replace("+00:00", "Z")

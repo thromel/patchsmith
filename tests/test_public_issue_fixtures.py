@@ -84,6 +84,5 @@ def test_public_issue_source_hints_normalize_and_reject_unsafe_paths() -> None:
     assert "source_hints[2] cannot contain traversal: ../escape.py" in errors
     assert "source_hints[3] cannot target Git metadata: .git/config" in errors
     assert (
-        "source_hints[4] symbol must be identifier-like: "
-        "src/_pytest/pathlib.py#bad/symbol"
+        "source_hints[4] symbol must be identifier-like: src/_pytest/pathlib.py#bad/symbol"
     ) in errors

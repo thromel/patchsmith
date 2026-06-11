@@ -152,13 +152,13 @@ def issue_with_test_feedback(
     if test_result is not None:
         sections.extend(
             [
-                "Sandbox command:\n" f"{test_result.command}",
-                "Sandbox exit code:\n" f"{test_result.exit_code}",
-                "Sandbox stdout:\n" f"{_truncate_feedback(test_result.stdout)}",
-                "Sandbox stderr:\n" f"{_truncate_feedback(test_result.stderr)}",
+                f"Sandbox command:\n{test_result.command}",
+                f"Sandbox exit code:\n{test_result.exit_code}",
+                f"Sandbox stdout:\n{_truncate_feedback(test_result.stdout)}",
+                f"Sandbox stderr:\n{_truncate_feedback(test_result.stderr)}",
             ]
         )
-    sections.append("Current diff after failed attempt:\n" f"{_truncate_feedback(final_diff)}")
+    sections.append(f"Current diff after failed attempt:\n{_truncate_feedback(final_diff)}")
     return "\n\n".join(sections)
 
 

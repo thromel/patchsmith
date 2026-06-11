@@ -16,18 +16,18 @@ from patchsmith.context import (
 from patchsmith.deepagents_planner import DeepAgentsRepairPlanner
 from patchsmith.ingest import clone_or_copy_repository, index_repository
 from patchsmith.models import RepairRunResult, RunRequest, new_id
-from patchsmith.reporting import render_run_report
-from patchsmith.retrieval import GraphRetriever, HybridRetriever, KeywordRetriever
 from patchsmith.planning import (
     HeuristicRepairPlanner,
     ModelBackedRepairPlanner,
     OpenAIResponsesModelClient,
     SeededFakeRepairModelClient,
 )
+from patchsmith.reporting import render_run_report
+from patchsmith.retrieval import GraphRetriever, HybridRetriever, KeywordRetriever
 from patchsmith.runtime import (
-    AgentTask,
-    AgentRuntime,
     AgentlessRuntime,
+    AgentRuntime,
+    AgentTask,
     DeepAgentsRuntime,
     HeuristicRuntime,
     LangGraphRuntime,
@@ -277,8 +277,7 @@ class RepairRunner:
                     event_type="repair_retry",
                     status="scheduled",
                     output_summary=(
-                        f"Scheduling DeepAgents feedback retry {attempt} of "
-                        f"{max_feedback_retries}."
+                        f"Scheduling DeepAgents feedback retry {attempt} of {max_feedback_retries}."
                     ),
                     payload={
                         "attempt": attempt,
@@ -340,6 +339,7 @@ class RepairRunner:
             retrieved_context=retrieved_context,
             test_result=test_result,
         )
+
 
 def _workspace_diff(repo_path: Path) -> str:
     if not (repo_path / ".git").exists():

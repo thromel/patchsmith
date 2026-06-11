@@ -30,7 +30,6 @@ class LangGraphRepairState(TypedDict, total=False):
     files_changed: list[str]
 
 
-
 class LangGraphRuntime:
     """LangGraph-backed repair runtime with a replaceable planner.
 
@@ -205,7 +204,9 @@ class LangGraphRuntime:
                 {
                     "node": "review",
                     "status": str(state.get("status", "missing_result")),
-                    "summary": "Generated one patch candidate." if final_diff else "No diff generated.",
+                    "summary": "Generated one patch candidate."
+                    if final_diff
+                    else "No diff generated.",
                     "attempt": int(state.get("attempt", 0)),
                 }
             )

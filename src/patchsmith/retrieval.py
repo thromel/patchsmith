@@ -115,7 +115,9 @@ class KeywordRetriever:
             path = repo_path / file.path
             text = _safe_read(path)
             text_terms = Counter(_tokens(text))
-            matched_terms = sorted(term for term in query_terms if term in text_terms or term in file.path.lower())
+            matched_terms = sorted(
+                term for term in query_terms if term in text_terms or term in file.path.lower()
+            )
             if not matched_terms:
                 continue
 

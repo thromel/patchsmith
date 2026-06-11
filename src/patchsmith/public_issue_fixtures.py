@@ -81,22 +81,16 @@ def normalize_public_issue_fixture_files(
         path = Path(raw_path)
         normalized_path = path.as_posix()
         if path.is_absolute():
-            errors.append(
-                f"fixture_files[{index}].path must be repository-relative: {raw_path}"
-            )
+            errors.append(f"fixture_files[{index}].path must be repository-relative: {raw_path}")
             continue
         if raw_path.endswith(("/", "\\")) or normalized_path in {"", "."}:
             errors.append(f"fixture_files[{index}].path must name a file: {raw_path}")
             continue
         if any(part in {"..", ""} for part in path.parts):
-            errors.append(
-                f"fixture_files[{index}].path cannot contain traversal: {raw_path}"
-            )
+            errors.append(f"fixture_files[{index}].path cannot contain traversal: {raw_path}")
             continue
         if any(part == ".git" for part in path.parts):
-            errors.append(
-                f"fixture_files[{index}].path cannot target Git metadata: {raw_path}"
-            )
+            errors.append(f"fixture_files[{index}].path cannot target Git metadata: {raw_path}")
             continue
         if normalized_path in seen_paths:
             errors.append(f"fixture_files[{index}].path is duplicated: {normalized_path}")
@@ -140,16 +134,12 @@ def normalize_public_issue_source_hints(value: Any) -> tuple[list[str], list[str
             continue
         hint_path, hint_symbol = _split_source_hint(raw_hint.strip())
         if hint_symbol is not None and not SOURCE_HINT_SYMBOL_RE.match(hint_symbol):
-            errors.append(
-                f"source_hints[{index}] symbol must be identifier-like: {raw_hint}"
-            )
+            errors.append(f"source_hints[{index}] symbol must be identifier-like: {raw_hint}")
             continue
         path = Path(hint_path)
         normalized_path = path.as_posix()
         if path.is_absolute():
-            errors.append(
-                f"source_hints[{index}] must be repository-relative: {raw_hint}"
-            )
+            errors.append(f"source_hints[{index}] must be repository-relative: {raw_hint}")
             continue
         if raw_hint.endswith(("/", "\\")) or normalized_path in {"", "."}:
             errors.append(f"source_hints[{index}] must name a file: {raw_hint}")
@@ -160,9 +150,7 @@ def normalize_public_issue_source_hints(value: Any) -> tuple[list[str], list[str
         if any(part == ".git" for part in path.parts):
             errors.append(f"source_hints[{index}] cannot target Git metadata: {raw_hint}")
             continue
-        normalized_hint = (
-            f"{normalized_path}#{hint_symbol}" if hint_symbol else normalized_path
-        )
+        normalized_hint = f"{normalized_path}#{hint_symbol}" if hint_symbol else normalized_path
         if normalized_hint in seen_hints:
             errors.append(f"source_hints[{index}] is duplicated: {normalized_hint}")
             continue

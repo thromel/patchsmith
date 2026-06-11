@@ -5,13 +5,13 @@ import os
 import re
 import urllib.error
 import urllib.request
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import PurePosixPath
-from typing import Any, Callable, Mapping, Protocol
+from typing import Any, Protocol
 
 from patchsmith.model_config import DEFAULT_OPENAI_MODEL, configured_model_pricing
 from patchsmith.models import RetrievedContext
-
 
 OPENAI_RESPONSES_ENDPOINT = "https://api.openai.com/v1/responses"
 
@@ -104,7 +104,7 @@ class OpenAIResponsesModelClient:
         environ: Mapping[str, str] | None = None,
         *,
         opener: Callable[[urllib.request.Request, float], bytes] | None = None,
-    ) -> "OpenAIResponsesModelClient":
+    ) -> OpenAIResponsesModelClient:
         env = os.environ if environ is None else environ
         api_key = env.get("OPENAI_API_KEY", "").strip()
         if not api_key:
@@ -112,7 +112,9 @@ class OpenAIResponsesModelClient:
                 "OPENAI_API_KEY is required for planner `openai`; "
                 "use `fake_model` for offline evals"
             )
-        model = env.get("PATCHSMITH_OPENAI_MODEL", DEFAULT_OPENAI_MODEL).strip() or DEFAULT_OPENAI_MODEL
+        model = (
+            env.get("PATCHSMITH_OPENAI_MODEL", DEFAULT_OPENAI_MODEL).strip() or DEFAULT_OPENAI_MODEL
+        )
         pricing = configured_model_pricing(
             env=env,
             model=model,

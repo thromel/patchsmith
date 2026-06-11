@@ -35,4 +35,3 @@ def test_apply_text_replacement_rejects_path_escape(tmp_path: Path) -> None:
             old="x",
             new="y",
         )
-

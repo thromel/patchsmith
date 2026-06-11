@@ -138,7 +138,9 @@ def detect_package_manager(repo_path: Path) -> str | None:
 
 def detect_test_commands(repo_path: Path) -> list[str]:
     commands: list[str] = []
-    has_python_tests = any(path.name.startswith("test_") and path.suffix == ".py" for path in repo_path.rglob("*.py"))
+    has_python_tests = any(
+        path.name.startswith("test_") and path.suffix == ".py" for path in repo_path.rglob("*.py")
+    )
     has_package_json = (repo_path / "package.json").exists()
 
     if has_python_tests:
@@ -167,9 +169,7 @@ def _should_index_file(repo_path: Path, path: Path) -> bool:
         return False
     if path.stat().st_size > MAX_INDEXED_FILE_BYTES:
         return False
-    if _is_binary(path):
-        return False
-    return True
+    return not _is_binary(path)
 
 
 def _is_binary(path: Path) -> bool:

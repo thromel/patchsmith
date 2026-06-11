@@ -6,14 +6,14 @@ import tempfile
 from pathlib import Path
 
 from patchsmith.evaluation import (
-    check_materialized_issue_run_readiness,
     check_focused_test_setup_readiness,
+    check_materialized_issue_run_readiness,
     check_public_issue_repair_readiness,
     diagnose_focused_test_runs,
     discover_public_issue_failure_signals,
     execute_focused_test_setups,
-    execute_public_issue_reproductions,
     execute_public_issue_repairs,
+    execute_public_issue_reproductions,
     materialize_issue_corpus_tasks,
     plan_focused_test_setups,
     plan_materialized_issue_focused_tests,
@@ -23,8 +23,8 @@ from patchsmith.evaluation import (
     run_materialized_issue_focused_tests,
     run_patch_search_evaluation,
     run_repair_evaluation,
-    run_scaffold_comparison,
     run_retrieval_evaluation,
+    run_scaffold_comparison,
     validate_focused_test_setups,
     validate_issue_corpus,
     validate_materialized_issue_tasks,
@@ -37,10 +37,10 @@ from patchsmith.model_preflight import openai_model_preflight_from_env
 from patchsmith.models import RunRequest
 from patchsmith.observability import write_artifact_index, write_failure_report
 from patchsmith.portfolio import (
-    write_demo_readiness_report,
-    write_demo_media_assets,
-    write_demo_script_report,
     write_delivery_audit_report,
+    write_demo_media_assets,
+    write_demo_readiness_report,
+    write_demo_script_report,
     write_docker_smoke_report,
     write_environment_readiness_report,
     write_evidence_refresh_report,
@@ -343,9 +343,7 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
         else:
-            print(
-                f"Report: {Path(args.output) / 'materialized_task_validation_report.md'}"
-            )
+            print(f"Report: {Path(args.output) / 'materialized_task_validation_report.md'}")
             print(
                 f"valid={summary.valid_tasks}/{summary.task_count} "
                 f"errors={summary.error_count} warnings={summary.warning_count}"
@@ -371,9 +369,7 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
         else:
-            print(
-                f"Report: {Path(args.output) / 'materialized_run_readiness_report.md'}"
-            )
+            print(f"Report: {Path(args.output) / 'materialized_run_readiness_report.md'}")
             print(
                 f"ready={summary.ready_tasks} warning={summary.warning_tasks} "
                 f"blocked={summary.blocked_tasks}"
@@ -444,9 +440,7 @@ def main(argv: list[str] | None = None) -> int:
                 json.dumps(
                     {
                         "result_count": len(results),
-                        "report_path": str(
-                            Path(args.output) / "focused_test_diagnosis_report.md"
-                        ),
+                        "report_path": str(Path(args.output) / "focused_test_diagnosis_report.md"),
                         "summary": summary.to_dict(),
                     },
                     indent=2,
@@ -471,9 +465,7 @@ def main(argv: list[str] | None = None) -> int:
                 json.dumps(
                     {
                         "result_count": len(results),
-                        "report_path": str(
-                            Path(args.output) / "focused_test_setup_plan_report.md"
-                        ),
+                        "report_path": str(Path(args.output) / "focused_test_setup_plan_report.md"),
                         "summary": summary.to_dict(),
                     },
                     indent=2,
@@ -584,9 +576,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "plan-public-issue-reproductions":
         focused_plan = Path(args.focused_plan) if args.focused_plan else None
-        reproduction_specs = (
-            Path(args.reproduction_specs) if args.reproduction_specs else None
-        )
+        reproduction_specs = Path(args.reproduction_specs) if args.reproduction_specs else None
         results, summary = plan_public_issue_reproductions(
             tasks_dir=Path(args.tasks_dir),
             focused_plan_path=focused_plan,
@@ -607,9 +597,7 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
         else:
-            print(
-                f"Report: {Path(args.output) / 'public_issue_reproduction_plan_report.md'}"
-            )
+            print(f"Report: {Path(args.output) / 'public_issue_reproduction_plan_report.md'}")
             print(
                 f"planned={summary.planned_tasks} warning={summary.warning_tasks} "
                 f"blocked={summary.blocked_tasks}"
@@ -667,8 +655,7 @@ def main(argv: list[str] | None = None) -> int:
                     {
                         "result_count": len(results),
                         "report_path": str(
-                            Path(args.output)
-                            / "public_issue_failure_signal_discovery_report.md"
+                            Path(args.output) / "public_issue_failure_signal_discovery_report.md"
                         ),
                         "summary": summary.to_dict(),
                     },
@@ -677,8 +664,7 @@ def main(argv: list[str] | None = None) -> int:
             )
         else:
             print(
-                "Report: "
-                f"{Path(args.output) / 'public_issue_failure_signal_discovery_report.md'}"
+                f"Report: {Path(args.output) / 'public_issue_failure_signal_discovery_report.md'}"
             )
             print(
                 f"dry_run={summary.dry_run_tasks} attempted={summary.attempted_tasks} "
@@ -705,8 +691,7 @@ def main(argv: list[str] | None = None) -> int:
                     {
                         "result_count": len(results),
                         "report_path": str(
-                            Path(args.output)
-                            / "public_issue_reproduction_execution_report.md"
+                            Path(args.output) / "public_issue_reproduction_execution_report.md"
                         ),
                         "summary": summary.to_dict(),
                     },
@@ -714,10 +699,7 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
         else:
-            print(
-                "Report: "
-                f"{Path(args.output) / 'public_issue_reproduction_execution_report.md'}"
-            )
+            print(f"Report: {Path(args.output) / 'public_issue_reproduction_execution_report.md'}")
             print(
                 f"dry_run={summary.dry_run_tasks} attempted={summary.attempted_tasks} "
                 f"reproduced={summary.reproduced_tasks} blocked={summary.blocked_tasks}"
@@ -748,9 +730,7 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
         else:
-            print(
-                f"Report: {Path(args.output) / 'public_issue_repair_readiness_report.md'}"
-            )
+            print(f"Report: {Path(args.output) / 'public_issue_repair_readiness_report.md'}")
             print(
                 f"ready={summary.ready_tasks} warning={summary.warning_tasks} "
                 f"blocked={summary.blocked_tasks}"
@@ -788,9 +768,7 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
         else:
-            print(
-                f"Report: {Path(args.output) / 'public_issue_repair_attempt_report.md'}"
-            )
+            print(f"Report: {Path(args.output) / 'public_issue_repair_attempt_report.md'}")
             print(
                 f"dry_run={summary.dry_run_tasks} attempted={summary.attempted_tasks} "
                 f"validated={summary.validated_tasks} blocked={summary.blocked_tasks}"
@@ -864,7 +842,7 @@ def main(argv: list[str] | None = None) -> int:
                     f"{result.scaffold}: patch_generated={result.patch_generated_rate:.2f} "
                     f"tests_passed={result.targeted_test_pass_rate:.2f} "
                     f"completed={result.completed_tasks}/{result.attempted_tasks}"
-            )
+                )
         return 0
 
     if args.command == "eval-patch-search":
@@ -901,9 +879,7 @@ def main(argv: list[str] | None = None) -> int:
         json_output_path = Path(args.json_output) if args.json_output else None
         html_output_path = Path(args.html_output) if args.html_output else None
         run_detail_output_dir = (
-            Path(args.run_detail_output_dir)
-            if args.run_detail_output_dir
-            else None
+            Path(args.run_detail_output_dir) if args.run_detail_output_dir else None
         )
         index = write_artifact_index(
             artifacts_dir=Path(args.artifacts_dir),
@@ -922,11 +898,7 @@ def main(argv: list[str] | None = None) -> int:
                 "index_path": str(Path(args.output)),
                 "json_path": str(json_output_path) if json_output_path else None,
                 "html_path": str(html_output_path) if html_output_path else None,
-                "run_detail_dir": (
-                    str(run_detail_output_dir)
-                    if run_detail_output_dir
-                    else None
-                ),
+                "run_detail_dir": (str(run_detail_output_dir) if run_detail_output_dir else None),
             }
             print(json.dumps(payload, indent=2))
         else:
@@ -1115,9 +1087,7 @@ def main(argv: list[str] | None = None) -> int:
                         "deepagents_compatibility_run_count": (
                             report.deepagents_compatibility_run_count
                         ),
-                        "openai_agents_package_run_count": (
-                            report.openai_agents_package_run_count
-                        ),
+                        "openai_agents_package_run_count": (report.openai_agents_package_run_count),
                         "openai_agents_compatibility_run_count": (
                             report.openai_agents_compatibility_run_count
                         ),
@@ -1159,9 +1129,7 @@ def main(argv: list[str] | None = None) -> int:
                         "deepagents_compatibility_run_count": (
                             report.deepagents_compatibility_run_count
                         ),
-                        "openai_agents_package_run_count": (
-                            report.openai_agents_package_run_count
-                        ),
+                        "openai_agents_package_run_count": (report.openai_agents_package_run_count),
                         "openai_agents_compatibility_run_count": (
                             report.openai_agents_compatibility_run_count
                         ),
@@ -1534,9 +1502,7 @@ def main(argv: list[str] | None = None) -> int:
                         "launch_status": report.launch_status,
                         "release_status": report.release_status,
                         "docker_smoke_status": report.docker_smoke_status,
-                        "environment_readiness_status": (
-                            report.environment_readiness_status
-                        ),
+                        "environment_readiness_status": (report.environment_readiness_status),
                         "live_calibration_status": report.live_calibration_status,
                         "saved_live_provider_count": report.saved_live_provider_count,
                         "blocker_count": report.blocker_count,
@@ -1679,7 +1645,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     model_preflight.add_argument("--json", action="store_true", help="Print JSON result.")
 
-    index = subparsers.add_parser("index", help="Clone/copy a repository and print file index JSON.")
+    index = subparsers.add_parser(
+        "index", help="Clone/copy a repository and print file index JSON."
+    )
     _add_repo_args(index)
 
     retrieve = subparsers.add_parser("retrieve", help="Run keyword retrieval and print JSON.")
@@ -2032,8 +2000,7 @@ def build_parser() -> argparse.ArgumentParser:
     focused_test_setup_execution_parser.add_argument(
         "--readiness",
         default=(
-            "artifacts/experiments/public_issue_corpus_v1/"
-            "focused_test_setup_readiness_results.json"
+            "artifacts/experiments/public_issue_corpus_v1/focused_test_setup_readiness_results.json"
         ),
         help="Focused test setup-readiness results JSON.",
     )
@@ -2099,8 +2066,7 @@ def build_parser() -> argparse.ArgumentParser:
     focused_test_setup_validation_parser.add_argument(
         "--setup-execution",
         default=(
-            "artifacts/experiments/public_issue_corpus_v1/"
-            "focused_test_setup_execution_results.json"
+            "artifacts/experiments/public_issue_corpus_v1/focused_test_setup_execution_results.json"
         ),
         help="Focused test setup-execution results JSON.",
     )
@@ -2160,10 +2126,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     public_reproduction_plan_parser.add_argument(
         "--focused-plan",
-        default=(
-            "artifacts/experiments/public_issue_corpus_v1/"
-            "focused_test_plan_results.json"
-        ),
+        default=("artifacts/experiments/public_issue_corpus_v1/focused_test_plan_results.json"),
         help="Focused public issue test-plan results JSON.",
     )
     public_reproduction_plan_parser.add_argument(
@@ -2204,10 +2167,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     public_reproduction_spec_validation_parser.add_argument(
         "--focused-plan",
-        default=(
-            "artifacts/experiments/public_issue_corpus_v1/"
-            "focused_test_plan_results.json"
-        ),
+        default=("artifacts/experiments/public_issue_corpus_v1/focused_test_plan_results.json"),
         help="Focused public issue test-plan results JSON.",
     )
     public_reproduction_spec_validation_parser.add_argument(
@@ -2341,17 +2301,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     public_repair_readiness_parser.add_argument(
         "--focused-run",
-        default=(
-            "artifacts/experiments/public_issue_corpus_v1/"
-            "focused_test_run_results.json"
-        ),
+        default=("artifacts/experiments/public_issue_corpus_v1/focused_test_run_results.json"),
         help="Focused public issue test-run results JSON.",
     )
     public_repair_readiness_parser.add_argument(
         "--diagnosis",
         default=(
-            "artifacts/experiments/public_issue_corpus_v1/"
-            "focused_test_diagnosis_results.json"
+            "artifacts/experiments/public_issue_corpus_v1/focused_test_diagnosis_results.json"
         ),
         help="Focused public issue test-diagnosis results JSON.",
     )

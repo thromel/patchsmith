@@ -20,8 +20,7 @@ def deepagents_system_prompt() -> str:
 
 def deepagents_planner_prompt(issue_text: str, virtual_to_repo: dict[str, str]) -> str:
     paths = "\n".join(
-        f"- {virtual}: repository path `{repo}`"
-        for virtual, repo in virtual_to_repo.items()
+        f"- {virtual}: repository path `{repo}`" for virtual, repo in virtual_to_repo.items()
     )
     return (
         "Issue:\n"

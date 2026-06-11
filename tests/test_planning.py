@@ -201,9 +201,7 @@ def test_deepagents_repair_planner_from_env_uses_default_model_pricing() -> None
 
 
 def test_deepagents_repair_planner_from_env_allows_reasoning_effort_opt_in() -> None:
-    planner = DeepAgentsRepairPlanner.from_env(
-        {"PATCHSMITH_DEEPAGENTS_REASONING_EFFORT": "low"}
-    )
+    planner = DeepAgentsRepairPlanner.from_env({"PATCHSMITH_DEEPAGENTS_REASONING_EFFORT": "low"})
 
     assert planner.config.reasoning_effort == "low"
 

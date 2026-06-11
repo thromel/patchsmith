@@ -546,9 +546,7 @@ def render_materialized_issue_focused_test_run_report(
         logs = "none"
         if result.stdout_path or result.stderr_path:
             logs = ", ".join(
-                path
-                for path in [result.stdout_path, result.stderr_path]
-                if path is not None
+                path for path in [result.stdout_path, result.stderr_path] if path is not None
             )
         exit_code = result.exit_code if result.exit_code is not None else "n/a"
         lines.append(
@@ -765,10 +763,7 @@ def render_focused_test_setup_execution_report(
         f"- Task count: `{summary.task_count}`",
         f"- Dry run: `{str(summary.dry_run).lower()}`",
         f"- Allow warnings: `{str(summary.allow_warnings).lower()}`",
-        (
-            "- Allow dependency installs: "
-            f"`{str(summary.allow_dependency_installs).lower()}`"
-        ),
+        (f"- Allow dependency installs: `{str(summary.allow_dependency_installs).lower()}`"),
         f"- Sandbox mode: `{summary.sandbox_mode}`",
         f"- Sandbox image: `{summary.sandbox_image}`",
         f"- Sandbox network: `{summary.sandbox_network}`",
@@ -859,9 +854,7 @@ def render_focused_test_setup_validation_report(
     for result in results:
         notes = [*result.errors, *result.warnings]
         command_status = (
-            result.command_result.status
-            if result.command_result is not None
-            else "none"
+            result.command_result.status if result.command_result is not None else "none"
         )
         lines.append(
             "| "

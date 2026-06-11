@@ -16,6 +16,15 @@ class SandboxRunner(Protocol):
         """Run a policy-checked command in a workspace."""
 
 
+def _timeout_output(value: bytes | str | None) -> str:
+    """Normalize TimeoutExpired output, which is bytes|str|None even with text=True."""
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return value
+
+
 class LocalSandboxRunner:
     """Development-only command runner with policy checks.
 
@@ -66,8 +75,8 @@ class LocalSandboxRunner:
             return CommandResult(
                 command=command,
                 exit_code=None,
-                stdout=error.stdout or "",
-                stderr=error.stderr or "",
+                stdout=_timeout_output(error.stdout),
+                stderr=_timeout_output(error.stderr),
                 duration_ms=duration_ms,
                 timed_out=True,
                 policy_decision=decision,
@@ -139,8 +148,8 @@ class DockerSandboxRunner:
             return CommandResult(
                 command=command,
                 exit_code=None,
-                stdout=error.stdout or "",
-                stderr=error.stderr or "",
+                stdout=_timeout_output(error.stdout),
+                stderr=_timeout_output(error.stderr),
                 duration_ms=duration_ms,
                 timed_out=True,
                 policy_decision=decision,

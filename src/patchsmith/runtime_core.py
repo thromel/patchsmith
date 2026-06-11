@@ -74,7 +74,9 @@ class HeuristicRuntime:
 
     def run(self, task: AgentTask) -> AgentResult:
         repo_path = Path(task.repo_path)
-        plan = self.planner.plan(issue_text=task.issue_text, retrieved_context=task.retrieved_context)
+        plan = self.planner.plan(
+            issue_text=task.issue_text, retrieved_context=task.retrieved_context
+        )
         if plan:
             try:
                 return _apply_plan(
@@ -89,7 +91,11 @@ class HeuristicRuntime:
                     runtime_trace=[
                         {"node": "plan", "status": "completed", "summary": plan.summary},
                         {"node": "edit", "status": "completed", "summary": plan.path},
-                        {"node": "review", "status": "completed", "summary": "single diff generated"},
+                        {
+                            "node": "review",
+                            "status": "completed",
+                            "summary": "single diff generated",
+                        },
                     ],
                 )
             except PatchSafetyError:
@@ -120,6 +126,8 @@ class HeuristicRuntime:
                 }
             ],
         )
+
+
 def _apply_plan(
     *,
     task: AgentTask,

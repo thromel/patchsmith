@@ -166,4 +166,6 @@ def test_graph_retrieval_expands_source_to_related_tests(tmp_path: Path) -> None
     assert contexts[0].path == "src/string_tools.py"
     assert contexts[0].method == "native_graph"
     assert "tests/test_string_tools.py" in [context.path for context in contexts]
-    assert any("graph_neighbor:src/string_tools.py" in context.matched_terms for context in contexts)
+    assert any(
+        "graph_neighbor:src/string_tools.py" in context.matched_terms for context in contexts
+    )

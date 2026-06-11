@@ -2,25 +2,25 @@ from __future__ import annotations
 
 import os
 import re
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable, Iterable, Mapping
+from typing import Any
 
-from patchsmith.model_config import DEFAULT_OPENAI_MODEL, configured_model_pricing
-from patchsmith.models import RetrievedContext
 from patchsmith.deepagents_prompts import (
     deepagents_patch_review_subagents,
     deepagents_planner_prompt,
     deepagents_system_prompt,
 )
+from patchsmith.model_config import DEFAULT_OPENAI_MODEL, configured_model_pricing
+from patchsmith.models import RetrievedContext
 from patchsmith.planning import (
     ModelCallMetadata,
     RepairPlan,
     _extract_json_object,
     _repair_plan_from_payload,
 )
-
 
 DEFAULT_DEEPAGENTS_MODEL = DEFAULT_OPENAI_MODEL
 DEEPAGENTS_PROVIDER = "deepagents_openai_chat"
@@ -65,7 +65,7 @@ class DeepAgentsRepairPlanner:
         environ: Mapping[str, str] | None = None,
         *,
         agent_factory: Callable[..., Any] | None = None,
-    ) -> "DeepAgentsRepairPlanner":
+    ) -> DeepAgentsRepairPlanner:
         env = os.environ if environ is None else environ
         model = (
             env.get("PATCHSMITH_DEEPAGENTS_MODEL")
@@ -150,8 +150,7 @@ class DeepAgentsRepairPlanner:
             return self.agent_factory(config=self.config)
 
         try:
-            from deepagents import create_deep_agent
-            from deepagents import FilesystemPermission
+            from deepagents import FilesystemPermission, create_deep_agent
             from deepagents.backends import StateBackend
             from langchain_openai import ChatOpenAI
             from pydantic import BaseModel, Field
@@ -179,7 +178,7 @@ class DeepAgentsRepairPlanner:
             model=model,
             tools=[],
             system_prompt=deepagents_system_prompt(),
-            subagents=deepagents_patch_review_subagents(),
+            subagents=deepagents_patch_review_subagents(),  # type: ignore[arg-type]
             backend=StateBackend(),
             permissions=_read_only_filesystem_permissions(
                 files.keys(),
@@ -220,11 +219,7 @@ def _read_only_filesystem_permissions(
     permission_cls: Callable[..., Any],
 ) -> list[Any]:
     allowed_reads = sorted(
-        {
-            "/" + path.strip().lstrip("/")
-            for path in paths
-            if isinstance(path, str) and path.strip()
-        }
+        {"/" + path.strip().lstrip("/") for path in paths if isinstance(path, str) and path.strip()}
     )
     return [
         permission_cls(operations=["read"], paths=allowed_reads, mode="allow"),

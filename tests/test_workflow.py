@@ -131,8 +131,7 @@ def test_repair_runner_records_selected_sandbox_in_trace(
     assert result.test_result.exit_code == 0
     assert created == [("docker", "patchsmith-test:latest")]
     trace_events = [
-        json.loads(line)
-        for line in result.trace_path.read_text(encoding="utf-8").splitlines()
+        json.loads(line) for line in result.trace_path.read_text(encoding="utf-8").splitlines()
     ]
     sandbox_event = next(
         event for event in trace_events if event["event_type"] == "sandbox_command"
@@ -179,14 +178,11 @@ def test_deepagents_runner_retries_with_sandbox_feedback(
         encoding="utf-8"
     )
     trace_events = [
-        json.loads(line)
-        for line in result.trace_path.read_text(encoding="utf-8").splitlines()
+        json.loads(line) for line in result.trace_path.read_text(encoding="utf-8").splitlines()
     ]
     retry_event = next(event for event in trace_events if event["node_name"] == "feedback_retry")
     assert retry_event["payload"]["next_attempt"] == 2
-    test_events = [
-        event for event in trace_events if event["event_type"] == "sandbox_command"
-    ]
+    test_events = [event for event in trace_events if event["event_type"] == "sandbox_command"]
     assert [event["payload"]["attempt"] for event in test_events] == [1, 2]
 
 

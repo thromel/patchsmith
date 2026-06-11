@@ -4,14 +4,16 @@ from pathlib import Path
 
 from patchsmith.cli import main
 from patchsmith.evaluation import (
+    RepairEvalResult,
+    RepairEvalSummary,
     check_focused_test_setup_readiness,
     check_materialized_issue_run_readiness,
     check_public_issue_repair_readiness,
     diagnose_focused_test_runs,
     discover_public_issue_failure_signals,
     execute_focused_test_setups,
-    execute_public_issue_reproductions,
     execute_public_issue_repairs,
+    execute_public_issue_reproductions,
     load_seeded_tasks,
     materialize_issue_corpus_tasks,
     plan_focused_test_setups,
@@ -20,18 +22,16 @@ from patchsmith.evaluation import (
     preflight_issue_corpus_repositories,
     preview_issue_corpus_context,
     recall,
-    RepairEvalResult,
-    RepairEvalSummary,
     render_public_issue_reproduction_plan_report,
     render_repair_eval_report,
     render_retrieval_eval_report,
     run_materialized_issue_focused_tests,
     run_patch_search_evaluation,
     run_repair_evaluation,
-    run_scaffold_comparison,
     run_retrieval_evaluation,
-    validate_focused_test_setups,
+    run_scaffold_comparison,
     top_k_recall,
+    validate_focused_test_setups,
     validate_issue_corpus,
     validate_materialized_issue_tasks,
     validate_public_issue_reproduction_specs,
@@ -146,9 +146,7 @@ def test_validate_issue_corpus_writes_outputs(tmp_path: Path) -> None:
     assert (tmp_path / "public_issue_corpus" / "corpus_report.md").exists()
     assert (tmp_path / "public_issue_corpus" / "corpus_results.csv").exists()
     assert (tmp_path / "public_issue_corpus" / "corpus_summary.json").exists()
-    report = (tmp_path / "public_issue_corpus" / "corpus_report.md").read_text(
-        encoding="utf-8"
-    )
+    report = (tmp_path / "public_issue_corpus" / "corpus_report.md").read_text(encoding="utf-8")
     assert "Claim Boundary" in report
 
     cli_output = tmp_path / "cli_public_issue_corpus"
@@ -215,19 +213,13 @@ def test_preflight_issue_corpus_repositories_writes_outputs(
             return subprocess.CompletedProcess(
                 command,
                 0,
-                stdout=(
-                    "ref: refs/heads/main\tHEAD\n"
-                    "abc123\tHEAD\n"
-                ),
+                stdout=("ref: refs/heads/main\tHEAD\nabc123\tHEAD\n"),
                 stderr="",
             )
         return subprocess.CompletedProcess(
             command,
             0,
-            stdout=(
-                "ref: refs/heads/main\tHEAD\n"
-                "def456\tHEAD\n"
-            ),
+            stdout=("ref: refs/heads/main\tHEAD\ndef456\tHEAD\n"),
             stderr="",
         )
 
@@ -813,7 +805,7 @@ def test_run_materialized_issue_focused_tests_executes_planned_command(
         ]
     )
     assert exit_code == 0
-    report = (cli_output / "focused_test_run_report.md")
+    report = cli_output / "focused_test_run_report.md"
     assert report.exists()
     assert "Sandbox network: `bridge`" in report.read_text(encoding="utf-8")
 
@@ -994,10 +986,7 @@ test = ["pytest-httpbin==2.1.0"]
     assert by_task["pytest_task"].setup_profile == "python_editable_install_build_metadata"
     assert "python3 -m pip install -e ." in by_task["pytest_task"].setup_commands
     assert by_task["requests_task"].setup_profile == "pytest_fixture_environment"
-    assert (
-        "python3 -m pip install -e . --group test"
-        in by_task["requests_task"].setup_commands
-    )
+    assert "python3 -m pip install -e . --group test" in by_task["requests_task"].setup_commands
     assert by_task["requests_task"].validation_command == "python3 -m pytest tests/test_requests.py"
     assert (output_dir / "focused_test_setup_plan_report.md").exists()
     assert (output_dir / "focused_test_setup_plan_results.csv").exists()
@@ -1583,15 +1572,11 @@ def test_validate_focused_test_setups_classifies_httpbin_fixture_failure(
     tests_dir = repo_dir / "tests"
     tests_dir.mkdir(parents=True)
     (tests_dir / "conftest.py").write_text(
-        "import pytest\n\n"
-        "@pytest.fixture\n"
-        "def httpbin(httpbin):\n"
-        "    return httpbin\n",
+        "import pytest\n\n@pytest.fixture\ndef httpbin(httpbin):\n    return httpbin\n",
         encoding="utf-8",
     )
     (tests_dir / "test_requests.py").write_text(
-        "def test_needs_httpbin(httpbin):\n"
-        "    assert httpbin\n",
+        "def test_needs_httpbin(httpbin):\n    assert httpbin\n",
         encoding="utf-8",
     )
     setup_execution_path = tmp_path / "focused_test_setup_execution_results.json"
@@ -1692,15 +1677,10 @@ def test_plan_public_issue_reproductions_warns_without_expected_failure_spec(
     assert (output_dir / "public_issue_reproduction_plan_report.md").exists()
     assert (output_dir / "public_issue_reproduction_plan_results.csv").exists()
     generated_template = json.loads(
-        (output_dir / "public_issue_reproduction_specs_template.json").read_text(
-            encoding="utf-8"
-        )
+        (output_dir / "public_issue_reproduction_specs_template.json").read_text(encoding="utf-8")
     )
     assert generated_template["specs"][0]["task_id"] == "public_task"
-    assert (
-        generated_template["specs"][0]["command"]
-        == "python3 -m pytest tests/test_bug.py"
-    )
+    assert generated_template["specs"][0]["command"] == "python3 -m pytest tests/test_bug.py"
     assert generated_template["specs"][0]["expected_failure_signals"] == []
 
     cli_output = tmp_path / "cli_reproduction_plan"
@@ -1830,16 +1810,10 @@ def test_plan_public_issue_reproductions_merges_reviewed_spec_file(
             "content": "def test_reviewed_repro():\n    assert False\n",
         }
     ]
-    assert results[0].expected_failure_signals == [
-        "AssertionError: reviewed public issue signal"
-    ]
+    assert results[0].expected_failure_signals == ["AssertionError: reviewed public issue signal"]
     assert results[0].source_hints == ["src/example.py"]
-    assert "reproduction spec provides an explicit command" in ";".join(
-        results[0].evidence
-    )
-    assert "reproduction spec provides 1 reviewed source hint(s)" in ";".join(
-        results[0].evidence
-    )
+    assert "reproduction spec provides an explicit command" in ";".join(results[0].evidence)
+    assert "reproduction spec provides 1 reviewed source hint(s)" in ";".join(results[0].evidence)
     assert "expected failing signal is encoded in the reproduction spec" in ";".join(
         results[0].evidence
     )
@@ -1859,9 +1833,7 @@ def test_plan_public_issue_reproductions_merges_reviewed_spec_file(
     )
     assert exit_code == 0
     cli_results = json.loads(
-        (cli_output / "public_issue_reproduction_plan_results.json").read_text(
-            encoding="utf-8"
-        )
+        (cli_output / "public_issue_reproduction_plan_results.json").read_text(encoding="utf-8")
     )
     assert cli_results[0]["command_source"] == "reproduction_spec"
     assert cli_results[0]["fixture_files"][0]["path"] == "tests/test_reviewed_repro.py"
@@ -1923,12 +1895,8 @@ def test_validate_public_issue_reproduction_specs_blocks_unfilled_template(
     assert results[0].status == "blocked"
     assert results[0].spec_present
     assert "expected_failure_signals is empty" in ";".join(results[0].errors)
-    assert (
-        output_dir / "public_issue_reproduction_spec_validation_report.md"
-    ).exists()
-    assert (
-        output_dir / "public_issue_reproduction_spec_validation_results.csv"
-    ).exists()
+    assert (output_dir / "public_issue_reproduction_spec_validation_report.md").exists()
+    assert (output_dir / "public_issue_reproduction_spec_validation_results.csv").exists()
 
     cli_output = tmp_path / "cli_spec_validation"
     exit_code = main(
@@ -1944,9 +1912,7 @@ def test_validate_public_issue_reproduction_specs_blocks_unfilled_template(
         ]
     )
     assert exit_code == 0
-    assert (
-        cli_output / "public_issue_reproduction_spec_validation_report.md"
-    ).exists()
+    assert (cli_output / "public_issue_reproduction_spec_validation_report.md").exists()
 
 
 def test_validate_public_issue_reproduction_specs_accepts_reviewed_spec(
@@ -2049,9 +2015,7 @@ def test_validate_public_issue_reproduction_specs_blocks_unsafe_fixture_path(
     assert summary.blocked_tasks == 1
     assert summary.unsafe_fixture_tasks == 1
     assert results[0].status == "blocked"
-    assert "fixture_files[1].path cannot contain traversal" in ";".join(
-        results[0].errors
-    )
+    assert "fixture_files[1].path cannot contain traversal" in ";".join(results[0].errors)
 
 
 def test_discover_public_issue_failure_signals_dry_runs_without_expected_spec(
@@ -2092,12 +2056,8 @@ def test_discover_public_issue_failure_signals_dry_runs_without_expected_spec(
     assert summary.blocked_tasks == 0
     assert results[0].status == "dry_run"
     assert results[0].candidate_failure_signals == []
-    assert (
-        output_dir / "public_issue_failure_signal_discovery_report.md"
-    ).exists()
-    assert (
-        output_dir / "public_issue_failure_signal_discovery_results.csv"
-    ).exists()
+    assert (output_dir / "public_issue_failure_signal_discovery_report.md").exists()
+    assert (output_dir / "public_issue_failure_signal_discovery_results.csv").exists()
 
     cli_output = tmp_path / "cli_discovery"
     exit_code = main(
@@ -2113,9 +2073,7 @@ def test_discover_public_issue_failure_signals_dry_runs_without_expected_spec(
         ]
     )
     assert exit_code == 0
-    assert (
-        cli_output / "public_issue_failure_signal_discovery_report.md"
-    ).exists()
+    assert (cli_output / "public_issue_failure_signal_discovery_report.md").exists()
 
 
 def test_discover_public_issue_failure_signals_extracts_local_failure(
@@ -2163,10 +2121,7 @@ def test_discover_public_issue_failure_signals_extracts_local_failure(
     assert summary.candidate_signal_tasks == 1
     assert results[0].status == "observed_failure"
     assert results[0].exit_code == 1
-    assert any(
-        "AssertionError" in signal
-        for signal in results[0].candidate_failure_signals
-    )
+    assert any("AssertionError" in signal for signal in results[0].candidate_failure_signals)
     assert results[0].stdout_path is not None
     assert results[0].stderr_path is not None
 
@@ -2220,10 +2175,7 @@ def test_discover_public_issue_failure_signals_applies_fixture_to_temp_workspace
     assert summary.fixture_file_tasks == 1
     assert results[0].status == "observed_failure"
     assert results[0].fixture_paths == ["tests/test_fixture_repro.py"]
-    assert any(
-        "AssertionError" in signal
-        for signal in results[0].candidate_failure_signals
-    )
+    assert any("AssertionError" in signal for signal in results[0].candidate_failure_signals)
     assert not fixture_path.exists()
 
 
@@ -2759,9 +2711,7 @@ def test_check_public_issue_repair_readiness_uses_reproduction_execution(
     assert results[0].validation_source_hints == ["src/example.py"]
     assert results[0].validation_fixture_files[0]["content"].startswith("def test_repro")
     assert "saved failing evidence" in ";".join(results[0].evidence)
-    assert "issue-specific validation command is available" in ";".join(
-        results[0].evidence
-    )
+    assert "issue-specific validation command is available" in ";".join(results[0].evidence)
     assert "issue reproduction is not proven" not in ";".join(results[0].warnings)
 
 
@@ -3084,9 +3034,7 @@ def test_graph_retrieval_evaluation_proves_graph_specific_source_localization(
     assert summary_by_provider["native_hybrid"].avg_top1_touched_recall == 0.0
     assert summary_by_provider["native_graph"].avg_top1_touched_recall == 1.0
     assert summary_by_provider["native_graph"].avg_top3_touched_recall == 1.0
-    report = (tmp_path / "graph_retrieval_eval" / "report.md").read_text(
-        encoding="utf-8"
-    )
+    report = (tmp_path / "graph_retrieval_eval" / "report.md").read_text(encoding="utf-8")
     assert "native_graph" in report
 
 
@@ -3128,9 +3076,7 @@ def test_run_repair_evaluation_langgraph_fake_model_tracks_usage(tmp_path: Path)
     assert summary.planner == "fake_model"
     assert summary.model_provider == "offline_fake_model"
     assert summary.estimated_cost_usd == 0.0
-    report = (tmp_path / "repair_eval_fake_model" / "repair_report.md").read_text(
-        encoding="utf-8"
-    )
+    report = (tmp_path / "repair_eval_fake_model" / "repair_report.md").read_text(encoding="utf-8")
     assert "Model provider: `offline_fake_model`" in report
 
 
@@ -3210,14 +3156,10 @@ def test_run_scaffold_comparison_writes_outputs(tmp_path: Path) -> None:
     assert (tmp_path / "scaffold_comparison" / "scaffold_report.md").exists()
     assert (tmp_path / "scaffold_comparison" / "scaffold_results.csv").exists()
     results_json = json.loads(
-        (tmp_path / "scaffold_comparison" / "scaffold_results.json").read_text(
-            encoding="utf-8"
-        )
+        (tmp_path / "scaffold_comparison" / "scaffold_results.json").read_text(encoding="utf-8")
     )
     assert results_json[0]["avg_trace_events"] > 0
-    report = (tmp_path / "scaffold_comparison" / "scaffold_report.md").read_text(
-        encoding="utf-8"
-    )
+    report = (tmp_path / "scaffold_comparison" / "scaffold_report.md").read_text(encoding="utf-8")
     assert "Scaffold Comparison Report" in report
     assert "Debug Score" in report
     assert "agentless" in report
@@ -3248,13 +3190,9 @@ def test_run_patch_search_evaluation_writes_outputs(tmp_path: Path) -> None:
     assert (tmp_path / "patch_search_eval" / "patch_search_report.md").exists()
     assert (tmp_path / "patch_search_eval" / "patch_search_results.csv").exists()
     results_json = json.loads(
-        (tmp_path / "patch_search_eval" / "patch_search_results.json").read_text(
-            encoding="utf-8"
-        )
+        (tmp_path / "patch_search_eval" / "patch_search_results.json").read_text(encoding="utf-8")
     )
     assert results_json[0]["candidate_results"]
-    report = (tmp_path / "patch_search_eval" / "patch_search_report.md").read_text(
-        encoding="utf-8"
-    )
+    report = (tmp_path / "patch_search_eval" / "patch_search_report.md").read_text(encoding="utf-8")
     assert "Patch Search Evaluation Report" in report
     assert "Success@k" in report
