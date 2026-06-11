@@ -1,14 +1,10 @@
-"""Agent runtime package; public API facade for the runtime adapters."""
+"""Agent runtime package; public API facade for the runtime adapters.
+
+Attempt orchestration helpers live in ``patchsmith.runtime.attempts``.
+"""
 
 from __future__ import annotations
 
-from patchsmith.runtime.attempts import (
-    emit_agent_result_trace,
-    issue_with_test_feedback,
-    run_sandbox_attempt,
-    should_retry_with_test_feedback,
-    test_feedback_retry_budget,
-)
 from patchsmith.runtime.core import (
     AgentlessRuntime,
     AgentResult,
@@ -29,9 +25,4 @@ __all__ = [
     "HeuristicRuntime",
     "LangGraphRuntime",
     "OpenAIAgentsRuntime",
-    "emit_agent_result_trace",
-    "issue_with_test_feedback",
-    "run_sandbox_attempt",
-    "should_retry_with_test_feedback",
-    "test_feedback_retry_budget",
 ]

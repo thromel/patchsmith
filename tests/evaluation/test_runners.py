@@ -2,15 +2,14 @@ import json
 from pathlib import Path
 
 from patchsmith.evaluation import (
-    RepairEvalResult,
-    RepairEvalSummary,
-    render_repair_eval_report,
     run_patch_search_evaluation,
     run_repair_evaluation,
     run_retrieval_evaluation,
     run_scaffold_comparison,
     validate_seeded_dataset,
 )
+from patchsmith.evaluation_models import RepairEvalResult, RepairEvalSummary
+from patchsmith.repair_reports import render_repair_eval_report
 
 
 def test_graph_retrieval_dataset_validates(tmp_path: Path) -> None:

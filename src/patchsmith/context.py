@@ -226,29 +226,6 @@ class CtxhelmCliBroker:
         return completed
 
 
-class NullBrokerForTests:
-    def prepare(
-        self,
-        request: ContextBrokerRequest,
-        *,
-        repo_index: RepositoryIndex,
-        artifact_dir: Path | None = None,
-    ) -> ContextBundle:
-        return ContextBundle(
-            provider="null",
-            provider_version=None,
-            targets=[],
-            related_tests=[],
-            validation_commands=[],
-            diagnostics=[],
-            warnings=["null broker returned no context"],
-            pack_uri=None,
-            source_text_logged=False,
-            raw_artifact_path=None,
-            latency_ms=0,
-        )
-
-
 class ContextBrokerError(RuntimeError):
     pass
 
