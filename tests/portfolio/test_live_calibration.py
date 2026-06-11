@@ -1,0 +1,208 @@
+import json
+from pathlib import Path
+
+from patchsmith.portfolio import (
+    write_final_evaluation_report,
+    write_live_calibration_report,
+)
+
+
+def test_live_calibration_report_counts_saved_deepagents_package_runs(tmp_path: Path) -> None:
+    artifacts_dir = tmp_path / "artifacts"
+    package_trace = (
+        artifacts_dir
+        / "experiments"
+        / "deepagents_package_smoke_v1"
+        / "run_artifacts"
+        / "runs"
+        / "package-run"
+        / "traces.jsonl"
+    )
+    package_trace.parent.mkdir(parents=True)
+    package_trace.write_text(
+        json.dumps(
+            {
+                "run_id": "package-run",
+                "event_type": "runtime_node",
+                "status": "package_available",
+                "payload": {
+                    "runtime": "deepagents",
+                    "framework": "deepagents",
+                    "node": "harness",
+                    "status": "package_available",
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    compatibility_trace = (
+        artifacts_dir
+        / "experiments"
+        / "deepagents_compatibility_v1"
+        / "run_artifacts"
+        / "runs"
+        / "compatibility-run"
+        / "traces.jsonl"
+    )
+    compatibility_trace.parent.mkdir(parents=True)
+    compatibility_trace.write_text(
+        json.dumps(
+            {
+                "run_id": "compatibility-run",
+                "event_type": "runtime_node",
+                "status": "compatibility_mode",
+                "payload": {
+                    "runtime": "deepagents",
+                    "framework": "deepagents",
+                    "node": "harness",
+                    "status": "compatibility_mode",
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    openai_agents_package_trace = (
+        artifacts_dir
+        / "experiments"
+        / "openai_agents_package_smoke_v1"
+        / "run_artifacts"
+        / "runs"
+        / "openai-agents-package-run"
+        / "traces.jsonl"
+    )
+    openai_agents_package_trace.parent.mkdir(parents=True)
+    openai_agents_package_trace.write_text(
+        json.dumps(
+            {
+                "run_id": "openai-agents-package-run",
+                "event_type": "runtime_node",
+                "status": "package_available",
+                "payload": {
+                    "runtime": "openai_agents",
+                    "framework": "openai_agents",
+                    "node": "harness",
+                    "status": "package_available",
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    openai_agents_compatibility_trace = (
+        artifacts_dir
+        / "experiments"
+        / "openai_agents_compatibility_v1"
+        / "run_artifacts"
+        / "runs"
+        / "openai-agents-compatibility-run"
+        / "traces.jsonl"
+    )
+    openai_agents_compatibility_trace.parent.mkdir(parents=True)
+    openai_agents_compatibility_trace.write_text(
+        json.dumps(
+            {
+                "run_id": "openai-agents-compatibility-run",
+                "event_type": "runtime_node",
+                "status": "compatibility_mode",
+                "payload": {
+                    "runtime": "openai_agents",
+                    "framework": "openai_agents",
+                    "node": "harness",
+                    "status": "compatibility_mode",
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    report = write_live_calibration_report(
+        artifacts_dir=artifacts_dir,
+        output_path=tmp_path / "calibration.md",
+        json_output_path=tmp_path / "calibration.json",
+        environment={},
+        package_availability={"openai": True, "deepagents": False, "agents": False},
+    )
+
+    assert report.deepagents_package_run_count == 1
+    assert report.deepagents_compatibility_run_count == 1
+    assert report.openai_agents_package_run_count == 1
+    assert report.openai_agents_compatibility_run_count == 1
+    statuses = {check.name: check.status for check in report.checks}
+    assert statuses["Saved DeepAgents Package Evidence"] == "passed"
+    assert statuses["Saved OpenAI Agents Package Evidence"] == "passed"
+    rendered = (tmp_path / "calibration.md").read_text(encoding="utf-8")
+    assert "DeepAgents package-backed runs: `1`" in rendered
+    assert "OpenAI Agents package-backed runs: `1`" in rendered
+    payload = json.loads((tmp_path / "calibration.json").read_text(encoding="utf-8"))
+    assert payload["deepagents_package_run_count"] == 1
+    assert payload["openai_agents_package_run_count"] == 1
+
+    final = write_final_evaluation_report(
+        artifacts_dir=artifacts_dir,
+        output_path=tmp_path / "final.md",
+        json_output_path=tmp_path / "final.json",
+    )
+    assert final.deepagents_package_run_count == 1
+    assert final.openai_agents_package_run_count == 1
+    assert any("package-backed" in decision for decision in final.decisions)
+    assert any(
+        "live DeepAgents model execution remains uncalibrated" in item for item in final.limitations
+    )
+    assert any(
+        "live OpenAI Agents model execution remains uncalibrated" in item
+        for item in final.limitations
+    )
+
+
+def test_live_calibration_report_separates_deepagents_package_and_live_claims(
+    tmp_path: Path,
+) -> None:
+    artifacts_dir = tmp_path / "artifacts"
+    experiment_dir = artifacts_dir / "experiments" / "deepagents_live"
+    experiment_dir.mkdir(parents=True)
+    (experiment_dir / "repair_results.json").write_text(
+        json.dumps(
+            [
+                {
+                    "runtime": "deepagents",
+                    "model_provider": "deepagents_openai_chat",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    run_dir = experiment_dir / "run_artifacts" / "runs" / "live-run"
+    run_dir.mkdir(parents=True)
+    (run_dir / "traces.jsonl").write_text(
+        json.dumps(
+            {
+                "event_type": "runtime_node",
+                "payload": {
+                    "runtime": "deepagents",
+                    "framework": "deepagents",
+                    "node": "harness",
+                    "status": "package_available",
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    report = write_live_calibration_report(
+        artifacts_dir=artifacts_dir,
+        output_path=tmp_path / "calibration.md",
+        environment={"OPENAI_API_KEY": "test-key"},
+        package_availability={"openai": True, "deepagents": True, "agents": False},
+    )
+
+    checks = {check.name: check for check in report.checks}
+    assert report.saved_live_provider_count == 1
+    assert checks["Saved DeepAgents Package Evidence"].status == "passed"
+    assert (
+        "use saved deepagents_openai_chat rows for live DeepAgents model claims"
+        in checks["Saved DeepAgents Package Evidence"].next_action
+    )
