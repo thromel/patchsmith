@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from patchsmith.analysis import RepairOutcomeAnalysis
+from patchsmith.artifacts import format_cost as _format_cost
 from patchsmith.context_packing import summarize_context_pack
 from patchsmith.models import (
     CommandResult,
@@ -259,11 +260,3 @@ def _append_float(values: list[float], value: object) -> None:
         return
     if isinstance(value, int | float):
         values.append(float(value))
-
-
-def _format_cost(value: float | None) -> str:
-    if value is None:
-        return "n/a"
-    if value == 0:
-        return "$0.00"
-    return f"${value:.6f}"

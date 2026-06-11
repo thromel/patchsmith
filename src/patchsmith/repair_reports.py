@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from patchsmith.artifacts import format_cost as _format_cost
 from patchsmith.evaluation_models import (
     PatchSearchEvalResult,
     PatchSearchEvalSummary,
@@ -17,14 +18,6 @@ def _sum_optional_float(values: Any) -> float | None:
     if not values_list:
         return None
     return float(sum(values_list))
-
-
-def _format_cost(value: float | None) -> str:
-    if value is None:
-        return "n/a"
-    if value == 0:
-        return "$0.00"
-    return f"${value:.6f}"
 
 
 def render_repair_eval_report(

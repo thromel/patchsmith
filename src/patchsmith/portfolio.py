@@ -17,6 +17,8 @@ from importlib.util import find_spec
 from pathlib import Path
 from typing import Any
 
+from patchsmith.artifacts import load_json as _load_json
+from patchsmith.artifacts import safe_artifact_name
 from patchsmith.evaluation import (
     check_public_issue_repair_readiness,
     discover_public_issue_failure_signals,
@@ -4256,11 +4258,6 @@ def _delivery_completion_percent(items: list[DeliveryAuditItem]) -> float:
     return round(score / len(items) * 100.0, 1)
 
 
-def _safe_artifact_name(value: str) -> str:
-    safe = "".join(character if character.isalnum() else "_" for character in value.lower())
-    return safe.strip("_") or "artifact"
-
-
 def _run_quality_gate_check(
     *,
     name: str,
@@ -4270,7 +4267,7 @@ def _run_quality_gate_check(
     logs_dir: Path,
     timeout_seconds: int,
 ) -> QualityGateCheck:
-    safe_name = _safe_artifact_name(name)
+    safe_name = safe_artifact_name(name, lowercase=True, fallback="artifact")
     stdout_path = logs_dir / f"{safe_name}_stdout.txt"
     stderr_path = logs_dir / f"{safe_name}_stderr.txt"
     if command is None:
@@ -5545,13 +5542,6 @@ def _collect_model_providers(payload: Any, providers: Counter[str]) -> None:
         for item in payload:
             if isinstance(item, dict | list):
                 _collect_model_providers(item, providers)
-
-
-def _load_json(path: Path) -> Any:
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
 
 
 def _write_demo_media_png(report: DemoMediaReport, output_path: Path) -> None:

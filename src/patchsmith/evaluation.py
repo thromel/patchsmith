@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from patchsmith.artifacts import safe_artifact_name as _safe_artifact_name
 from patchsmith.context import (
     ContextBrokerError,
     ContextBrokerRequest,
@@ -7778,12 +7779,6 @@ def _rerank_contexts(contexts: list[RetrievedContext]) -> list[RetrievedContext]
     return [replace(context, rank=index + 1) for index, context in enumerate(contexts)]
 
 
-def _safe_artifact_name(value: str) -> str:
-    sanitized = "".join(character if character.isalnum() else "_" for character in value)
-    sanitized = "_".join(part for part in sanitized.split("_") if part)
-    return sanitized or "unknown"
-
-
 def _remove_artifact_dir(*, root: Path, target: Path) -> None:
     root = root.resolve()
     target = target.resolve()
@@ -8124,14 +8119,6 @@ def _sum_optional_float(values: Any) -> float | None:
     if not values_list:
         return None
     return float(sum(values_list))
-
-
-def _format_cost(value: float | None) -> str:
-    if value is None:
-        return "n/a"
-    if value == 0:
-        return "$0.00"
-    return f"${value:.6f}"
 
 
 def _average(values: Any) -> float:

@@ -9,6 +9,8 @@ from os.path import relpath
 from pathlib import Path
 from typing import Any
 
+from patchsmith.artifacts import load_json as _load_json
+
 REPORT_FILENAMES = (
     "report.md",
     "repair_report.md",
@@ -1780,15 +1782,6 @@ def _metric_entry_from_row(
         )
 
     return None
-
-
-def _load_json(path: Path | None) -> Any:
-    if path is None:
-        return None
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
 
 
 def _metric_task_count(metric: ExperimentMetricIndexEntry) -> str:
