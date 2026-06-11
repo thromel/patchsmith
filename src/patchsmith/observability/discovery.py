@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from os.path import relpath
 from pathlib import Path
@@ -406,7 +407,7 @@ def _updated_at(
 
 def _updated_at_from_paths(
     directory: Path,
-    paths: list[Path | None],
+    paths: Sequence[Path | None],
 ) -> str | None:
     candidates = [path for path in paths if path is not None]
     if not candidates:

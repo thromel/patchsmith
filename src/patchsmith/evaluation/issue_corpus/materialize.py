@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from patchsmith.artifacts import dict_or_empty
 from patchsmith.artifacts import safe_artifact_name as _safe_artifact_name
 from patchsmith.evaluation._helpers import (
     _manifest_object,
@@ -623,12 +624,8 @@ def _check_materialized_issue_task_run_readiness(
             errors.append(f"task_manifest.json is invalid JSON: {error.msg}")
 
     task_id = manifest.get("task_id") if isinstance(manifest.get("task_id"), str) else None
-    issue = manifest.get("issue") if isinstance(manifest.get("issue"), dict) else {}
-    snapshot = (
-        manifest.get("repository_snapshot")
-        if isinstance(manifest.get("repository_snapshot"), dict)
-        else {}
-    )
+    issue = dict_or_empty(manifest.get("issue"))
+    snapshot = dict_or_empty(manifest.get("repository_snapshot"))
     repository = issue.get("repository") if isinstance(issue.get("repository"), str) else None
     issue_url = issue.get("issue_url") if isinstance(issue.get("issue_url"), str) else None
     repo_path_value = (
@@ -818,17 +815,9 @@ def _render_materialized_issue(
 
 
 def _render_materialized_task_runbook(*, manifest: dict[str, Any]) -> str:
-    issue = manifest.get("issue") if isinstance(manifest.get("issue"), dict) else {}
-    snapshot = (
-        manifest.get("repository_snapshot")
-        if isinstance(manifest.get("repository_snapshot"), dict)
-        else {}
-    )
-    retrieval = (
-        manifest.get("retrieval_preview")
-        if isinstance(manifest.get("retrieval_preview"), dict)
-        else {}
-    )
+    issue = dict_or_empty(manifest.get("issue"))
+    snapshot = dict_or_empty(manifest.get("repository_snapshot"))
+    retrieval = dict_or_empty(manifest.get("retrieval_preview"))
     commands = _string_list(manifest.get("suggested_commands"))
     lines = [
         f"# {manifest.get('task_id', 'Public Issue Task')} Runbook",

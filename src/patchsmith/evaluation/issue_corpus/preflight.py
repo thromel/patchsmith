@@ -157,7 +157,7 @@ def _preflight_issue_corpus_repository(
     latency_ms = int((time.perf_counter() - started) * 1000)
     default_branch, head_sha = _parse_ls_remote_head(completed.stdout)
     if completed.returncode != 0:
-        error = completed.stderr.strip() or completed.stdout.strip() or "git ls-remote failed"
+        failure = completed.stderr.strip() or completed.stdout.strip() or "git ls-remote failed"
         return IssueCorpusRepoPreflightResult(
             repository=repository,
             repo_url=repo_url,
@@ -165,7 +165,7 @@ def _preflight_issue_corpus_repository(
             default_branch=default_branch,
             head_sha=head_sha,
             latency_ms=latency_ms,
-            error=error,
+            error=failure,
             issue_count=issue_count,
         )
     return IssueCorpusRepoPreflightResult(

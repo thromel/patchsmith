@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from patchsmith.artifacts import dict_or_empty
 from patchsmith.artifacts import safe_artifact_name as _safe_artifact_name
 from patchsmith.evaluation._helpers import (
     _dedupe_preserve_order,
@@ -1268,20 +1269,10 @@ def _plan_public_issue_reproduction_record(
                 blockers.append("task_manifest.json must contain a JSON object")
 
     task_id = _optional_string(manifest.get("task_id")) or task_dir.name
-    issue = manifest.get("issue") if isinstance(manifest.get("issue"), dict) else {}
-    snapshot = (
-        manifest.get("repository_snapshot")
-        if isinstance(manifest.get("repository_snapshot"), dict)
-        else {}
-    )
-    retrieval = (
-        manifest.get("retrieval_preview")
-        if isinstance(manifest.get("retrieval_preview"), dict)
-        else {}
-    )
-    reproduction = (
-        manifest.get("reproduction") if isinstance(manifest.get("reproduction"), dict) else {}
-    )
+    issue = dict_or_empty(manifest.get("issue"))
+    snapshot = dict_or_empty(manifest.get("repository_snapshot"))
+    retrieval = dict_or_empty(manifest.get("retrieval_preview"))
+    reproduction = dict_or_empty(manifest.get("reproduction"))
     spec_reproduction = reproduction_spec if isinstance(reproduction_spec, dict) else {}
     repository = _optional_string(issue.get("repository"))
     issue_url = _optional_string(issue.get("issue_url"))
@@ -2545,7 +2536,7 @@ def _public_issue_repair_issue_text(manifest: dict[str, Any] | None) -> str | No
         path = Path(issue_file)
         if path.exists() and path.is_file():
             return path.read_text(encoding="utf-8")
-    issue = manifest.get("issue") if isinstance(manifest.get("issue"), dict) else {}
+    issue = dict_or_empty(manifest.get("issue"))
     parts = [
         _optional_string(issue.get("title")),
         _optional_string(issue.get("task_type")),

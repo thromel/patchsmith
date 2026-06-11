@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from patchsmith.context import SupportsRetrieve
 from patchsmith.retrieval import GraphRetriever, HybridRetriever, KeywordRetriever
 
 
@@ -41,7 +42,7 @@ def _load_issue_text(args: argparse.Namespace) -> str:
     return args.issue
 
 
-def _retriever_for(name: str) -> object:
+def _retriever_for(name: str) -> SupportsRetrieve:
     if name == "native_hybrid":
         return HybridRetriever()
     if name == "native_graph":

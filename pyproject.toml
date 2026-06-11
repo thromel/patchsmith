@@ -63,26 +63,6 @@ module = [
 check_untyped_defs = true
 disallow_untyped_defs = true
 
-# Legacy mega-modules pending decomposition; tighten these as they are split
-# into subpackages (see codebase reorganization plan).
-[[tool.mypy.overrides]]
-module = [
-  "patchsmith.cli",
-  "patchsmith.cli.*",
-  "patchsmith.evaluation",
-  "patchsmith.evaluation.*",
-  "patchsmith.observability",
-  "patchsmith.observability.*",
-  "patchsmith.planning",
-]
-disable_error_code = [
-  "attr-defined",
-  "assignment",
-  "union-attr",
-  "arg-type",
-  "misc",
-]
-
 [tool.hatch.build.targets.wheel]
 packages = ["src/patchsmith"]
 

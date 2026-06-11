@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Any, Protocol
 
+from patchsmith.artifacts import dict_or_empty
 from patchsmith.model_config import DEFAULT_OPENAI_MODEL, configured_model_pricing
 from patchsmith.models import RetrievedContext
 
@@ -174,7 +175,7 @@ class OpenAIResponsesModelClient:
             raise ModelClientError("OpenAI Responses API returned a non-object response")
 
         text = _extract_openai_output_text(response)
-        usage = response.get("usage") if isinstance(response.get("usage"), dict) else {}
+        usage = dict_or_empty(response.get("usage"))
         input_tokens = _int_or_none(usage.get("input_tokens"))
         output_tokens = _int_or_none(usage.get("output_tokens"))
         total_tokens = _int_or_none(usage.get("total_tokens"))
@@ -447,7 +448,13 @@ def _repair_plan_from_payload(
     new = payload.get("new")
     summary = payload.get("summary")
     name = payload.get("name", default_name)
-    if not all(isinstance(value, str) for value in (path, old, new, summary, name)):
+    if (
+        not isinstance(path, str)
+        or not isinstance(old, str)
+        or not isinstance(new, str)
+        or not isinstance(summary, str)
+        or not isinstance(name, str)
+    ):
         return None
 
     path = path.strip()

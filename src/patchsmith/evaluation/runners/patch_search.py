@@ -9,6 +9,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from patchsmith.context import SupportsRetrieve
 from patchsmith.evaluation._helpers import _average
 from patchsmith.evaluation.seeded import load_seeded_tasks
 from patchsmith.evaluation_models import (
@@ -294,6 +295,7 @@ def _retrieve_for_patch_search(
     issue_text: str,
     context_provider: str,
 ) -> list[RetrievedContext]:
+    retriever: SupportsRetrieve
     if context_provider == "native_graph":
         retriever = GraphRetriever()
     elif context_provider == "native_hybrid":

@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from patchsmith.artifacts import dict_or_empty
 from patchsmith.observability.discovery import (
     _bool_or_none,
     _int_or_none,
@@ -154,11 +155,7 @@ def _failure_run_insight(
     events = _load_trace_events(run, artifacts_dir)
     failed_events = [event for event in events if _is_failure_status(event.get("status"))]
     outcome = _last_repair_outcome_event(events)
-    outcome_payload = (
-        outcome.get("payload")
-        if outcome is not None and isinstance(outcome.get("payload"), dict)
-        else {}
-    )
+    outcome_payload = dict_or_empty(outcome.get("payload")) if outcome is not None else {}
     category = _repair_outcome_category(outcome, outcome_payload)
     if category is None and failed_events:
         category = _event_failure_category(failed_events[0])

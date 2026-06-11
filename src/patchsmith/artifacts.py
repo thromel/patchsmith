@@ -32,6 +32,11 @@ def load_json(path: Path | None) -> Any:
         return None
 
 
+def dict_or_empty(value: Any) -> dict[str, Any]:
+    """Narrow an untyped JSON value to a dict, defaulting to empty."""
+    return value if isinstance(value, dict) else {}
+
+
 def write_json(path: Path, payload: Any, *, trailing_newline: bool = False) -> None:
     """Write an indented JSON artifact."""
     text = json.dumps(payload, indent=2)
