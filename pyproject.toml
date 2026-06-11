@@ -71,6 +71,7 @@ module = [
   "patchsmith.evaluation",
   "patchsmith.evaluation.*",
   "patchsmith.observability",
+  "patchsmith.observability.*",
   "patchsmith.planning",
 ]
 disable_error_code = [
