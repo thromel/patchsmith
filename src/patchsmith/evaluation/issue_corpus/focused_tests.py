@@ -17,8 +17,8 @@ from patchsmith.evaluation._helpers import (
     _optional_string,
     _string_list,
 )
+from patchsmith.evaluation.issue_corpus.log_signals import last_nonempty_lines, matching_lines
 from patchsmith.evaluation.issue_corpus.materialize import _is_materialized_test_candidate_path
-from patchsmith.evaluation.issue_corpus.public_issues import _last_nonempty_lines, _matching_lines
 from patchsmith.evaluation_models import (
     IssueCorpusFocusedTestDiagnosisResult,
     IssueCorpusFocusedTestDiagnosisSummary,
@@ -1378,7 +1378,7 @@ def _diagnose_focused_test_run_record(
             category="timeout",
             severity="environment",
             summary="Focused test command timed out in the saved run.",
-            evidence=_matching_lines(logs, ["timed out", "timeout"], limit=2),
+            evidence=matching_lines(logs, ["timed out", "timeout"], limit=2),
             suggested_next_actions=[
                 "Run the focused command in a stricter isolated environment with an explicit timeout budget.",
                 "Reduce the command to issue-specific tests before using it as repair validation.",
@@ -1399,7 +1399,7 @@ def _diagnose_focused_test_run_record(
             severity="blocked",
             summary="Focused test command was blocked before meaningful test execution.",
             evidence=_string_list(record.get("errors"))
-            or _matching_lines(logs, ["blocked", "policy", "exit code"], limit=3),
+            or matching_lines(logs, ["blocked", "policy", "exit code"], limit=3),
             suggested_next_actions=[
                 "Fix the focused test plan or sandbox availability before running public issue repairs.",
             ],
@@ -1418,7 +1418,7 @@ def _diagnose_focused_test_run_record(
             category="missing_generated_version_metadata",
             severity="dependency",
             summary="Pytest snapshot failed before collection because generated version metadata is missing.",
-            evidence=_matching_lines(logs, ["_pytest._version", "ModuleNotFoundError"], limit=3),
+            evidence=matching_lines(logs, ["_pytest._version", "ModuleNotFoundError"], limit=3),
             suggested_next_actions=[
                 "Prepare the repository in an isolated environment using its documented build step before running tests.",
                 "Record the setup command separately from repair validation; do not treat this as a patch failure.",
@@ -1438,7 +1438,7 @@ def _diagnose_focused_test_run_record(
             category="pytest_fixture_dependency_error",
             severity="environment",
             summary="Pytest fixture setup failed before issue-specific assertions could run.",
-            evidence=_matching_lines(
+            evidence=matching_lines(
                 logs,
                 ["recursive dependency involving fixture", "ERROR at setup"],
                 limit=4,
@@ -1462,7 +1462,7 @@ def _diagnose_focused_test_run_record(
             category="missing_python_module",
             severity="dependency",
             summary="Focused test command failed because Python import dependencies are missing.",
-            evidence=_matching_lines(logs, ["ModuleNotFoundError"], limit=3),
+            evidence=matching_lines(logs, ["ModuleNotFoundError"], limit=3),
             suggested_next_actions=[
                 "Resolve repository test dependencies in a sandbox before interpreting repair quality.",
             ],
@@ -1481,7 +1481,7 @@ def _diagnose_focused_test_run_record(
             category="pytest_setup_error",
             severity="environment",
             summary="Focused test command reached pytest but failed during setup.",
-            evidence=_matching_lines(logs, ["ERROR at setup"], limit=4),
+            evidence=matching_lines(logs, ["ERROR at setup"], limit=4),
             suggested_next_actions=[
                 "Inspect fixture and service requirements before attempting automated repair.",
             ],
@@ -1525,7 +1525,7 @@ def _diagnose_focused_test_run_record(
         category="nonzero_exit",
         severity="unknown",
         summary="Focused test command failed without a known readiness signature.",
-        evidence=_last_nonempty_lines(logs, limit=4),
+        evidence=last_nonempty_lines(logs, limit=4),
         suggested_next_actions=[
             "Inspect the saved stdout/stderr and add a narrower diagnosis before repair-quality claims.",
         ],

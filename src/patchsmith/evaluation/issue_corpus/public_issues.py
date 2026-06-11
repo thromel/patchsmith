@@ -19,6 +19,12 @@ from patchsmith.evaluation._helpers import (
     _records_by_task_id,
     _string_list,
 )
+from patchsmith.evaluation.issue_corpus.log_signals import (
+    candidate_failure_signals_from_logs as _candidate_failure_signals_from_logs,
+)
+from patchsmith.evaluation.issue_corpus.log_signals import (
+    matched_expected_failure_signals as _matched_expected_failure_signals,
+)
 from patchsmith.evaluation.issue_corpus.materialize import _is_materialized_test_candidate_path
 from patchsmith.evaluation_models import (
     IssueCorpusPublicFailureSignalDiscoveryResult,
@@ -2660,59 +2666,3 @@ def _load_public_issue_task_manifests(tasks_dir: Path | None) -> dict[str, dict[
         task_id = _optional_string(parsed.get("task_id")) or manifest_path.parent.name
         manifests[task_id] = parsed
     return manifests
-
-
-def _matching_lines(text: str, patterns: list[str], *, limit: int) -> list[str]:
-    matches: list[str] = []
-    lowered_patterns = [pattern.lower() for pattern in patterns]
-    for line in text.splitlines():
-        stripped = line.strip()
-        if not stripped:
-            continue
-        lowered_line = stripped.lower()
-        if any(pattern in lowered_line for pattern in lowered_patterns):
-            matches.append(stripped[:240])
-            if len(matches) >= limit:
-                break
-    return matches
-
-
-def _matched_expected_failure_signals(text: str, patterns: list[str]) -> list[str]:
-    matched: list[str] = []
-    lowered_text = text.lower()
-    for pattern in patterns:
-        if pattern.lower() in lowered_text:
-            matched.append(pattern)
-    return matched
-
-
-def _candidate_failure_signals_from_logs(text: str, *, limit: int = 8) -> list[str]:
-    exception_markers = (
-        "assertionerror",
-        "modulenotfounderror",
-        "importerror",
-        "nameerror",
-        "typeerror",
-        "valueerror",
-        "no such file or directory",
-    )
-    matches: list[str] = []
-    for raw_line in text.splitlines():
-        stripped = raw_line.strip()
-        if not stripped:
-            continue
-        lowered = stripped.lower()
-        if (
-            lowered.startswith(("failed ", "error ", "e   ", "traceback"))
-            or "error:" in lowered
-            or any(marker in lowered for marker in exception_markers)
-        ):
-            matches.append(stripped[:240])
-            if len(matches) >= limit:
-                break
-    return _dedupe_preserve_order(matches)
-
-
-def _last_nonempty_lines(text: str, *, limit: int) -> list[str]:
-    lines = [line.strip()[:240] for line in text.splitlines() if line.strip()]
-    return lines[-limit:]
