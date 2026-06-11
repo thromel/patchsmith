@@ -6,6 +6,7 @@ from collections.abc import Iterable, Mapping
 from typing import Any
 
 from patchsmith.deepagents_prompts import PATCHSMITH_DEEPAGENTS_MEMORY_PATH
+from patchsmith.deepagents_schema import patch_plan_response_schema
 
 
 def deepagents_planning_contract(
@@ -44,6 +45,7 @@ def deepagents_planning_contract(
             for subagent in subagents
         ],
         "response_format": "PatchPlan",
+        "response_schema": patch_plan_response_schema(),
         "planning_policy": {
             "todos_required": True,
             "filesystem_reads_required": True,

@@ -28,6 +28,7 @@ from patchsmith.deepagents_prompts import (
     deepagents_planner_prompt,
     deepagents_system_prompt,
 )
+from patchsmith.deepagents_schema import PatchPlan
 from patchsmith.model_config import DEFAULT_OPENAI_MODEL, configured_model_pricing
 from patchsmith.models import RetrievedContext
 from patchsmith.planning import (
@@ -223,18 +224,11 @@ class DeepAgentsRepairPlanner:
             from deepagents import FilesystemPermission, create_deep_agent
             from deepagents.backends import StateBackend
             from langchain_openai import ChatOpenAI
-            from pydantic import BaseModel, Field
         except ImportError as error:
             raise RuntimeError(
                 "DeepAgents native planner requires the `deepagents` extra: "
                 'install with `python -m pip install -e ".[deepagents]"`.'
             ) from error
-
-        class PatchPlan(BaseModel):
-            path: str = Field(description="One provided repository path.")
-            old: str = Field(description="Exact text span to replace.")
-            new: str = Field(description="Replacement text.")
-            summary: str = Field(description="Brief repair rationale.")
 
         model_kwargs: dict[str, Any] = {
             "model": self.config.model,

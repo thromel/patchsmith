@@ -2,6 +2,7 @@ from pathlib import Path
 
 from patchsmith.deepagents_planner import DeepAgentsPlannerConfig, DeepAgentsRepairPlanner
 from patchsmith.deepagents_prompts import PATCHSMITH_DEEPAGENTS_MEMORY_PATH
+from patchsmith.deepagents_schema import patch_plan_response_schema
 from patchsmith.ingest import clone_or_copy_repository, index_repository
 from patchsmith.models import RunRequest
 from patchsmith.planning import ModelBackedRepairPlanner, RepairPlan, StaticResponseModelClient
@@ -213,6 +214,7 @@ def test_deepagents_runtime_records_native_planning_contract_on_no_plan(
     assert contract["mode"] == "custom_agent_factory"
     assert contract["virtual_file_count"] >= 1
     assert PATCHSMITH_DEEPAGENTS_MEMORY_PATH in contract["memory_paths"]
+    assert contract["response_schema"] == patch_plan_response_schema()
     assert contract["planning_policy"]["filesystem_reads_required"] is True
 
 

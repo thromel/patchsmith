@@ -19,6 +19,7 @@ from patchsmith.deepagents_prompts import (
     deepagents_planner_prompt,
     deepagents_system_prompt,
 )
+from patchsmith.deepagents_schema import PatchPlan, patch_plan_response_schema
 from patchsmith.model_config import DEFAULT_OPENAI_MODEL
 from patchsmith.models import RetrievedContext
 from patchsmith.planning import (
@@ -270,6 +271,17 @@ def test_deepagents_prompts_keep_planning_and_bounded_output_contract() -> None:
     assert subagents[0]["name"] == "patch-reviewer"
 
 
+def test_deepagents_patch_plan_schema_is_explicit_and_required() -> None:
+    schema = patch_plan_response_schema()
+
+    assert schema == {
+        "name": "PatchPlan",
+        "fields": ["path", "old", "new", "summary"],
+        "all_fields_required": True,
+    }
+    assert set(PatchPlan.model_fields) == {"path", "old", "new", "summary"}
+
+
 def test_deepagents_repair_planner_builds_agent_with_read_only_permissions(
     monkeypatch,
 ) -> None:
@@ -330,7 +342,7 @@ def test_deepagents_repair_planner_builds_agent_with_read_only_permissions(
     assert permissions[1].mode == "deny"
     subagents = captured["subagents"]
     assert subagents[0]["name"] == "patch-reviewer"
-    assert captured["response_format"].__name__ == "PatchPlan"
+    assert captured["response_format"] is PatchPlan
 
 
 def test_deepagents_repair_planner_maps_virtual_path_and_usage_metadata() -> None:
@@ -400,6 +412,7 @@ def test_deepagents_repair_planner_maps_virtual_path_and_usage_metadata() -> Non
     ]
     assert contract["subagents"][0]["name"] == "patch-reviewer"
     assert contract["response_format"] == "PatchPlan"
+    assert contract["response_schema"] == patch_plan_response_schema()
     assert contract["planning_policy"]["todos_required"] is True
     assert fake_agent.input_payload is not None
     files = fake_agent.input_payload["files"]

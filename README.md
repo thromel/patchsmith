@@ -301,6 +301,7 @@ src/patchsmith/
   portfolio/               readiness, release, and demo reports
   runtime/                 agent runtime adapters
   deepagents_planner.py    native DeepAgents planner
+  deepagents_schema.py     native DeepAgents structured output schema
   retrieval.py             native retrieval providers
   sandbox.py               local and Docker command execution
 
