@@ -552,11 +552,14 @@ def _mvp_progress_categories(items: list[MvpProgressItem]) -> list[MvpProgressCa
 
 
 def _cli_has_run_inputs(project_root: Path) -> bool:
-    cli_path = project_root / "src" / "patchsmith" / "cli.py"
-    if not cli_path.exists():
+    cli_dir = project_root / "src" / "patchsmith" / "cli"
+    run_commands_path = cli_dir / "commands" / "run.py"
+    args_path = cli_dir / "_args.py"
+    if not run_commands_path.exists() or not args_path.exists():
         return False
-    text = cli_path.read_text(encoding="utf-8")
-    return 'run = subparsers.add_parser("run"' in text and "--repo" in text
+    run_text = run_commands_path.read_text(encoding="utf-8")
+    args_text = args_path.read_text(encoding="utf-8")
+    return 'run = subparsers.add_parser("run"' in run_text and "--repo" in args_text
 
 
 def _seeded_task_count(project_root: Path) -> int:

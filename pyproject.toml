@@ -68,6 +68,7 @@ disallow_untyped_defs = true
 [[tool.mypy.overrides]]
 module = [
   "patchsmith.cli",
+  "patchsmith.cli.*",
   "patchsmith.evaluation",
   "patchsmith.evaluation.*",
   "patchsmith.observability",

@@ -1,0 +1,99 @@
+from __future__ import annotations
+
+import pytest
+
+from patchsmith.cli import _build_parser_and_handlers, build_parser, main
+
+pytestmark = pytest.mark.unit
+
+EXPECTED_COMMANDS = {
+    "run",
+    "openai-model-preflight",
+    "index",
+    "retrieve",
+    "eval-retrieval",
+    "validate-dataset",
+    "eval-repair",
+    "eval-scaffold",
+    "eval-patch-search",
+    "validate-issue-corpus",
+    "preflight-issue-corpus",
+    "preview-issue-corpus-context",
+    "materialize-issue-corpus-tasks",
+    "validate-materialized-issue-tasks",
+    "check-materialized-run-readiness",
+    "plan-materialized-focused-tests",
+    "run-materialized-focused-tests",
+    "diagnose-focused-test-runs",
+    "plan-focused-test-setups",
+    "check-focused-test-setup-readiness",
+    "execute-focused-test-setups",
+    "validate-focused-test-setups",
+    "plan-public-issue-reproductions",
+    "validate-public-issue-reproduction-specs",
+    "discover-public-issue-failure-signals",
+    "execute-public-issue-reproductions",
+    "check-public-issue-repair-readiness",
+    "execute-public-issue-repairs",
+    "index-artifacts",
+    "inspect-failures",
+    "demo-readiness",
+    "demo-script",
+    "demo-media",
+    "final-evaluation",
+    "live-calibration",
+    "live-calibration-plan",
+    "docker-smoke",
+    "environment-readiness",
+    "release-hygiene",
+    "launch-blockers",
+    "mvp-progress",
+    "delivery-audit",
+    "quality-gate",
+    "project-status",
+    "refresh-evidence",
+}
+
+
+def test_every_registered_command_has_a_handler() -> None:
+    parser, handlers = _build_parser_and_handlers()
+    subparsers_action = next(
+        action for action in parser._subparsers._group_actions if hasattr(action, "choices")
+    )
+    assert set(subparsers_action.choices) == set(handlers) == EXPECTED_COMMANDS
+    for command, handler in handlers.items():
+        assert callable(handler), command
+
+
+def test_build_parser_returns_argument_parser() -> None:
+    parser = build_parser()
+    assert parser.prog == "patchsmith"
+
+
+def test_main_without_command_prints_help_and_returns_2(capsys) -> None:
+    assert main([]) == 2
+    captured = capsys.readouterr()
+    assert "usage: patchsmith" in captured.out
+
+
+def test_main_dispatches_to_handler(monkeypatch, capsys) -> None:
+    import patchsmith.cli.commands.run as run_commands
+
+    calls: list[str] = []
+
+    def fake_handler(args) -> int:
+        calls.append(args.command)
+        return 0
+
+    monkeypatch.setitem(run_commands.register.__globals__, "_index_command", fake_handler)
+    # Re-registering picks up the patched handler through the module dict.
+    parser, handlers = _build_parser_and_handlers()
+    args = parser.parse_args(["index", "--repo", "."])
+    assert handlers["index"](args) == 0
+    assert calls == ["index"]
+
+
+def test_unknown_command_is_rejected() -> None:
+    parser = build_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(["no-such-command"])
