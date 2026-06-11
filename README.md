@@ -1,36 +1,46 @@
 # PatchSmith
 
-PatchSmith is a research platform for AI-assisted software maintenance. It takes an issue, retrieves the code that looks relevant, asks a repair scaffold to produce a bounded edit, runs the selected tests in a sandbox, and saves the evidence.
+[![CI](https://github.com/thromel/patchsmith/actions/workflows/ci.yml/badge.svg)](https://github.com/thromel/patchsmith/actions/workflows/ci.yml)
 
-Patch generation is only one part of the job. PatchSmith is built to answer a harder question: which parts of an agentic repair system actually help? Retrieval strategy, graph context, scaffold design, sandbox feedback, patch search, model choice, and cost are all measured separately.
+PatchSmith is a research platform for testing AI software-maintenance agents under a controlled repair loop.
+
+Give it an issue and a repository. PatchSmith selects likely context, asks a repair runtime to propose a bounded edit, applies that edit through its own replacement gate, runs tests in a sandbox, and saves the evidence: reports, diffs, traces, stdout, stderr, and cost metadata when a live model is involved.
+
+PatchSmith is deliberately plain about the hard part: it writes down what happened.
+
+## Why It Exists
+
+Most repair benchmarks flatten the result into one question: did the agent fix the bug?
+
+That hides the useful parts. PatchSmith keeps the repair pipeline split into pieces:
+
+- Did retrieval find the files that matter?
+- Did the scaffold produce a small, reviewable patch?
+- Did the test command actually reproduce the issue?
+- Did the run fail because the patch was wrong, because setup was missing, or because the validation command was bad?
+- Did retries use real sandbox feedback?
+- What did the live model call cost?
+
+With those pieces separated, you can improve one part without pretending the whole system got better.
 
 ## What Works Today
 
 - Repository clone/copy, file indexing, and issue-conditioned retrieval.
-- Native keyword, hybrid, graph, and ctxhelm-backed context providers.
-- Agent runtimes for `agentless`, `heuristic`, `langgraph`, `deepagents`, and `openai_agents`.
-- DeepAgents integration with state-backed file reads, todo-driven planning, a patch-review subagent, structured patch output, read-only virtual filesystem permissions, and sandbox-feedback retries.
-- Local and Docker sandbox execution with command policy checks.
+- Native keyword, hybrid, graph, and `ctxhelm` context providers.
+- Repair runtimes for `agentless`, `heuristic`, `langgraph`, `deepagents`, and `openai_agents`.
+- Native DeepAgents planning with state-backed file reads, todo state, a patch-review subagent, read-only virtual filesystem permissions, structured patch output, and sandbox-feedback retries.
+- Local and Docker sandbox execution with command-policy checks.
 - Seeded repair and retrieval benchmarks.
-- Public issue corpus preparation, reproduction gates, repair-readiness gates, and repair-attempt reporting.
-- Static artifact index, run reports, traces, diffs, stdout/stderr logs, failure reports, release hygiene checks, and quality gates.
+- A small public issue smoke corpus with separate setup, reproduction, readiness, and repair-attempt gates.
+- Static artifact indexing, run reports, traces, diffs, logs, failure reports, quality gates, and release-hygiene checks.
 
-The current saved evidence shows the seeded MVP is complete and the local quality gate passes. The public issue lane is still research evidence, not a claim that PatchSmith solves arbitrary GitHub issues.
+## Current Status
 
-## Why This Exists
+The seeded MVP path is implemented and the local quality gate passes in the saved project evidence.
 
-Most coding-agent demos collapse everything into one number: did the agent fix the bug or not?
+The public issue lane is still research evidence, not a broad repair claim. The latest saved all-task DeepAgents public issue attempt validated 2 of 3 tasks. Treat that as useful calibration data, not proof that PatchSmith can solve arbitrary GitHub issues.
 
-That hides the useful engineering signal. PatchSmith keeps the pieces apart:
-
-- Did retrieval find the right files?
-- Did the scaffold produce a safe, minimal edit?
-- Did tests fail because the patch was bad, because setup was missing, or because the command was wrong?
-- Did retries use real sandbox feedback?
-- How much did the model call cost?
-- Which failures are interesting enough to improve the system?
-
-That separation makes PatchSmith useful as both a software-maintenance agent prototype and an evaluation harness.
+Live DeepAgents evidence exists for `deepagents_openai_chat`, but any model-quality claim should name the exact model, account, prompt, dataset, and artifact directory used for that run.
 
 ## Architecture
 
@@ -45,7 +55,7 @@ issue + repo
   -> write report, trace, diff, logs, and metrics
 ```
 
-PatchSmith deliberately keeps model output away from direct filesystem writes. Agents can plan. PatchSmith applies the final edit through its own bounded replacement gate.
+PatchSmith deliberately keeps model output away from direct filesystem writes. Agents can plan and propose an edit. PatchSmith applies the final edit through its own bounded replacement gate.
 
 ## Install
 
@@ -88,7 +98,7 @@ PYTHONPATH=src python -m patchsmith.cli run \
 
 Expected result: PatchSmith edits `src/simple_calc.py`, runs the targeted pytest command, and writes a report under `artifacts/runs/<run_id>/`.
 
-When you have reviewed source hints from a reproduction spec or failure trace, force those files into the repair context:
+Force reviewed files into the repair context when you already know where the issue lives:
 
 ```bash
 PYTHONPATH=src python -m patchsmith.cli run \
@@ -101,7 +111,40 @@ PYTHONPATH=src python -m patchsmith.cli run \
 
 `--context-path` can be repeated. PatchSmith strips the optional `#symbol` suffix before reading the file, but keeps the full hint in the issue text when public issue repairs provide reviewed hints.
 
-## Run Evaluations
+## DeepAgents
+
+PatchSmith has two DeepAgents paths:
+
+- `runtime=deepagents, planner=heuristic`: adapter and scaffold compatibility evidence.
+- `runtime=deepagents, planner=deepagents`: native DeepAgents planning with a live OpenAI-compatible chat model.
+
+Preflight a model before spending money:
+
+```bash
+OPENAI_API_KEY=... \
+PYTHONPATH=src python -m patchsmith.cli openai-model-preflight \
+  --model <model> \
+  --json
+```
+
+Run the native DeepAgents planner:
+
+```bash
+OPENAI_API_KEY=... \
+PATCHSMITH_DEEPAGENTS_MODEL=<model> \
+PYTHONPATH=src python -m patchsmith.cli eval-repair \
+  --dataset evals/tasks/seeded_bugs_v1 \
+  --runtime deepagents \
+  --planner deepagents \
+  --max-retries 1 \
+  --context-provider native_hybrid \
+  --output artifacts/experiments/deepagents_native_repair_eval_v1 \
+  --json
+```
+
+Do not cite a model result from README text alone. Use the saved artifact directory for the exact run you want to discuss.
+
+## Evaluation Commands
 
 Validate the seeded benchmark:
 
@@ -164,39 +207,6 @@ PYTHONPATH=src python -m patchsmith.cli index-artifacts \
   --run-detail-output-dir artifacts/experiments/run-details \
   --json
 ```
-
-## DeepAgents
-
-PatchSmith has two DeepAgents paths:
-
-- `runtime=deepagents, planner=heuristic`: adapter and scaffold compatibility evidence.
-- `runtime=deepagents, planner=deepagents`: native DeepAgents planning with a live OpenAI-compatible chat model.
-
-Preflight a model before spending money:
-
-```bash
-OPENAI_API_KEY=... \
-PYTHONPATH=src python -m patchsmith.cli openai-model-preflight \
-  --model gpt-5.4-mini \
-  --json
-```
-
-Run the native DeepAgents planner:
-
-```bash
-OPENAI_API_KEY=... \
-PATCHSMITH_DEEPAGENTS_MODEL=gpt-5.4-mini \
-PYTHONPATH=src python -m patchsmith.cli eval-repair \
-  --dataset evals/tasks/seeded_bugs_v1 \
-  --runtime deepagents \
-  --planner deepagents \
-  --max-retries 1 \
-  --context-provider native_hybrid \
-  --output artifacts/experiments/deepagents_native_repair_eval_v1 \
-  --json
-```
-
-Saved live evidence currently uses `gpt-5.4-mini`. The requested `gpt-5.5-mini` model was not exposed by the available OpenAI account during the latest checks, and the most recent clipboard key returned `401 Unauthorized`. Do not cite `gpt-5.5-mini` results unless you rerun the preflight and the benchmark with a valid key that has access to that model.
 
 ## Docker Sandbox
 
@@ -262,21 +272,7 @@ The gate runs:
 - full pytest,
 - package build.
 
-CI also runs Ruff, Ruff format check, mypy, compile, pytest, and package build.
-
-## Current Status
-
-As of the latest local evidence:
-
-- MVP progress: `100%`.
-- Quality gate: `passed`.
-- Delivery audit: `in_progress_with_blockers`.
-- Release hygiene: `ready_with_warnings`.
-- DeepAgents package evidence: present.
-- Live-provider evidence: present for `deepagents_openai_chat` and `openai_responses`.
-- Public issue repair quality: not launch-grade yet. The latest all-task DeepAgents public issue attempt validated 2 of 3 tasks.
-
-That mix is important. The seeded benchmark and platform plumbing are in good shape. The real-world repair lane still needs more work before it should be presented as robust autonomous repair.
+CI also runs Ruff, Ruff format check, mypy, compile checks, pytest, and package build.
 
 ## Repository Layout
 
