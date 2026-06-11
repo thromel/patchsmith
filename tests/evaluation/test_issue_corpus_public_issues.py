@@ -1350,7 +1350,7 @@ def test_execute_public_issue_repairs_passes_source_hints_as_context_paths(
             )
 
     monkeypatch.setattr(
-        "patchsmith.evaluation.issue_corpus.public_issues.RepairRunner",
+        "patchsmith.evaluation.issue_corpus.public_issue_repairs.RepairRunner",
         FakeRepairRunner,
     )
 

@@ -31,10 +31,12 @@ from patchsmith.evaluation.issue_corpus.preflight import (
 from patchsmith.evaluation.issue_corpus.preview import (
     preview_issue_corpus_context,
 )
-from patchsmith.evaluation.issue_corpus.public_issues import (
+from patchsmith.evaluation.issue_corpus.public_issue_repairs import (
     check_public_issue_repair_readiness,
-    discover_public_issue_failure_signals,
     execute_public_issue_repairs,
+)
+from patchsmith.evaluation.issue_corpus.public_issues import (
+    discover_public_issue_failure_signals,
     execute_public_issue_reproductions,
     plan_public_issue_reproductions,
     validate_public_issue_reproduction_specs,
