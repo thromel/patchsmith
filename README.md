@@ -2,60 +2,69 @@
 
 [![CI](https://github.com/thromel/patchsmith/actions/workflows/ci.yml/badge.svg)](https://github.com/thromel/patchsmith/actions/workflows/ci.yml)
 
-PatchSmith is a research platform for testing AI software-maintenance agents under a controlled repair loop.
+PatchSmith is a research platform for studying AI software-maintenance agents.
 
-Give it an issue and a repository. PatchSmith selects likely context, asks a repair runtime to propose a bounded edit, applies that edit through its own replacement gate, runs tests in a sandbox, and saves the evidence: reports, diffs, traces, stdout, stderr, and cost metadata when a live model is involved.
+Give it an issue and a repository. PatchSmith retrieves likely context, asks a repair
+runtime for a bounded edit, applies that edit through its own patch gate, runs tests in a
+sandbox, and writes down the evidence: reports, diffs, traces, stdout, stderr, timing, and
+model-cost metadata when a live model is used.
 
-PatchSmith is deliberately plain about the hard part: it writes down what happened.
+The point is not to make a flashy claim that an agent fixed a bug. The point is to make the
+repair attempt auditable.
 
-## Why It Exists
+## Why This Exists
 
-Most repair benchmarks flatten the result into one question: did the agent fix the bug?
+Most coding-agent demos collapse everything into one question: did the final test pass?
+That is too coarse for real engineering work.
 
-That hides the useful parts. PatchSmith keeps the repair pipeline split into pieces:
+PatchSmith keeps the repair loop split into parts:
 
-- Did retrieval find the files that matter?
-- Did the scaffold produce a small, reviewable patch?
+- Did retrieval find the files that mattered?
+- Did the agent propose a small, reviewable patch?
 - Did the test command actually reproduce the issue?
-- Did the run fail because the patch was wrong, because setup was missing, or because the validation command was bad?
+- Did the patch fail because the model was wrong, setup was missing, or validation was weak?
 - Did retries use real sandbox feedback?
 - What did the live model call cost?
 
-With those pieces separated, you can improve one part without pretending the whole system got better.
+That separation matters. It lets us improve retrieval, scaffolding, validation, sandboxing,
+and model choice without pretending that one better number proves the whole system is solved.
 
 ## What Works Today
 
-- Repository clone/copy, file indexing, and issue-conditioned retrieval.
+PatchSmith currently includes:
+
+- Repository clone/copy, file indexing, and issue-conditioned context retrieval.
 - Native keyword, hybrid, graph, and `ctxhelm` context providers.
-- Repair runtimes for `agentless`, `heuristic`, `langgraph`, `deepagents`, and `openai_agents`.
-- Native DeepAgents planning with state-backed file reads, todo state, a patch-review subagent, read-only virtual filesystem permissions, structured patch output, and sandbox-feedback retries.
+- Repair runtimes for `agentless`, `heuristic`, `langgraph`, `deepagents`, and
+  `openai_agents`.
+- A native DeepAgents planner with state-backed file reads, todo state, a patch-review
+  subagent, read-only virtual filesystem permissions, structured patch output, and sandbox
+  feedback retries.
 - Local and Docker sandbox execution with command-policy checks.
-- Seeded repair and retrieval benchmarks.
-- A small public issue smoke corpus with separate setup, reproduction, readiness, and repair-attempt gates.
-- Static artifact indexing, run reports, traces, diffs, logs, failure reports, quality gates, and release-hygiene checks.
+- Seeded bug, retrieval, scaffold, repair, and public-issue smoke evaluation flows.
+- Static artifact indexing, run reports, failure reports, traces, diffs, logs, release
+  hygiene checks, and quality gates.
 
-## Current Status
+The seeded benchmark path is the stable development lane. The public issue lane is still
+calibration work. Saved artifacts can show useful behavior on a tiny curated corpus, but they
+should not be read as a broad GitHub-issue repair claim.
 
-The seeded MVP path is implemented and the local quality gate passes in the saved project evidence.
-
-The public issue lane is still research evidence, not a broad repair claim. The latest saved all-task DeepAgents public issue attempt validated 2 of 3 tasks. Treat that as useful calibration data, not proof that PatchSmith can solve arbitrary GitHub issues.
-
-Live DeepAgents evidence exists for `deepagents_openai_chat`, but any model-quality claim should name the exact model, account, prompt, dataset, and artifact directory used for that run.
-
-## Architecture
+## How PatchSmith Works
 
 ```text
-issue + repo
-  -> clone/copy repository
+issue + repository
+  -> clone or copy repository
   -> index files and symbols
   -> retrieve candidate context
-  -> run repair scaffold
+  -> run a repair scaffold
   -> apply one bounded text replacement
   -> run policy-checked tests
-  -> write report, trace, diff, logs, and metrics
+  -> write reports, traces, diffs, logs, and metrics
 ```
 
-PatchSmith deliberately keeps model output away from direct filesystem writes. Agents can plan and propose an edit. PatchSmith applies the final edit through its own bounded replacement gate.
+PatchSmith keeps model output away from direct filesystem writes. A runtime can plan, inspect
+context, and propose an edit. PatchSmith applies the final change through its own bounded
+replacement gate and records what happened.
 
 ## Install
 
@@ -73,6 +82,12 @@ For native DeepAgents runs:
 
 ```bash
 python -m pip install -e ".[dev,deepagents]"
+```
+
+For OpenAI Agents SDK experiments:
+
+```bash
+python -m pip install -e ".[dev,openai-agents]"
 ```
 
 ## Quickstart
@@ -96,9 +111,10 @@ PYTHONPATH=src python -m patchsmith.cli run \
   --json
 ```
 
-Expected result: PatchSmith edits `src/simple_calc.py`, runs the targeted pytest command, and writes a report under `artifacts/runs/<run_id>/`.
+Expected result: PatchSmith edits `src/simple_calc.py`, runs the targeted pytest command,
+and writes a run report under `artifacts/runs/<run_id>/`.
 
-Force reviewed files into the repair context when you already know where the issue lives:
+If you already know a likely file, force it into the repair context:
 
 ```bash
 PYTHONPATH=src python -m patchsmith.cli run \
@@ -109,14 +125,17 @@ PYTHONPATH=src python -m patchsmith.cli run \
   --json
 ```
 
-`--context-path` can be repeated. PatchSmith strips the optional `#symbol` suffix before reading the file, but keeps the full hint in the issue text when public issue repairs provide reviewed hints.
+`--context-path` can be repeated. PatchSmith strips the optional `#symbol` suffix before
+reading the file, but keeps the full hint in the issue text when public-issue repair flows
+provide reviewed hints.
 
 ## DeepAgents
 
 PatchSmith has two DeepAgents paths:
 
-- `runtime=deepagents, planner=heuristic`: adapter and scaffold compatibility evidence.
-- `runtime=deepagents, planner=deepagents`: native DeepAgents planning with a live OpenAI-compatible chat model.
+- `runtime=deepagents, planner=heuristic`: adapter and scaffold compatibility.
+- `runtime=deepagents, planner=deepagents`: native DeepAgents planning with a live
+  OpenAI-compatible chat model.
 
 Preflight a model before spending money:
 
@@ -127,7 +146,7 @@ PYTHONPATH=src python -m patchsmith.cli openai-model-preflight \
   --json
 ```
 
-Run the native DeepAgents planner:
+Run the native DeepAgents planner on the seeded benchmark:
 
 ```bash
 OPENAI_API_KEY=... \
@@ -142,9 +161,10 @@ PYTHONPATH=src python -m patchsmith.cli eval-repair \
   --json
 ```
 
-Do not cite a model result from README text alone. Use the saved artifact directory for the exact run you want to discuss.
+Do not cite a model result from README text alone. Use the saved artifact directory for the
+exact run: model name, account, prompt, dataset, commit, and output files all matter.
 
-## Evaluation Commands
+## Evaluation
 
 Validate the seeded benchmark:
 
@@ -168,7 +188,7 @@ PYTHONPATH=src python -m patchsmith.cli eval-retrieval \
   --json
 ```
 
-Run the repair benchmark:
+Run a repair benchmark:
 
 ```bash
 PYTHONPATH=src python -m patchsmith.cli eval-repair \
@@ -196,7 +216,7 @@ PYTHONPATH=src python -m patchsmith.cli eval-scaffold \
   --json
 ```
 
-Generate the artifact dashboard:
+Build an artifact index:
 
 ```bash
 PYTHONPATH=src python -m patchsmith.cli index-artifacts \
@@ -207,6 +227,26 @@ PYTHONPATH=src python -m patchsmith.cli index-artifacts \
   --run-detail-output-dir artifacts/experiments/run-details \
   --json
 ```
+
+## Public Issue Corpus
+
+The public issue smoke lane lives under `evals/issue_corpora/public_issue_smoke_v1`.
+
+It has separate gates for:
+
+- corpus validation,
+- repository preflight,
+- source-free context preview,
+- task materialization,
+- focused test planning,
+- setup validation,
+- reproduction evidence,
+- repair readiness,
+- repair attempts.
+
+This is intentional. A public issue repair should only count after the failing behavior is
+reproduced, a patch is generated, and validation passes. Passing setup checks are useful
+evidence, but they do not prove repair quality.
 
 ## Docker Sandbox
 
@@ -231,25 +271,9 @@ PYTHONPATH=src python -m patchsmith.cli run \
   --json
 ```
 
-Docker mode disables implicit image pulls, disables network by default, drops capabilities, mounts the repository at `/workspace`, applies resource limits, and records the selected sandbox in the trace.
-
-## Public Issue Corpus
-
-PatchSmith includes a small public issue smoke lane under `evals/issue_corpora/public_issue_smoke_v1`.
-
-The lane has separate gates for:
-
-- corpus validation,
-- repository preflight,
-- source-free context preview,
-- task materialization,
-- focused test planning,
-- setup validation,
-- reproduction evidence,
-- repair readiness,
-- repair attempts.
-
-This is intentional. A public issue repair should only count after the failing behavior is reproduced, the patch is generated, and validation passes. Passing setup checks are useful evidence, but they do not prove repair quality.
+Docker mode disables implicit image pulls, disables network by default, drops capabilities,
+mounts the repository at `/workspace`, applies resource limits, and records the selected
+sandbox in the trace.
 
 ## Quality Gates
 
@@ -265,13 +289,7 @@ PYTHONPATH=src python -m patchsmith.cli quality-gate \
   --json
 ```
 
-The gate runs:
-
-- Python compile checks,
-- whitespace diff checks,
-- full pytest,
-- package build.
-
+The gate runs compile checks, whitespace checks, the full pytest suite, and package build.
 CI also runs Ruff, Ruff format check, mypy, compile checks, pytest, and package build.
 
 ## Repository Layout
@@ -305,4 +323,5 @@ PYTHONPATH=src python -m patchsmith.cli demo-readiness --json
 
 ## License
 
-No license file is included yet. Treat the code as source-available until a license is added.
+No license file is included yet. Treat the code as source-available until a license is
+added.
