@@ -7,6 +7,9 @@ and ``patchsmith.public_issue_reports``.
 
 from __future__ import annotations
 
+from patchsmith.evaluation.issue_corpus.focused_setup_plan import (
+    plan_focused_test_setups,
+)
 from patchsmith.evaluation.issue_corpus.focused_setup_validation import (
     validate_focused_test_setups,
 )
@@ -14,7 +17,6 @@ from patchsmith.evaluation.issue_corpus.focused_tests import (
     check_focused_test_setup_readiness,
     diagnose_focused_test_runs,
     execute_focused_test_setups,
-    plan_focused_test_setups,
     plan_materialized_issue_focused_tests,
     run_materialized_issue_focused_tests,
 )
