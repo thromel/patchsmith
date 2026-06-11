@@ -276,11 +276,7 @@ def _final_evaluation_decisions(
             f"{openai_agents_compatibility_runs} compatibility-mode run(s); this proves "
             "optional-package import compatibility, not live OpenAI Agents model quality."
         )
-    live_providers = [
-        provider
-        for provider in readiness.model_providers
-        if provider and not provider.startswith("offline_")
-    ]
+    live_providers = _live_model_providers(readiness)
     if live_providers:
         decisions.append(
             f"Live-provider evidence exists for {', '.join(live_providers)}; report cost "
@@ -300,14 +296,18 @@ def _final_evaluation_limitations(
 ) -> list[str]:
     package_runs = deepagents_modes.get("package_available", 0)
     openai_agents_package_runs = openai_agents_modes.get("package_available", 0)
+    live_providers = _live_model_providers(readiness)
+    deepagents_live_providers = [
+        provider for provider in live_providers if provider == "deepagents_openai_chat"
+    ]
     deepagents_limitation = (
-        "DeepAgents package-backed adapter smoke evidence exists, but live DeepAgents "
-        "model execution remains uncalibrated."
-        if package_runs
-        else (
-            "DeepAgents evidence is adapter compatibility evidence unless the optional "
-            "package and live model provider are installed and reflected in saved artifacts."
+        (
+            "DeepAgents live-model evidence is present for "
+            f"{', '.join(deepagents_live_providers)}, but it remains scoped to the saved "
+            "seeded/public repair artifacts and is not broad autonomous repair quality."
         )
+        if deepagents_live_providers
+        else _uncalibrated_deepagents_limitation(package_runs)
     )
     openai_agents_limitation = (
         "OpenAI Agents package-backed adapter smoke evidence exists, but live OpenAI "
@@ -324,11 +324,6 @@ def _final_evaluation_limitations(
         deepagents_limitation,
         openai_agents_limitation,
     ]
-    live_providers = [
-        provider
-        for provider in readiness.model_providers
-        if provider and not provider.startswith("offline_")
-    ]
     if not live_providers:
         limitations.append(
             "No non-offline model provider metadata was found; live LLM quality, token use, and cost remain uncalibrated."
@@ -338,6 +333,26 @@ def _final_evaluation_limitations(
             f"{readiness.runs_requiring_attention} saved runs still require attention; use them as failure-analysis material, not as hidden exclusions."
         )
     return limitations
+
+
+def _live_model_providers(readiness: DemoReadinessReport) -> list[str]:
+    return [
+        provider
+        for provider in readiness.model_providers
+        if provider and not provider.startswith("offline_")
+    ]
+
+
+def _uncalibrated_deepagents_limitation(package_runs: int) -> str:
+    if package_runs:
+        return (
+            "DeepAgents package-backed adapter smoke evidence exists, but live DeepAgents "
+            "model execution remains uncalibrated."
+        )
+    return (
+        "DeepAgents evidence is adapter compatibility evidence unless the optional "
+        "package and live model provider are installed and reflected in saved artifacts."
+    )
 
 
 def _final_review_artifacts() -> list[str]:

@@ -208,6 +208,20 @@ def test_live_calibration_report_separates_deepagents_package_and_live_claims(
         in checks["Saved DeepAgents Package Evidence"].next_action
     )
 
+    final = write_final_evaluation_report(
+        artifacts_dir=artifacts_dir,
+        output_path=tmp_path / "final.md",
+        json_output_path=tmp_path / "final.json",
+    )
+    assert any("deepagents_openai_chat" in decision for decision in final.decisions)
+    assert any(
+        "DeepAgents live-model evidence is present for deepagents_openai_chat" in item
+        for item in final.limitations
+    )
+    assert not any(
+        "live DeepAgents model execution remains uncalibrated" in item for item in final.limitations
+    )
+
 
 def test_live_calibration_plan_includes_native_deepagents_live_runs(
     tmp_path: Path,
