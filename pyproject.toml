@@ -69,6 +69,7 @@ disallow_untyped_defs = true
 module = [
   "patchsmith.cli",
   "patchsmith.evaluation",
+  "patchsmith.evaluation.*",
   "patchsmith.observability",
   "patchsmith.planning",
 ]
