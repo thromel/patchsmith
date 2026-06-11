@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 import time
 import tomllib
-from dataclasses import asdict, dataclass, replace
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -21,1106 +21,114 @@ from patchsmith.context import (
     retrieved_context_from_bundle,
 )
 from patchsmith.context_packing import summarize_context_pack
+from patchsmith.evaluation_reports import (
+    render_focused_test_diagnosis_report,
+    render_focused_test_setup_execution_report,
+    render_focused_test_setup_plan_report,
+    render_focused_test_setup_readiness_report,
+    render_focused_test_setup_validation_report,
+    render_issue_corpus_context_preview_report,
+    render_issue_corpus_materialized_task_report,
+    render_issue_corpus_repo_preflight_report,
+    render_issue_corpus_validation_report,
+    render_materialized_issue_focused_test_plan_report,
+    render_materialized_issue_focused_test_run_report,
+    render_materialized_issue_run_readiness_report,
+    render_materialized_issue_task_validation_report,
+    render_retrieval_eval_report,
+    render_seeded_dataset_validation_report,
+)
 from patchsmith.ingest import clone_or_copy_repository, index_repository
 from patchsmith.models import RetrievedContext, RunRequest
 from patchsmith.patching import PatchSafetyError, apply_text_replacement
 from patchsmith.planning import HeuristicRepairPlanner, RepairPlan
+from patchsmith.public_issue_fixtures import (
+    normalize_public_issue_fixture_files as _normalize_public_issue_fixture_files,
+)
+from patchsmith.public_issue_fixtures import (
+    normalize_public_issue_source_hints as _normalize_public_issue_source_hints,
+)
+from patchsmith.public_issue_fixtures import (
+    public_issue_fixture_paths as _public_issue_fixture_paths,
+)
+from patchsmith.public_issue_fixtures import (
+    public_issue_fixture_source_hints as _public_issue_fixture_source_hints,
+)
+from patchsmith.public_issue_fixtures import (
+    write_public_issue_fixture_files as _write_public_issue_fixture_files,
+)
+from patchsmith.public_issue_reports import (
+    render_public_issue_failure_signal_discovery_report,
+    render_public_issue_repair_attempt_report,
+    render_public_issue_repair_readiness_report,
+    render_public_issue_reproduction_execution_report,
+    render_public_issue_reproduction_plan_report,
+    render_public_issue_reproduction_spec_validation_report,
+)
+from patchsmith.repair_reports import (
+    render_patch_search_eval_report,
+    render_repair_eval_report,
+    render_scaffold_comparison_report,
+)
 from patchsmith.retrieval import GraphRetriever, HybridRetriever, KeywordRetriever
 from patchsmith.sandbox import create_sandbox_runner
 from patchsmith.security import CommandPolicy, FocusedSetupCommandPolicy
 from patchsmith.workflow import RepairRunner
 
-PUBLIC_ISSUE_FIXTURE_FILE_MAX_BYTES = 64_000
-
-
-@dataclass(frozen=True)
-class SeededTask:
-    task_id: str
-    task_dir: Path
-    repo: Path
-    issue_text: str
-    test_command: str
-    expected_touched_files: list[str]
-    expected_related_tests: list[str]
-    language: str
-    failure_type: str
-
-
-@dataclass(frozen=True)
-class SeededTaskValidationResult:
-    task_dir: str
-    task_id: str | None
-    status: str
-    errors: list[str]
-    warnings: list[str]
-    issue_path: str | None
-    repo_path: str | None
-    expected_path: str | None
-    expected_touched_files: list[str]
-    expected_related_tests: list[str]
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class SeededDatasetValidationSummary:
-    dataset_dir: str
-    task_count: int
-    valid_tasks: int
-    invalid_tasks: int
-    warning_count: int
-    error_count: int
-    duplicate_task_ids: list[str]
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusEntryValidationResult:
-    task_id: str | None
-    repository: str | None
-    issue_url: str | None
-    status: str
-    errors: list[str]
-    warnings: list[str]
-    language: str | None
-    task_type: str | None
-    state_at_capture: str | None
-    expected_workflow: list[str]
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusValidationSummary:
-    corpus_path: str
-    corpus_id: str | None
-    entry_count: int
-    valid_entries: int
-    invalid_entries: int
-    warning_count: int
-    error_count: int
-    repositories: list[str]
-    languages: list[str]
-    task_types: list[str]
-    open_issue_count: int
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusRepoPreflightResult:
-    repository: str
-    repo_url: str
-    status: str
-    default_branch: str | None
-    head_sha: str | None
-    latency_ms: int
-    error: str | None
-    issue_count: int
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusRepoPreflightSummary:
-    corpus_path: str
-    repository_count: int
-    reachable_repositories: int
-    unreachable_repositories: int
-    issue_count: int
-    avg_latency_ms: float
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusContextPreviewResult:
-    task_id: str
-    repository: str
-    issue_url: str
-    status: str
-    error: str | None
-    repo_path: str | None
-    commit_hash: str | None
-    branch: str | None
-    file_count: int
-    language_summary: dict[str, int]
-    package_manager: str | None
-    test_commands: list[str]
-    context_provider: str
-    context_count: int
-    retrieved_files: list[str]
-    top_contexts: list[dict[str, Any]]
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusContextPreviewSummary:
-    corpus_path: str
-    attempted_issues: int
-    completed_issues: int
-    failed_issues: int
-    repository_count: int
-    context_provider: str
-    avg_context_count: float
-    source_free: bool
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusMaterializedTaskResult:
-    task_id: str
-    repository: str
-    issue_url: str
-    status: str
-    error: str | None
-    task_dir: str | None
-    manifest_path: str | None
-    issue_path: str | None
-    runbook_path: str | None
-    repo_url: str
-    commit_hash: str | None
-    context_provider: str | None
-    context_count: int
-    retrieved_files: list[str]
-    suggested_test_commands: list[str]
-    source_free: bool
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusMaterializedTaskSummary:
-    corpus_path: str
-    context_preview_path: str
-    output_dir: str
-    attempted_issues: int
-    materialized_tasks: int
-    failed_tasks: int
-    repository_count: int
-    source_free: bool
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusMaterializedTaskValidationResult:
-    task_id: str | None
-    task_dir: str
-    status: str
-    errors: list[str]
-    warnings: list[str]
-    manifest_path: str | None
-    issue_path: str | None
-    runbook_path: str | None
-    repository: str | None
-    issue_url: str | None
-    repo_path: str | None
-    retrieved_files: list[str]
-    suggested_commands: list[str]
-    source_free: bool
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusMaterializedTaskValidationSummary:
-    tasks_dir: str
-    task_count: int
-    valid_tasks: int
-    invalid_tasks: int
-    warning_count: int
-    error_count: int
-    source_free: bool
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusMaterializedRunReadinessResult:
-    task_id: str | None
-    task_dir: str
-    status: str
-    repository: str | None
-    issue_url: str | None
-    repo_path: str | None
-    repo_exists: bool
-    file_count: int | None
-    package_manager: str | None
-    test_commands: list[str]
-    allowed_test_commands: int
-    blocked_test_commands: int
-    command_checks: list[dict[str, Any]]
-    suggested_commands: list[str]
-    risk_level: str
-    risk_notes: list[str]
-    errors: list[str]
-    warnings: list[str]
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusMaterializedRunReadinessSummary:
-    tasks_dir: str
-    task_count: int
-    ready_tasks: int
-    warning_tasks: int
-    blocked_tasks: int
-    allowed_test_commands: int
-    blocked_test_commands: int
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusFocusedTestPlanResult:
-    task_id: str | None
-    task_dir: str
-    status: str
-    repository: str | None
-    issue_url: str | None
-    repo_path: str | None
-    focused_files: list[str]
-    command: str | None
-    policy_allowed: bool
-    policy_reason: str | None
-    fallback_command: str | None
-    risk_notes: list[str]
-    errors: list[str]
-    warnings: list[str]
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusFocusedTestPlanSummary:
-    tasks_dir: str
-    task_count: int
-    planned_tasks: int
-    fallback_tasks: int
-    blocked_tasks: int
-    policy_allowed_commands: int
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusFocusedTestRunResult:
-    task_id: str | None
-    repository: str | None
-    issue_url: str | None
-    status: str
-    command: str | None
-    repo_path: str | None
-    focused_files: list[str]
-    exit_code: int | None
-    timed_out: bool
-    duration_ms: int
-    policy_allowed: bool
-    policy_reason: str | None
-    stdout_path: str | None
-    stderr_path: str | None
-    errors: list[str]
-    warnings: list[str]
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusFocusedTestRunSummary:
-    plan_path: str
-    task_count: int
-    attempted_tasks: int
-    passed_tasks: int
-    failed_tasks: int
-    timed_out_tasks: int
-    blocked_tasks: int
-    sandbox_mode: str
-    sandbox_network: str
-    timeout_seconds: int
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusFocusedTestDiagnosisResult:
-    task_id: str | None
-    repository: str | None
-    issue_url: str | None
-    run_status: str | None
-    command: str | None
-    repo_path: str | None
-    focused_files: list[str]
-    category: str
-    severity: str
-    summary: str
-    evidence: list[str]
-    suggested_next_actions: list[str]
-    stdout_path: str | None
-    stderr_path: str | None
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusFocusedTestDiagnosisSummary:
-    run_results_path: str
-    task_count: int
-    passed_tasks: int
-    environment_issue_tasks: int
-    dependency_issue_tasks: int
-    timeout_tasks: int
-    blocked_tasks: int
-    unknown_failure_tasks: int
-    category_counts: dict[str, int]
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusFocusedTestSetupPlanResult:
-    task_id: str | None
-    repository: str | None
-    issue_url: str | None
-    status: str
-    category: str
-    severity: str
-    repo_path: str | None
-    setup_profile: str
-    setup_commands: list[str]
-    validation_command: str | None
-    focused_files: list[str]
-    requires_network: bool
-    sandbox_required: bool
-    evidence: list[str]
-    risk_notes: list[str]
-    suggested_next_actions: list[str]
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusFocusedTestSetupPlanSummary:
-    diagnosis_path: str
-    task_count: int
-    planned_tasks: int
-    ready_tasks: int
-    manual_review_tasks: int
-    dependency_setup_tasks: int
-    environment_setup_tasks: int
-    network_required_tasks: int
-    sandbox_required_tasks: int
-    category_counts: dict[str, int]
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusFocusedTestSetupReadinessResult:
-    task_id: str | None
-    repository: str | None
-    issue_url: str | None
-    status: str
-    setup_profile: str
-    repo_path: str | None
-    repo_exists: bool
-    setup_commands: list[str]
-    validation_command: str | None
-    requires_network: bool
-    sandbox_required: bool
-    docker_smoke_status: str
-    errors: list[str]
-    warnings: list[str]
-    next_actions: list[str]
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusFocusedTestSetupReadinessSummary:
-    setup_plan_path: str
-    docker_smoke_path: str
-    docker_smoke_status: str
-    task_count: int
-    ready_tasks: int
-    warning_tasks: int
-    blocked_tasks: int
-    network_required_tasks: int
-    sandbox_required_tasks: int
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusFocusedTestSetupCommandResult:
-    command: str
-    status: str
-    exit_code: int | None
-    timed_out: bool
-    duration_ms: int
-    policy_allowed: bool
-    policy_reason: str | None
-    stdout_path: str | None
-    stderr_path: str | None
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusFocusedTestSetupExecutionResult:
-    task_id: str | None
-    repository: str | None
-    issue_url: str | None
-    status: str
-    readiness_status: str
-    setup_profile: str
-    repo_path: str | None
-    setup_commands: list[str]
-    validation_command: str | None
-    requires_network: bool
-    sandbox_required: bool
-    sandbox_mode: str
-    sandbox_image: str
-    sandbox_network: str
-    dry_run: bool
-    allow_dependency_installs: bool
-    command_results: list[IssueCorpusFocusedTestSetupCommandResult]
-    errors: list[str]
-    warnings: list[str]
-    next_actions: list[str]
-
-    def to_dict(self) -> dict[str, Any]:
-        payload = asdict(self)
-        payload["command_results"] = [
-            command_result.to_dict() for command_result in self.command_results
-        ]
-        return payload
-
-
-@dataclass(frozen=True)
-class IssueCorpusFocusedTestSetupExecutionSummary:
-    readiness_path: str
-    task_count: int
-    dry_run: bool
-    allow_warnings: bool
-    allow_dependency_installs: bool
-    sandbox_mode: str
-    sandbox_image: str
-    sandbox_network: str
-    timeout_seconds: int
-    dry_run_tasks: int
-    attempted_tasks: int
-    completed_tasks: int
-    failed_tasks: int
-    timed_out_tasks: int
-    blocked_tasks: int
-    skipped_tasks: int
-    command_count: int
-    attempted_commands: int
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusFocusedTestSetupValidationResult:
-    task_id: str | None
-    repository: str | None
-    issue_url: str | None
-    status: str
-    setup_execution_status: str
-    setup_profile: str
-    repo_path: str | None
-    validation_command: str | None
-    sandbox_mode: str
-    sandbox_image: str
-    sandbox_network: str
-    dry_run: bool
-    failure_category: str | None
-    failure_summary: str | None
-    failure_evidence: list[str]
-    command_result: IssueCorpusFocusedTestSetupCommandResult | None
-    errors: list[str]
-    warnings: list[str]
-    next_actions: list[str]
-
-    def to_dict(self) -> dict[str, Any]:
-        payload = asdict(self)
-        payload["command_result"] = (
-            self.command_result.to_dict() if self.command_result is not None else None
-        )
-        return payload
-
-
-@dataclass(frozen=True)
-class IssueCorpusFocusedTestSetupValidationSummary:
-    setup_execution_path: str
-    task_count: int
-    dry_run: bool
-    sandbox_mode: str
-    sandbox_image: str
-    sandbox_network: str
-    timeout_seconds: int
-    dry_run_tasks: int
-    attempted_tasks: int
-    passed_tasks: int
-    failed_tasks: int
-    timed_out_tasks: int
-    blocked_tasks: int
-    skipped_tasks: int
-    failure_category_counts: dict[str, int]
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusPublicReproductionPlanResult:
-    task_id: str | None
-    repository: str | None
-    issue_url: str | None
-    status: str
-    repo_path: str | None
-    repo_exists: bool
-    reproduction_command: str | None
-    command_source: str
-    policy_allowed: bool
-    policy_reason: str | None
-    focused_files: list[str]
-    fixture_files: list[dict[str, str]]
-    expected_failure_signals: list[str]
-    manual_spec_required: bool
-    evidence: list[str]
-    blockers: list[str]
-    warnings: list[str]
-    next_actions: list[str]
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusPublicReproductionPlanSummary:
-    generated_at: str
-    tasks_dir: str
-    focused_plan_path: str | None
-    task_count: int
-    planned_tasks: int
-    warning_tasks: int
-    blocked_tasks: int
-    manual_spec_required_tasks: int
-    command_count: int
-    policy_allowed_commands: int
-    fixture_file_tasks: int
-    fixture_file_count: int
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusPublicReproductionSpecValidationResult:
-    task_id: str | None
-    repository: str | None
-    issue_url: str | None
-    status: str
-    spec_present: bool
-    repo_path: str | None
-    repo_exists: bool
-    reproduction_command: str | None
-    command_source: str
-    policy_allowed: bool
-    policy_reason: str | None
-    fixture_files: list[dict[str, str]]
-    expected_failure_signals: list[str]
-    errors: list[str]
-    warnings: list[str]
-    evidence: list[str]
-    next_actions: list[str]
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusPublicReproductionSpecValidationSummary:
-    generated_at: str
-    specs_path: str
-    tasks_dir: str
-    focused_plan_path: str | None
-    task_count: int
-    spec_count: int
-    ready_tasks: int
-    warning_tasks: int
-    blocked_tasks: int
-    missing_spec_tasks: int
-    empty_signal_tasks: int
-    policy_blocked_tasks: int
-    extra_spec_tasks: int
-    fixture_file_tasks: int
-    fixture_file_count: int
-    unsafe_fixture_tasks: int
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusPublicFailureSignalDiscoveryResult:
-    task_id: str | None
-    repository: str | None
-    issue_url: str | None
-    status: str
-    reproduction_plan_status: str
-    repo_path: str | None
-    reproduction_command: str | None
-    sandbox_mode: str
-    sandbox_image: str
-    sandbox_network: str
-    dry_run: bool
-    exit_code: int | None
-    timed_out: bool
-    duration_ms: int
-    policy_allowed: bool
-    policy_reason: str | None
-    stdout_path: str | None
-    stderr_path: str | None
-    fixture_paths: list[str]
-    candidate_failure_signals: list[str]
-    errors: list[str]
-    warnings: list[str]
-    next_actions: list[str]
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusPublicFailureSignalDiscoverySummary:
-    generated_at: str
-    reproduction_plan_path: str
-    task_count: int
-    dry_run: bool
-    sandbox_mode: str
-    sandbox_image: str
-    sandbox_network: str
-    timeout_seconds: int
-    dry_run_tasks: int
-    attempted_tasks: int
-    observed_failure_tasks: int
-    passed_tasks: int
-    timed_out_tasks: int
-    blocked_tasks: int
-    policy_allowed_commands: int
-    candidate_signal_tasks: int
-    fixture_file_tasks: int
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusPublicReproductionExecutionResult:
-    task_id: str | None
-    repository: str | None
-    issue_url: str | None
-    status: str
-    reproduction_plan_status: str
-    repo_path: str | None
-    reproduction_command: str | None
-    expected_failure_signals: list[str]
-    manual_spec_required: bool
-    sandbox_mode: str
-    sandbox_image: str
-    sandbox_network: str
-    dry_run: bool
-    exit_code: int | None
-    timed_out: bool
-    duration_ms: int
-    policy_allowed: bool
-    policy_reason: str | None
-    stdout_path: str | None
-    stderr_path: str | None
-    fixture_paths: list[str]
-    matched_failure_signals: list[str]
-    missing_failure_signals: list[str]
-    errors: list[str]
-    warnings: list[str]
-    next_actions: list[str]
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusPublicReproductionExecutionSummary:
-    generated_at: str
-    reproduction_plan_path: str
-    task_count: int
-    dry_run: bool
-    sandbox_mode: str
-    sandbox_image: str
-    sandbox_network: str
-    timeout_seconds: int
-    dry_run_tasks: int
-    attempted_tasks: int
-    reproduced_tasks: int
-    not_reproduced_tasks: int
-    failed_tasks: int
-    timed_out_tasks: int
-    blocked_tasks: int
-    manual_spec_required_tasks: int
-    policy_allowed_commands: int
-    fixture_file_tasks: int
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusPublicRepairReadinessResult:
-    task_id: str | None
-    repository: str | None
-    issue_url: str | None
-    status: str
-    repo_path: str | None
-    repo_exists: bool
-    repair_command: str | None
-    validation_command: str | None
-    focused_run_status: str | None
-    diagnosis_category: str | None
-    setup_validation_status: str | None
-    setup_failure_category: str | None
-    reproduction_execution_status: str | None
-    reproduction_stdout_path: str | None
-    reproduction_stderr_path: str | None
-    matched_failure_signals: list[str]
-    sandbox_mode: str | None
-    sandbox_network: str | None
-    evidence: list[str]
-    blockers: list[str]
-    warnings: list[str]
-    next_actions: list[str]
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusPublicRepairReadinessSummary:
-    generated_at: str
-    tasks_dir: str | None
-    focused_run_path: str
-    diagnosis_path: str
-    setup_validation_path: str
-    reproduction_execution_path: str | None
-    task_count: int
-    ready_tasks: int
-    warning_tasks: int
-    blocked_tasks: int
-    repair_command_tasks: int
-    passed_focused_tasks: int
-    passed_setup_validation_tasks: int
-    reproduced_tasks: int
-    missing_reproduction_tasks: int
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusPublicRepairAttemptResult:
-    task_id: str | None
-    repository: str | None
-    issue_url: str | None
-    status: str
-    readiness_status: str
-    repo_path: str | None
-    repo_exists: bool
-    repair_command: str | None
-    validation_command: str | None
-    reproduction_execution_status: str | None
-    runtime: str
-    planner: str
-    context_provider: str
-    sandbox_mode: str
-    sandbox_image: str
-    dry_run: bool
-    run_id: str | None
-    run_status: str | None
-    report_path: str | None
-    trace_path: str | None
-    final_diff_path: str | None
-    test_exit_code: int | None
-    patch_generated: bool
-    errors: list[str]
-    warnings: list[str]
-    evidence: list[str]
-    next_actions: list[str]
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class IssueCorpusPublicRepairAttemptSummary:
-    generated_at: str
-    readiness_path: str
-    tasks_dir: str | None
-    task_count: int
-    dry_run: bool
-    allow_warnings: bool
-    runtime: str
-    planner: str
-    context_provider: str
-    sandbox_mode: str
-    sandbox_image: str
-    dry_run_tasks: int
-    attempted_tasks: int
-    validated_tasks: int
-    failed_tasks: int
-    blocked_tasks: int
-    warning_tasks: int
-    reproduced_input_tasks: int
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class RetrievalEvalResult:
-    task_id: str
-    context_provider: str
-    status: str
-    error: str | None
-    retrieved_files: list[str]
-    related_test_files: list[str]
-    expected_touched_files: list[str]
-    expected_related_tests: list[str]
-    top1_touched_recall: float
-    top3_touched_recall: float
-    top5_touched_recall: float
-    related_test_recall: float
-    latency_ms: int
-    context_count: int
-    source_context_count: int
-    test_context_count: int
-    context_excerpt_chars: int
-    context_approx_tokens: int
-    fallback_used: bool
-    source_text_logged: bool
-    source_free_violation: bool
-    raw_artifact_path: str | None
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class RetrievalEvalSummary:
-    provider: str
-    attempted_tasks: int
-    completed_tasks: int
-    failed_tasks: int
-    avg_top1_touched_recall: float
-    avg_top3_touched_recall: float
-    avg_top5_touched_recall: float
-    avg_related_test_recall: float
-    avg_latency_ms: float
-    avg_context_count: float
-    avg_source_context_count: float
-    avg_test_context_count: float
-    avg_context_excerpt_chars: float
-    avg_context_approx_tokens: float
-    fallback_count: int
-    source_free_violation_count: int
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class RepairEvalResult:
-    task_id: str
-    runtime: str
-    planner: str
-    context_provider: str
-    status: str
-    error: str | None
-    patch_generated: bool
-    targeted_tests_passed: bool
-    test_exit_code: int | None
-    report_path: str | None
-    trace_path: str | None
-    final_diff_path: str | None
-    retrieved_files: list[str]
-    latency_ms: int
-    trace_event_count: int = 0
-    runtime_node_count: int = 0
-    failed_trace_event_count: int = 0
-    retry_event_count: int = 0
-    debuggability_score: float = 0.0
-    model_provider: str | None = None
-    input_tokens: int | None = None
-    output_tokens: int | None = None
-    total_tokens: int | None = None
-    estimated_cost_usd: float | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class RepairEvalSummary:
-    runtime: str
-    planner: str
-    context_provider: str
-    attempted_tasks: int
-    completed_tasks: int
-    patch_generated_rate: float
-    targeted_test_pass_rate: float
-    avg_latency_ms: float
-    avg_trace_events: float = 0.0
-    avg_runtime_nodes: float = 0.0
-    failed_trace_event_count: int = 0
-    avg_retry_events: float = 0.0
-    avg_debuggability_score: float = 0.0
-    model_provider: str | None = None
-    input_tokens: int | None = None
-    output_tokens: int | None = None
-    total_tokens: int | None = None
-    estimated_cost_usd: float | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class ScaffoldComparisonResult:
-    scaffold: str
-    runtime: str
-    planner: str
-    context_provider: str
-    attempted_tasks: int
-    completed_tasks: int
-    patch_generated_rate: float
-    targeted_test_pass_rate: float
-    avg_latency_ms: float
-    avg_trace_events: float
-    avg_runtime_nodes: float
-    failed_trace_event_count: int
-    avg_retry_events: float
-    avg_debuggability_score: float
-    model_provider: str | None
-    input_tokens: int | None
-    output_tokens: int | None
-    total_tokens: int | None
-    estimated_cost_usd: float | None
-    repair_report_path: str
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class ScaffoldVariant:
-    name: str
-    runtime: str
-    planner: str
-
-
-SCAFFOLD_VARIANTS: dict[str, ScaffoldVariant] = {
-    "agentless": ScaffoldVariant("agentless", "agentless", "heuristic"),
-    "heuristic": ScaffoldVariant("heuristic", "heuristic", "heuristic"),
-    "langgraph": ScaffoldVariant("langgraph", "langgraph", "heuristic"),
-    "langgraph_fake_model": ScaffoldVariant("langgraph_fake_model", "langgraph", "fake_model"),
-    "deepagents": ScaffoldVariant("deepagents", "deepagents", "heuristic"),
-    "openai_agents": ScaffoldVariant("openai_agents", "openai_agents", "heuristic"),
-}
-
-
-@dataclass(frozen=True)
-class PatchSearchCandidateResult:
-    candidate_index: int
-    name: str
-    path: str | None
-    status: str
-    test_exit_code: int | None
-    tests_passed: bool
-    diff: str
-    duration_ms: int
-    risk_score: float
-    reason: str
-    error: str | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class PatchSearchEvalResult:
-    task_id: str
-    variant: str
-    candidate_count: int
-    status: str
-    success_at_1: bool
-    success_at_k: bool
-    selected_candidate_index: int | None
-    selected_candidate_name: str | None
-    selected_candidate_passed: bool
-    test_runs: int
-    latency_ms: int
-    candidate_results: list[PatchSearchCandidateResult]
-    error: str | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class PatchSearchEvalSummary:
-    variant: str
-    candidate_count: int
-    attempted_tasks: int
-    completed_tasks: int
-    success_at_1_rate: float
-    success_at_k_rate: float
-    selected_success_rate: float
-    avg_latency_ms: float
-    avg_test_runs: float
-    estimated_cost_usd: float = 0.0
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+from patchsmith.evaluation_models import (
+    SeededTask,
+    SeededTaskValidationResult,
+    SeededDatasetValidationSummary,
+    IssueCorpusEntryValidationResult,
+    IssueCorpusValidationSummary,
+    IssueCorpusRepoPreflightResult,
+    IssueCorpusRepoPreflightSummary,
+    IssueCorpusContextPreviewResult,
+    IssueCorpusContextPreviewSummary,
+    IssueCorpusMaterializedTaskResult,
+    IssueCorpusMaterializedTaskSummary,
+    IssueCorpusMaterializedTaskValidationResult,
+    IssueCorpusMaterializedTaskValidationSummary,
+    IssueCorpusMaterializedRunReadinessResult,
+    IssueCorpusMaterializedRunReadinessSummary,
+    IssueCorpusFocusedTestPlanResult,
+    IssueCorpusFocusedTestPlanSummary,
+    IssueCorpusFocusedTestRunResult,
+    IssueCorpusFocusedTestRunSummary,
+    IssueCorpusFocusedTestDiagnosisResult,
+    IssueCorpusFocusedTestDiagnosisSummary,
+    IssueCorpusFocusedTestSetupPlanResult,
+    IssueCorpusFocusedTestSetupPlanSummary,
+    IssueCorpusFocusedTestSetupReadinessResult,
+    IssueCorpusFocusedTestSetupReadinessSummary,
+    IssueCorpusFocusedTestSetupCommandResult,
+    IssueCorpusFocusedTestSetupExecutionResult,
+    IssueCorpusFocusedTestSetupExecutionSummary,
+    IssueCorpusFocusedTestSetupValidationResult,
+    IssueCorpusFocusedTestSetupValidationSummary,
+    IssueCorpusPublicReproductionPlanResult,
+    IssueCorpusPublicReproductionPlanSummary,
+    IssueCorpusPublicReproductionSpecValidationResult,
+    IssueCorpusPublicReproductionSpecValidationSummary,
+    IssueCorpusPublicFailureSignalDiscoveryResult,
+    IssueCorpusPublicFailureSignalDiscoverySummary,
+    IssueCorpusPublicReproductionExecutionResult,
+    IssueCorpusPublicReproductionExecutionSummary,
+    IssueCorpusPublicRepairReadinessResult,
+    IssueCorpusPublicRepairReadinessSummary,
+    IssueCorpusPublicRepairAttemptResult,
+    IssueCorpusPublicRepairAttemptSummary,
+    RetrievalEvalResult,
+    RetrievalEvalSummary,
+    RepairEvalResult,
+    RepairEvalSummary,
+    ScaffoldComparisonResult,
+    ScaffoldVariant,
+    PatchSearchCandidateResult,
+    PatchSearchEvalResult,
+    PatchSearchEvalSummary,
+    SCAFFOLD_VARIANTS,
+)
 
 
 def load_seeded_tasks(dataset_dir: Path) -> list[SeededTask]:
@@ -3354,6 +2362,9 @@ def validate_public_issue_reproduction_specs(
                 fixture_files=_normalize_public_issue_fixture_files(
                     specs_by_task[extra_task_id].get("fixture_files")
                 )[0],
+                source_hints=_normalize_public_issue_source_hints(
+                    specs_by_task[extra_task_id].get("source_hints")
+                )[0],
                 expected_failure_signals=_string_list(
                     specs_by_task[extra_task_id].get("expected_failure_signals")
                 ),
@@ -4098,6 +3109,7 @@ def write_public_issue_repair_readiness_outputs(
                 "repo_exists",
                 "repair_command",
                 "validation_command",
+                "validation_fixture_paths",
                 "focused_run_status",
                 "diagnosis_category",
                 "setup_validation_status",
@@ -4126,6 +3138,9 @@ def write_public_issue_repair_readiness_outputs(
                     "repo_exists": result.repo_exists,
                     "repair_command": result.repair_command,
                     "validation_command": result.validation_command,
+                    "validation_fixture_paths": ";".join(
+                        result.validation_fixture_paths
+                    ),
                     "focused_run_status": result.focused_run_status,
                     "diagnosis_category": result.diagnosis_category,
                     "setup_validation_status": result.setup_validation_status,
@@ -4170,6 +3185,7 @@ def execute_public_issue_repairs(
     context_provider: str = "native_hybrid",
     sandbox_mode: str = "docker",
     sandbox_image: str = "patchsmith-seeded-smoke:py312",
+    max_retries: int = 0,
     max_tasks: int | None = None,
     dry_run: bool = True,
     allow_warnings: bool = False,
@@ -4201,6 +3217,7 @@ def execute_public_issue_repairs(
             context_provider=context_provider,
             sandbox_mode=sandbox_mode,
             sandbox_image=sandbox_image,
+            max_retries=max_retries,
             dry_run=dry_run,
             allow_warnings=allow_warnings,
         )
@@ -4217,6 +3234,7 @@ def execute_public_issue_repairs(
         context_provider=context_provider,
         sandbox_mode=sandbox_mode,
         sandbox_image=sandbox_image,
+        max_retries=max_retries,
     )
     write_public_issue_repair_attempt_outputs(
         output_dir=output_dir,
@@ -4240,6 +3258,7 @@ def summarize_public_issue_repair_attempts(
     context_provider: str,
     sandbox_mode: str,
     sandbox_image: str,
+    max_retries: int,
 ) -> IssueCorpusPublicRepairAttemptSummary:
     return IssueCorpusPublicRepairAttemptSummary(
         generated_at=datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace(
@@ -4255,6 +3274,7 @@ def summarize_public_issue_repair_attempts(
         context_provider=context_provider,
         sandbox_mode=sandbox_mode,
         sandbox_image=sandbox_image,
+        max_retries=max_retries,
         dry_run_tasks=sum(1 for result in results if result.status == "dry_run"),
         attempted_tasks=sum(
             1 for result in results if result.status in {"validated", "failed"}
@@ -4305,6 +3325,7 @@ def write_public_issue_repair_attempt_outputs(
                 "repo_exists",
                 "repair_command",
                 "validation_command",
+                "validation_fixture_paths",
                 "reproduction_execution_status",
                 "runtime",
                 "planner",
@@ -4338,6 +3359,9 @@ def write_public_issue_repair_attempt_outputs(
                     "repo_exists": result.repo_exists,
                     "repair_command": result.repair_command,
                     "validation_command": result.validation_command,
+                    "validation_fixture_paths": ";".join(
+                        result.validation_fixture_paths
+                    ),
                     "reproduction_execution_status": (
                         result.reproduction_execution_status
                     ),
@@ -5192,1572 +4216,6 @@ def write_seeded_dataset_validation_outputs(
     )
 
 
-def render_retrieval_eval_report(
-    *,
-    dataset_dir: Path,
-    results: list[RetrievalEvalResult],
-    summaries: list[RetrievalEvalSummary],
-) -> str:
-    lines = [
-        "# Retrieval Evaluation Report",
-        "",
-        f"- Dataset: `{dataset_dir}`",
-        f"- Task count: `{len({result.task_id for result in results})}`",
-        f"- Lane count: `{len({result.context_provider for result in results})}`",
-        "- Model cost: `$0.00` (retrieval-only evaluation; no model calls)",
-        "",
-        "## Summary",
-        "",
-        (
-            "| Provider | Attempted | Completed | Top-1 | Top-3 | Top-5 | Related Tests | "
-            "Avg Ctx | Avg Src | Avg Test | Avg Tokens | Avg Latency ms | Fallbacks | "
-            "Source-Free Violations |"
-        ),
-        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
-    ]
-    for summary in summaries:
-        lines.append(
-            "| "
-            f"{summary.provider} | "
-            f"{summary.attempted_tasks} | "
-            f"{summary.completed_tasks} | "
-            f"{summary.avg_top1_touched_recall:.2f} | "
-            f"{summary.avg_top3_touched_recall:.2f} | "
-            f"{summary.avg_top5_touched_recall:.2f} | "
-            f"{summary.avg_related_test_recall:.2f} | "
-            f"{summary.avg_context_count:.1f} | "
-            f"{summary.avg_source_context_count:.1f} | "
-            f"{summary.avg_test_context_count:.1f} | "
-            f"{summary.avg_context_approx_tokens:.0f} | "
-            f"{summary.avg_latency_ms:.0f} | "
-            f"{summary.fallback_count} | "
-            f"{summary.source_free_violation_count} |"
-        )
-
-    lines.extend(
-        [
-            "",
-            "## Per-Task Results",
-            "",
-            (
-                "| Task | Provider | Status | Top-1 | Top-3 | Top-5 | Related Tests | "
-                "Ctx | Tokens | Retrieved Files | Error |"
-            ),
-            "|---|---|---|---:|---:|---:|---:|---:|---:|---|---|",
-        ]
-    )
-    for result in results:
-        lines.append(
-            "| "
-            f"{result.task_id} | "
-            f"{result.context_provider} | "
-            f"{result.status} | "
-            f"{result.top1_touched_recall:.2f} | "
-            f"{result.top3_touched_recall:.2f} | "
-            f"{result.top5_touched_recall:.2f} | "
-            f"{result.related_test_recall:.2f} | "
-            f"{result.context_count} | "
-            f"{result.context_approx_tokens} | "
-            f"{', '.join(result.retrieved_files) or 'none'} | "
-            f"{(result.error or '').replace('|', '/')} |"
-        )
-
-    lines.extend(
-        [
-            "",
-            "## Decision Notes",
-            "",
-            "- This report measures localization evidence only; it does not claim patch success.",
-            "- Context providers are compared under the same task and repository snapshot.",
-            "- Context token counts are approximate and use packed excerpt characters, not a model-specific tokenizer.",
-            "- Source-bearing raw artifacts are kept under the experiment output directory and not copied into this public summary.",
-            "",
-        ]
-    )
-    return "\n".join(lines)
-
-
-def render_seeded_dataset_validation_report(
-    *,
-    dataset_dir: Path,
-    results: list[SeededTaskValidationResult],
-    summary: SeededDatasetValidationSummary,
-) -> str:
-    lines = [
-        "# Seeded Dataset Validation Report",
-        "",
-        f"- Dataset: `{dataset_dir}`",
-        f"- Task count: `{summary.task_count}`",
-        f"- Valid tasks: `{summary.valid_tasks}`",
-        f"- Invalid tasks: `{summary.invalid_tasks}`",
-        f"- Error count: `{summary.error_count}`",
-        f"- Warning count: `{summary.warning_count}`",
-        (
-            f"- Duplicate task IDs: `{', '.join(summary.duplicate_task_ids)}`"
-            if summary.duplicate_task_ids
-            else "- Duplicate task IDs: `none`"
-        ),
-        "",
-        "## Results",
-        "",
-        "| Task | Status | Errors | Warnings | Expected Source | Expected Tests |",
-        "|---|---|---|---|---|---|",
-    ]
-    for result in results:
-        lines.append(
-            "| "
-            f"{result.task_id or result.task_dir} | "
-            f"{result.status} | "
-            f"{'; '.join(result.errors) or 'none'} | "
-            f"{'; '.join(result.warnings) or 'none'} | "
-            f"{', '.join(result.expected_touched_files) or 'none'} | "
-            f"{', '.join(result.expected_related_tests) or 'none'} |"
-        )
-    lines.extend(
-        [
-            "",
-            "## Gate Notes",
-            "",
-            (
-                "- Dataset validation checks metadata shape, required files, non-empty "
-                "issues, and expected paths."
-            ),
-            (
-                "- A valid dataset is required before retrieval or repair eval metrics are "
-                "release evidence."
-            ),
-            "",
-        ]
-    )
-    return "\n".join(lines)
-
-
-def render_issue_corpus_validation_report(
-    *,
-    corpus_path: Path,
-    results: list[IssueCorpusEntryValidationResult],
-    summary: IssueCorpusValidationSummary,
-) -> str:
-    lines = [
-        "# Public Issue Corpus Validation Report",
-        "",
-        f"- Corpus: `{corpus_path}`",
-        f"- Corpus ID: `{summary.corpus_id or 'unknown'}`",
-        f"- Entry count: `{summary.entry_count}`",
-        f"- Valid entries: `{summary.valid_entries}`",
-        f"- Invalid entries: `{summary.invalid_entries}`",
-        f"- Error count: `{summary.error_count}`",
-        f"- Warning count: `{summary.warning_count}`",
-        f"- Repositories: `{', '.join(summary.repositories) or 'none'}`",
-        f"- Languages: `{', '.join(summary.languages) or 'none'}`",
-        f"- Task types: `{', '.join(summary.task_types) or 'none'}`",
-        f"- Open issues at capture: `{summary.open_issue_count}`",
-        "",
-        "## Results",
-        "",
-        "| Task | Repository | Issue | Status | Errors | Warnings | Workflow |",
-        "|---|---|---|---|---|---|---|",
-    ]
-    for result in results:
-        lines.append(
-            "| "
-            f"{result.task_id or 'unknown'} | "
-            f"{result.repository or 'unknown'} | "
-            f"{result.issue_url or 'unknown'} | "
-            f"{result.status} | "
-            f"{'; '.join(result.errors) or 'none'} | "
-            f"{'; '.join(result.warnings) or 'none'} | "
-            f"{', '.join(result.expected_workflow) or 'none'} |"
-        )
-    lines.extend(
-        [
-            "",
-            "## Claim Boundary",
-            "",
-            "- This corpus proves that public issue candidates have been curated and validated.",
-            "- It does not prove PatchSmith solved these issues until run artifacts exist for them.",
-            "- Use this corpus as the next real-world evaluation lane after seeded-suite gates.",
-            "",
-        ]
-    )
-    return "\n".join(lines)
-
-
-def render_issue_corpus_repo_preflight_report(
-    *,
-    corpus_path: Path,
-    results: list[IssueCorpusRepoPreflightResult],
-    summary: IssueCorpusRepoPreflightSummary,
-) -> str:
-    lines = [
-        "# Public Issue Corpus Repository Preflight",
-        "",
-        f"- Corpus: `{corpus_path}`",
-        f"- Repository count: `{summary.repository_count}`",
-        f"- Reachable repositories: `{summary.reachable_repositories}`",
-        f"- Unreachable repositories: `{summary.unreachable_repositories}`",
-        f"- Issue count: `{summary.issue_count}`",
-        f"- Average reachable latency: `{summary.avg_latency_ms:.1f}ms`",
-        "",
-        "## Results",
-        "",
-        "| Repository | Status | Default Branch | HEAD | Issues | Latency ms | Error |",
-        "|---|---|---|---|---:|---:|---|",
-    ]
-    for result in results:
-        lines.append(
-            "| "
-            f"{result.repository} | "
-            f"{result.status} | "
-            f"{result.default_branch or 'unknown'} | "
-            f"{result.head_sha or 'unknown'} | "
-            f"{result.issue_count} | "
-            f"{result.latency_ms} | "
-            f"{result.error or 'none'} |"
-        )
-    lines.extend(
-        [
-            "",
-            "## Claim Boundary",
-            "",
-            "- This preflight proves repository reachability and records current HEAD metadata.",
-            "- It does not clone source or run repair tasks.",
-            "- Use this before converting public issue candidates into executable eval tasks.",
-            "",
-        ]
-    )
-    return "\n".join(lines)
-
-
-def render_issue_corpus_context_preview_report(
-    *,
-    corpus_path: Path,
-    results: list[IssueCorpusContextPreviewResult],
-    summary: IssueCorpusContextPreviewSummary,
-) -> str:
-    lines = [
-        "# Public Issue Corpus Context Preview",
-        "",
-        f"- Corpus: `{corpus_path}`",
-        f"- Attempted issues: `{summary.attempted_issues}`",
-        f"- Completed issues: `{summary.completed_issues}`",
-        f"- Failed issues: `{summary.failed_issues}`",
-        f"- Repositories: `{summary.repository_count}`",
-        f"- Context provider: `{summary.context_provider}`",
-        f"- Average context count: `{summary.avg_context_count:.1f}`",
-        f"- Source-free summary: `{str(summary.source_free).lower()}`",
-        "",
-        "## Results",
-        "",
-        "| Task | Repository | Status | Commit | Files | Contexts | Retrieved Files | Error |",
-        "|---|---|---|---|---:|---:|---|---|",
-    ]
-    for result in results:
-        lines.append(
-            "| "
-            f"{result.task_id} | "
-            f"{result.repository} | "
-            f"{result.status} | "
-            f"{(result.commit_hash or 'unknown')[:12]} | "
-            f"{result.file_count} | "
-            f"{result.context_count} | "
-            f"{', '.join(result.retrieved_files) or 'none'} | "
-            f"{result.error or 'none'} |"
-        )
-    lines.extend(
-        [
-            "",
-            "## Claim Boundary",
-            "",
-            "- This preview proves repository clone/index/retrieval plumbing on public issue candidates.",
-            "- Retrieved source excerpts are intentionally omitted from this summary.",
-            "- It does not prove issue reproduction, patch generation, or test success.",
-            "",
-        ]
-    )
-    return "\n".join(lines)
-
-
-def render_issue_corpus_materialized_task_report(
-    *,
-    corpus_path: Path,
-    context_preview_path: Path,
-    results: list[IssueCorpusMaterializedTaskResult],
-    summary: IssueCorpusMaterializedTaskSummary,
-) -> str:
-    lines = [
-        "# Public Issue Corpus Materialized Tasks",
-        "",
-        f"- Corpus: `{corpus_path}`",
-        f"- Context preview: `{context_preview_path}`",
-        f"- Output: `{summary.output_dir}`",
-        f"- Attempted issues: `{summary.attempted_issues}`",
-        f"- Materialized tasks: `{summary.materialized_tasks}`",
-        f"- Failed tasks: `{summary.failed_tasks}`",
-        f"- Repositories: `{summary.repository_count}`",
-        f"- Source-free manifests: `{str(summary.source_free).lower()}`",
-        "",
-        "## Results",
-        "",
-        "| Task | Repository | Status | Commit | Contexts | Retrieved Files | Task Dir | Error |",
-        "|---|---|---|---|---:|---|---|---|",
-    ]
-    for result in results:
-        lines.append(
-            "| "
-            f"{result.task_id} | "
-            f"{result.repository} | "
-            f"{result.status} | "
-            f"{(result.commit_hash or 'unknown')[:12]} | "
-            f"{result.context_count} | "
-            f"{', '.join(result.retrieved_files) or 'none'} | "
-            f"{result.task_dir or 'none'} | "
-            f"{result.error or 'none'} |"
-        )
-    lines.extend(
-        [
-            "",
-            "## Claim Boundary",
-            "",
-            "- This materialization creates external-evaluation task manifests and runbooks.",
-            "- Manifests intentionally omit source excerpts and issue body scraping.",
-            "- It does not prove issue reproduction, patch generation, or test success.",
-            "",
-        ]
-    )
-    return "\n".join(lines)
-
-
-def render_materialized_issue_task_validation_report(
-    *,
-    tasks_dir: Path,
-    results: list[IssueCorpusMaterializedTaskValidationResult],
-    summary: IssueCorpusMaterializedTaskValidationSummary,
-) -> str:
-    lines = [
-        "# Public Issue Materialized Task Validation",
-        "",
-        f"- Tasks directory: `{tasks_dir}`",
-        f"- Task count: `{summary.task_count}`",
-        f"- Valid tasks: `{summary.valid_tasks}`",
-        f"- Invalid tasks: `{summary.invalid_tasks}`",
-        f"- Error count: `{summary.error_count}`",
-        f"- Warning count: `{summary.warning_count}`",
-        f"- Source-free manifests: `{str(summary.source_free).lower()}`",
-        "",
-        "## Results",
-        "",
-        "| Task | Status | Repository | Issue | Retrieved Files | Errors | Warnings |",
-        "|---|---|---|---|---|---|---|",
-    ]
-    for result in results:
-        lines.append(
-            "| "
-            f"{result.task_id or result.task_dir} | "
-            f"{result.status} | "
-            f"{result.repository or 'unknown'} | "
-            f"{result.issue_url or 'unknown'} | "
-            f"{', '.join(result.retrieved_files) or 'none'} | "
-            f"{'; '.join(result.errors) or 'none'} | "
-            f"{'; '.join(result.warnings) or 'none'} |"
-        )
-    lines.extend(
-        [
-            "",
-            "## Gate Notes",
-            "",
-            "- This gate validates manifest shape, source-free context summaries, task files, local repository snapshots, and suggested run commands.",
-            "- A valid manifest set is external-evaluation setup evidence, not repair-quality evidence.",
-            "- Public issue reproduction and repair claims still require normal PatchSmith run artifacts.",
-            "",
-        ]
-    )
-    return "\n".join(lines)
-
-
-def render_materialized_issue_run_readiness_report(
-    *,
-    tasks_dir: Path,
-    results: list[IssueCorpusMaterializedRunReadinessResult],
-    summary: IssueCorpusMaterializedRunReadinessSummary,
-) -> str:
-    lines = [
-        "# Public Issue Materialized Run Readiness",
-        "",
-        f"- Tasks directory: `{tasks_dir}`",
-        f"- Task count: `{summary.task_count}`",
-        f"- Ready tasks: `{summary.ready_tasks}`",
-        f"- Warning tasks: `{summary.warning_tasks}`",
-        f"- Blocked tasks: `{summary.blocked_tasks}`",
-        f"- Allowed test commands: `{summary.allowed_test_commands}`",
-        f"- Blocked test commands: `{summary.blocked_test_commands}`",
-        "",
-        "## Results",
-        "",
-        "| Task | Status | Risk | Repository | Files | Allowed Tests | Blocked Tests | Notes |",
-        "|---|---|---|---|---:|---:|---:|---|",
-    ]
-    for result in results:
-        notes = [*result.risk_notes, *result.errors, *result.warnings]
-        lines.append(
-            "| "
-            f"{result.task_id or result.task_dir} | "
-            f"{result.status} | "
-            f"{result.risk_level} | "
-            f"{result.repository or 'unknown'} | "
-            f"{result.file_count if result.file_count is not None else 'unknown'} | "
-            f"{result.allowed_test_commands} | "
-            f"{result.blocked_test_commands} | "
-            f"{'; '.join(notes) or 'none'} |"
-        )
-    lines.extend(
-        [
-            "",
-            "## Claim Boundary",
-            "",
-            "- This report checks run readiness without executing public repository tests.",
-            "- `warning` means the task is runnable by policy but has cost, dependency, or scope risk.",
-            "- It does not prove issue reproduction, patch generation, or test success.",
-            "",
-        ]
-    )
-    return "\n".join(lines)
-
-
-def render_materialized_issue_focused_test_plan_report(
-    *,
-    tasks_dir: Path,
-    results: list[IssueCorpusFocusedTestPlanResult],
-    summary: IssueCorpusFocusedTestPlanSummary,
-) -> str:
-    lines = [
-        "# Public Issue Focused Test Plan",
-        "",
-        f"- Tasks directory: `{tasks_dir}`",
-        f"- Task count: `{summary.task_count}`",
-        f"- Planned focused tasks: `{summary.planned_tasks}`",
-        f"- Fallback tasks: `{summary.fallback_tasks}`",
-        f"- Blocked tasks: `{summary.blocked_tasks}`",
-        f"- Policy-allowed commands: `{summary.policy_allowed_commands}`",
-        "",
-        "## Results",
-        "",
-        "| Task | Status | Repository | Focused Files | Command | Policy | Notes |",
-        "|---|---|---|---|---|---|---|",
-    ]
-    for result in results:
-        notes = [*result.risk_notes, *result.errors, *result.warnings]
-        lines.append(
-            "| "
-            f"{result.task_id or result.task_dir} | "
-            f"{result.status} | "
-            f"{result.repository or 'unknown'} | "
-            f"{', '.join(result.focused_files) or 'none'} | "
-            f"`{result.command or 'none'}` | "
-            f"{'allowed' if result.policy_allowed else result.policy_reason or 'not checked'} | "
-            f"{'; '.join(notes) or 'none'} |"
-        )
-    lines.extend(
-        [
-            "",
-            "## Claim Boundary",
-            "",
-            "- This report plans narrower pytest commands from retrieved test-like files.",
-            "- Commands are policy-checked but not executed.",
-            "- Passing these commands would still be targeted evidence, not full public issue repair quality.",
-            "",
-        ]
-    )
-    return "\n".join(lines)
-
-
-def render_materialized_issue_focused_test_run_report(
-    *,
-    plan_path: Path,
-    results: list[IssueCorpusFocusedTestRunResult],
-    summary: IssueCorpusFocusedTestRunSummary,
-) -> str:
-    lines = [
-        "# Public Issue Focused Test Run",
-        "",
-        f"- Plan path: `{plan_path}`",
-        f"- Task count: `{summary.task_count}`",
-        f"- Attempted tasks: `{summary.attempted_tasks}`",
-        f"- Passed tasks: `{summary.passed_tasks}`",
-        f"- Failed tasks: `{summary.failed_tasks}`",
-        f"- Timed out tasks: `{summary.timed_out_tasks}`",
-        f"- Blocked tasks: `{summary.blocked_tasks}`",
-        f"- Sandbox mode: `{summary.sandbox_mode}`",
-        f"- Sandbox network: `{summary.sandbox_network}`",
-        f"- Timeout seconds: `{summary.timeout_seconds}`",
-        "",
-        "## Results",
-        "",
-        "| Task | Status | Repository | Command | Exit | Duration | Logs | Notes |",
-        "|---|---|---|---|---|---|---|---|",
-    ]
-    for result in results:
-        notes = [*result.errors, *result.warnings]
-        logs = "none"
-        if result.stdout_path or result.stderr_path:
-            logs = ", ".join(
-                path
-                for path in [result.stdout_path, result.stderr_path]
-                if path is not None
-            )
-        exit_code = result.exit_code if result.exit_code is not None else "n/a"
-        lines.append(
-            "| "
-            f"{result.task_id or 'unknown'} | "
-            f"{result.status} | "
-            f"{result.repository or 'unknown'} | "
-            f"`{result.command or 'none'}` | "
-            f"{exit_code} | "
-            f"{result.duration_ms}ms | "
-            f"{logs} | "
-            f"{'; '.join(notes) or 'none'} |"
-        )
-    lines.extend(
-        [
-            "",
-            "## Claim Boundary",
-            "",
-            "- This report executes the focused commands selected by the public issue task plan.",
-            "- Passing tasks prove only that the planned focused test command is runnable in the current snapshot.",
-            "- Failed or timed-out tasks are dependency, environment, or upstream-suite readiness signals unless paired with issue reproduction evidence.",
-            "- This report does not prove issue reproduction, patch generation, or end-to-end repair quality.",
-            "",
-        ]
-    )
-    return "\n".join(lines)
-
-
-def render_focused_test_diagnosis_report(
-    *,
-    results_path: Path,
-    results: list[IssueCorpusFocusedTestDiagnosisResult],
-    summary: IssueCorpusFocusedTestDiagnosisSummary,
-) -> str:
-    lines = [
-        "# Public Issue Focused Test Diagnosis",
-        "",
-        f"- Run results path: `{results_path}`",
-        f"- Task count: `{summary.task_count}`",
-        f"- Passed tasks: `{summary.passed_tasks}`",
-        f"- Environment issue tasks: `{summary.environment_issue_tasks}`",
-        f"- Dependency issue tasks: `{summary.dependency_issue_tasks}`",
-        f"- Timeout tasks: `{summary.timeout_tasks}`",
-        f"- Blocked tasks: `{summary.blocked_tasks}`",
-        f"- Unknown failure tasks: `{summary.unknown_failure_tasks}`",
-        "",
-        "## Category Counts",
-        "",
-    ]
-    if summary.category_counts:
-        for category, count in summary.category_counts.items():
-            lines.append(f"- `{category}`: `{count}`")
-    else:
-        lines.append("- none")
-    lines.extend(
-        [
-            "",
-            "## Results",
-            "",
-            "| Task | Run Status | Category | Severity | Summary | Evidence | Next Actions |",
-            "|---|---|---|---|---|---|---|",
-        ]
-    )
-    for result in results:
-        lines.append(
-            "| "
-            f"{_markdown_table_text(result.task_id or 'unknown')} | "
-            f"{_markdown_table_text(result.run_status or 'unknown')} | "
-            f"{_markdown_table_text(result.category)} | "
-            f"{_markdown_table_text(result.severity)} | "
-            f"{_markdown_table_text(result.summary)} | "
-            f"{_markdown_table_text('; '.join(result.evidence) or 'none')} | "
-            f"{_markdown_table_text('; '.join(result.suggested_next_actions) or 'none')} |"
-        )
-    lines.extend(
-        [
-            "",
-            "## Claim Boundary",
-            "",
-            "- This report classifies focused test execution failures from saved stdout/stderr logs.",
-            "- It is a dependency and environment readiness aid, not a patch-quality score.",
-            "- Suggested actions must be executed only inside an approved sandbox and should not bypass command policy.",
-            "- Public issue repair quality remains unproven until issue reproduction, patch generation, and passing validation are saved.",
-            "",
-        ]
-    )
-    return "\n".join(lines)
-
-
-def render_focused_test_setup_plan_report(
-    *,
-    diagnosis_path: Path,
-    results: list[IssueCorpusFocusedTestSetupPlanResult],
-    summary: IssueCorpusFocusedTestSetupPlanSummary,
-) -> str:
-    lines = [
-        "# Public Issue Focused Test Setup Plan",
-        "",
-        f"- Diagnosis path: `{diagnosis_path}`",
-        f"- Task count: `{summary.task_count}`",
-        f"- Planned setup tasks: `{summary.planned_tasks}`",
-        f"- Ready tasks: `{summary.ready_tasks}`",
-        f"- Manual review tasks: `{summary.manual_review_tasks}`",
-        f"- Dependency setup tasks: `{summary.dependency_setup_tasks}`",
-        f"- Environment setup tasks: `{summary.environment_setup_tasks}`",
-        f"- Network-required tasks: `{summary.network_required_tasks}`",
-        f"- Sandbox-required tasks: `{summary.sandbox_required_tasks}`",
-        "",
-        "## Category Counts",
-        "",
-    ]
-    if summary.category_counts:
-        for category, count in summary.category_counts.items():
-            lines.append(f"- `{category}`: `{count}`")
-    else:
-        lines.append("- none")
-    lines.extend(
-        [
-            "",
-            "## Results",
-            "",
-            "| Task | Status | Profile | Setup Commands | Validation | Risk Notes |",
-            "|---|---|---|---|---|---|",
-        ]
-    )
-    for result in results:
-        setup_commands = "; ".join(result.setup_commands) if result.setup_commands else "none"
-        lines.append(
-            "| "
-            f"{_markdown_table_text(result.task_id or 'unknown')} | "
-            f"{_markdown_table_text(result.status)} | "
-            f"{_markdown_table_text(result.setup_profile)} | "
-            f"{_markdown_table_text(setup_commands)} | "
-            f"{_markdown_table_text(result.validation_command or 'none')} | "
-            f"{_markdown_table_text('; '.join(result.risk_notes) or 'none')} |"
-        )
-    lines.extend(
-        [
-            "",
-            "## Claim Boundary",
-            "",
-            "- This report plans setup work from focused-test diagnosis categories.",
-            "- Setup commands are not executed by this report and may require network access.",
-            "- Run setup commands only in disposable, policy-approved sandboxes with no host secrets.",
-            "- Passing setup does not prove public issue repair quality; it only prepares later reproduction and validation attempts.",
-            "",
-        ]
-    )
-    return "\n".join(lines)
-
-
-def render_focused_test_setup_readiness_report(
-    *,
-    setup_plan_path: Path,
-    docker_smoke_path: Path,
-    results: list[IssueCorpusFocusedTestSetupReadinessResult],
-    summary: IssueCorpusFocusedTestSetupReadinessSummary,
-) -> str:
-    lines = [
-        "# Public Issue Focused Test Setup Readiness",
-        "",
-        f"- Setup plan path: `{setup_plan_path}`",
-        f"- Docker smoke path: `{docker_smoke_path}`",
-        f"- Docker smoke status: `{summary.docker_smoke_status}`",
-        f"- Task count: `{summary.task_count}`",
-        f"- Ready tasks: `{summary.ready_tasks}`",
-        f"- Warning tasks: `{summary.warning_tasks}`",
-        f"- Blocked tasks: `{summary.blocked_tasks}`",
-        f"- Network-required tasks: `{summary.network_required_tasks}`",
-        f"- Sandbox-required tasks: `{summary.sandbox_required_tasks}`",
-        "",
-        "## Results",
-        "",
-        "| Task | Status | Profile | Repository Snapshot | Docker | Notes | Next Actions |",
-        "|---|---|---|---|---|---|---|",
-    ]
-    for result in results:
-        notes = [*result.errors, *result.warnings]
-        lines.append(
-            "| "
-            f"{_markdown_table_text(result.task_id or 'unknown')} | "
-            f"{_markdown_table_text(result.status)} | "
-            f"{_markdown_table_text(result.setup_profile)} | "
-            f"{_markdown_table_text('present' if result.repo_exists else result.repo_path or 'missing')} | "
-            f"{_markdown_table_text(result.docker_smoke_status)} | "
-            f"{_markdown_table_text('; '.join(notes) or 'none')} | "
-            f"{_markdown_table_text('; '.join(result.next_actions) or 'none')} |"
-        )
-    lines.extend(
-        [
-            "",
-            "## Claim Boundary",
-            "",
-            "- This report checks whether focused public issue setup plans are ready to execute.",
-            "- It does not execute setup commands, install dependencies, or run validation tests.",
-            "- `blocked` means setup should not be attempted until the listed safety or environment issue is fixed.",
-            "- Public issue repair quality remains unproven until setup, reproduction, patching, and validation are saved as run artifacts.",
-            "",
-        ]
-    )
-    return "\n".join(lines)
-
-
-def render_focused_test_setup_execution_report(
-    *,
-    readiness_path: Path,
-    results: list[IssueCorpusFocusedTestSetupExecutionResult],
-    summary: IssueCorpusFocusedTestSetupExecutionSummary,
-) -> str:
-    lines = [
-        "# Public Issue Focused Test Setup Execution",
-        "",
-        f"- Readiness path: `{readiness_path}`",
-        f"- Task count: `{summary.task_count}`",
-        f"- Dry run: `{str(summary.dry_run).lower()}`",
-        f"- Allow warnings: `{str(summary.allow_warnings).lower()}`",
-        (
-            "- Allow dependency installs: "
-            f"`{str(summary.allow_dependency_installs).lower()}`"
-        ),
-        f"- Sandbox mode: `{summary.sandbox_mode}`",
-        f"- Sandbox image: `{summary.sandbox_image}`",
-        f"- Sandbox network: `{summary.sandbox_network}`",
-        f"- Timeout seconds: `{summary.timeout_seconds}`",
-        f"- Dry-run tasks: `{summary.dry_run_tasks}`",
-        f"- Attempted tasks: `{summary.attempted_tasks}`",
-        f"- Completed tasks: `{summary.completed_tasks}`",
-        f"- Failed tasks: `{summary.failed_tasks}`",
-        f"- Timed-out tasks: `{summary.timed_out_tasks}`",
-        f"- Blocked tasks: `{summary.blocked_tasks}`",
-        f"- Skipped tasks: `{summary.skipped_tasks}`",
-        f"- Setup commands: `{summary.command_count}`",
-        f"- Attempted commands: `{summary.attempted_commands}`",
-        "",
-        "## Results",
-        "",
-        (
-            "| Task | Status | Readiness | Profile | Image | Network | Dependency Installs | "
-            "Commands | Command Statuses | Notes | Next Actions |"
-        ),
-        "|---|---|---|---|---|---|---|---|---|---|---|",
-    ]
-    for result in results:
-        notes = [*result.errors, *result.warnings]
-        command_statuses = [
-            f"{command.status}:{command.policy_reason or command.exit_code or 'n/a'}"
-            for command in result.command_results
-        ]
-        lines.append(
-            "| "
-            f"{_markdown_table_text(result.task_id or 'unknown')} | "
-            f"{_markdown_table_text(result.status)} | "
-            f"{_markdown_table_text(result.readiness_status)} | "
-            f"{_markdown_table_text(result.setup_profile)} | "
-            f"{_markdown_table_text(result.sandbox_image)} | "
-            f"{_markdown_table_text(result.sandbox_network)} | "
-            f"{_markdown_table_text(str(result.allow_dependency_installs).lower())} | "
-            f"{_markdown_table_text('; '.join(result.setup_commands) or 'none')} | "
-            f"{_markdown_table_text('; '.join(command_statuses) or 'none')} | "
-            f"{_markdown_table_text('; '.join(notes) or 'none')} | "
-            f"{_markdown_table_text('; '.join(result.next_actions) or 'none')} |"
-        )
-    lines.extend(
-        [
-            "",
-            "## Claim Boundary",
-            "",
-            "- Dry-run rows prove setup orchestration and command-policy checks, not dependency installation.",
-            "- Blocked rows are stop conditions and must not be counted as public issue reproduction evidence.",
-            "- Executed rows prove only setup command outcomes; repair quality still requires focused validation and normal run artifacts.",
-            "- Commands must run only in disposable, policy-approved sandboxes with no host secrets.",
-            "",
-        ]
-    )
-    return "\n".join(lines)
-
-
-def render_focused_test_setup_validation_report(
-    *,
-    setup_execution_path: Path,
-    results: list[IssueCorpusFocusedTestSetupValidationResult],
-    summary: IssueCorpusFocusedTestSetupValidationSummary,
-) -> str:
-    lines = [
-        "# Public Issue Focused Test Setup Validation",
-        "",
-        f"- Setup execution path: `{setup_execution_path}`",
-        f"- Task count: `{summary.task_count}`",
-        f"- Dry run: `{str(summary.dry_run).lower()}`",
-        f"- Sandbox mode: `{summary.sandbox_mode}`",
-        f"- Sandbox image: `{summary.sandbox_image}`",
-        f"- Sandbox network: `{summary.sandbox_network}`",
-        f"- Timeout seconds: `{summary.timeout_seconds}`",
-        f"- Dry-run tasks: `{summary.dry_run_tasks}`",
-        f"- Attempted tasks: `{summary.attempted_tasks}`",
-        f"- Passed tasks: `{summary.passed_tasks}`",
-        f"- Failed tasks: `{summary.failed_tasks}`",
-        f"- Timed-out tasks: `{summary.timed_out_tasks}`",
-        f"- Blocked tasks: `{summary.blocked_tasks}`",
-        f"- Skipped tasks: `{summary.skipped_tasks}`",
-        f"- Failure categories: `{json.dumps(summary.failure_category_counts, sort_keys=True)}`",
-        "",
-        "## Results",
-        "",
-        "| Task | Status | Setup Status | Profile | Image | Validation Command | Command Status | Failure | Notes | Next Actions |",
-        "|---|---|---|---|---|---|---|---|---|---|",
-    ]
-    for result in results:
-        notes = [*result.errors, *result.warnings]
-        command_status = (
-            result.command_result.status
-            if result.command_result is not None
-            else "none"
-        )
-        lines.append(
-            "| "
-            f"{_markdown_table_text(result.task_id or 'unknown')} | "
-            f"{_markdown_table_text(result.status)} | "
-            f"{_markdown_table_text(result.setup_execution_status)} | "
-            f"{_markdown_table_text(result.setup_profile)} | "
-            f"{_markdown_table_text(result.sandbox_image)} | "
-            f"{_markdown_table_text(result.validation_command or 'none')} | "
-            f"{_markdown_table_text(command_status)} | "
-            f"{_markdown_table_text(result.failure_category or 'none')} | "
-            f"{_markdown_table_text('; '.join(notes) or 'none')} | "
-            f"{_markdown_table_text('; '.join(result.next_actions) or 'none')} |"
-        )
-    lines.extend(
-        [
-            "",
-            "## Claim Boundary",
-            "",
-            "- Dry-run rows prove validation command policy checks, not public issue reproduction.",
-            "- Blocked rows mean setup has not reached a state where validation can run.",
-            "- Passed validation proves the focused validation command runs after setup, not that a PatchSmith repair succeeded.",
-            "- Repair-quality claims still require issue reproduction, patch generation, and saved normal PatchSmith run artifacts.",
-            "",
-        ]
-    )
-    return "\n".join(lines)
-
-
-def render_public_issue_reproduction_plan_report(
-    *,
-    tasks_dir: Path,
-    focused_plan_path: Path | None,
-    results: list[IssueCorpusPublicReproductionPlanResult],
-    summary: IssueCorpusPublicReproductionPlanSummary,
-) -> str:
-    lines = [
-        "# Public Issue Reproduction Plan",
-        "",
-        f"- Generated at: `{summary.generated_at}`",
-        f"- Tasks directory: `{tasks_dir}`",
-        f"- Focused plan path: `{focused_plan_path or 'not provided'}`",
-        f"- Task count: `{summary.task_count}`",
-        f"- Planned tasks: `{summary.planned_tasks}`",
-        f"- Warning tasks: `{summary.warning_tasks}`",
-        f"- Blocked tasks: `{summary.blocked_tasks}`",
-        f"- Manual-spec-required tasks: `{summary.manual_spec_required_tasks}`",
-        f"- Candidate commands: `{summary.command_count}`",
-        f"- Policy-allowed commands: `{summary.policy_allowed_commands}`",
-        f"- Fixture-file tasks: `{summary.fixture_file_tasks}`",
-        f"- Fixture files: `{summary.fixture_file_count}`",
-        "",
-        "## Results",
-        "",
-        (
-            "| Task | Status | Repository | Command Source | Command | Fixtures | "
-            "Expected Failure Signals | Notes | Next Actions |"
-        ),
-        "|---|---|---|---|---|---|---|---|---|",
-    ]
-    for result in results:
-        notes = [*result.blockers, *result.warnings]
-        fixture_paths = "; ".join(_public_issue_fixture_paths(result.fixture_files))
-        lines.append(
-            "| "
-            f"{_markdown_table_text(result.task_id or 'unknown')} | "
-            f"{_markdown_table_text(result.status)} | "
-            f"{_markdown_table_text(result.repository or 'unknown')} | "
-            f"{_markdown_table_text(result.command_source)} | "
-            f"{_markdown_table_text(result.reproduction_command or 'missing')} | "
-            f"{_markdown_table_text(fixture_paths or 'none')} | "
-            f"{_markdown_table_text('; '.join(result.expected_failure_signals) or 'manual spec required')} | "
-            f"{_markdown_table_text('; '.join(notes) or 'none')} | "
-            f"{_markdown_table_text('; '.join(result.next_actions) or 'none')} |"
-        )
-    lines.extend(
-        [
-            "",
-            "## Claim Boundary",
-            "",
-            "- This report plans public issue reproduction checks before repair attempts.",
-            "- `planned` means an explicit expected failing signal is encoded and the command is policy-allowed.",
-            "- `warning` means a candidate command exists but a reviewer still needs to encode the expected failing signal.",
-            "- `blocked` means the reproduction command should not be run until the listed prerequisite is fixed.",
-            "- Fixture files are written only to disposable execution workspaces; they do not modify source snapshots.",
-            "- This report does not run tests, prove issue reproduction, generate patches, or call a live model provider.",
-            "",
-        ]
-    )
-    return "\n".join(lines)
-
-
-def render_public_issue_reproduction_spec_validation_report(
-    *,
-    specs_path: Path,
-    tasks_dir: Path,
-    focused_plan_path: Path | None,
-    results: list[IssueCorpusPublicReproductionSpecValidationResult],
-    summary: IssueCorpusPublicReproductionSpecValidationSummary,
-) -> str:
-    lines = [
-        "# Public Issue Reproduction Spec Validation",
-        "",
-        f"- Generated at: `{summary.generated_at}`",
-        f"- Specs path: `{specs_path}`",
-        f"- Tasks directory: `{tasks_dir}`",
-        f"- Focused plan path: `{focused_plan_path or 'not provided'}`",
-        f"- Task rows: `{summary.task_count}`",
-        f"- Spec count: `{summary.spec_count}`",
-        f"- Ready tasks: `{summary.ready_tasks}`",
-        f"- Warning tasks: `{summary.warning_tasks}`",
-        f"- Blocked tasks: `{summary.blocked_tasks}`",
-        f"- Missing-spec tasks: `{summary.missing_spec_tasks}`",
-        f"- Empty-signal tasks: `{summary.empty_signal_tasks}`",
-        f"- Policy-blocked tasks: `{summary.policy_blocked_tasks}`",
-        f"- Extra-spec tasks: `{summary.extra_spec_tasks}`",
-        f"- Fixture-file tasks: `{summary.fixture_file_tasks}`",
-        f"- Fixture files: `{summary.fixture_file_count}`",
-        f"- Unsafe-fixture tasks: `{summary.unsafe_fixture_tasks}`",
-        "",
-        "## Results",
-        "",
-        (
-            "| Task | Status | Spec | Repository | Command Source | Command | "
-            "Fixtures | Expected Failure Signals | Notes | Next Actions |"
-        ),
-        "|---|---|---|---|---|---|---|---|---|---|",
-    ]
-    for result in results:
-        notes = [*result.errors, *result.warnings]
-        fixture_paths = "; ".join(_public_issue_fixture_paths(result.fixture_files))
-        lines.append(
-            "| "
-            f"{_markdown_table_text(result.task_id or 'unknown')} | "
-            f"{_markdown_table_text(result.status)} | "
-            f"{_markdown_table_text('present' if result.spec_present else 'missing')} | "
-            f"{_markdown_table_text(result.repository or 'unknown')} | "
-            f"{_markdown_table_text(result.command_source)} | "
-            f"{_markdown_table_text(result.reproduction_command or 'missing')} | "
-            f"{_markdown_table_text(fixture_paths or 'none')} | "
-            f"{_markdown_table_text('; '.join(result.expected_failure_signals) or 'missing')} | "
-            f"{_markdown_table_text('; '.join(notes) or 'none')} | "
-            f"{_markdown_table_text('; '.join(result.next_actions) or 'none')} |"
-        )
-    lines.extend(
-        [
-            "",
-            "## Claim Boundary",
-            "",
-            "- This report validates reviewed reproduction criteria before execution.",
-            "- `ready` means a spec exists, the merged command is policy-allowed, and expected failure signals are non-empty.",
-            "- `warning` means the spec can be reviewed further before execution.",
-            "- `blocked` means the spec should not be used for reproduction execution until fixed.",
-            "- Fixture files must be repository-relative, traversal-free, and are applied only to disposable execution workspaces.",
-            "- This report does not execute reproduction commands or prove public issue repair quality.",
-            "",
-        ]
-    )
-    return "\n".join(lines)
-
-
-def render_public_issue_failure_signal_discovery_report(
-    *,
-    plan_path: Path,
-    results: list[IssueCorpusPublicFailureSignalDiscoveryResult],
-    summary: IssueCorpusPublicFailureSignalDiscoverySummary,
-) -> str:
-    lines = [
-        "# Public Issue Failure Signal Discovery",
-        "",
-        f"- Generated at: `{summary.generated_at}`",
-        f"- Reproduction plan path: `{plan_path}`",
-        f"- Dry run: `{str(summary.dry_run).lower()}`",
-        f"- Sandbox: `{summary.sandbox_mode}`",
-        f"- Sandbox image: `{summary.sandbox_image}`",
-        f"- Sandbox network: `{summary.sandbox_network}`",
-        f"- Timeout seconds: `{summary.timeout_seconds}`",
-        f"- Task count: `{summary.task_count}`",
-        f"- Dry-run tasks: `{summary.dry_run_tasks}`",
-        f"- Attempted tasks: `{summary.attempted_tasks}`",
-        f"- Observed-failure tasks: `{summary.observed_failure_tasks}`",
-        f"- Passed tasks: `{summary.passed_tasks}`",
-        f"- Timed-out tasks: `{summary.timed_out_tasks}`",
-        f"- Blocked tasks: `{summary.blocked_tasks}`",
-        f"- Candidate-signal tasks: `{summary.candidate_signal_tasks}`",
-        f"- Fixture-file tasks: `{summary.fixture_file_tasks}`",
-        "",
-        "## Results",
-        "",
-        (
-            "| Task | Status | Repository | Command | Exit Code | Candidate "
-            "Signals | Fixtures | Logs | Notes | Next Actions |"
-        ),
-        "|---|---|---|---|---|---|---|---|---|---|",
-    ]
-    for result in results:
-        notes = [*result.errors, *result.warnings]
-        log_paths = "; ".join(
-            path
-            for path in [result.stdout_path, result.stderr_path]
-            if path
-        )
-        lines.append(
-            "| "
-            f"{_markdown_table_text(result.task_id or 'unknown')} | "
-            f"{_markdown_table_text(result.status)} | "
-            f"{_markdown_table_text(result.repository or 'unknown')} | "
-            f"{_markdown_table_text(result.reproduction_command or 'missing')} | "
-            f"{_markdown_table_text(str(result.exit_code) if result.exit_code is not None else 'not run')} | "
-            f"{_markdown_table_text('; '.join(result.candidate_failure_signals) or 'none')} | "
-            f"{_markdown_table_text('; '.join(result.fixture_paths) or 'none')} | "
-            f"{_markdown_table_text(log_paths or 'none')} | "
-            f"{_markdown_table_text('; '.join(notes) or 'none')} | "
-            f"{_markdown_table_text('; '.join(result.next_actions) or 'none')} |"
-        )
-    lines.extend(
-        [
-            "",
-            "## Claim Boundary",
-            "",
-            "- This report discovers candidate failure text for human review.",
-            "- `observed_failure` means the candidate command failed and logs were saved; it does not prove issue reproduction.",
-            "- Only `execute-public-issue-reproductions` with reviewed expected failure signals can count a task as reproduced.",
-            "- `passed` means the candidate command did not expose a pre-repair failure and likely needs a more specific reproduction.",
-            "- Fixture files, when present, are applied to a disposable copy before the candidate command runs.",
-            "",
-        ]
-    )
-    return "\n".join(lines)
-
-
-def render_public_issue_reproduction_execution_report(
-    *,
-    plan_path: Path,
-    results: list[IssueCorpusPublicReproductionExecutionResult],
-    summary: IssueCorpusPublicReproductionExecutionSummary,
-) -> str:
-    lines = [
-        "# Public Issue Reproduction Execution",
-        "",
-        f"- Generated at: `{summary.generated_at}`",
-        f"- Reproduction plan path: `{plan_path}`",
-        f"- Task count: `{summary.task_count}`",
-        f"- Dry run: `{summary.dry_run}`",
-        f"- Sandbox mode: `{summary.sandbox_mode}`",
-        f"- Sandbox image: `{summary.sandbox_image}`",
-        f"- Sandbox network: `{summary.sandbox_network}`",
-        f"- Timeout seconds: `{summary.timeout_seconds}`",
-        f"- Dry-run tasks: `{summary.dry_run_tasks}`",
-        f"- Attempted tasks: `{summary.attempted_tasks}`",
-        f"- Reproduced tasks: `{summary.reproduced_tasks}`",
-        f"- Not-reproduced tasks: `{summary.not_reproduced_tasks}`",
-        f"- Failed tasks: `{summary.failed_tasks}`",
-        f"- Timed-out tasks: `{summary.timed_out_tasks}`",
-        f"- Blocked tasks: `{summary.blocked_tasks}`",
-        f"- Manual-spec-required tasks: `{summary.manual_spec_required_tasks}`",
-        f"- Policy-allowed commands: `{summary.policy_allowed_commands}`",
-        f"- Fixture-file tasks: `{summary.fixture_file_tasks}`",
-        "",
-        "## Results",
-        "",
-        (
-            "| Task | Status | Repository | Plan Status | Command | Expected Signals | "
-            "Matched Signals | Fixtures | Exit | Logs | Notes | Next Actions |"
-        ),
-        "|---|---|---|---|---|---|---|---|---|---|---|---|",
-    ]
-    for result in results:
-        notes = [*result.errors, *result.warnings]
-        log_paths = "; ".join(
-            path
-            for path in [result.stdout_path, result.stderr_path]
-            if path is not None
-        )
-        lines.append(
-            "| "
-            f"{_markdown_table_text(result.task_id or 'unknown')} | "
-            f"{_markdown_table_text(result.status)} | "
-            f"{_markdown_table_text(result.repository or 'unknown')} | "
-            f"{_markdown_table_text(result.reproduction_plan_status)} | "
-            f"{_markdown_table_text(result.reproduction_command or 'missing')} | "
-            f"{_markdown_table_text('; '.join(result.expected_failure_signals) or 'missing')} | "
-            f"{_markdown_table_text('; '.join(result.matched_failure_signals) or 'none')} | "
-            f"{_markdown_table_text('; '.join(result.fixture_paths) or 'none')} | "
-            f"{_markdown_table_text(str(result.exit_code) if result.exit_code is not None else 'not run')} | "
-            f"{_markdown_table_text(log_paths or 'none')} | "
-            f"{_markdown_table_text('; '.join(notes) or 'none')} | "
-            f"{_markdown_table_text('; '.join(result.next_actions) or 'none')} |"
-        )
-    lines.extend(
-        [
-            "",
-            "## Claim Boundary",
-            "",
-            "- This report only executes commands from the public issue reproduction plan.",
-            "- `blocked` means the command was not run because required safety or expected-failure criteria were missing.",
-            "- `dry_run` means the command and expected failure signal passed preflight, but no repository code was executed.",
-            "- `reproduced` means an executed command failed nonzero and all configured expected failure signals appeared in saved stdout/stderr.",
-            "- Fixture files, when present, are applied to a disposable copy before the reproduction command runs.",
-            "- This report does not generate patches, prove repair quality, or call a live model provider.",
-            "",
-        ]
-    )
-    return "\n".join(lines)
-
-
-def render_public_issue_repair_readiness_report(
-    *,
-    tasks_dir: Path | None,
-    focused_run_path: Path,
-    diagnosis_path: Path,
-    setup_validation_path: Path,
-    reproduction_execution_path: Path | None,
-    results: list[IssueCorpusPublicRepairReadinessResult],
-    summary: IssueCorpusPublicRepairReadinessSummary,
-) -> str:
-    lines = [
-        "# Public Issue Repair Readiness",
-        "",
-        f"- Generated at: `{summary.generated_at}`",
-        f"- Materialized tasks directory: `{tasks_dir or 'not provided'}`",
-        f"- Focused run path: `{focused_run_path}`",
-        f"- Diagnosis path: `{diagnosis_path}`",
-        f"- Setup validation path: `{setup_validation_path}`",
-        f"- Reproduction execution path: `{reproduction_execution_path or 'not provided'}`",
-        f"- Task count: `{summary.task_count}`",
-        f"- Ready tasks: `{summary.ready_tasks}`",
-        f"- Warning tasks: `{summary.warning_tasks}`",
-        f"- Blocked tasks: `{summary.blocked_tasks}`",
-        f"- Repair-command tasks: `{summary.repair_command_tasks}`",
-        f"- Passed focused tasks: `{summary.passed_focused_tasks}`",
-        f"- Passed setup-validation tasks: `{summary.passed_setup_validation_tasks}`",
-        f"- Reproduced tasks: `{summary.reproduced_tasks}`",
-        f"- Missing reproduction tasks: `{summary.missing_reproduction_tasks}`",
-        "",
-        "## Results",
-        "",
-        (
-            "| Task | Status | Repository | Focused Run | Diagnosis | Setup Validation | "
-            "Reproduction | Repair Command | Evidence | Blockers | Warnings | Next Actions |"
-        ),
-        "|---|---|---|---|---|---|---|---|---|---|---|---|",
-    ]
-    for result in results:
-        lines.append(
-            "| "
-            f"{_markdown_table_text(result.task_id or 'unknown')} | "
-            f"{_markdown_table_text(result.status)} | "
-            f"{_markdown_table_text(result.repository or 'unknown')} | "
-            f"{_markdown_table_text(result.focused_run_status or 'missing')} | "
-            f"{_markdown_table_text(result.diagnosis_category or 'missing')} | "
-            f"{_markdown_table_text(result.setup_validation_status or 'missing')} | "
-            f"{_markdown_table_text(result.reproduction_execution_status or 'missing')} | "
-            f"{_markdown_table_text(result.repair_command or 'missing')} | "
-            f"{_markdown_table_text('; '.join(result.evidence) or 'none')} | "
-            f"{_markdown_table_text('; '.join(result.blockers) or 'none')} | "
-            f"{_markdown_table_text('; '.join(result.warnings) or 'none')} | "
-            f"{_markdown_table_text('; '.join(result.next_actions) or 'none')} |"
-        )
-    lines.extend(
-        [
-            "",
-            "## Claim Boundary",
-            "",
-            "- This report gates readiness for a later PatchSmith public issue repair attempt.",
-            "- `ready` means focused validation, setup validation, repository snapshot, and a saved repair command are available.",
-            "- `warning` means repair can be attempted only with explicit caveats, usually because the saved pre-repair command passed and does not prove issue reproduction.",
-            "- `blocked` means do not attempt a public issue repair until the listed prerequisite is fixed.",
-            "- This report does not execute PatchSmith repair, generate a patch, call a live model provider, or prove public issue repair quality.",
-            "",
-        ]
-    )
-    return "\n".join(lines)
-
-
-def render_public_issue_repair_attempt_report(
-    *,
-    readiness_path: Path,
-    tasks_dir: Path | None,
-    results: list[IssueCorpusPublicRepairAttemptResult],
-    summary: IssueCorpusPublicRepairAttemptSummary,
-) -> str:
-    lines = [
-        "# Public Issue Repair Attempts",
-        "",
-        f"- Generated at: `{summary.generated_at}`",
-        f"- Readiness path: `{readiness_path}`",
-        f"- Materialized tasks directory: `{tasks_dir or 'not provided'}`",
-        f"- Task count: `{summary.task_count}`",
-        f"- Dry run: `{summary.dry_run}`",
-        f"- Allow warnings: `{summary.allow_warnings}`",
-        f"- Runtime: `{summary.runtime}`",
-        f"- Planner: `{summary.planner}`",
-        f"- Context provider: `{summary.context_provider}`",
-        f"- Sandbox mode: `{summary.sandbox_mode}`",
-        f"- Sandbox image: `{summary.sandbox_image}`",
-        f"- Dry-run tasks: `{summary.dry_run_tasks}`",
-        f"- Attempted tasks: `{summary.attempted_tasks}`",
-        f"- Validated tasks: `{summary.validated_tasks}`",
-        f"- Failed tasks: `{summary.failed_tasks}`",
-        f"- Blocked tasks: `{summary.blocked_tasks}`",
-        f"- Warning tasks: `{summary.warning_tasks}`",
-        f"- Reproduced-input tasks: `{summary.reproduced_input_tasks}`",
-        "",
-        "## Results",
-        "",
-        (
-            "| Task | Status | Repository | Readiness | Reproduction | Runtime | "
-            "Test Exit | Patch | Run | Notes | Next Actions |"
-        ),
-        "|---|---|---|---|---|---|---|---|---|---|---|",
-    ]
-    for result in results:
-        notes = [*result.errors, *result.warnings]
-        run_refs = "; ".join(
-            path
-            for path in [result.report_path, result.trace_path, result.final_diff_path]
-            if path is not None
-        )
-        lines.append(
-            "| "
-            f"{_markdown_table_text(result.task_id or 'unknown')} | "
-            f"{_markdown_table_text(result.status)} | "
-            f"{_markdown_table_text(result.repository or 'unknown')} | "
-            f"{_markdown_table_text(result.readiness_status)} | "
-            f"{_markdown_table_text(result.reproduction_execution_status or 'missing')} | "
-            f"{_markdown_table_text(result.runtime + '/' + result.planner)} | "
-            f"{_markdown_table_text(str(result.test_exit_code) if result.test_exit_code is not None else 'not run')} | "
-            f"{_markdown_table_text(str(result.patch_generated).lower())} | "
-            f"{_markdown_table_text(run_refs or 'none')} | "
-            f"{_markdown_table_text('; '.join(notes) or 'none')} | "
-            f"{_markdown_table_text('; '.join(result.next_actions) or 'none')} |"
-        )
-    lines.extend(
-        [
-            "",
-            "## Claim Boundary",
-            "",
-            "- This gate consumes public repair-readiness evidence before launching PatchSmith runs.",
-            "- `blocked` rows were not run and must not be counted as repair attempts.",
-            "- `dry_run` rows prove only readiness and configuration checks.",
-            "- `validated` rows mean PatchSmith produced run artifacts and the configured validation command exited zero.",
-            "- This report does not prove live LLM quality unless non-offline provider metadata is present in the saved run artifacts.",
-            "",
-        ]
-    )
-    return "\n".join(lines)
-
-
-def render_repair_eval_report(
-    *,
-    dataset_dir: Path,
-    results: list[RepairEvalResult],
-    summary: RepairEvalSummary,
-) -> str:
-    input_tokens = summary.input_tokens if summary.input_tokens is not None else "n/a"
-    output_tokens = summary.output_tokens if summary.output_tokens is not None else "n/a"
-    total_tokens = summary.total_tokens if summary.total_tokens is not None else "n/a"
-    lines = [
-        "# Repair Evaluation Report",
-        "",
-        f"- Dataset: `{dataset_dir}`",
-        f"- Runtime: `{summary.runtime}`",
-        f"- Planner: `{summary.planner}`",
-        f"- Context provider: `{summary.context_provider}`",
-        f"- Attempted tasks: `{summary.attempted_tasks}`",
-        f"- Completed tasks: `{summary.completed_tasks}`",
-        f"- Model provider: `{summary.model_provider or 'none'}`",
-        f"- Input tokens: `{input_tokens}`",
-        f"- Output tokens: `{output_tokens}`",
-        f"- Total tokens: `{total_tokens}`",
-        f"- Estimated model cost: `{_format_cost(summary.estimated_cost_usd)}`",
-        "",
-        "## Summary",
-        "",
-        (
-            "| Runtime | Planner | Context | Patch Generated | Targeted Tests Passed | "
-            "Avg Latency ms | Avg Trace Events | Avg Runtime Nodes | Failed Trace Events | "
-            "Avg Retries | Debug Score | Input Tokens | Output Tokens | Est Cost |"
-        ),
-        "|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
-        "| "
-        f"{summary.runtime} | "
-        f"{summary.planner} | "
-        f"{summary.context_provider} | "
-        f"{summary.patch_generated_rate:.2f} | "
-        f"{summary.targeted_test_pass_rate:.2f} | "
-        f"{summary.avg_latency_ms:.0f} | "
-        f"{summary.avg_trace_events:.1f} | "
-        f"{summary.avg_runtime_nodes:.1f} | "
-        f"{summary.failed_trace_event_count} | "
-        f"{summary.avg_retry_events:.1f} | "
-        f"{summary.avg_debuggability_score:.1f} | "
-        f"{summary.input_tokens if summary.input_tokens is not None else ''} | "
-        f"{summary.output_tokens if summary.output_tokens is not None else ''} | "
-        f"{_format_cost(summary.estimated_cost_usd)} |",
-        "",
-        "## Per-Task Results",
-        "",
-        (
-            "| Task | Planner | Model Provider | Status | Patch Generated | Tests Passed | "
-            "Exit Code | Trace Events | Runtime Nodes | Failed Trace Events | Retries | "
-            "Debug Score | Tokens | Est Cost | Retrieved Files | Report | Error |"
-        ),
-        "|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|---|",
-    ]
-    for result in results:
-        lines.append(
-            "| "
-            f"{result.task_id} | "
-            f"{result.planner} | "
-            f"{result.model_provider or ''} | "
-            f"{result.status} | "
-            f"{int(result.patch_generated)} | "
-            f"{int(result.targeted_tests_passed)} | "
-            f"{result.test_exit_code if result.test_exit_code is not None else ''} | "
-            f"{result.trace_event_count} | "
-            f"{result.runtime_node_count} | "
-            f"{result.failed_trace_event_count} | "
-            f"{result.retry_event_count} | "
-            f"{result.debuggability_score:.1f} | "
-            f"{result.total_tokens if result.total_tokens is not None else ''} | "
-            f"{_format_cost(result.estimated_cost_usd)} | "
-            f"{', '.join(result.retrieved_files) or 'none'} | "
-            f"{result.report_path or ''} | "
-            f"{(result.error or '').replace('|', '/')} |"
-        )
-    lines.extend(
-        [
-            "",
-            "## Decision Notes",
-            "",
-            "- This report measures seeded-task patch smoke behavior.",
-            (
-                "- Heuristic and fake-model planners should not be presented as autonomous "
-                "coding-agent quality."
-            ),
-            (
-                "- Use this runner to validate artifacts and gates before enabling a live "
-                "model provider."
-            ),
-            "- Estimated cost is reported only when provider usage and configured rates exist.",
-            (
-                "- Debug score is a 0-5 trace-completeness heuristic: trace, context, "
-                "runtime-node, test, and repair-outcome visibility."
-            ),
-            "",
-        ]
-    )
-    if summary.runtime == "deepagents":
-        lines.insert(
-            -1,
-            (
-                "- The `deepagents` runtime row is dependency-gated adapter evidence; "
-                "local runs use offline compatibility mode unless the optional "
-                "`deepagents` extra and live model provider are configured."
-            ),
-        )
-    if summary.runtime == "openai_agents":
-        lines.insert(
-            -1,
-            (
-                "- The `openai_agents` runtime row is dependency-gated adapter evidence; "
-                "local runs use offline compatibility mode unless the optional "
-                "`openai-agents` extra and live model provider are configured."
-            ),
-        )
-    return "\n".join(lines)
-
-
-def render_scaffold_comparison_report(
-    *,
-    dataset_dir: Path,
-    results: list[ScaffoldComparisonResult],
-) -> str:
-    lines = [
-        "# Scaffold Comparison Report",
-        "",
-        f"- Dataset: `{dataset_dir}`",
-        f"- Scaffold count: `{len(results)}`",
-        f"- Model cost: `{_format_cost(_sum_optional_float(result.estimated_cost_usd for result in results))}`",
-        "",
-        "## Summary",
-        "",
-        (
-            "| Scaffold | Runtime | Planner | Context | Completed | Patch Generated | "
-            "Targeted Tests Passed | Avg Latency ms | Avg Trace Events | Avg Runtime Nodes | "
-            "Failed Trace Events | Avg Retries | Debug Score | Model Provider | Tokens | Est Cost | Repair Report |"
-        ),
-        "|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---:|---:|---|",
-    ]
-    for result in results:
-        lines.append(
-            "| "
-            f"{result.scaffold} | "
-            f"{result.runtime} | "
-            f"{result.planner} | "
-            f"{result.context_provider} | "
-            f"{result.completed_tasks}/{result.attempted_tasks} | "
-            f"{result.patch_generated_rate:.2f} | "
-            f"{result.targeted_test_pass_rate:.2f} | "
-            f"{result.avg_latency_ms:.0f} | "
-            f"{result.avg_trace_events:.1f} | "
-            f"{result.avg_runtime_nodes:.1f} | "
-            f"{result.failed_trace_event_count} | "
-            f"{result.avg_retry_events:.1f} | "
-            f"{result.avg_debuggability_score:.1f} | "
-            f"{result.model_provider or ''} | "
-            f"{result.total_tokens if result.total_tokens is not None else ''} | "
-            f"{_format_cost(result.estimated_cost_usd)} | "
-            f"{result.repair_report_path} |"
-        )
-
-    best_resolved = max((result.targeted_test_pass_rate for result in results), default=0.0)
-    best_scaffolds = [
-        result.scaffold for result in results if result.targeted_test_pass_rate == best_resolved
-    ]
-    lines.extend(
-        [
-            "",
-            "## Decision Notes",
-            "",
-            (
-                f"- Best targeted-test pass rate in this run: `{best_resolved:.2f}` "
-                f"from `{', '.join(best_scaffolds) or 'none'}`."
-            ),
-            "- Agentless is the no-edit baseline and should not be treated as a repair scaffold.",
-            (
-                "- Heuristic and fake-model planners are deterministic seeded-task baselines; "
-                "they do not prove autonomous coding-agent quality."
-            ),
-            (
-                "- Debug score is a 0-5 trace-completeness heuristic: trace, context, "
-                "runtime-node, test, and repair-outcome visibility."
-            ),
-            "- Compare repair report traces before making a default-runtime decision.",
-            "",
-        ]
-    )
-    if any(result.scaffold == "deepagents" for result in results):
-        lines.insert(
-            -1,
-            (
-                "- The `deepagents` row is dependency-gated adapter evidence; local "
-                "runs use offline compatibility mode unless the optional `deepagents` "
-                "extra and live model provider are configured."
-            ),
-        )
-    if any(result.scaffold == "openai_agents" for result in results):
-        lines.insert(
-            -1,
-            (
-                "- The `openai_agents` row is dependency-gated adapter evidence; local "
-                "runs use offline compatibility mode unless the optional `openai-agents` "
-                "extra and live model provider are configured."
-            ),
-        )
-    return "\n".join(lines)
-
-
-def render_patch_search_eval_report(
-    *,
-    dataset_dir: Path,
-    results: list[PatchSearchEvalResult],
-    summaries: list[PatchSearchEvalSummary],
-) -> str:
-    lines = [
-        "# Patch Search Evaluation Report",
-        "",
-        f"- Dataset: `{dataset_dir}`",
-        f"- Variant count: `{len(summaries)}`",
-        "- Model cost: `$0.00` (deterministic candidate generation; no model calls)",
-        "",
-        "## Summary",
-        "",
-        (
-            "| Variant | Candidates | Attempted | Completed | Success@1 | Success@k | "
-            "Selected Success | Avg Latency ms | Avg Test Runs | Est Cost |"
-        ),
-        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
-    ]
-    for summary in summaries:
-        lines.append(
-            "| "
-            f"{summary.variant} | "
-            f"{summary.candidate_count} | "
-            f"{summary.attempted_tasks} | "
-            f"{summary.completed_tasks} | "
-            f"{summary.success_at_1_rate:.2f} | "
-            f"{summary.success_at_k_rate:.2f} | "
-            f"{summary.selected_success_rate:.2f} | "
-            f"{summary.avg_latency_ms:.0f} | "
-            f"{summary.avg_test_runs:.1f} | "
-            f"{_format_cost(summary.estimated_cost_usd)} |"
-        )
-
-    lines.extend(
-        [
-            "",
-            "## Per-Task Results",
-            "",
-            (
-                "| Task | Variant | Status | Success@1 | Success@k | Selected Candidate | "
-                "Selected Passed | Test Runs | Latency ms | Error |"
-            ),
-            "|---|---|---|---:|---:|---|---:|---:|---:|---|",
-        ]
-    )
-    for result in results:
-        selected = (
-            f"{result.selected_candidate_index}:{result.selected_candidate_name}"
-            if result.selected_candidate_index is not None
-            else "none"
-        )
-        lines.append(
-            "| "
-            f"{result.task_id} | "
-            f"{result.variant} | "
-            f"{result.status} | "
-            f"{int(result.success_at_1)} | "
-            f"{int(result.success_at_k)} | "
-            f"{selected} | "
-            f"{int(result.selected_candidate_passed)} | "
-            f"{result.test_runs} | "
-            f"{result.latency_ms} | "
-            f"{(result.error or '').replace('|', '/')} |"
-        )
-
-    lines.extend(
-        [
-            "",
-            "## Decision Notes",
-            "",
-            "- This report measures deterministic patch-search infrastructure, not model diversity.",
-            "- Each candidate is applied and tested in an isolated copy of the task repository.",
-            "- The selector chooses the first candidate whose targeted tests pass.",
-            "- Cost is zero because this lane currently uses heuristic candidate generation.",
-            "",
-        ]
-    )
-    return "\n".join(lines)
 
 
 def top_k_recall(retrieved: list[str], expected: list[str], k: int) -> float:
@@ -8521,6 +5979,15 @@ def _plan_public_issue_reproduction_record(
         evidence.append(
             f"{fixture_source} provides {len(fixture_files)} temporary fixture file(s)"
         )
+    source_hints, source_hint_errors = _normalize_public_issue_source_hints(
+        spec_reproduction.get("source_hints")
+    )
+    if source_hint_errors:
+        blockers.extend(source_hint_errors)
+    elif source_hints:
+        evidence.append(
+            f"reproduction spec provides {len(source_hints)} reviewed source hint(s)"
+        )
     manual_spec_required = not expected_failure_signals
     if expected_failure_signals:
         if spec_failure_signals:
@@ -8582,6 +6049,7 @@ def _plan_public_issue_reproduction_record(
         policy_reason=policy_reason,
         focused_files=focused_files,
         fixture_files=fixture_files,
+        source_hints=source_hints,
         expected_failure_signals=expected_failure_signals,
         manual_spec_required=manual_spec_required,
         evidence=_dedupe_preserve_order(evidence),
@@ -8650,6 +6118,7 @@ def _validate_public_issue_reproduction_spec_record(
         policy_allowed=planned.policy_allowed,
         policy_reason=planned.policy_reason,
         fixture_files=planned.fixture_files,
+        source_hints=planned.source_hints,
         expected_failure_signals=planned.expected_failure_signals,
         errors=_dedupe_preserve_order(errors),
         warnings=_dedupe_preserve_order(warnings),
@@ -8683,7 +6152,11 @@ def _discover_public_issue_failure_signal_record(
         record.get("fixture_files")
     )
     fixture_paths = _public_issue_fixture_paths(fixture_files)
+    source_hints, source_hint_errors = _normalize_public_issue_source_hints(
+        record.get("source_hints")
+    )
     errors.extend(fixture_errors)
+    errors.extend(source_hint_errors)
     policy_allowed = False
     policy_reason: str | None = None
     workspace: Path | None = None
@@ -8920,7 +6393,11 @@ def _execute_public_issue_reproduction_record(
         record.get("fixture_files")
     )
     fixture_paths = _public_issue_fixture_paths(fixture_files)
+    source_hints, source_hint_errors = _normalize_public_issue_source_hints(
+        record.get("source_hints")
+    )
     errors.extend(fixture_errors)
+    errors.extend(source_hint_errors)
 
     exit_code: int | None = None
     timed_out = False
@@ -8984,7 +6461,9 @@ def _execute_public_issue_reproduction_record(
             policy_reason=policy_reason,
             stdout_path=stdout_path,
             stderr_path=stderr_path,
+            fixture_files=fixture_files,
             fixture_paths=fixture_paths,
+            source_hints=source_hints,
             matched_failure_signals=matched_failure_signals,
             missing_failure_signals=missing_failure_signals,
             errors=_dedupe_preserve_order(errors),
@@ -9016,7 +6495,9 @@ def _execute_public_issue_reproduction_record(
             policy_reason=policy_reason,
             stdout_path=stdout_path,
             stderr_path=stderr_path,
+            fixture_files=fixture_files,
             fixture_paths=fixture_paths,
+            source_hints=source_hints,
             matched_failure_signals=matched_failure_signals,
             missing_failure_signals=missing_failure_signals,
             errors=[],
@@ -9075,7 +6556,9 @@ def _execute_public_issue_reproduction_record(
             policy_reason=policy_reason,
             stdout_path=stdout_path,
             stderr_path=stderr_path,
+            fixture_files=fixture_files,
             fixture_paths=fixture_paths,
+            source_hints=source_hints,
             matched_failure_signals=matched_failure_signals,
             missing_failure_signals=missing_failure_signals,
             errors=_dedupe_preserve_order(
@@ -9155,7 +6638,9 @@ def _execute_public_issue_reproduction_record(
         policy_reason=policy_reason,
         stdout_path=stdout_path,
         stderr_path=stderr_path,
+        fixture_files=fixture_files,
         fixture_paths=fixture_paths,
+        source_hints=source_hints,
         matched_failure_signals=matched_failure_signals,
         missing_failure_signals=missing_failure_signals,
         errors=_dedupe_preserve_order(errors),
@@ -9198,7 +6683,7 @@ def _check_public_issue_repair_readiness_record(
         if setup_validation_record is not None
         else None
     )
-    validation_command = (
+    setup_validation_command = (
         _optional_string(setup_validation_record.get("validation_command"))
         if setup_validation_record is not None
         else focused_command
@@ -9233,12 +6718,39 @@ def _check_public_issue_repair_readiness_record(
         if reproduction_execution_record is not None
         else []
     )
+    reproduction_command = (
+        _optional_string(reproduction_execution_record.get("reproduction_command"))
+        if reproduction_execution_record is not None
+        else None
+    )
+    validation_fixture_files, fixture_errors = (
+        _normalize_public_issue_fixture_files(
+            reproduction_execution_record.get("fixture_files")
+        )
+        if reproduction_execution_record is not None
+        else ([], [])
+    )
+    validation_fixture_paths = _public_issue_fixture_paths(validation_fixture_files)
+    validation_source_hints, source_hint_errors = (
+        _normalize_public_issue_source_hints(
+            reproduction_execution_record.get("source_hints")
+        )
+        if reproduction_execution_record is not None
+        else ([], [])
+    )
+    validation_command = (
+        reproduction_command
+        if reproduction_execution_status == "reproduced" and reproduction_command
+        else setup_validation_command
+    )
     repair_command = _first_manifest_repair_command(manifest)
 
     evidence: list[str] = []
     blockers: list[str] = []
     warnings: list[str] = []
     next_actions: list[str] = []
+    blockers.extend(fixture_errors)
+    blockers.extend(source_hint_errors)
 
     if not task_id:
         blockers.append("focused run record has no task_id")
@@ -9306,6 +6818,17 @@ def _check_public_issue_repair_readiness_record(
         next_actions.append("run `execute-public-issue-reproductions` before repair attempts")
     elif reproduction_execution_status == "reproduced":
         evidence.append("public issue reproduction execution saved failing evidence")
+        if reproduction_command:
+            evidence.append("issue-specific reproduction command selected for repair validation")
+        if validation_fixture_paths:
+            evidence.append(
+                "repair validation fixtures selected: "
+                + ", ".join(validation_fixture_paths)
+            )
+        if validation_source_hints:
+            evidence.append(
+                "reviewed source hints selected: " + ", ".join(validation_source_hints)
+            )
         if reproduction_stdout_path:
             evidence.append(f"reproduction stdout saved: {reproduction_stdout_path}")
         if reproduction_stderr_path:
@@ -9336,9 +6859,12 @@ def _check_public_issue_repair_readiness_record(
         next_actions.append("regenerate materialized public issue tasks with suggested commands")
 
     if validation_command:
-        evidence.append("focused validation command is available")
+        if validation_command == reproduction_command:
+            evidence.append("issue-specific validation command is available")
+        else:
+            evidence.append("focused validation command is available")
     else:
-        blockers.append("focused validation command is missing")
+        blockers.append("validation command is missing")
 
     if sandbox_mode == "docker":
         evidence.append(f"setup validation used Docker network {sandbox_network or 'unknown'}")
@@ -9360,6 +6886,9 @@ def _check_public_issue_repair_readiness_record(
         repo_exists=repo_exists,
         repair_command=repair_command,
         validation_command=validation_command,
+        validation_fixture_files=validation_fixture_files,
+        validation_fixture_paths=validation_fixture_paths,
+        validation_source_hints=validation_source_hints,
         focused_run_status=focused_status,
         diagnosis_category=diagnosis_category,
         setup_validation_status=setup_status,
@@ -9387,6 +6916,7 @@ def _execute_public_issue_repair_record(
     context_provider: str,
     sandbox_mode: str,
     sandbox_image: str,
+    max_retries: int,
     dry_run: bool,
     allow_warnings: bool,
 ) -> IssueCorpusPublicRepairAttemptResult:
@@ -9397,10 +6927,19 @@ def _execute_public_issue_repair_record(
     repo_path_value = _optional_string(record.get("repo_path"))
     repair_command = _optional_string(record.get("repair_command"))
     validation_command = _optional_string(record.get("validation_command"))
+    validation_fixture_files, fixture_errors = _normalize_public_issue_fixture_files(
+        record.get("validation_fixture_files")
+    )
+    validation_fixture_paths = _public_issue_fixture_paths(validation_fixture_files)
+    validation_source_hints, source_hint_errors = _normalize_public_issue_source_hints(
+        record.get("validation_source_hints")
+    )
     reproduction_execution_status = _optional_string(
         record.get("reproduction_execution_status")
     )
     errors = _string_list(record.get("blockers"))
+    errors.extend(fixture_errors)
+    errors.extend(source_hint_errors)
     warnings = _string_list(record.get("warnings"))
     evidence = _string_list(record.get("evidence"))
     next_actions = _string_list(record.get("next_actions"))
@@ -9449,6 +6988,7 @@ def _execute_public_issue_repair_record(
             repo_exists=repo_exists,
             repair_command=repair_command,
             validation_command=validation_command,
+            validation_fixture_paths=validation_fixture_paths,
             reproduction_execution_status=reproduction_execution_status,
             runtime=runtime,
             planner=planner,
@@ -9482,6 +7022,7 @@ def _execute_public_issue_repair_record(
             repo_exists=repo_exists,
             repair_command=repair_command,
             validation_command=validation_command,
+            validation_fixture_paths=validation_fixture_paths,
             reproduction_execution_status=reproduction_execution_status,
             runtime=runtime,
             planner=planner,
@@ -9509,20 +7050,64 @@ def _execute_public_issue_repair_record(
     assert runner is not None
     assert repo_path_value is not None
     assert issue_text is not None
+    run_repo = repo_path_value
+    source_hints = _dedupe_preserve_order(
+        [
+            *validation_source_hints,
+            *_public_issue_fixture_source_hints(
+                repo_path=Path(repo_path_value),
+                fixture_files=validation_fixture_files,
+            ),
+        ]
+    )
+    run_issue_text = _public_issue_repair_attempt_issue_text(
+        issue_text=issue_text,
+        validation_command=validation_command,
+        validation_fixture_paths=validation_fixture_paths,
+        validation_fixture_files=validation_fixture_files,
+        source_hints=source_hints,
+    )
     try:
-        run_result = runner.run(
-            RunRequest(
-                repo=repo_path_value,
-                issue_text=issue_text,
-                issue_url=issue_url,
-                test_command=validation_command,
-                runtime=runtime,
-                planner=planner,
-                context_provider=context_provider,
-                sandbox_mode=sandbox_mode,
-                sandbox_image=sandbox_image,
+        if validation_fixture_files:
+            with tempfile.TemporaryDirectory(
+                prefix="patchsmith-public-repair-fixtures-"
+            ) as tmp_dir:
+                fixture_workspace = Path(tmp_dir) / "repo"
+                snapshot = clone_or_copy_repository(repo_path_value, fixture_workspace)
+                _write_public_issue_fixture_files(
+                    repo_path=snapshot.repo_path,
+                    fixture_files=validation_fixture_files,
+                )
+                run_repo = str(snapshot.repo_path)
+                run_result = runner.run(
+                    RunRequest(
+                        repo=run_repo,
+                        issue_text=run_issue_text,
+                        issue_url=issue_url,
+                        test_command=validation_command,
+                        runtime=runtime,
+                        planner=planner,
+                        max_retries=max_retries,
+                        context_provider=context_provider,
+                        sandbox_mode=sandbox_mode,
+                        sandbox_image=sandbox_image,
+                    )
+                )
+        else:
+            run_result = runner.run(
+                RunRequest(
+                    repo=run_repo,
+                    issue_text=run_issue_text,
+                    issue_url=issue_url,
+                    test_command=validation_command,
+                    runtime=runtime,
+                    planner=planner,
+                    max_retries=max_retries,
+                    context_provider=context_provider,
+                    sandbox_mode=sandbox_mode,
+                    sandbox_image=sandbox_image,
+                )
             )
-        )
     except Exception as error:
         errors.append(f"PatchSmith repair run failed: {error}")
         return IssueCorpusPublicRepairAttemptResult(
@@ -9535,6 +7120,7 @@ def _execute_public_issue_repair_record(
             repo_exists=repo_exists,
             repair_command=repair_command,
             validation_command=validation_command,
+            validation_fixture_paths=validation_fixture_paths,
             reproduction_execution_status=reproduction_execution_status,
             runtime=runtime,
             planner=planner,
@@ -9591,6 +7177,7 @@ def _execute_public_issue_repair_record(
         repo_exists=repo_exists,
         repair_command=repair_command,
         validation_command=validation_command,
+        validation_fixture_paths=validation_fixture_paths,
         reproduction_execution_status=reproduction_execution_status,
         runtime=runtime,
         planner=planner,
@@ -9636,6 +7223,49 @@ def _public_issue_repair_issue_text(manifest: dict[str, Any] | None) -> str | No
     workflow = _string_list(issue.get("expected_workflow"))
     text = "\n".join(part for part in [*parts, *workflow] if part)
     return text or None
+
+
+def _public_issue_repair_attempt_issue_text(
+    *,
+    issue_text: str,
+    validation_command: str | None,
+    validation_fixture_paths: list[str],
+    validation_fixture_files: list[dict[str, str]],
+    source_hints: list[str],
+) -> str:
+    sections = [issue_text.rstrip()]
+    details: list[str] = []
+    if validation_command:
+        details.append(f"Validation command: `{validation_command}`")
+    if validation_fixture_paths:
+        details.append(
+            "Fixture files already added to the disposable repair workspace: "
+            + ", ".join(f"`{path}`" for path in validation_fixture_paths)
+        )
+    if source_hints:
+        details.append(
+            "Reviewed source files and fixture import hints: "
+            + ", ".join(f"`{path}`" for path in source_hints)
+        )
+    if details:
+        sections.extend(["", "## Reviewed Reproduction", "", *details])
+    for fixture in validation_fixture_files[:3]:
+        path = fixture.get("path", "fixture")
+        content = fixture.get("content", "")
+        if not isinstance(path, str) or not isinstance(content, str):
+            continue
+        excerpt = content[:4000]
+        sections.extend(
+            [
+                "",
+                f"### Fixture `{path}`",
+                "",
+                "```python",
+                excerpt,
+                "```",
+            ]
+        )
+    return "\n".join(sections)
 
 
 def _path_has_text(path: Path) -> bool:
@@ -9691,95 +7321,6 @@ def _load_public_issue_reproduction_specs(path: Path) -> dict[str, dict[str, Any
             raise ValueError(f"duplicate reproduction spec for task_id: {task_id}")
         specs[task_id] = raw_record
     return specs
-
-
-def _normalize_public_issue_fixture_files(
-    value: Any,
-) -> tuple[list[dict[str, str]], list[str]]:
-    if value is None:
-        return [], []
-    if not isinstance(value, list):
-        return [], ["fixture_files must be a list"]
-
-    fixture_files: list[dict[str, str]] = []
-    errors: list[str] = []
-    seen_paths: set[str] = set()
-    for index, raw_fixture in enumerate(value, start=1):
-        if not isinstance(raw_fixture, dict):
-            errors.append(f"fixture_files[{index}] must be an object")
-            continue
-        raw_path = _optional_string(raw_fixture.get("path"))
-        if raw_path is None or not raw_path.strip():
-            errors.append(f"fixture_files[{index}].path is missing")
-            continue
-        path = Path(raw_path)
-        normalized_path = path.as_posix()
-        if path.is_absolute():
-            errors.append(
-                f"fixture_files[{index}].path must be repository-relative: {raw_path}"
-            )
-            continue
-        if raw_path.endswith(("/", "\\")) or normalized_path in {"", "."}:
-            errors.append(f"fixture_files[{index}].path must name a file: {raw_path}")
-            continue
-        if any(part in {"..", ""} for part in path.parts):
-            errors.append(
-                f"fixture_files[{index}].path cannot contain traversal: {raw_path}"
-            )
-            continue
-        if any(part == ".git" for part in path.parts):
-            errors.append(
-                f"fixture_files[{index}].path cannot target Git metadata: {raw_path}"
-            )
-            continue
-        if normalized_path in seen_paths:
-            errors.append(f"fixture_files[{index}].path is duplicated: {normalized_path}")
-            continue
-        content = raw_fixture.get("content")
-        if not isinstance(content, str):
-            errors.append(f"fixture_files[{index}].content must be a string")
-            continue
-        content_size = len(content.encode("utf-8"))
-        if content_size > PUBLIC_ISSUE_FIXTURE_FILE_MAX_BYTES:
-            errors.append(
-                f"fixture_files[{index}].content exceeds "
-                f"{PUBLIC_ISSUE_FIXTURE_FILE_MAX_BYTES} bytes"
-            )
-            continue
-        seen_paths.add(normalized_path)
-        fixture_files.append({"path": normalized_path, "content": content})
-    return fixture_files, errors
-
-
-def _public_issue_fixture_paths(fixture_files: list[dict[str, str]]) -> list[str]:
-    return [
-        fixture["path"]
-        for fixture in fixture_files
-        if isinstance(fixture.get("path"), str) and fixture["path"]
-    ]
-
-
-def _write_public_issue_fixture_files(
-    *,
-    repo_path: Path,
-    fixture_files: list[dict[str, str]],
-) -> None:
-    root = repo_path.resolve()
-    for fixture in fixture_files:
-        relative_path = Path(fixture["path"])
-        target = (root / relative_path).resolve()
-        try:
-            target.relative_to(root)
-        except ValueError as error:
-            raise ValueError(
-                f"fixture file escapes repository workspace: {fixture['path']}"
-            ) from error
-        if target.exists() and target.is_dir():
-            raise IsADirectoryError(
-                f"fixture file target is an existing directory: {fixture['path']}"
-            )
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(fixture["content"], encoding="utf-8")
 
 
 def _records_by_task_id(records: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -10275,8 +7816,6 @@ def _string_list(value: Any) -> list[str]:
     return [item for item in value if isinstance(item, str)]
 
 
-def _markdown_table_text(value: str) -> str:
-    return value.replace("|", "\\|").replace("\n", " ")[:500]
 
 
 def _supplement_context_preview_source_neighbors(

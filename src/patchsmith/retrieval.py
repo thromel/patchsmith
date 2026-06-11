@@ -38,6 +38,61 @@ STOPWORDS = {
     "when",
     "with",
 }
+LOW_SIGNAL_EXCERPT_TERMS = STOPWORDS | {
+    "__future__",
+    "added",
+    "already",
+    "annotations",
+    "assert",
+    "assert_outcomes",
+    "captured",
+    "com",
+    "command",
+    "contains",
+    "context",
+    "dedent",
+    "def",
+    "doc",
+    "encoding",
+    "expected",
+    "file",
+    "files",
+    "first",
+    "fixture",
+    "fixtures",
+    "github",
+    "https",
+    "issue",
+    "issues",
+    "mkdir",
+    "none",
+    "not",
+    "open",
+    "passed",
+    "public",
+    "pytest",
+    "python",
+    "python3",
+    "reference",
+    "run",
+    "runpytest",
+    "second",
+    "source",
+    "src",
+    "str",
+    "test",
+    "testing",
+    "tests",
+    "text",
+    "textwrap",
+    "this",
+    "traceback",
+    "type",
+    "used",
+    "utf",
+    "validation",
+    "write_text",
+}
 
 
 class KeywordRetriever:
@@ -311,12 +366,12 @@ def _path_hint_score(path: str, path_hints: set[str]) -> float:
     if not path_hints:
         return 0.0
     if path in path_hints:
-        return 40.0
+        return 10_000.0
     filename = path.rsplit("/", 1)[-1]
     if filename in {hint.rsplit("/", 1)[-1] for hint in path_hints}:
-        return 12.0
+        return 500.0
     if any(path.endswith(f"/{hint}") or hint.endswith(f"/{path}") for hint in path_hints):
-        return 8.0
+        return 250.0
     return 0.0
 
 
@@ -383,19 +438,73 @@ def _is_test_path(path: str) -> bool:
     return path.startswith(("tests/", "test/")) or "/test_" in path or path.endswith("_test.py")
 
 
-def _excerpt(text: str, matched_terms: list[str], radius: int = 2) -> str:
+def _excerpt(text: str, matched_terms: list[str], radius: int = 90) -> str:
     lines = text.splitlines()
     if not lines:
         return ""
 
-    lowered_terms = tuple(term.lower() for term in matched_terms)
-    first_match = 0
-    for index, line in enumerate(lines):
-        lower_line = line.lower()
-        if any(term in lower_line for term in lowered_terms):
-            first_match = index
-            break
+    lowered_terms = _excerpt_search_terms(matched_terms)
+    first_match = _best_excerpt_center(lines, lowered_terms)
 
     start = max(0, first_match - radius)
     end = min(len(lines), first_match + radius + 1)
     return "\n".join(f"{line_no + 1}: {lines[line_no]}" for line_no in range(start, end))
+
+
+def _excerpt_search_terms(matched_terms: list[str]) -> tuple[str, ...]:
+    terms = []
+    for term in matched_terms:
+        normalized = term.lower().rsplit(":", 1)[-1]
+        if len(normalized) <= 2 or normalized in LOW_SIGNAL_EXCERPT_TERMS:
+            continue
+        terms.append(normalized)
+        if "_" in normalized:
+            terms.extend(
+                part
+                for part in normalized.split("_")
+                if len(part) > 2 and part not in LOW_SIGNAL_EXCERPT_TERMS
+            )
+    if not terms:
+        terms = [
+            term.lower()
+            for term in matched_terms
+            if len(term) > 2 and term.lower() not in STOPWORDS
+        ]
+    return tuple(dict.fromkeys(terms))
+
+
+def _best_excerpt_center(lines: list[str], lowered_terms: tuple[str, ...]) -> int:
+    best_index = 0
+    best_score = 0.0
+    for index, line in enumerate(lines):
+        score = _line_match_score(line, lowered_terms)
+        if score > best_score:
+            best_index = index
+            best_score = score
+    if best_score > 0:
+        return best_index
+
+    for index, line in enumerate(lines):
+        lower_line = line.lower()
+        if any(term in lower_line for term in lowered_terms):
+            return index
+    return 0
+
+
+def _line_match_score(line: str, lowered_terms: tuple[str, ...]) -> float:
+    lower_line = line.lower()
+    score = 0.0
+    for term in lowered_terms:
+        if term not in lower_line:
+            continue
+        weight = 1.0
+        if "_" in term:
+            weight += 2.0
+        if len(term) >= 8:
+            weight += 1.0
+        score += lower_line.count(term) * weight
+    if score and re.match(r"\s*(?:async\s+def|def|class)\s+", line):
+        score += 6.0
+    if score and line[:1].isspace():
+        score += 0.25
+    return score

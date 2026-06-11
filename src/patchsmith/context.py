@@ -316,18 +316,28 @@ def retrieved_context_from_bundle(
 ) -> list[RetrievedContext]:
     contexts: list[RetrievedContext] = []
     seen: set[str] = set()
+    fallback_by_path = {context.path: context for context in fallback_contexts}
     for target in bundle.targets:
         if target.path in seen:
             continue
         seen.add(target.path)
+        fallback = fallback_by_path.get(target.path)
         contexts.append(
             RetrievedContext(
                 path=target.path,
                 rank=len(contexts) + 1,
-                score=float(target.confidence or 0.0),
+                score=float(target.confidence or (fallback.score if fallback else 0.0)),
                 method=bundle.provider,
-                matched_terms=[target.role, target.source],
-                excerpt=_read_excerpt(repo_path / target.path),
+                matched_terms=(
+                    [target.role, target.source, *fallback.matched_terms]
+                    if fallback
+                    else [target.role, target.source]
+                ),
+                excerpt=(
+                    fallback.excerpt
+                    if fallback and fallback.excerpt.strip()
+                    else _read_excerpt(repo_path / target.path)
+                ),
             )
         )
         if len(contexts) >= top_k:

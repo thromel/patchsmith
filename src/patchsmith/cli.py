@@ -32,6 +32,8 @@ from patchsmith.evaluation import (
     validate_seeded_dataset,
 )
 from patchsmith.ingest import clone_or_copy_repository, index_repository
+from patchsmith.model_config import DEFAULT_OPENAI_MODEL
+from patchsmith.model_preflight import openai_model_preflight_from_env
 from patchsmith.models import RunRequest
 from patchsmith.observability import write_artifact_index, write_failure_report
 from patchsmith.portfolio import (
@@ -108,6 +110,26 @@ def main(argv: list[str] | None = None) -> int:
                 for context in result.retrieved_context[:5]:
                     print(f"  {context.rank}. {context.path} ({context.score:.2f})")
         return 0
+
+    if args.command == "openai-model-preflight":
+        result = openai_model_preflight_from_env(
+            model=args.model,
+            endpoint=args.endpoint,
+            timeout_seconds=args.timeout_seconds,
+        )
+        if args.json:
+            print(json.dumps(result.to_dict(), indent=2))
+        else:
+            print(f"Model: {result.model}")
+            print(f"Status: {result.status}")
+            print(f"Available: {result.available}")
+            if result.suggestions:
+                print("Suggestions:")
+                for suggestion in result.suggestions:
+                    print(f"  - {suggestion}")
+            if result.error:
+                print(f"Error: {result.error}")
+        return 0 if result.available else 2
 
     if args.command == "index":
         with tempfile.TemporaryDirectory(prefix="patchsmith-index-") as tmp_dir:
@@ -747,6 +769,7 @@ def main(argv: list[str] | None = None) -> int:
             context_provider=args.context_provider,
             sandbox_mode=args.sandbox_mode,
             sandbox_image=args.sandbox_image,
+            max_retries=args.max_retries,
             max_tasks=max_tasks,
             dry_run=not args.execute,
             allow_warnings=args.allow_warnings,
@@ -1613,7 +1636,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     run.add_argument(
         "--planner",
-        choices=["heuristic", "fake_model", "openai"],
+        choices=["heuristic", "fake_model", "openai", "deepagents"],
         default="heuristic",
         help="Repair planner used by model-capable runtimes.",
     )
@@ -1633,6 +1656,28 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--artifacts-dir", default="artifacts", help="Artifact output directory.")
     _add_sandbox_args(run)
     run.add_argument("--json", action="store_true", help="Print machine-readable run summary.")
+
+    model_preflight = subparsers.add_parser(
+        "openai-model-preflight",
+        help="Check whether the configured OpenAI account exposes a model id.",
+    )
+    model_preflight.add_argument(
+        "--model",
+        default=DEFAULT_OPENAI_MODEL,
+        help="Model id to check before running live repair evaluation.",
+    )
+    model_preflight.add_argument(
+        "--endpoint",
+        default="https://api.openai.com/v1/models",
+        help="OpenAI Models API endpoint.",
+    )
+    model_preflight.add_argument(
+        "--timeout-seconds",
+        type=float,
+        default=30.0,
+        help="HTTP timeout for the model availability request.",
+    )
+    model_preflight.add_argument("--json", action="store_true", help="Print JSON result.")
 
     index = subparsers.add_parser("index", help="Clone/copy a repository and print file index JSON.")
     _add_repo_args(index)
@@ -2372,7 +2417,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     public_repair_attempt_parser.add_argument(
         "--planner",
-        choices=["heuristic", "fake_model", "openai"],
+        choices=["heuristic", "fake_model", "openai", "deepagents"],
         default="fake_model",
         help="Planner used for executed repair attempts.",
     )
@@ -2398,6 +2443,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=0,
         help="Maximum repair-readiness records to process. Use 0 for all records.",
+    )
+    public_repair_attempt_parser.add_argument(
+        "--max-retries",
+        type=int,
+        default=0,
+        help="Maximum extra DeepAgents feedback retries after the first public repair attempt.",
     )
     public_repair_attempt_parser.add_argument(
         "--allow-warnings",
@@ -2431,7 +2482,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     eval_repair.add_argument(
         "--planner",
-        choices=["heuristic", "fake_model", "openai"],
+        choices=["heuristic", "fake_model", "openai", "deepagents"],
         default="heuristic",
         help="Repair planner to evaluate. `openai` requires OPENAI_API_KEY.",
     )

@@ -78,7 +78,7 @@ PYTHONPATH=src python3 -m patchsmith.cli demo-readiness \
   --json
 ```
 
-Current local evidence reports `ready_with_caveats`: the offline seeded-suite demo, dashboard, and failure-analysis artifacts are coherent, while live LLM calibration remains a clearly labeled follow-up unless non-offline provider metadata appears in saved artifacts.
+Current local evidence reports `ready`: the seeded-suite demo, dashboard, failure-analysis artifacts, and live DeepAgents provider metadata are coherent. Release claims still need to name the tested `gpt-5.4-mini` model and keep public-issue reproduction caveats separate from live-model calibration.
 
 Generate the timed recording script:
 
@@ -116,7 +116,7 @@ PYTHONPATH=src python3 -m patchsmith.cli live-calibration \
   --json
 ```
 
-Current live calibration readiness output is `not_configured`: the OpenAI SDK is importable locally, but `OPENAI_API_KEY` is not set and saved provider evidence is offline-only. DeepAgents has 10 saved package-backed adapter smoke runs and 30 compatibility-mode runs; this proves optional-package import compatibility, not live DeepAgents model quality. OpenAI Agents SDK has 10 saved package-backed adapter smoke runs and 20 compatibility-mode runs; this proves optional-package import compatibility, not live OpenAI Agents model quality.
+Current live calibration readiness output is `calibrated`: saved artifacts include native DeepAgents `deepagents_openai_chat` runs with token and cost metadata, including a 10-task seeded eval on `gpt-5.4-mini`. The originally requested `gpt-5.5-mini` model was not exposed by the configured OpenAI account, so release claims must name the actual tested model. OpenAI Agents SDK still has package-backed adapter smoke evidence only; this proves optional-package import compatibility, not live OpenAI Agents model quality.
 
 Generate the live calibration execution plan:
 
@@ -218,7 +218,7 @@ PYTHONPATH=src python3 -m patchsmith.cli delivery-audit \
   --json
 ```
 
-Current delivery audit output is `in_progress_with_blockers`: requirements, roadmaps, sprint plans, process docs, development commits, executable quality-gate evidence, saved evaluation artifacts, Docker smoke evidence, public issue setup validation, and the live-calibration execution plan are present, while live LLM calibration remains the blocker-class evidence gap.
+Current delivery audit output is `in_progress_with_blockers`: requirements, roadmaps, sprint plans, process docs, development commits, executable quality-gate evidence, saved evaluation artifacts, Docker smoke evidence, public issue setup validation, the live-calibration execution plan, and live DeepAgents provider evidence are present. Remaining blocker-class gaps are quality/release hygiene state and public issue reproduction-spec readiness.
 
 Generate the Docker smoke report:
 
@@ -470,7 +470,7 @@ PYTHONPATH=src python3 -m patchsmith.cli release-hygiene \
   --json
 ```
 
-Current release hygiene output is `ready_with_warnings`: generated review artifacts now include quality-gate, project-status, project-status freshness, environment-readiness, calibration-readiness, live-calibration plan, delivery audit, launch-blocker, and public issue context-preview/materialization validation/readiness/focused-test plan/run/diagnosis/setup-plan/setup-readiness/setup-execution/setup-validation/reproduction-plan/failure-signal-discovery/reproduction-spec-validation/reproduction-execution/repair-readiness/repair-attempt evidence, package build metadata exists, local Git metadata exists, and the remaining release caveats are unproven live LLM calibration plus warning-class environment/setup/reproduction evidence.
+Current release hygiene output is `blocked` while implementation changes are uncommitted. Generated review artifacts include quality-gate, project-status, project-status freshness, environment-readiness, calibration-readiness, live-calibration plan, delivery audit, launch-blocker, and public issue context-preview/materialization validation/readiness/focused-test plan/run/diagnosis/setup-plan/setup-readiness/setup-execution/setup-validation/reproduction-plan/failure-signal-discovery/reproduction-spec-validation/reproduction-execution/repair-readiness/repair-attempt evidence. Release caveats are dirty worktree status plus warning-class environment/setup/reproduction evidence; live DeepAgents calibration is now saved.
 
 ## Example flagship demo scenario
 

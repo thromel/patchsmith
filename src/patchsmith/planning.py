@@ -9,11 +9,11 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Any, Callable, Mapping, Protocol
 
+from patchsmith.model_config import DEFAULT_OPENAI_MODEL, configured_model_pricing
 from patchsmith.models import RetrievedContext
 
 
 OPENAI_RESPONSES_ENDPOINT = "https://api.openai.com/v1/responses"
-DEFAULT_OPENAI_MODEL = "gpt-5.5"
 
 
 @dataclass(frozen=True)
@@ -105,22 +105,28 @@ class OpenAIResponsesModelClient:
         *,
         opener: Callable[[urllib.request.Request, float], bytes] | None = None,
     ) -> "OpenAIResponsesModelClient":
-        env = environ or os.environ
+        env = os.environ if environ is None else environ
         api_key = env.get("OPENAI_API_KEY", "").strip()
         if not api_key:
             raise ModelClientError(
                 "OPENAI_API_KEY is required for planner `openai`; "
                 "use `fake_model` for offline evals"
             )
+        model = env.get("PATCHSMITH_OPENAI_MODEL", DEFAULT_OPENAI_MODEL).strip() or DEFAULT_OPENAI_MODEL
+        pricing = configured_model_pricing(
+            env=env,
+            model=model,
+            input_key="PATCHSMITH_OPENAI_INPUT_COST_PER_1M",
+            output_key="PATCHSMITH_OPENAI_OUTPUT_COST_PER_1M",
+        )
         return cls(
             api_key=api_key,
-            model=env.get("PATCHSMITH_OPENAI_MODEL", DEFAULT_OPENAI_MODEL).strip()
-            or DEFAULT_OPENAI_MODEL,
+            model=model,
             endpoint=env.get("PATCHSMITH_OPENAI_RESPONSES_ENDPOINT", OPENAI_RESPONSES_ENDPOINT),
             timeout_seconds=_float_env(env, "PATCHSMITH_OPENAI_TIMEOUT_SECONDS", 60.0),
             max_output_tokens=_int_env(env, "PATCHSMITH_OPENAI_MAX_OUTPUT_TOKENS", 1200),
-            input_cost_per_1m=_optional_float_env(env, "PATCHSMITH_OPENAI_INPUT_COST_PER_1M"),
-            output_cost_per_1m=_optional_float_env(env, "PATCHSMITH_OPENAI_OUTPUT_COST_PER_1M"),
+            input_cost_per_1m=pricing.input_cost_per_1m if pricing else None,
+            output_cost_per_1m=pricing.output_cost_per_1m if pricing else None,
             opener=opener,
         )
 
@@ -203,6 +209,7 @@ class ModelBackedRepairPlanner:
         self.name = name
         self.max_contexts = max_contexts
         self.max_excerpt_chars = max_excerpt_chars
+        self.last_model_metadata: ModelCallMetadata | None = None
 
     def plan(
         self,
@@ -210,8 +217,10 @@ class ModelBackedRepairPlanner:
         issue_text: str,
         retrieved_context: list[RetrievedContext],
     ) -> RepairPlan | None:
+        self.last_model_metadata = None
         prompt = self._build_prompt(issue_text=issue_text, retrieved_context=retrieved_context)
         response = self.model_client.complete(prompt)
+        self.last_model_metadata = response.metadata
         payload = _extract_json_object(response.text)
         if payload is None:
             return None
@@ -554,16 +563,6 @@ def _float_env(env: Mapping[str, str], key: str, default: float) -> float:
     value = env.get(key, "").strip()
     if not value:
         return default
-    try:
-        return float(value)
-    except ValueError as error:
-        raise ModelClientError(f"{key} must be a number") from error
-
-
-def _optional_float_env(env: Mapping[str, str], key: str) -> float | None:
-    value = env.get(key, "").strip()
-    if not value:
-        return None
     try:
         return float(value)
     except ValueError as error:

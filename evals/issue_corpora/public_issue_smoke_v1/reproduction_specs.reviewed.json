@@ -20,7 +20,50 @@
       "expected_failure_signals": [
         "AssertionError"
       ],
+      "source_hints": [
+        "src/_pytest/pytester.py",
+        "src/_pytest/pathlib.py#import_path",
+        "src/_pytest/python.py"
+      ],
       "review_notes": "Reviewed against pytest-dev/pytest#14552: the second run after moving test1 to test2 should pass, but the current snapshot reports the old test1 co_filename."
+    },
+    {
+      "task_id": "requests_7223_chardet_extra",
+      "repository": "psf/requests",
+      "issue_url": "https://github.com/psf/requests/issues/7223",
+      "command": "python3 -m pytest tests/test_issue_7223_repro.py",
+      "fixture_files": [
+        {
+          "path": "tests/test_issue_7223_repro.py",
+          "content": "from __future__ import annotations\n\nfrom types import SimpleNamespace\n\nfrom requests import compat\n\n\ndef test_importable_chardet_is_not_preferred_without_extra(monkeypatch):\n    modules = {\n        \"chardet\": SimpleNamespace(__name__=\"chardet\"),\n        \"charset_normalizer\": SimpleNamespace(__name__=\"charset_normalizer\"),\n    }\n\n    def fake_import_module(name: str):\n        return modules[name]\n\n    monkeypatch.setattr(compat.importlib, \"import_module\", fake_import_module)\n\n    detected = compat._resolve_char_detection()\n\n    assert detected is not None\n    assert detected.__name__ == \"charset_normalizer\", (\n        \"chardet should not be preferred just because it is importable when \"\n        \"requests was not installed with the use_chardet_on_py3 extra\"\n    )\n"
+        }
+      ],
+      "expected_failure_signals": [
+        "chardet should not be preferred just because it is importable"
+      ],
+      "source_hints": [
+        "src/requests/compat.py"
+      ],
+      "review_notes": "Reviewed against psf/requests#7223: the issue reports Requests using chardet whenever importable, causing dependency warnings even when the use_chardet_on_py3 extra was not installed."
+    },
+    {
+      "task_id": "requests_7341_chunked_encoding_docs",
+      "repository": "psf/requests",
+      "issue_url": "https://github.com/psf/requests/issues/7341",
+      "command": "python3 -m pytest tests/test_issue_7341_repro.py",
+      "fixture_files": [
+        {
+          "path": "tests/test_issue_7341_repro.py",
+          "content": "from __future__ import annotations\n\nfrom requests.exceptions import ChunkedEncodingError\n\n\ndef test_chunked_encoding_error_docs_include_transient_network_resets():\n    docs = ChunkedEncodingError.__doc__ or \"\"\n\n    assert \"transient\" in docs.lower() and \"connection\" in docs.lower(), (\n        \"ChunkedEncodingError docs should mention transient connection resets \"\n        \"because urllib3 ProtocolError can wrap ConnectionResetError\"\n    )\n"
+        }
+      ],
+      "expected_failure_signals": [
+        "ChunkedEncodingError docs should mention transient connection resets"
+      ],
+      "source_hints": [
+        "src/requests/exceptions.py"
+      ],
+      "review_notes": "Reviewed against psf/requests#7341: the issue reports that the current ChunkedEncodingError documentation is misleading because urllib3 ProtocolError can wrap transient ConnectionResetError cases, not only invalid chunks."
     }
   ]
 }

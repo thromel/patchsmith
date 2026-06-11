@@ -13,6 +13,7 @@ from patchsmith.context import (
     fallback_bundle,
     retrieved_context_from_bundle,
 )
+from patchsmith.deepagents_planner import DeepAgentsRepairPlanner
 from patchsmith.ingest import clone_or_copy_repository, index_repository
 from patchsmith.models import RepairRunResult, RunRequest, new_id
 from patchsmith.reporting import render_run_report
@@ -34,6 +35,13 @@ from patchsmith.runtime import (
 )
 from patchsmith.sandbox import create_sandbox_runner
 from patchsmith.tracing import RunTrace
+from patchsmith.workflow_attempts import (
+    emit_agent_result_trace,
+    issue_with_test_feedback,
+    run_sandbox_attempt,
+    should_retry_with_test_feedback,
+    test_feedback_retry_budget,
+)
 
 
 class RepairRunner:
@@ -197,97 +205,96 @@ class RepairRunner:
             )
 
             runtime = _runtime_for(request.runtime, request.planner)
-            agent_result = runtime.run(
-                AgentTask(
-                    run_id=run_id,
-                    repo_path=str(repo_path),
-                    issue_text=request.issue_text,
-                    retrieved_context=retrieved_context,
-                    test_command=request.test_command,
-                    runtime_config={
-                        "planner": request.planner,
-                        "max_retries": request.max_retries,
-                    },
-                )
-            )
-            trace.emit(
-                node_name="runtime",
-                event_type="agent_result",
-                status=agent_result.status,
-                output_summary=agent_result.summary,
-                payload={
-                    "planner": request.planner,
-                    "patch_candidates": [
-                        candidate.to_dict() for candidate in agent_result.patch_candidates
-                    ]
-                },
-            )
-            for runtime_event in agent_result.runtime_trace:
-                trace.emit(
-                    node_name=f"runtime.{runtime_event.get('node', 'unknown')}",
-                    event_type="runtime_node",
-                    status=str(runtime_event.get("status", "completed")),
-                    output_summary=str(runtime_event.get("summary", "")),
-                    payload={
-                        "runtime": request.runtime,
-                        "planner": request.planner,
-                        **runtime_event,
-                    },
-                )
-
             command = request.test_command or (
                 snapshot.test_commands[0] if snapshot.test_commands else None
             )
-            test_result = None
             sandbox = create_sandbox_runner(
                 mode=request.sandbox_mode,
                 image=request.sandbox_image,
             )
-            if command:
-                test_result = sandbox.run(
+            attempt_issue_text = request.issue_text
+            attempt = 0
+            max_feedback_retries = test_feedback_retry_budget(request)
+            while True:
+                attempt += 1
+                agent_result = runtime.run(
+                    AgentTask(
+                        run_id=run_id,
+                        repo_path=str(repo_path),
+                        issue_text=attempt_issue_text,
+                        retrieved_context=retrieved_context,
+                        test_command=command,
+                        runtime_config={
+                            "planner": request.planner,
+                            "max_retries": request.max_retries,
+                            "workflow_attempt": attempt,
+                            "test_feedback_retries": max_feedback_retries,
+                        },
+                    )
+                )
+                emit_agent_result_trace(
+                    trace=trace,
+                    request=request,
+                    agent_result=agent_result,
+                    attempt=attempt,
+                )
+                test_result = run_sandbox_attempt(
                     command=command,
-                    workspace=repo_path,
-                    timeout_seconds=60,
+                    sandbox=sandbox,
+                    repo_path=repo_path,
+                    logs_dir=logs_dir,
+                    trace=trace,
+                    request=request,
+                    attempt=attempt,
                 )
-                (logs_dir / "stdout.txt").write_text(test_result.stdout, encoding="utf-8")
-                (logs_dir / "stderr.txt").write_text(test_result.stderr, encoding="utf-8")
+                final_diff = _workspace_diff(repo_path) or agent_result.final_diff
+                repair_analysis = analyze_repair_outcome(
+                    patch_status=agent_result.status,
+                    final_diff=final_diff,
+                    test_result=test_result,
+                )
                 trace.emit(
-                    node_name="test",
-                    event_type="sandbox_command",
-                    status="completed" if test_result.exit_code == 0 else "failed",
-                    input_summary=command,
-                    output_summary=f"exit_code={test_result.exit_code}",
+                    node_name="analyze",
+                    event_type="repair_outcome",
+                    status=repair_analysis.status,
+                    output_summary=repair_analysis.summary,
                     payload={
-                        **test_result.to_dict(),
-                        "sandbox_mode": request.sandbox_mode,
-                        "sandbox_image": (
-                            request.sandbox_image if request.sandbox_mode == "docker" else None
-                        ),
+                        **repair_analysis.to_dict(),
+                        "attempt": attempt,
+                        "max_feedback_retries": max_feedback_retries,
                     },
-                    latency_ms=test_result.duration_ms,
                 )
-            else:
+                if not should_retry_with_test_feedback(
+                    request=request,
+                    agent_result=agent_result,
+                    test_result=test_result,
+                    attempt=attempt,
+                    max_feedback_retries=max_feedback_retries,
+                ):
+                    break
                 trace.emit(
-                    node_name="test",
-                    event_type="sandbox_command",
-                    status="skipped",
-                    output_summary="no test command supplied or detected",
-                    payload={"sandbox_mode": request.sandbox_mode},
+                    node_name="feedback_retry",
+                    event_type="repair_retry",
+                    status="scheduled",
+                    output_summary=(
+                        f"Scheduling DeepAgents feedback retry {attempt} of "
+                        f"{max_feedback_retries}."
+                    ),
+                    payload={
+                        "attempt": attempt,
+                        "next_attempt": attempt + 1,
+                        "max_feedback_retries": max_feedback_retries,
+                        "test_exit_code": test_result.exit_code if test_result else None,
+                    },
                 )
-
-            final_diff = _workspace_diff(repo_path) or agent_result.final_diff
-            repair_analysis = analyze_repair_outcome(
-                patch_status=agent_result.status,
-                final_diff=final_diff,
-                test_result=test_result,
-            )
-            trace.emit(
-                node_name="analyze",
-                event_type="repair_outcome",
-                status=repair_analysis.status,
-                output_summary=repair_analysis.summary,
-                payload=repair_analysis.to_dict(),
-            )
+                attempt_issue_text = issue_with_test_feedback(
+                    original_issue=request.issue_text,
+                    agent_status=agent_result.status,
+                    agent_summary=agent_result.summary,
+                    test_result=test_result,
+                    final_diff=final_diff,
+                    attempt=attempt,
+                )
             final_diff_path.write_text(final_diff, encoding="utf-8")
             report = render_run_report(
                 run_id=run_id,
@@ -333,7 +340,6 @@ class RepairRunner:
             retrieved_context=retrieved_context,
             test_result=test_result,
         )
-
 
 def _workspace_diff(repo_path: Path) -> str:
     if not (repo_path / ".git").exists():
@@ -381,4 +387,6 @@ def _planner_for(planner_name: str):
             OpenAIResponsesModelClient.from_env(),
             name="openai_json_plan",
         )
+    if planner_name == "deepagents":
+        return DeepAgentsRepairPlanner.from_env()
     raise ValueError(f"unsupported planner: {planner_name}")

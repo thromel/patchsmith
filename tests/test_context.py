@@ -71,3 +71,34 @@ def test_retrieved_context_from_bundle_appends_native_fallback() -> None:
         "tests/test_simple_calc.py",
     ]
     assert contexts[1].method == "keyword_fallback"
+
+
+def test_retrieved_context_from_bundle_preserves_matching_fallback_excerpt() -> None:
+    bundle = normalize_ctxhelm_export(
+        {"targetFiles": [{"path": "src/simple_calc.py", "confidence": 0.8}]},
+        repo_path=Path("tests/fixtures/simple_calc_bug/repo"),
+        provider_version=None,
+        raw_artifact_path=None,
+        latency_ms=0,
+    )
+    native = [
+        RetrievedContext(
+            path="src/simple_calc.py",
+            rank=1,
+            score=8.0,
+            method="native_hybrid",
+            matched_terms=["add"],
+            excerpt="20: def add(left, right):\n21:     return left - right",
+        )
+    ]
+
+    contexts = retrieved_context_from_bundle(
+        bundle=bundle,
+        repo_path=Path("tests/fixtures/simple_calc_bug/repo"),
+        fallback_contexts=native,
+        top_k=1,
+    )
+
+    assert contexts[0].path == "src/simple_calc.py"
+    assert contexts[0].excerpt == native[0].excerpt
+    assert "add" in contexts[0].matched_terms

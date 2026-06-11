@@ -20,6 +20,11 @@ from patchsmith.evaluation import (
     preflight_issue_corpus_repositories,
     preview_issue_corpus_context,
     recall,
+    RepairEvalResult,
+    RepairEvalSummary,
+    render_public_issue_reproduction_plan_report,
+    render_repair_eval_report,
+    render_retrieval_eval_report,
     run_materialized_issue_focused_tests,
     run_patch_search_evaluation,
     run_repair_evaluation,
@@ -32,6 +37,16 @@ from patchsmith.evaluation import (
     validate_public_issue_reproduction_specs,
     validate_seeded_dataset,
 )
+from patchsmith.evaluation_models import RepairEvalResult as EvaluationModelsRepairEvalResult
+from patchsmith.evaluation_reports import (
+    render_retrieval_eval_report as evaluation_reports_render_retrieval_eval_report,
+)
+from patchsmith.public_issue_reports import (
+    render_public_issue_reproduction_plan_report as public_issue_reports_render_public_issue_reproduction_plan_report,
+)
+from patchsmith.repair_reports import (
+    render_repair_eval_report as repair_reports_render_repair_eval_report,
+)
 
 
 def test_recall_metrics() -> None:
@@ -39,6 +54,25 @@ def test_recall_metrics() -> None:
     assert top_k_recall(["src/b.py", "src/a.py"], ["src/a.py"], 1) == 0.0
     assert top_k_recall(["src/b.py", "src/a.py"], ["src/a.py"], 3) == 1.0
     assert recall(["tests/test_a.py"], ["tests/test_a.py", "tests/test_b.py"]) == 0.5
+
+
+def test_evaluation_reexports_result_models() -> None:
+    assert RepairEvalResult is EvaluationModelsRepairEvalResult
+
+
+def test_evaluation_reexports_public_issue_report_renderers() -> None:
+    assert (
+        render_public_issue_reproduction_plan_report
+        is public_issue_reports_render_public_issue_reproduction_plan_report
+    )
+
+
+def test_evaluation_reexports_repair_report_renderers() -> None:
+    assert render_repair_eval_report is repair_reports_render_repair_eval_report
+
+
+def test_evaluation_reexports_evaluation_report_renderers() -> None:
+    assert render_retrieval_eval_report is evaluation_reports_render_retrieval_eval_report
 
 
 def test_load_seeded_tasks() -> None:
@@ -1769,6 +1803,7 @@ def test_plan_public_issue_reproductions_merges_reviewed_spec_file(
                         "expected_failure_signals": [
                             "AssertionError: reviewed public issue signal"
                         ],
+                        "source_hints": ["src/example.py"],
                     }
                 ],
             }
@@ -1798,7 +1833,11 @@ def test_plan_public_issue_reproductions_merges_reviewed_spec_file(
     assert results[0].expected_failure_signals == [
         "AssertionError: reviewed public issue signal"
     ]
+    assert results[0].source_hints == ["src/example.py"]
     assert "reproduction spec provides an explicit command" in ";".join(
+        results[0].evidence
+    )
+    assert "reproduction spec provides 1 reviewed source hint(s)" in ";".join(
         results[0].evidence
     )
     assert "expected failing signal is encoded in the reproduction spec" in ";".join(
@@ -1940,6 +1979,7 @@ def test_validate_public_issue_reproduction_specs_accepts_reviewed_spec(
                 {
                     "task_id": "public_task",
                     "command": "python3 -m pytest tests/test_bug.py",
+                    "source_hints": ["src/example.py"],
                     "expected_failure_signals": ["AssertionError: reviewed signal"],
                 }
             ]
@@ -1958,6 +1998,7 @@ def test_validate_public_issue_reproduction_specs_accepts_reviewed_spec(
     assert summary.empty_signal_tasks == 0
     assert results[0].status == "ready"
     assert results[0].command_source == "reproduction_spec"
+    assert results[0].source_hints == ["src/example.py"]
     assert results[0].expected_failure_signals == ["AssertionError: reviewed signal"]
 
 
@@ -2670,6 +2711,14 @@ def test_check_public_issue_repair_readiness_uses_reproduction_execution(
                     "repository": "owner/repo",
                     "issue_url": "https://github.com/owner/repo/issues/10",
                     "status": "reproduced",
+                    "reproduction_command": "python3 -m pytest tests/test_repro.py",
+                    "fixture_files": [
+                        {
+                            "path": "tests/test_repro.py",
+                            "content": "def test_repro():\n    assert False, 'expected public bug'\n",
+                        }
+                    ],
+                    "source_hints": ["src/example.py"],
                     "stdout_path": str(tmp_path / "stdout.txt"),
                     "stderr_path": str(tmp_path / "stderr.txt"),
                     "matched_failure_signals": ["AssertionError: expected public bug"],
@@ -2705,7 +2754,14 @@ def test_check_public_issue_repair_readiness_uses_reproduction_execution(
     assert summary.reproduced_tasks == 1
     assert results[0].status == "ready"
     assert results[0].reproduction_execution_status == "reproduced"
+    assert results[0].validation_command == "python3 -m pytest tests/test_repro.py"
+    assert results[0].validation_fixture_paths == ["tests/test_repro.py"]
+    assert results[0].validation_source_hints == ["src/example.py"]
+    assert results[0].validation_fixture_files[0]["content"].startswith("def test_repro")
     assert "saved failing evidence" in ";".join(results[0].evidence)
+    assert "issue-specific validation command is available" in ";".join(
+        results[0].evidence
+    )
     assert "issue reproduction is not proven" not in ";".join(results[0].warnings)
 
 
@@ -2869,6 +2925,7 @@ def test_execute_public_issue_repairs_dry_runs_ready_task(tmp_path: Path) -> Non
     assert summary.dry_run_tasks == 1
     assert summary.blocked_tasks == 0
     assert summary.reproduced_input_tasks == 1
+    assert summary.max_retries == 0
     assert results[0].status == "dry_run"
     assert "repair attempt passed dry-run gating" in ";".join(results[0].evidence)
 
@@ -2927,7 +2984,19 @@ def test_execute_public_issue_repairs_executes_local_heuristic_repair(
                     "repo_path": str(repo_dir),
                     "repo_exists": True,
                     "repair_command": "PYTHONPATH=src python3 -m patchsmith.cli run --json",
-                    "validation_command": "python3 -m pytest tests/test_simple_calc.py",
+                    "validation_command": "python3 -m pytest tests/test_issue_repro.py",
+                    "validation_fixture_files": [
+                        {
+                            "path": "tests/test_issue_repro.py",
+                            "content": (
+                                "from simple_calc import add\n\n\n"
+                                "def test_public_issue_repro():\n"
+                                "    assert add(2, 3) == 5\n"
+                            ),
+                        }
+                    ],
+                    "validation_fixture_paths": ["tests/test_issue_repro.py"],
+                    "validation_source_hints": ["src/simple_calc.py"],
                     "reproduction_execution_status": "reproduced",
                     "blockers": [],
                     "warnings": [],
@@ -2947,16 +3016,22 @@ def test_execute_public_issue_repairs_executes_local_heuristic_repair(
         runtime="heuristic",
         planner="heuristic",
         sandbox_mode="local",
+        max_retries=2,
         dry_run=False,
     )
 
     assert summary.attempted_tasks == 1
     assert summary.validated_tasks == 1
+    assert summary.max_retries == 2
     assert results[0].status == "validated"
     assert results[0].patch_generated
     assert results[0].test_exit_code == 0
+    assert results[0].validation_fixture_paths == ["tests/test_issue_repro.py"]
     assert results[0].report_path is not None
     assert Path(results[0].report_path).exists()
+    report_text = Path(results[0].report_path).read_text(encoding="utf-8")
+    assert "Reviewed source files and fixture import hints" in report_text
+    assert "src/simple_calc.py" in report_text
 
 
 def test_graph_retrieval_dataset_validates(tmp_path: Path) -> None:
@@ -3057,6 +3132,54 @@ def test_run_repair_evaluation_langgraph_fake_model_tracks_usage(tmp_path: Path)
         encoding="utf-8"
     )
     assert "Model provider: `offline_fake_model`" in report
+
+
+def test_repair_eval_report_labels_live_deepagents_evidence() -> None:
+    summary = RepairEvalSummary(
+        runtime="deepagents",
+        planner="deepagents",
+        context_provider="native_hybrid",
+        attempted_tasks=1,
+        completed_tasks=1,
+        patch_generated_rate=1.0,
+        targeted_test_pass_rate=1.0,
+        avg_latency_ms=1000.0,
+        model_provider="deepagents_openai_chat",
+        input_tokens=100,
+        output_tokens=10,
+        total_tokens=110,
+        estimated_cost_usd=0.001,
+    )
+    result = RepairEvalResult(
+        task_id="task_001_logic_bug",
+        runtime="deepagents",
+        planner="deepagents",
+        context_provider="native_hybrid",
+        status="completed",
+        error=None,
+        patch_generated=True,
+        targeted_tests_passed=True,
+        test_exit_code=0,
+        report_path="/tmp/report.md",
+        trace_path="/tmp/traces.jsonl",
+        final_diff_path="/tmp/final.diff",
+        retrieved_files=["src/simple_calc.py"],
+        latency_ms=1000,
+        model_provider="deepagents_openai_chat",
+        input_tokens=100,
+        output_tokens=10,
+        total_tokens=110,
+        estimated_cost_usd=0.001,
+    )
+
+    report = render_repair_eval_report(
+        dataset_dir=Path("evals/tasks/seeded_bugs_v1"),
+        results=[result],
+        summary=summary,
+    )
+
+    assert "includes live model-provider evidence (`deepagents_openai_chat`)" in report
+    assert "not broad production repair quality" in report
 
 
 def test_run_scaffold_comparison_writes_outputs(tmp_path: Path) -> None:

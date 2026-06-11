@@ -25,6 +25,7 @@ from patchsmith.evaluation import (
     plan_public_issue_reproductions,
     validate_public_issue_reproduction_specs,
 )
+from patchsmith.model_config import DEFAULT_OPENAI_MODEL, openai_model_pricing
 from patchsmith.observability import (
     ArtifactIndex,
     ExperimentMetricIndexEntry,
@@ -1603,19 +1604,47 @@ def build_evidence_refresh_report(
                     summary="Skipped because the reproduction specs template is missing.",
                 )
             )
-        steps.append(
-            _run_evidence_refresh_step(
-                name="Public issue reproduction execution",
-                artifact_paths=output_paths(
-                    "public_issue_corpus_v1/public_issue_reproduction_execution_report.md",
-                    "public_issue_corpus_v1/public_issue_reproduction_execution_summary.json",
-                ),
-                action=lambda: execute_public_issue_reproductions(
-                    plan_path=public_reproduction_plan_path,
-                    output_dir=experiment_path("public_issue_corpus_v1"),
-                )[1],
-            )
+        public_reproduction_execution_summary_path = experiment_path(
+            "public_issue_corpus_v1/public_issue_reproduction_execution_summary.json"
         )
+        if _has_executed_public_reproduction_evidence(
+            public_reproduction_execution_summary_path
+        ):
+            steps.append(
+                EvidenceRefreshStep(
+                    name="Public issue reproduction execution",
+                    status="passed",
+                    duration_ms=0,
+                    artifact_paths=output_paths(
+                        "public_issue_corpus_v1/public_issue_reproduction_execution_report.md",
+                        (
+                            "public_issue_corpus_v1/"
+                            "public_issue_reproduction_execution_summary.json"
+                        ),
+                    ),
+                    summary=(
+                        "Preserved existing executed reproduction evidence; rerun "
+                        "`execute-public-issue-reproductions --execute` explicitly to refresh it."
+                    ),
+                )
+            )
+        else:
+            steps.append(
+                _run_evidence_refresh_step(
+                    name="Public issue reproduction execution",
+                    artifact_paths=output_paths(
+                        "public_issue_corpus_v1/public_issue_reproduction_execution_report.md",
+                        (
+                            "public_issue_corpus_v1/"
+                            "public_issue_reproduction_execution_summary.json"
+                        ),
+                    ),
+                    action=lambda: execute_public_issue_reproductions(
+                        plan_path=public_reproduction_plan_path,
+                        output_dir=experiment_path("public_issue_corpus_v1"),
+                    )[1],
+                )
+            )
     else:
         steps.append(
             EvidenceRefreshStep(
@@ -1702,19 +1731,40 @@ def build_evidence_refresh_report(
             )
         )
         steps.append(
-            _run_evidence_refresh_step(
-                name="Public issue repair attempts",
-                artifact_paths=output_paths(
-                    "public_issue_corpus_v1/public_issue_repair_attempt_report.md",
-                    "public_issue_corpus_v1/public_issue_repair_attempt_summary.json",
-                ),
-                action=lambda: execute_public_issue_repairs(
-                    readiness_path=experiment_path(
-                        "public_issue_corpus_v1/public_issue_repair_readiness_results.json"
+            (
+                EvidenceRefreshStep(
+                    name="Public issue repair attempts",
+                    status="passed",
+                    duration_ms=0,
+                    artifact_paths=output_paths(
+                        "public_issue_corpus_v1/public_issue_repair_attempt_report.md",
+                        "public_issue_corpus_v1/public_issue_repair_attempt_summary.json",
                     ),
-                    tasks_dir=experiment_path("public_issue_corpus_v1/materialized_tasks"),
-                    output_dir=experiment_path("public_issue_corpus_v1"),
-                )[1],
+                    summary=(
+                        "Preserved existing executed repair-attempt evidence; rerun "
+                        "`execute-public-issue-repairs --execute` explicitly to refresh it."
+                    ),
+                )
+                if _has_executed_public_repair_attempt_evidence(
+                    experiment_path(
+                        "public_issue_corpus_v1/public_issue_repair_attempt_summary.json"
+                    )
+                )
+                else _run_evidence_refresh_step(
+                    name="Public issue repair attempts",
+                    artifact_paths=output_paths(
+                        "public_issue_corpus_v1/public_issue_repair_attempt_report.md",
+                        "public_issue_corpus_v1/public_issue_repair_attempt_summary.json",
+                    ),
+                    action=lambda: execute_public_issue_repairs(
+                        readiness_path=experiment_path(
+                            "public_issue_corpus_v1/public_issue_repair_readiness_results.json"
+                        ),
+                        tasks_dir=experiment_path("public_issue_corpus_v1/materialized_tasks"),
+                        output_dir=experiment_path("public_issue_corpus_v1"),
+                        allow_warnings=True,
+                    )[1],
+                )
             )
         )
     else:
@@ -2085,7 +2135,7 @@ def build_live_calibration_plan_report(
         environment.get("PATCHSMITH_OPENAI_INPUT_COST_PER_1M", "").strip()
         and environment.get("PATCHSMITH_OPENAI_OUTPUT_COST_PER_1M", "").strip()
     )
-    model = environment.get("PATCHSMITH_OPENAI_MODEL", "").strip() or "planner_default"
+    model = environment.get("PATCHSMITH_OPENAI_MODEL", "").strip() or DEFAULT_OPENAI_MODEL
     runs = _live_calibration_plan_runs(
         openai_sdk_available=openai_sdk_available,
         credentials_configured=credentials_configured,
@@ -4161,7 +4211,11 @@ def _delivery_public_repair_readiness_item(
         next_action = "Resolve blocked public repair-readiness prerequisites."
     elif warning:
         status = "warning"
-        next_action = "Capture failing reproduction evidence before claiming public repair quality."
+        next_action = (
+            "Review warning-class setup and sandbox caveats before claiming public repair quality."
+            if missing_reproduction == 0
+            else "Capture failing reproduction evidence before claiming public repair quality."
+        )
     else:
         status = "passed"
         next_action = "Run bounded public issue repair attempts and save run artifacts."
@@ -5093,8 +5147,20 @@ def _live_calibration_checks(
     model_name = environment.get("PATCHSMITH_OPENAI_MODEL", "").strip()
     input_rate = environment.get("PATCHSMITH_OPENAI_INPUT_COST_PER_1M", "").strip()
     output_rate = environment.get("PATCHSMITH_OPENAI_OUTPUT_COST_PER_1M", "").strip()
+    selected_model = model_name or DEFAULT_OPENAI_MODEL
+    selected_model_pricing = openai_model_pricing(selected_model)
+    cost_rates_known = bool(input_rate and output_rate) or selected_model_pricing is not None
     deepagents_package_runs = deepagents_modes.get("package_available", 0)
     deepagents_compatibility_runs = deepagents_modes.get("compatibility_mode", 0)
+    deepagents_live_runs = model_providers.get("deepagents_openai_chat", 0)
+    deepagents_package_next_action = "Run the DeepAgents adapter with the optional extra installed and save traces."
+    if deepagents_package_runs:
+        deepagents_package_next_action = (
+            "Use package-backed traces for adapter-import claims; use saved "
+            "deepagents_openai_chat rows for live DeepAgents model claims."
+            if deepagents_live_runs
+            else "Use package-backed traces for adapter-import claims; still avoid live-model claims."
+        )
     openai_agents_package_runs = openai_agents_modes.get("package_available", 0)
     openai_agents_compatibility_runs = openai_agents_modes.get("compatibility_mode", 0)
 
@@ -5129,7 +5195,7 @@ def _live_calibration_checks(
             evidence=(
                 f"PATCHSMITH_OPENAI_MODEL={model_name}."
                 if model_name
-                else "PATCHSMITH_OPENAI_MODEL is not set; planner default will be used."
+                else f"PATCHSMITH_OPENAI_MODEL is not set; default `{DEFAULT_OPENAI_MODEL}` will be used."
             ),
             next_action=(
                 "Keep the model name in the saved run metadata."
@@ -5139,15 +5205,19 @@ def _live_calibration_checks(
         ),
         LiveCalibrationCheck(
             name="Cost Rate Configuration",
-            status="passed" if input_rate and output_rate else "warning",
+            status="passed" if cost_rates_known else "warning",
             evidence=(
                 "Input and output cost rates are configured."
                 if input_rate and output_rate
-                else "Cost rates are not fully configured."
+                else (
+                    f"Using built-in pricing for `{selected_model}`."
+                    if selected_model_pricing
+                    else "Cost rates are not fully configured."
+                )
             ),
             next_action=(
                 "Report quality, token use, and estimated cost together."
-                if input_rate and output_rate
+                if cost_rates_known
                 else (
                     "Set PATCHSMITH_OPENAI_INPUT_COST_PER_1M and "
                     "PATCHSMITH_OPENAI_OUTPUT_COST_PER_1M when cost claims matter."
@@ -5190,11 +5260,7 @@ def _live_calibration_checks(
                 if deepagents_package_runs
                 else f"0 package-backed runs; {deepagents_compatibility_runs} compatibility-mode run(s)."
             ),
-            next_action=(
-                "Use package-backed traces for adapter-import claims; still avoid live-model claims."
-                if deepagents_package_runs
-                else "Run the DeepAgents adapter with the optional extra installed and save traces."
-            ),
+            next_action=deepagents_package_next_action,
         ),
         LiveCalibrationCheck(
             name="OpenAI Agents Package",
@@ -6014,7 +6080,11 @@ def _public_repair_readiness_launch_item(artifacts_dir: Path) -> LaunchBlockerIt
         status = "warning"
         severity = "P1"
         summary = f"{warning_tasks} public issue repair attempt(s) need caveat review."
-        next_action = "Capture issue-specific failing reproduction evidence before repair-quality claims."
+        next_action = (
+            "Review warning-class setup and sandbox caveats before repair-quality claims."
+            if missing_reproduction_tasks == 0
+            else "Capture issue-specific failing reproduction evidence before repair-quality claims."
+        )
     else:
         status = "ready"
         severity = "P2"
@@ -6188,6 +6258,29 @@ def _load_json_artifact(path: Path) -> dict[str, Any] | None:
     except (OSError, json.JSONDecodeError):
         return None
     return payload if isinstance(payload, dict) else None
+
+
+def _has_executed_public_reproduction_evidence(summary_path: Path) -> bool:
+    payload = _load_json_artifact(summary_path)
+    if not payload:
+        return False
+    return (
+        payload.get("dry_run") is False
+        and _payload_int(payload, "attempted_tasks") > 0
+        and _payload_int(payload, "reproduced_tasks") > 0
+    )
+
+
+def _has_executed_public_repair_attempt_evidence(summary_path: Path) -> bool:
+    payload = _load_json_artifact(summary_path)
+    if not payload:
+        return False
+    return (
+        payload.get("dry_run") is False
+        and _payload_int(payload, "attempted_tasks") > 0
+        and _payload_int(payload, "reproduced_input_tasks") > 0
+        and _payload_int(payload, "blocked_tasks") == 0
+    )
 
 
 def _first_actionable_check(checks: list[Any]) -> dict[str, Any] | None:

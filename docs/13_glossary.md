@@ -18,7 +18,7 @@ The process of selecting and formatting retrieved repository context for model i
 
 ## DeepAgents runtime
 
-An experimental runtime adapter for DeepAgents-style high-level scaffold behavior. Current local evidence uses dependency-gated offline compatibility mode; live DeepAgents package/model execution is a separate calibration step.
+An experimental DeepAgents-backed runtime behind PatchSmith's bounded planner/edit contract. It supports offline adapter evidence and native live-model planning; current saved live evidence uses `deepagents_openai_chat` on `gpt-5.4-mini`.
 
 ## OpenAI Agents runtime
 

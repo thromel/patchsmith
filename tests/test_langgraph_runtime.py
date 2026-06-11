@@ -2,7 +2,7 @@ from pathlib import Path
 
 from patchsmith.ingest import clone_or_copy_repository, index_repository
 from patchsmith.models import RunRequest
-from patchsmith.planning import RepairPlan
+from patchsmith.planning import ModelBackedRepairPlanner, RepairPlan, StaticResponseModelClient
 from patchsmith.retrieval import HybridRetriever
 from patchsmith.runtime import AgentTask, DeepAgentsRuntime, LangGraphRuntime, OpenAIAgentsRuntime
 from patchsmith.workflow import RepairRunner
@@ -100,6 +100,75 @@ def test_deepagents_runtime_generates_patch_with_adapter_trace(tmp_path: Path) -
         "review",
     ]
     assert result.runtime_trace[0]["framework"] == "deepagents"
+
+
+def test_deepagents_runtime_preserves_model_usage_metadata(tmp_path: Path) -> None:
+    fixture = Path("evals/tasks/seeded_bugs_v1/task_001_logic_bug")
+    snapshot = clone_or_copy_repository(str(fixture / "repo"), tmp_path / "repo")
+    repo_index = index_repository(snapshot.repo_path)
+    issue_text = (fixture / "issue.md").read_text(encoding="utf-8")
+    contexts = HybridRetriever().retrieve(
+        repo_path=snapshot.repo_path,
+        repo_index=repo_index,
+        issue_text=issue_text,
+    )
+    planner = ModelBackedRepairPlanner(
+        StaticResponseModelClient(
+            """
+            {
+              "path": "src/simple_calc.py",
+              "old": "return left - right",
+              "new": "return left + right",
+              "summary": "Fix add to return the sum."
+            }
+            """,
+            provider="unit_model",
+        )
+    )
+
+    result = DeepAgentsRuntime(planner=planner).run(
+        AgentTask(
+            run_id="test-run",
+            repo_path=str(snapshot.repo_path),
+            issue_text=issue_text,
+            retrieved_context=contexts,
+            test_command="python3 -m pytest",
+        )
+    )
+
+    plan_event = next(event for event in result.runtime_trace if event["node"] == "plan")
+    assert result.status == "patch_generated"
+    assert plan_event["metadata"]["model_call"]["provider"] == "unit_model"
+
+
+def test_deepagents_runtime_preserves_failed_model_usage_metadata(tmp_path: Path) -> None:
+    fixture = Path("evals/tasks/seeded_bugs_v1/task_001_logic_bug")
+    snapshot = clone_or_copy_repository(str(fixture / "repo"), tmp_path / "repo")
+    repo_index = index_repository(snapshot.repo_path)
+    issue_text = (fixture / "issue.md").read_text(encoding="utf-8")
+    contexts = HybridRetriever().retrieve(
+        repo_path=snapshot.repo_path,
+        repo_index=repo_index,
+        issue_text=issue_text,
+    )
+    planner = ModelBackedRepairPlanner(
+        StaticResponseModelClient("not a json repair plan", provider="unit_model")
+    )
+
+    result = DeepAgentsRuntime(planner=planner).run(
+        AgentTask(
+            run_id="test-run",
+            repo_path=str(snapshot.repo_path),
+            issue_text=issue_text,
+            retrieved_context=contexts,
+            test_command="python3 -m pytest",
+        )
+    )
+
+    plan_event = next(event for event in result.runtime_trace if event["node"] == "plan")
+    assert result.status == "no_patch_generated"
+    assert plan_event["status"] == "no_match"
+    assert plan_event["metadata"]["model_call"]["provider"] == "unit_model"
 
 
 def test_repair_runner_deepagents_runtime_emits_runtime_node_traces(tmp_path: Path) -> None:

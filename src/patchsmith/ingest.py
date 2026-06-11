@@ -12,6 +12,9 @@ from patchsmith.models import FileRecord, RepositoryIndex, RepositorySnapshot
 IGNORED_DIRS = {
     ".git",
     ".hg",
+    ".env",
+    ".cache",
+    ".local",
     ".mypy_cache",
     ".pytest_cache",
     ".ruff_cache",
@@ -59,7 +62,7 @@ def clone_or_copy_repository(
 
     source_path = Path(repo).expanduser()
     if source_path.exists():
-        shutil.copytree(source_path, target_dir, ignore=_copy_ignore)
+        shutil.copytree(source_path, target_dir, ignore=_copy_ignore, symlinks=True)
         commit_hash = _resolve_git_commit(target_dir) or _content_hash(target_dir)
         branch_name = branch or _resolve_git_branch(target_dir)
     elif _looks_like_git_url(repo):

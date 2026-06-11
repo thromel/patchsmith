@@ -103,7 +103,7 @@ The repository now includes a runnable Python scaffold for the first half of the
 issue input -> repo copy/clone -> context broker -> file index -> retrieval metrics -> command policy -> test run -> trace/report artifacts
 ```
 
-Deterministic patch generation is wired for seeded smoke tasks. The current runtimes are `agentless`, `heuristic`, `langgraph`, `deepagents`, and `openai_agents`; LangGraph supports planner selection with `heuristic`, `fake_model`, and `openai`, while the DeepAgents and OpenAI Agents SDK adapters run in offline compatibility mode unless their optional extras are installed. The `fake_model` planner exercises the prompt/JSON model-backed planning seam offline, validates that model output targets retrieved repo-relative paths, and keeps local evals credential-free. The `openai` planner uses the OpenAI Responses API only when credentials are configured. The context layer supports native keyword retrieval, native hybrid retrieval, native graph retrieval, and a ctxhelm CLI broker. Test execution defaults to the local command-policy sandbox for developer speed, and `--sandbox-mode docker` selects the Docker runner for stronger process and environment isolation. Saved experiment and run artifacts can be summarized with a static artifact index for demo and review.
+Deterministic patch generation is wired for seeded smoke tasks. The current runtimes are `agentless`, `heuristic`, `langgraph`, `deepagents`, and `openai_agents`. LangGraph supports planner selection with `heuristic`, `fake_model`, and `openai`; DeepAgents supports the same bounded runtime contract plus a native `deepagents` planner when the optional package and model credentials are installed. The native DeepAgents planner uses state-backed file reads, todo planning, a patch-review subagent, structured output, syntax-aware patch normalization, read-only DeepAgents filesystem permissions over the provided virtual files, and optional sandbox-feedback retries through `--max-retries`. The `fake_model` planner exercises the prompt/JSON model-backed planning seam offline, validates that model output targets retrieved repo-relative paths, and keeps local evals credential-free. The `openai` planner uses the OpenAI Responses API only when credentials are configured. The context layer supports native keyword retrieval, native hybrid retrieval, native graph retrieval, and a ctxhelm CLI broker. Test execution defaults to the local command-policy sandbox for developer speed, and `--sandbox-mode docker` selects the Docker runner for stronger process and environment isolation. Saved experiment and run artifacts can be summarized with a static artifact index for demo and review.
 
 ## Quickstart
 
@@ -410,7 +410,7 @@ PYTHONPATH=src python3 -m patchsmith.cli plan-public-issue-reproductions \
   --json
 ```
 
-The reproduction-plan report records candidate commands before public issue repair attempts and marks tasks that still need explicit expected-failure signals. It also emits `public_issue_reproduction_specs_template.json` with task-specific candidate commands for review. Add `--reproduction-specs <reviewed-specs.json>` when reviewed criteria are available; the specs file accepts `task_id`, optional `command`, optional `fixture_files`, and `expected_failure_signals`, and the corpus includes `evals/issue_corpora/public_issue_smoke_v1/reproduction_specs.template.json` as the source-controlled authoring template. Reviewed criteria that should survive refreshes live in `evals/issue_corpora/public_issue_smoke_v1/reproduction_specs.reviewed.json`; `refresh-evidence` uses that file when present. Fixture files must use repository-relative paths and are written only to disposable execution workspaces. Current public issue reproduction planning is warning-class: the pytest file-move issue has a reviewed fixture-backed spec, while the two Requests tasks still need manual failing-signal specs before reproduction can be claimed.
+The reproduction-plan report records candidate commands before public issue repair attempts and marks tasks that still need explicit expected-failure signals. It also emits `public_issue_reproduction_specs_template.json` with task-specific candidate commands for review. Add `--reproduction-specs <reviewed-specs.json>` when reviewed criteria are available; the specs file accepts `task_id`, optional `command`, optional `fixture_files`, optional `source_hints`, and `expected_failure_signals`, and the corpus includes `evals/issue_corpora/public_issue_smoke_v1/reproduction_specs.template.json` as the source-controlled authoring template. Reviewed criteria that should survive refreshes live in `evals/issue_corpora/public_issue_smoke_v1/reproduction_specs.reviewed.json`; `refresh-evidence` uses that file when present. Fixture files must use repository-relative paths and are written only to disposable execution workspaces. Source hints must be repository-relative file paths, optionally with a reviewed identifier focus such as `src/pkg/module.py#function_name`, and are copied into the repair prompt to improve targeting. Current public issue reproduction planning has reviewed fixture-backed specs for all three smoke tasks.
 
 Discover candidate failure signals for review:
 
@@ -460,7 +460,7 @@ PYTHONPATH=src python3 -m patchsmith.cli check-public-issue-repair-readiness \
   --json
 ```
 
-The repair-readiness report joins focused-run, diagnosis, setup-validation, reproduction-execution, and materialized-task command evidence before any public issue repair attempt. Current public issue repair readiness is warning-class: all three tasks have runnable validation and saved PatchSmith repair commands, but all three lack saved failing reproduction evidence, so repair-quality claims remain unproven.
+The repair-readiness report joins focused-run, diagnosis, setup-validation, reproduction-execution, and materialized-task command evidence before any public issue repair attempt. Current public issue repair readiness is warning-class: all three tasks have runnable validation, saved failing reproduction evidence, and saved PatchSmith repair commands; warnings remain because the setup lane originally depended on Docker bridge networking, while this local environment may only support the local command-policy sandbox.
 
 Dry-run or execute public issue repair attempts:
 
@@ -469,10 +469,11 @@ PYTHONPATH=src python3 -m patchsmith.cli execute-public-issue-repairs \
   --readiness artifacts/experiments/public_issue_corpus_v1/public_issue_repair_readiness_results.json \
   --tasks-dir artifacts/experiments/public_issue_corpus_v1/materialized_tasks \
   --output artifacts/experiments/public_issue_corpus_v1 \
+  --max-retries 1 \
   --json
 ```
 
-The repair-attempt report is dry-run by default and blocks rows without reproduced failing evidence. Use `--execute` only after reproduction is proven and readiness warnings are explicitly accepted.
+The repair-attempt report is dry-run by default and blocks rows without reproduced failing evidence. Use `--execute` only after reproduction is proven and readiness warnings are explicitly accepted. `--max-retries` enables extra DeepAgents feedback turns for failed tests or rejected bounded edits.
 
 Run the seeded repair evaluation:
 
@@ -676,7 +677,7 @@ PYTHONPATH=src python3 -m patchsmith.cli delivery-audit \
   --json
 ```
 
-Latest delivery-audit evidence is saved in `artifacts/experiments/delivery_audit.md` and `artifacts/experiments/delivery_audit.json`. It maps the original planning/development objective to concrete evidence. Docker smoke and public issue setup validation now pass, environment readiness is warning-class, and live LLM calibration remains the hard blocker until credentials and a bounded live-provider run exist. Quality-gate evidence is included as an executable verification item.
+Latest delivery-audit evidence is saved in `artifacts/experiments/delivery_audit.md` and `artifacts/experiments/delivery_audit.json`. It maps the original planning/development objective to concrete evidence. Docker smoke, public issue setup validation, and live LLM calibration now have saved evidence. The remaining blocker-class items are executable quality-gate/release hygiene status and public issue reproduction-spec gates. Quality-gate evidence is included as an executable verification item.
 
 Generate the live calibration readiness report:
 
@@ -688,7 +689,7 @@ PYTHONPATH=src python3 -m patchsmith.cli live-calibration \
   --json
 ```
 
-Latest live calibration readiness evidence is saved in `artifacts/experiments/calibration_readiness.md` and `artifacts/experiments/calibration_readiness.json`. Current status is `not_configured`: the OpenAI SDK is importable, but `OPENAI_API_KEY` is not set and saved model-provider evidence is still offline-only. DeepAgents now has 10 saved package-backed adapter smoke runs, while the current shell still does not import `deepagents`. OpenAI Agents SDK now has 10 saved package-backed adapter smoke runs, while the current shell still does not import `agents`.
+Latest live calibration readiness evidence is saved in `artifacts/experiments/calibration_readiness.md` and `artifacts/experiments/calibration_readiness.json`. Current saved evidence is `calibrated`: native DeepAgents has saved live `deepagents_openai_chat` repair runs with token and cost metadata, including a 10-task seeded eval on `gpt-5.4-mini`. The requested `gpt-5.5-mini` model was not exposed by the configured OpenAI account, so `gpt-5.4-mini` is the documented mini-model fallback for current live evidence.
 
 Generate the live calibration execution plan:
 
@@ -702,7 +703,7 @@ PYTHONPATH=src python3 -m patchsmith.cli live-calibration-plan \
 
 Latest calibration-plan evidence is saved in `artifacts/experiments/live_calibration_plan.md` and `artifacts/experiments/live_calibration_plan.json`. Current plan status is `blocked` until `OPENAI_API_KEY` is configured; the plan still records the exact single-task live smoke, follow-up seeded-suite eval, optional adapter refresh commands, and claim boundaries.
 
-Run DeepAgents with the optional package installed:
+Run DeepAgents with the optional package installed in offline adapter mode:
 
 ```bash
 python -m pip install -e ".[dev,deepagents]"
@@ -715,6 +716,32 @@ PYTHONPATH=src python3 -m patchsmith.cli eval-repair \
   --output artifacts/experiments/deepagents_package_smoke_v1 \
   --json
 ```
+
+Run the native DeepAgents planner with a live OpenAI-compatible chat model:
+
+```bash
+python -m pip install -e ".[dev,deepagents]"
+
+OPENAI_API_KEY=... \
+PYTHONPATH=src python3 -m patchsmith.cli openai-model-preflight \
+  --model gpt-5.4-mini \
+  --json
+
+OPENAI_API_KEY=... \
+PATCHSMITH_DEEPAGENTS_MODEL=gpt-5.4-mini \
+PATCHSMITH_OPENAI_INPUT_COST_PER_1M=0.75 \
+PATCHSMITH_OPENAI_OUTPUT_COST_PER_1M=4.50 \
+PYTHONPATH=src python3 -m patchsmith.cli eval-repair \
+  --dataset evals/tasks/seeded_bugs_v1 \
+  --runtime deepagents \
+  --planner deepagents \
+  --max-retries 1 \
+  --context-provider native_hybrid \
+  --output artifacts/experiments/deepagents_native_repair_eval_v1 \
+  --json
+```
+
+The preflight checks model availability through the OpenAI Models API before a paid repair eval. The retry budget is intentionally explicit. It feeds failed sandbox stdout/stderr and the current diff back into the next DeepAgents planning prompt, while the final report and trace keep each attempt visible. DeepAgents receives a read-only virtual filesystem for retrieved files; PatchSmith still applies the selected bounded text replacement through its own safety gate.
 
 Generate the timed demo script:
 
@@ -764,7 +791,7 @@ PYTHONPATH=src python3 -m patchsmith.cli launch-blockers \
   --json
 ```
 
-Latest launch blocker evidence is saved in `artifacts/experiments/launch_blockers.md` and `artifacts/experiments/launch_blockers.json`. Current status is `ready_with_warnings`: Docker smoke is ready, focused public issue setup-readiness is warning-class rather than blocked, setup validation passes after the approved Docker setup recipe, public repair-readiness is warning-class because failing reproduction evidence is not saved, and live-provider calibration plus release hygiene remain caveats. Public issue setup validation and repair readiness remain prerequisites rather than public issue repair-quality evidence.
+Latest launch blocker evidence is saved in `artifacts/experiments/launch_blockers.md` and `artifacts/experiments/launch_blockers.json`. Current status is `blocked` until quality-gate/release hygiene and public issue reproduction-spec evidence are clean. Docker smoke is ready, focused public issue setup-readiness is warning-class rather than blocked, setup validation passes after the approved Docker setup recipe, live-provider calibration is saved, and public repair-readiness is warning-class because failing reproduction evidence is not saved. Public issue setup validation and repair readiness remain prerequisites rather than public issue repair-quality evidence.
 
 Generate the release hygiene report:
 
@@ -777,7 +804,7 @@ PYTHONPATH=src python3 -m patchsmith.cli release-hygiene \
   --json
 ```
 
-Latest release hygiene evidence is saved in `artifacts/experiments/release_hygiene.md` and `artifacts/experiments/release_hygiene.json`. Current status is `ready_with_warnings`: CI, packaging metadata, architecture-diagram, demo-media, quality-gate, project-status, project-status freshness, calibration-readiness, live-calibration plan, delivery audit, launch-blocker, public issue corpus/context-preview/materialized-task validation/readiness/focused-test plan/run/diagnosis/setup-plan/setup-readiness/setup-execution/setup-validation/reproduction-plan/failure-signal-discovery/reproduction-spec-validation/reproduction-execution/repair-readiness/repair-attempt evidence, and local Git metadata checks pass, while unproven live LLM calibration and warning-class environment/setup/reproduction evidence must stay visible in release claims.
+Latest release hygiene evidence is saved in `artifacts/experiments/release_hygiene.md` and `artifacts/experiments/release_hygiene.json`. Current status is `blocked` while the implementation worktree is dirty; generated review artifacts, project-status freshness, calibration-readiness, live-calibration plan, CI, packaging metadata, architecture-diagram, demo-media, and local Git metadata checks are present. Live-provider quality claims should name the tested `gpt-5.4-mini` DeepAgents evidence and keep warning-class environment/setup/reproduction evidence visible.
 
 Build package artifacts:
 
@@ -812,7 +839,7 @@ When those rates are set, reports estimate model cost from provider token usage.
 
 ## Next engineering wedges
 
-The context broker boundary, retrieval eval runner, repair eval runner, scaffold comparison runner, patch-search evaluator, public issue corpus validation/preflight/context preview/task materialization, validation, run-readiness, focused-test planning, focused-test execution, focused-test diagnosis, focused-test setup planning, setup-readiness checks, setup-execution dry-run and executed Docker evidence, passing setup-validation execution evidence, public issue reproduction planning, public issue failure-signal discovery, public issue reproduction-spec validation, public issue reproduction execution gating, public issue repair-readiness gating, public issue repair-attempt gating, static artifact index/dashboard with normalized metrics and generated run-detail trace pages, failure review report, demo readiness report, executable quality-gate report, consolidated project-status report with evidence freshness, environment readiness report, evidence-refresh orchestration report with opt-in Docker smoke refresh, live calibration readiness report and execution plan, delivery audit, launch blocker backlog with dependency-chain remediation commands, generated demo script, final evaluation report, release hygiene report, deterministic heuristic runtime, LangGraph orchestration runtime, DeepAgents adapter compatibility mode plus package-backed smoke evidence, OpenAI Agents SDK adapter compatibility mode, offline model-planner seam, credential-gated OpenAI Responses client, and Python Code Context Graph v0 now exist. The current seeded suite has 10 tasks and compares `native`, `native_hybrid`, `native_graph`, and `ctxhelm_cli` for retrieval, including aggregate context packing metadata. Scaffold comparison now includes trace complexity and debuggability metrics. The next useful development step is resolving the live-provider warning, harder patch-search tasks with model-diverse candidates, or public issue repair attempts once reproduction criteria are explicit.
+The context broker boundary, retrieval eval runner, repair eval runner, scaffold comparison runner, patch-search evaluator, public issue corpus validation/preflight/context preview/task materialization, validation, run-readiness, focused-test planning, focused-test execution, focused-test diagnosis, focused-test setup planning, setup-readiness checks, setup-execution dry-run and executed Docker evidence, passing setup-validation execution evidence, public issue reproduction planning, public issue failure-signal discovery, public issue reproduction-spec validation, public issue reproduction execution gating, public issue repair-readiness gating, public issue repair-attempt gating, static artifact index/dashboard with normalized metrics and generated run-detail trace pages, failure review report, demo readiness report, executable quality-gate report, consolidated project-status report with evidence freshness, environment readiness report, evidence-refresh orchestration report with opt-in Docker smoke refresh, live calibration readiness report and execution plan, delivery audit, launch blocker backlog with dependency-chain remediation commands, generated demo script, final evaluation report, release hygiene report, deterministic heuristic runtime, LangGraph orchestration runtime, DeepAgents adapter compatibility mode plus package-backed smoke evidence, native DeepAgents planner integration, OpenAI Agents SDK adapter compatibility mode, offline model-planner seam, credential-gated OpenAI Responses client, and Python Code Context Graph v0 now exist. The current seeded suite has 10 tasks and compares `native`, `native_hybrid`, `native_graph`, and `ctxhelm_cli` for retrieval, including aggregate context packing metadata. Scaffold comparison now includes trace complexity and debuggability metrics. The next useful development step is resolving the live-provider warning, harder patch-search tasks with model-diverse candidates, or public issue repair attempts once reproduction criteria are explicit.
 
 The current LangGraph repair skeleton is:
 

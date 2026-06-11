@@ -291,7 +291,7 @@ PYTHONPATH=src python3 -m patchsmith.cli plan-public-issue-reproductions \
   --json
 ```
 
-The reproduction-plan report records candidate commands and expected-failure signal gaps before public issue repairs. It also emits `public_issue_reproduction_specs_template.json` with task-specific candidate commands for review. Add `--reproduction-specs <reviewed-specs.json>` when reviewed criteria are available; the specs file accepts `task_id`, optional `command`, optional `fixture_files`, and `expected_failure_signals`, and `evals/issue_corpora/public_issue_smoke_v1/reproduction_specs.template.json` is the authoring template. Reviewed criteria that should survive refreshes live in `evals/issue_corpora/public_issue_smoke_v1/reproduction_specs.reviewed.json`; `refresh-evidence` uses that file when present. Fixture files must use repository-relative paths and are written only to disposable execution workspaces. Treat `warning` rows as planning work, not reproduction evidence; encode the failing assertion, traceback, or behavior mismatch before running repair attempts.
+The reproduction-plan report records candidate commands and expected-failure signal gaps before public issue repairs. It also emits `public_issue_reproduction_specs_template.json` with task-specific candidate commands for review. Add `--reproduction-specs <reviewed-specs.json>` when reviewed criteria are available; the specs file accepts `task_id`, optional `command`, optional `fixture_files`, optional `source_hints`, and `expected_failure_signals`, and `evals/issue_corpora/public_issue_smoke_v1/reproduction_specs.template.json` is the authoring template. Reviewed criteria that should survive refreshes live in `evals/issue_corpora/public_issue_smoke_v1/reproduction_specs.reviewed.json`; `refresh-evidence` uses that file when present. Fixture files must use repository-relative paths and are written only to disposable execution workspaces. Source hints must be repository-relative file paths, optionally with a reviewed identifier focus such as `src/pkg/module.py#function_name`, and are copied into the repair prompt to improve targeting. Treat `warning` rows as planning work, not reproduction evidence; encode the failing assertion, traceback, or behavior mismatch before running repair attempts.
 
 Public issue failure-signal discovery:
 
@@ -350,10 +350,11 @@ PYTHONPATH=src python3 -m patchsmith.cli execute-public-issue-repairs \
   --readiness artifacts/experiments/public_issue_corpus_v1/public_issue_repair_readiness_results.json \
   --tasks-dir artifacts/experiments/public_issue_corpus_v1/materialized_tasks \
   --output artifacts/experiments/public_issue_corpus_v1 \
+  --max-retries 1 \
   --json
 ```
 
-The repair-attempt command writes `public_issue_repair_attempt_*` artifacts and is dry-run by default. It blocks rows without reproduced failing evidence and only executes PatchSmith repairs when readiness is clean, or when warning rows are explicitly accepted with `--allow-warnings`.
+The repair-attempt command writes `public_issue_repair_attempt_*` artifacts and is dry-run by default. It blocks rows without reproduced failing evidence and only executes PatchSmith repairs when readiness is clean, or when warning rows are explicitly accepted with `--allow-warnings`. `--max-retries` enables extra DeepAgents feedback turns after failed validation or a rejected bounded edit.
 
 Scaffold comparison:
 
@@ -549,7 +550,7 @@ PYTHONPATH=src python3 -m patchsmith.cli live-calibration \
   --json
 ```
 
-The live calibration readiness report checks whether the OpenAI SDK is importable, credentials are configured, cost-rate environment variables are present, the optional DeepAgents package is importable in the current shell, saved DeepAgents traces prove package-backed adapter execution, and saved artifacts contain non-offline provider metadata. `not_configured` means live calibration has not been run and public claims must stay scoped to offline seeded-suite evidence.
+The live calibration readiness report checks whether the OpenAI SDK is importable, credentials are configured, cost-rate environment variables are present, the optional DeepAgents package is importable in the current shell, saved DeepAgents traces prove package-backed execution, and saved artifacts contain non-offline provider metadata. `calibrated` means saved live-provider rows exist; public claims must still name the tested model and scope results to the saved benchmark lane.
 
 Live calibration execution plan:
 
@@ -576,6 +577,8 @@ PYTHONPATH=src python3 -m patchsmith.cli eval-repair \
   --output artifacts/experiments/deepagents_package_smoke_v1 \
   --json
 ```
+
+Native DeepAgents planning uses state-backed file reads, structured patch output, a patch-review subagent, and read-only DeepAgents filesystem permissions over the retrieved virtual files. The agent plans; PatchSmith applies the final bounded replacement through its own patch safety gate.
 
 Demo script:
 
