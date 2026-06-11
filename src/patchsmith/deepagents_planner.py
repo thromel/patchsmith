@@ -59,6 +59,14 @@ class DeepAgentsRepairPlanner:
         repo_path = getattr(task, "repo_path", None)
         self._repo_path = Path(repo_path) if repo_path else None
 
+    def plan_for_task(self, *, task: Any) -> RepairPlan | None:
+        repo_path = getattr(task, "repo_path", None)
+        return self._plan_with_repo_path(
+            issue_text=str(getattr(task, "issue_text", "")),
+            retrieved_context=list(getattr(task, "retrieved_context", [])),
+            repo_path=Path(repo_path) if repo_path else None,
+        )
+
     @classmethod
     def from_env(
         cls,
@@ -100,13 +108,26 @@ class DeepAgentsRepairPlanner:
         issue_text: str,
         retrieved_context: list[RetrievedContext],
     ) -> RepairPlan | None:
+        return self._plan_with_repo_path(
+            issue_text=issue_text,
+            retrieved_context=retrieved_context,
+            repo_path=self._repo_path,
+        )
+
+    def _plan_with_repo_path(
+        self,
+        *,
+        issue_text: str,
+        retrieved_context: list[RetrievedContext],
+        repo_path: Path | None,
+    ) -> RepairPlan | None:
         self.last_model_metadata = None
         if not retrieved_context:
             return None
 
         files, virtual_to_repo = _context_files(
             retrieved_context,
-            repo_path=self._repo_path,
+            repo_path=repo_path,
             max_file_chars=self.config.max_file_chars,
         )
         agent = self._build_agent(files=files)

@@ -86,6 +86,48 @@ def test_plan_builds_repair_plan_from_structured_response(tmp_path: Path) -> Non
     assert planner.last_model_metadata.provider
 
 
+def test_plan_for_task_uses_explicit_task_repo_path(tmp_path: Path) -> None:
+    stale_repo = tmp_path / "stale"
+    task_repo = tmp_path / "task"
+    (stale_repo / "src").mkdir(parents=True)
+    (task_repo / "src").mkdir(parents=True)
+    (stale_repo / "src" / "calc.py").write_text(
+        "def add(a, b):\n    return 'stale'\n",
+        encoding="utf-8",
+    )
+    task_source = "def add(a, b):\n    return a - b\n"
+    (task_repo / "src" / "calc.py").write_text(task_source, encoding="utf-8")
+
+    fake_result = {
+        "messages": [],
+        "structured_response": {
+            "path": "src/calc.py",
+            "old": "return a - b",
+            "new": "return a + b",
+            "summary": "Fix the addition operator.",
+        },
+    }
+    agent = _FakeAgent(fake_result)
+    planner = DeepAgentsRepairPlanner(
+        DeepAgentsPlannerConfig(model="gpt-test"),
+        agent_factory=lambda **_kwargs: agent,
+    )
+    planner.prepare_task(SimpleNamespace(repo_path=str(stale_repo)))
+
+    plan = planner.plan_for_task(
+        task=SimpleNamespace(
+            repo_path=str(task_repo),
+            issue_text="add() subtracts",
+            retrieved_context=[_context(task_source)],
+        )
+    )
+
+    assert plan is not None
+    assert agent.invocations
+    files = agent.invocations[0]["files"]
+    assert files["/src/calc.py"]["content"] == task_source
+
+
 def test_plan_returns_none_for_unparseable_result(tmp_path: Path) -> None:
     planner = DeepAgentsRepairPlanner(
         agent_factory=lambda **_kwargs: _FakeAgent({"messages": []}),

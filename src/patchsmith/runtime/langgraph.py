@@ -10,8 +10,8 @@ from patchsmith.runtime.core import (
     AgentResult,
     AgentTask,
     _no_patch_result,
+    _plan_for_task,
     _plan_or_planner_metadata,
-    _prepare_planner_for_task,
     _runtime_config_int,
 )
 
@@ -46,7 +46,6 @@ class LangGraphRuntime:
         from langgraph.graph import END, StateGraph
 
         max_retries = _runtime_config_int(task.runtime_config, "max_retries", 0)
-        _prepare_planner_for_task(self.planner, task)
 
         def triage_node(state: LangGraphRepairState) -> LangGraphRepairState:
             trace = list(state.get("trace", []))
@@ -60,10 +59,7 @@ class LangGraphRuntime:
             return {"trace": trace}
 
         def plan_node(state: LangGraphRepairState) -> LangGraphRepairState:
-            plan = self.planner.plan(
-                issue_text=task.issue_text,
-                retrieved_context=task.retrieved_context,
-            )
+            plan = _plan_for_task(self.planner, task)
             trace = list(state.get("trace", []))
             attempt = int(state.get("attempt", 0)) + 1
             event: dict[str, Any] = {

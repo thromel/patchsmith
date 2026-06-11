@@ -218,3 +218,14 @@ def _prepare_planner_for_task(planner: RepairPlanner, task: AgentTask) -> None:
     prepare_task = getattr(planner, "prepare_task", None)
     if callable(prepare_task):
         prepare_task(task)
+
+
+def _plan_for_task(planner: RepairPlanner, task: AgentTask) -> RepairPlan | None:
+    plan_for_task = getattr(planner, "plan_for_task", None)
+    if callable(plan_for_task):
+        return plan_for_task(task=task)
+    _prepare_planner_for_task(planner, task)
+    return planner.plan(
+        issue_text=task.issue_text,
+        retrieved_context=task.retrieved_context,
+    )

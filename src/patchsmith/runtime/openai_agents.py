@@ -11,8 +11,8 @@ from patchsmith.runtime.core import (
     AgentTask,
     _apply_plan,
     _no_patch_result,
+    _plan_for_task,
     _plan_or_planner_metadata,
-    _prepare_planner_for_task,
 )
 
 
@@ -32,7 +32,6 @@ class OpenAIAgentsRuntime:
         repo_path = Path(task.repo_path)
         package_available = find_spec("agents") is not None
         mode = "package_available" if package_available else "compatibility_mode"
-        _prepare_planner_for_task(self.planner, task)
         trace: list[dict[str, Any]] = [
             {
                 "node": "harness",
@@ -71,10 +70,7 @@ class OpenAIAgentsRuntime:
                 "context_paths": [context.path for context in task.retrieved_context],
             },
         ]
-        plan = self.planner.plan(
-            issue_text=task.issue_text,
-            retrieved_context=task.retrieved_context,
-        )
+        plan = _plan_for_task(self.planner, task)
         plan_event: dict[str, Any] = {
             "node": "plan",
             "status": "completed" if plan else "no_match",
