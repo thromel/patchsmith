@@ -51,6 +51,15 @@ def register(subparsers: argparse._SubParsersAction) -> dict[str, CommandHandler
         default="native",
         help="Context broker to use before agent execution.",
     )
+    run.add_argument(
+        "--context-path",
+        action="append",
+        default=[],
+        help=(
+            "Repo-relative file to force into the repair context. Repeat for multiple files; "
+            "an optional #symbol suffix is accepted for traceability."
+        ),
+    )
     run.add_argument("--top-k", type=int, default=5, help="Number of files to retrieve.")
     run.add_argument("--artifacts-dir", default="artifacts", help="Artifact output directory.")
     _add_sandbox_args(run)
@@ -119,6 +128,7 @@ def _run_command(args: argparse.Namespace) -> int:
         top_k=args.top_k,
         sandbox_mode=args.sandbox_mode,
         sandbox_image=args.sandbox_image,
+        context_paths=tuple(args.context_path or ()),
     )
     result = RepairRunner(artifacts_dir=Path(args.artifacts_dir)).run(request)
     if args.json:

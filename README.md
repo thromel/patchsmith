@@ -88,6 +88,19 @@ PYTHONPATH=src python -m patchsmith.cli run \
 
 Expected result: PatchSmith edits `src/simple_calc.py`, runs the targeted pytest command, and writes a report under `artifacts/runs/<run_id>/`.
 
+When you have reviewed source hints from a reproduction spec or failure trace, force those files into the repair context:
+
+```bash
+PYTHONPATH=src python -m patchsmith.cli run \
+  --repo path/to/repo \
+  --issue-file path/to/issue.md \
+  --context-provider native_hybrid \
+  --context-path "src/package/module.py#suspected_symbol" \
+  --json
+```
+
+`--context-path` can be repeated. PatchSmith strips the optional `#symbol` suffix before reading the file, but keeps the full hint in the issue text when public issue repairs provide reviewed hints.
+
 ## Run Evaluations
 
 Validate the seeded benchmark:
@@ -258,10 +271,10 @@ As of the latest local evidence:
 - MVP progress: `100%`.
 - Quality gate: `passed`.
 - Delivery audit: `in_progress_with_blockers`.
-- Release hygiene: `blocked` while the worktree has uncommitted changes.
+- Release hygiene: `ready_with_warnings`.
 - DeepAgents package evidence: present.
 - Live-provider evidence: present for `deepagents_openai_chat` and `openai_responses`.
-- Public issue repair quality: not launch-grade yet. The latest all-task DeepAgents public issue attempt validated 1 of 3 tasks.
+- Public issue repair quality: not launch-grade yet. The latest all-task DeepAgents public issue attempt validated 2 of 3 tasks.
 
 That mix is important. The seeded benchmark and platform plumbing are in good shape. The real-world repair lane still needs more work before it should be presented as robust autonomous repair.
 
