@@ -11,6 +11,7 @@ from patchsmith.context import (
     CtxhelmCliBroker,
     PatchSmithNativeBroker,
     fallback_bundle,
+    promote_active_context_targets,
     retrieved_context_from_bundle,
 )
 from patchsmith.deepagents_planner import DeepAgentsRepairPlanner
@@ -142,7 +143,11 @@ class RepairRunner:
                 started=started,
             )
 
-            broker_request = ContextBrokerRequest(repo_path=repo_path, task=request.issue_text)
+            broker_request = ContextBrokerRequest(
+                repo_path=repo_path,
+                task=request.issue_text,
+                active_paths=request.context_paths,
+            )
             native_bundle = self.native_broker.prepare(
                 broker_request,
                 repo_index=repo_index,
@@ -183,6 +188,11 @@ class RepairRunner:
                         reason="ctxhelm returned no target files; using native keyword contexts",
                         native_bundle=native_bundle,
                     )
+            context_bundle = promote_active_context_targets(
+                bundle=context_bundle,
+                repo_path=repo_path,
+                active_paths=request.context_paths,
+            )
 
             trace.emit(
                 node_name="context_broker",

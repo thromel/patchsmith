@@ -31,6 +31,7 @@ class RunRequest:
     top_k: int = 5
     sandbox_mode: str = "local"
     sandbox_image: str = "python:3.12-slim"
+    context_paths: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

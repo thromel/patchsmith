@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 from patchsmith.cli import main
 from patchsmith.evaluation import (
@@ -1274,6 +1275,97 @@ def test_execute_public_issue_repairs_dry_runs_ready_task(tmp_path: Path) -> Non
     assert summary.max_retries == 0
     assert results[0].status == "dry_run"
     assert "repair attempt passed dry-run gating" in ";".join(results[0].evidence)
+
+
+def test_execute_public_issue_repairs_passes_source_hints_as_context_paths(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    src_dir = repo_dir / "src"
+    src_dir.mkdir(parents=True)
+    (src_dir / "example.py").write_text("def target_symbol():\n    pass\n", encoding="utf-8")
+    tasks_dir = tmp_path / "materialized_tasks"
+    task_dir = tasks_dir / "public_task"
+    task_dir.mkdir(parents=True)
+    issue_path = task_dir / "issue.md"
+    issue_path.write_text("external failure needs reviewed source context\n", encoding="utf-8")
+    (task_dir / "task_manifest.json").write_text(
+        json.dumps(
+            {
+                "task_id": "public_task",
+                "issue_file": str(issue_path),
+                "suggested_commands": ["PYTHONPATH=src python3 -m patchsmith.cli run --json"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    readiness_path = tmp_path / "public_issue_repair_readiness_results.json"
+    readiness_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "public_task",
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/10",
+                    "status": "ready",
+                    "repo_path": str(repo_dir),
+                    "repo_exists": True,
+                    "repair_command": "PYTHONPATH=src python3 -m patchsmith.cli run --json",
+                    "validation_command": "python3 -m pytest tests/test_bug.py",
+                    "validation_source_hints": ["src/example.py#target_symbol"],
+                    "reproduction_execution_status": "reproduced",
+                    "blockers": [],
+                    "warnings": [],
+                    "evidence": ["public issue reproduction execution saved failing evidence"],
+                    "next_actions": [],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    captured_requests = []
+
+    class FakeRepairRunner:
+        def __init__(self, *, artifacts_dir: Path) -> None:
+            self.artifacts_dir = artifacts_dir
+
+        def run(self, request):
+            captured_requests.append(request)
+            run_dir = self.artifacts_dir / "runs" / "fake-run"
+            run_dir.mkdir(parents=True)
+            report_path = run_dir / "report.md"
+            trace_path = run_dir / "traces.jsonl"
+            diff_path = run_dir / "final.diff"
+            report_path.write_text("fake report\n", encoding="utf-8")
+            trace_path.write_text("", encoding="utf-8")
+            diff_path.write_text("", encoding="utf-8")
+            return SimpleNamespace(
+                run_id="fake-run",
+                status="completed",
+                report_path=report_path,
+                trace_path=trace_path,
+                final_diff_path=diff_path,
+                test_result=SimpleNamespace(exit_code=1),
+            )
+
+    monkeypatch.setattr(
+        "patchsmith.evaluation.issue_corpus.public_issues.RepairRunner",
+        FakeRepairRunner,
+    )
+
+    results, summary = execute_public_issue_repairs(
+        readiness_path=readiness_path,
+        output_dir=tmp_path / "repair_attempts",
+        tasks_dir=tasks_dir,
+        dry_run=False,
+    )
+
+    assert summary.attempted_tasks == 1
+    assert results[0].status == "failed"
+    assert len(captured_requests) == 1
+    assert captured_requests[0].context_paths == ("src/example.py",)
+    assert "`src/example.py#target_symbol`" in captured_requests[0].issue_text
 
 
 def test_execute_public_issue_repairs_executes_local_heuristic_repair(

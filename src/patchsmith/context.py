@@ -355,6 +355,37 @@ def retrieved_context_from_bundle(
     return contexts
 
 
+def promote_active_context_targets(
+    *,
+    bundle: ContextBundle,
+    repo_path: Path,
+    active_paths: tuple[str, ...],
+) -> ContextBundle:
+    active_targets = _active_context_targets(repo_path=repo_path, active_paths=active_paths)
+    if not active_targets:
+        return bundle
+
+    seen_paths = {target.path for target in active_targets}
+    merged_targets = [
+        *active_targets,
+        *(target for target in bundle.targets if target.path not in seen_paths),
+    ]
+    return ContextBundle(
+        provider=bundle.provider,
+        provider_version=bundle.provider_version,
+        targets=_renumber_context_targets(merged_targets),
+        related_tests=bundle.related_tests,
+        validation_commands=bundle.validation_commands,
+        diagnostics=bundle.diagnostics,
+        warnings=bundle.warnings,
+        pack_uri=bundle.pack_uri,
+        source_text_logged=bundle.source_text_logged,
+        raw_artifact_path=bundle.raw_artifact_path,
+        latency_ms=bundle.latency_ms,
+        fallback_used=bundle.fallback_used,
+    )
+
+
 def fallback_bundle(
     *,
     provider: str,
@@ -375,6 +406,58 @@ def fallback_bundle(
         latency_ms=native_bundle.latency_ms,
         fallback_used=True,
     )
+
+
+def _active_context_targets(
+    *,
+    repo_path: Path,
+    active_paths: tuple[str, ...],
+) -> list[ContextTarget]:
+    targets: list[ContextTarget] = []
+    seen_paths: set[str] = set()
+    for raw_path in active_paths:
+        path = _normalize_active_context_path(raw_path)
+        if path is None or path in seen_paths:
+            continue
+        if not _is_repo_relative_path(repo_path, path):
+            continue
+        if not (repo_path / path).is_file():
+            continue
+        seen_paths.add(path)
+        targets.append(
+            ContextTarget(
+                path=path,
+                role="reviewed_source_hint",
+                rank=len(targets) + 1,
+                confidence=1.0,
+                reason="reviewed source hint",
+                source="active_path",
+            )
+        )
+    return targets
+
+
+def _normalize_active_context_path(path: str) -> str | None:
+    if not isinstance(path, str):
+        return None
+    file_path = path.strip().strip("`").partition("#")[0]
+    if not file_path:
+        return None
+    return Path(file_path).as_posix()
+
+
+def _renumber_context_targets(targets: list[ContextTarget]) -> list[ContextTarget]:
+    return [
+        ContextTarget(
+            path=target.path,
+            role=target.role,
+            rank=index,
+            confidence=target.confidence,
+            reason=target.reason,
+            source=target.source,
+        )
+        for index, target in enumerate(targets, start=1)
+    ]
 
 
 def _append_ctxhelm_target(

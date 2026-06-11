@@ -2398,6 +2398,7 @@ def _execute_public_issue_repair_record(
         validation_fixture_files=validation_fixture_files,
         source_hints=source_hints,
     )
+    context_paths = tuple(_source_hint_file_paths(source_hints))
     try:
         if validation_fixture_files:
             with tempfile.TemporaryDirectory(
@@ -2422,6 +2423,7 @@ def _execute_public_issue_repair_record(
                         context_provider=context_provider,
                         sandbox_mode=sandbox_mode,
                         sandbox_image=sandbox_image,
+                        context_paths=context_paths,
                     )
                 )
         else:
@@ -2437,6 +2439,7 @@ def _execute_public_issue_repair_record(
                     context_provider=context_provider,
                     sandbox_mode=sandbox_mode,
                     sandbox_image=sandbox_image,
+                    context_paths=context_paths,
                 )
             )
     except Exception as error:
@@ -2597,6 +2600,16 @@ def _public_issue_repair_attempt_issue_text(
             ]
         )
     return "\n".join(sections)
+
+
+def _source_hint_file_paths(source_hints: list[str]) -> list[str]:
+    return _dedupe_preserve_order(
+        [
+            Path(hint.partition("#")[0]).as_posix()
+            for hint in source_hints
+            if isinstance(hint, str) and hint.partition("#")[0].strip()
+        ]
+    )
 
 
 def _load_public_issue_reproduction_specs(path: Path) -> dict[str, dict[str, Any]]:

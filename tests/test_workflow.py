@@ -61,6 +61,31 @@ def test_repair_runner_auto_context_provider_falls_back_to_native(tmp_path: Path
     assert "context_broker_call" in trace
 
 
+def test_repair_runner_promotes_context_paths_into_retrieved_context(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    (repo / "src").mkdir(parents=True)
+    (repo / "src" / "hinted.py").write_text("def hidden_fix_site():\n    pass\n", encoding="utf-8")
+    (repo / "README.md").write_text("nothing useful here\n", encoding="utf-8")
+
+    result = RepairRunner(artifacts_dir=tmp_path / "artifacts").run(
+        RunRequest(
+            repo=str(repo),
+            issue_text="a vague external failure with no lexical match",
+            context_provider="native_hybrid",
+            retrieval_strategy="native_hybrid",
+            top_k=1,
+            context_paths=("src/hinted.py#hidden_fix_site",),
+        )
+    )
+
+    assert result.status == "completed"
+    assert [context.path for context in result.retrieved_context] == ["src/hinted.py"]
+    assert result.retrieved_context[0].matched_terms[:2] == [
+        "reviewed_source_hint",
+        "active_path",
+    ]
+
+
 def test_repair_runner_heuristic_runtime_generates_passing_patch(tmp_path: Path) -> None:
     fixture = Path("evals/tasks/seeded_bugs_v1/task_001_logic_bug")
     issue = (fixture / "issue.md").read_text(encoding="utf-8")
