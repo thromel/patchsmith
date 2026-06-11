@@ -13,6 +13,8 @@ from patchsmith.deepagents_planner import (
     _read_only_filesystem_permissions,
 )
 from patchsmith.deepagents_prompts import (
+    PATCHSMITH_DEEPAGENTS_MEMORY_PATH,
+    deepagents_agents_md,
     deepagents_patch_review_subagents,
     deepagents_planner_prompt,
     deepagents_system_prompt,
@@ -262,6 +264,8 @@ def test_deepagents_prompts_keep_planning_and_bounded_output_contract() -> None:
 
     assert "create and update todos" in system_prompt
     assert "exact text span" in system_prompt
+    assert "PatchSmith DeepAgents Repair Contract" in deepagents_agents_md()
+    assert "patch-reviewer" in deepagents_agents_md()
     assert "src/simple_calc.py" in planner_prompt
     assert subagents[0]["name"] == "patch-reviewer"
 
@@ -310,11 +314,12 @@ def test_deepagents_repair_planner_builds_agent_with_read_only_permissions(
     planner._build_agent(files={"/src/simple_calc.py": {"content": "x"}})
 
     assert captured["tools"] == []
+    assert captured["memory"] == [PATCHSMITH_DEEPAGENTS_MEMORY_PATH]
     assert isinstance(captured["backend"], FakeStateBackend)
     permissions = captured["permissions"]
     assert len(permissions) == 2
     assert permissions[0].operations == ["read"]
-    assert permissions[0].paths == ["/src/simple_calc.py"]
+    assert permissions[0].paths == [PATCHSMITH_DEEPAGENTS_MEMORY_PATH, "/src/simple_calc.py"]
     assert permissions[0].mode == "allow"
     assert permissions[1].operations == ["read", "write"]
     assert permissions[1].paths == ["/**"]

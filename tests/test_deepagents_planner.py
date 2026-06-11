@@ -10,6 +10,7 @@ from patchsmith.deepagents_planner import (
     DeepAgentsPlannerConfig,
     DeepAgentsRepairPlanner,
 )
+from patchsmith.deepagents_prompts import PATCHSMITH_DEEPAGENTS_MEMORY_PATH
 from patchsmith.models import RetrievedContext
 
 pytestmark = pytest.mark.unit
@@ -82,6 +83,11 @@ def test_plan_builds_repair_plan_from_structured_response(tmp_path: Path) -> Non
     assert plan.old == "return a - b"
     assert plan.new == "return a + b"
     assert agent.invocations, "agent should have been invoked"
+    assert PATCHSMITH_DEEPAGENTS_MEMORY_PATH in agent.invocations[0]["files"]
+    assert (
+        "PatchSmith DeepAgents Repair Contract"
+        in agent.invocations[0]["files"][PATCHSMITH_DEEPAGENTS_MEMORY_PATH]["content"]
+    )
     assert planner.last_model_metadata is not None
     assert planner.last_model_metadata.provider
 

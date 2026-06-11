@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+PATCHSMITH_DEEPAGENTS_MEMORY_PATH = "/.patchsmith/AGENTS.md"
+
 
 def deepagents_system_prompt() -> str:
     return (
@@ -15,6 +17,23 @@ def deepagents_system_prompt() -> str:
         "The path must be one of the provided repository paths. The old field must be "
         "an exact text span from that file, without line-number display prefixes. "
         "Do not return markdown or extra prose."
+    )
+
+
+def deepagents_agents_md() -> str:
+    return (
+        "# PatchSmith DeepAgents Repair Contract\n\n"
+        "Use this memory file as the durable repair workflow for PatchSmith runs.\n\n"
+        "1. Create and maintain a short todo list before reading files.\n"
+        "2. Read the provided source files through the virtual filesystem before choosing an edit.\n"
+        "3. Trace the failure to the runtime mechanism that controls the observed behavior; "
+        "avoid cosmetic edits, comments, or path-only normalization unless the failure evidence "
+        "proves that is the defect.\n"
+        "4. Prefer source fixes over changing reproduction fixtures or tests.\n"
+        "5. For ambiguous, multi-file, or feedback-retry repairs, ask the patch-reviewer "
+        "subagent to review the intended bounded replacement before returning the patch plan.\n"
+        "6. Return exactly one structured bounded replacement: path, old, new, and summary. "
+        "The path must be one provided repository path and old must be an exact text span."
     )
 
 

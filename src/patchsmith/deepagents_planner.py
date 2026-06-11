@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Any
 
 from patchsmith.deepagents_prompts import (
+    PATCHSMITH_DEEPAGENTS_MEMORY_PATH,
+    deepagents_agents_md,
     deepagents_patch_review_subagents,
     deepagents_planner_prompt,
     deepagents_system_prompt,
@@ -130,7 +132,8 @@ class DeepAgentsRepairPlanner:
             repo_path=repo_path,
             max_file_chars=self.config.max_file_chars,
         )
-        agent = self._build_agent(files=files)
+        agent_files = _agent_files(files)
+        agent = self._build_agent(files=agent_files)
         result = agent.invoke(
             {
                 "messages": [
@@ -139,7 +142,7 @@ class DeepAgentsRepairPlanner:
                         "content": deepagents_planner_prompt(issue_text, virtual_to_repo),
                     }
                 ],
-                "files": files,
+                "files": agent_files,
             }
         )
         metadata = _metadata_from_result(
@@ -169,6 +172,7 @@ class DeepAgentsRepairPlanner:
     def _build_agent(self, *, files: dict[str, dict[str, str]]) -> Any:
         if self.agent_factory is not None:
             return self.agent_factory(config=self.config)
+        agent_files = _agent_files(files)
 
         try:
             from deepagents import FilesystemPermission, create_deep_agent
@@ -200,9 +204,10 @@ class DeepAgentsRepairPlanner:
             tools=[],
             system_prompt=deepagents_system_prompt(),
             subagents=deepagents_patch_review_subagents(),  # type: ignore[arg-type]
+            memory=[PATCHSMITH_DEEPAGENTS_MEMORY_PATH],
             backend=StateBackend(),
             permissions=_read_only_filesystem_permissions(
-                files.keys(),
+                agent_files.keys(),
                 permission_cls=FilesystemPermission,
             ),
             response_format=PatchPlan,
@@ -232,6 +237,18 @@ def _context_files(
             "modified_at": modified_at,
         }
     return files, virtual_to_repo
+
+
+def _agent_files(files: dict[str, dict[str, str]]) -> dict[str, dict[str, str]]:
+    return {
+        **files,
+        PATCHSMITH_DEEPAGENTS_MEMORY_PATH: {
+            "content": deepagents_agents_md(),
+            "encoding": "utf-8",
+            "created_at": _stable_timestamp(),
+            "modified_at": _stable_timestamp(),
+        },
+    }
 
 
 def _read_only_filesystem_permissions(
