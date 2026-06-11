@@ -207,6 +207,9 @@ def _plan_or_planner_metadata(
 ) -> dict[str, Any] | None:
     if plan and plan.metadata:
         return plan.metadata
+    planner_metadata = getattr(planner, "last_plan_metadata", None)
+    if isinstance(planner_metadata, dict) and planner_metadata:
+        return planner_metadata
     model_metadata = getattr(planner, "last_model_metadata", None)
     to_dict = getattr(model_metadata, "to_dict", None)
     if callable(to_dict):

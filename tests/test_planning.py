@@ -313,6 +313,10 @@ def test_deepagents_repair_planner_builds_agent_with_read_only_permissions(
 
     planner._build_agent(files={"/src/simple_calc.py": {"content": "x"}})
 
+    model = captured["model"]
+    assert model.kwargs["use_responses_api"] is True
+    assert model.kwargs["store"] is False
+    assert model.kwargs["include"] == ["reasoning.encrypted_content"]
     assert captured["tools"] == []
     assert captured["memory"] == [PATCHSMITH_DEEPAGENTS_MEMORY_PATH]
     assert isinstance(captured["backend"], FakeStateBackend)
@@ -382,6 +386,21 @@ def test_deepagents_repair_planner_maps_virtual_path_and_usage_metadata() -> Non
     assert model_call["model"] == "gpt-test"
     assert model_call["response_id"] == "chatcmpl_test"
     assert math.isclose(model_call["estimated_cost_usd"], 0.00015)
+    contract = plan.metadata["deepagents_contract"]
+    assert contract["framework"] == "deepagents"
+    assert contract["mode"] == "custom_agent_factory"
+    assert contract["model"] == "gpt-test"
+    assert contract["use_responses_api"] is True
+    assert contract["store"] is False
+    assert contract["memory_paths"] == [PATCHSMITH_DEEPAGENTS_MEMORY_PATH]
+    assert contract["virtual_file_paths"] == ["/src/simple_calc.py"]
+    assert contract["filesystem_policy"]["allowed_read_paths"] == [
+        PATCHSMITH_DEEPAGENTS_MEMORY_PATH,
+        "/src/simple_calc.py",
+    ]
+    assert contract["subagents"][0]["name"] == "patch-reviewer"
+    assert contract["response_format"] == "PatchPlan"
+    assert contract["planning_policy"]["todos_required"] is True
     assert fake_agent.input_payload is not None
     files = fake_agent.input_payload["files"]
     assert "/src/simple_calc.py" in files
@@ -489,6 +508,15 @@ def test_deepagents_repair_planner_preserves_usage_when_json_is_invalid() -> Non
     assert planner.last_model_metadata.provider == "deepagents_openai_chat"
     assert planner.last_model_metadata.input_tokens == 10
     assert planner.last_model_metadata.estimated_cost_usd == 0.00002
+    assert planner.last_plan_metadata is not None
+    assert planner.last_plan_metadata["model_call"]["provider"] == "deepagents_openai_chat"
+    assert planner.last_plan_metadata["deepagents_contract"]["virtual_file_count"] == 1
+    assert (
+        planner.last_plan_metadata["deepagents_contract"]["planning_policy"][
+            "one_bounded_replacement"
+        ]
+        is True
+    )
 
 
 def test_deepagents_repair_planner_normalizes_line_numbered_old_span() -> None:

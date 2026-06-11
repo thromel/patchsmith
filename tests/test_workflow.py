@@ -249,6 +249,50 @@ def test_deepagents_runner_retries_after_rejected_edit(
     )
 
 
+def test_deepagents_runner_does_not_retry_validation_environment_failure(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    fixture = Path("evals/tasks/seeded_bugs_v1/task_001_logic_bug")
+    planner = CorrectThenBadFeedbackPlanner()
+    sandbox = EnvironmentFailureSandboxRunner()
+
+    monkeypatch.setattr("patchsmith.workflow._planner_for", lambda planner_name: planner)
+    monkeypatch.setattr(
+        "patchsmith.workflow.create_sandbox_runner",
+        lambda *, mode, image: sandbox,
+    )
+
+    result = RepairRunner(artifacts_dir=tmp_path / "artifacts").run(
+        RunRequest(
+            repo=str(fixture / "repo"),
+            issue_text=(fixture / "issue.md").read_text(encoding="utf-8"),
+            test_command="python3 -m pytest",
+            runtime="deepagents",
+            planner="deepagents",
+            max_retries=1,
+            context_provider="native_hybrid",
+            retrieval_strategy="native_hybrid",
+        )
+    )
+
+    assert result.test_result is not None
+    assert result.test_result.exit_code == 1
+    assert len(planner.issue_texts) == 1
+    assert len(sandbox.calls) == 1
+    assert "return left + right" in (result.repo_path / "src/simple_calc.py").read_text(
+        encoding="utf-8"
+    )
+    trace_events = [
+        json.loads(line) for line in result.trace_path.read_text(encoding="utf-8").splitlines()
+    ]
+    assert not any(event["node_name"] == "feedback_retry" for event in trace_events)
+    analysis_event = next(
+        event for event in trace_events if event["event_type"] == "repair_outcome"
+    )
+    assert analysis_event["payload"]["failure_category"] == "test_environment_missing_pytest"
+
+
 class SequencedFeedbackPlanner:
     def __init__(self) -> None:
         self.issue_texts: list[str] = []
@@ -277,6 +321,37 @@ class SequencedFeedbackPlanner:
             old="return left + 0",
             new="return left + right",
             summary="Use sandbox feedback to repair the failed attempt.",
+        )
+
+
+class CorrectThenBadFeedbackPlanner:
+    def __init__(self) -> None:
+        self.issue_texts: list[str] = []
+
+    def prepare_task(self, task: object) -> None:
+        pass
+
+    def plan(
+        self,
+        *,
+        issue_text: str,
+        retrieved_context: list[object],
+    ) -> RepairPlan | None:
+        self.issue_texts.append(issue_text)
+        if len(self.issue_texts) == 1:
+            return RepairPlan(
+                name="correct_patch",
+                path="src/simple_calc.py",
+                old="return left - right",
+                new="return left + right",
+                summary="Fix addition.",
+            )
+        return RepairPlan(
+            name="bad_retry_patch",
+            path="src/simple_calc.py",
+            old="return left + right",
+            new="return left - right",
+            summary="This retry should not run for environment failures.",
         )
 
 
@@ -325,6 +400,27 @@ class SequencedSandboxRunner:
             exit_code=exit_code,
             stdout=f"stdout from attempt {attempt}\n",
             stderr="" if exit_code == 0 else f"failure from attempt {attempt}\n",
+            duration_ms=7,
+            timed_out=False,
+            policy_decision=CommandPolicyDecision(
+                allowed=True,
+                reason="allowed",
+                tokens=("python3", "-m", "pytest"),
+            ),
+        )
+
+
+class EnvironmentFailureSandboxRunner:
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def run(self, *, command: str, workspace: Path, timeout_seconds: int = 60) -> CommandResult:
+        self.calls.append(command)
+        return CommandResult(
+            command=command,
+            exit_code=1,
+            stdout="",
+            stderr="/Applications/Xcode.app/Contents/Developer/usr/bin/python3: No module named pytest\n",
             duration_ms=7,
             timed_out=False,
             policy_decision=CommandPolicyDecision(

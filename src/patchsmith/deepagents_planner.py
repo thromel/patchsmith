@@ -6,6 +6,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from patchsmith.deepagents_contract import (
+    combine_plan_metadata,
+    deepagents_planning_contract,
+)
 from patchsmith.deepagents_files import (
     _agent_files,
     _context_files,
@@ -43,6 +47,8 @@ class DeepAgentsPlannerConfig:
     max_output_tokens: int = 3200
     max_file_chars: int = 40_000
     reasoning_effort: str | None = None
+    use_responses_api: bool = True
+    store: bool = False
     input_cost_per_1m: float | None = None
     output_cost_per_1m: float | None = None
 
@@ -64,6 +70,7 @@ class DeepAgentsRepairPlanner:
         self.config = config or DeepAgentsPlannerConfig()
         self.agent_factory = agent_factory
         self.last_model_metadata: ModelCallMetadata | None = None
+        self.last_plan_metadata: dict[str, Any] | None = None
         self._repo_path: Path | None = None
 
     def prepare_task(self, task: Any) -> None:
@@ -107,6 +114,12 @@ class DeepAgentsRepairPlanner:
                 max_file_chars=_int_env(env, "PATCHSMITH_DEEPAGENTS_MAX_FILE_CHARS", 40_000),
                 reasoning_effort=env.get("PATCHSMITH_DEEPAGENTS_REASONING_EFFORT", "").strip()
                 or None,
+                use_responses_api=_bool_env(
+                    env,
+                    "PATCHSMITH_DEEPAGENTS_USE_RESPONSES_API",
+                    True,
+                ),
+                store=_bool_env(env, "PATCHSMITH_DEEPAGENTS_STORE", False),
                 input_cost_per_1m=pricing.input_cost_per_1m if pricing else None,
                 output_cost_per_1m=pricing.output_cost_per_1m if pricing else None,
             ),
@@ -133,6 +146,7 @@ class DeepAgentsRepairPlanner:
         repo_path: Path | None,
     ) -> RepairPlan | None:
         self.last_model_metadata = None
+        self.last_plan_metadata = None
         if not retrieved_context:
             return None
 
@@ -142,7 +156,18 @@ class DeepAgentsRepairPlanner:
             max_file_chars=self.config.max_file_chars,
         )
         agent_files = _agent_files(files)
-        agent = self._build_agent(files=files)
+        subagents = deepagents_patch_review_subagents()
+        contract = deepagents_planning_contract(
+            config=self.config,
+            virtual_file_paths=files.keys(),
+            subagents=subagents,
+            custom_agent_factory=self.agent_factory is not None,
+        )
+        self.last_plan_metadata = combine_plan_metadata(
+            model_call=None,
+            deepagents_contract=contract,
+        )
+        agent = self._build_agent(files=files, subagents=subagents)
         result = agent.invoke(
             {
                 "messages": [
@@ -162,6 +187,10 @@ class DeepAgentsRepairPlanner:
             output_cost_per_1m=self.config.output_cost_per_1m,
         )
         self.last_model_metadata = metadata
+        self.last_plan_metadata = combine_plan_metadata(
+            model_call=metadata.to_dict(),
+            deepagents_contract=contract,
+        )
 
         payload = _structured_payload(result) or _extract_json_object(_last_ai_text(result))
         if payload is None:
@@ -176,12 +205,19 @@ class DeepAgentsRepairPlanner:
             allowed_paths={context.path for context in retrieved_context},
             default_name="deepagents_native_json_plan",
             model_metadata=metadata,
+            extra_metadata={"deepagents_contract": contract},
         )
 
-    def _build_agent(self, *, files: dict[str, dict[str, str]]) -> Any:
+    def _build_agent(
+        self,
+        *,
+        files: dict[str, dict[str, str]],
+        subagents: list[dict[str, str]] | None = None,
+    ) -> Any:
         if self.agent_factory is not None:
             return self.agent_factory(config=self.config)
         agent_files = _agent_files(files)
+        configured_subagents = subagents or deepagents_patch_review_subagents()
 
         try:
             from deepagents import FilesystemPermission, create_deep_agent
@@ -202,9 +238,12 @@ class DeepAgentsRepairPlanner:
 
         model_kwargs: dict[str, Any] = {
             "model": self.config.model,
-            "use_responses_api": False,
+            "use_responses_api": self.config.use_responses_api,
             "max_completion_tokens": self.config.max_output_tokens,
         }
+        if self.config.use_responses_api:
+            model_kwargs["store"] = self.config.store
+            model_kwargs["include"] = ["reasoning.encrypted_content"]
         if self.config.reasoning_effort:
             model_kwargs["reasoning_effort"] = self.config.reasoning_effort
         model = ChatOpenAI(**model_kwargs)
@@ -212,7 +251,7 @@ class DeepAgentsRepairPlanner:
             model=model,
             tools=[],
             system_prompt=deepagents_system_prompt(),
-            subagents=deepagents_patch_review_subagents(),  # type: ignore[arg-type]
+            subagents=configured_subagents,  # type: ignore[arg-type]
             memory=[PATCHSMITH_DEEPAGENTS_MEMORY_PATH],
             backend=StateBackend(),
             permissions=_read_only_filesystem_permissions(
@@ -228,3 +267,10 @@ def _int_env(env: Mapping[str, str], key: str, default: int) -> int:
         return int(env.get(key, str(default)))
     except ValueError:
         return default
+
+
+def _bool_env(env: Mapping[str, str], key: str, default: bool) -> bool:
+    value = env.get(key)
+    if value is None or not value.strip():
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}

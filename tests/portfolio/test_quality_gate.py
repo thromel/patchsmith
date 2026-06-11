@@ -1,4 +1,5 @@
 import json
+import sys
 from pathlib import Path
 
 from patchsmith.cli import main
@@ -27,6 +28,7 @@ def test_quality_gate_report_runs_quick_verifiers(
     assert report.quality_status == "passed_with_skips"
     assert report.passed_count == 2
     assert report.skipped_count == 2
+    assert report.checks[0].command[0] == sys.executable
     assert all(check.status != "failed" for check in report.checks)
     assert any(check.stdout_path for check in report.checks if check.status == "passed")
     rendered = output_path.read_text(encoding="utf-8")

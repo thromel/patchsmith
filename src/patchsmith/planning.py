@@ -442,6 +442,7 @@ def _repair_plan_from_payload(
     allowed_paths: set[str],
     default_name: str,
     model_metadata: ModelCallMetadata | None = None,
+    extra_metadata: Mapping[str, Any] | None = None,
 ) -> RepairPlan | None:
     path = payload.get("path")
     old = payload.get("old")
@@ -463,17 +464,19 @@ def _repair_plan_from_payload(
     if _unsafe_plan_path(path) or path not in allowed_paths:
         return None
 
+    metadata: dict[str, Any] = {}
+    if model_metadata:
+        metadata["model_call"] = model_metadata.to_dict()
+    if extra_metadata:
+        metadata.update(dict(extra_metadata))
+
     return RepairPlan(
         name=name.strip() or default_name,
         path=path,
         old=old,
         new=new,
         summary=summary.strip() or f"Model planner selected {path}.",
-        metadata={
-            "model_call": model_metadata.to_dict(),
-        }
-        if model_metadata
-        else None,
+        metadata=metadata or None,
     )
 
 

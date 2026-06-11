@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from patchsmith.analysis import RepairOutcomeAnalysis
 from patchsmith.models import CommandResult, RunRequest
 from patchsmith.runtime.core import AgentResult
 from patchsmith.sandbox import SandboxRunner
@@ -110,12 +111,19 @@ def should_retry_with_test_feedback(
     request: RunRequest,
     agent_result: AgentResult,
     test_result: CommandResult | None,
+    repair_analysis: RepairOutcomeAnalysis | None = None,
     attempt: int,
     max_feedback_retries: int,
 ) -> bool:
     if test_feedback_retry_budget(request) == 0:
         return False
     if attempt > max_feedback_retries:
+        return False
+    if (
+        repair_analysis is not None
+        and repair_analysis.failure_category is not None
+        and repair_analysis.failure_category.startswith("test_environment_")
+    ):
         return False
     if agent_result.status == "patch_generated":
         if test_result is None:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import shlex
 import subprocess
+import sys
 import time
 from collections import Counter
 from pathlib import Path
@@ -33,7 +34,7 @@ def build_quality_gate_report(
     commands: list[tuple[str, list[str] | None, str]] = [
         (
             "Compile Python sources",
-            ["python3", "-m", "compileall", "-q", "src/patchsmith", "tests"],
+            [sys.executable, "-m", "compileall", "-q", "src/patchsmith", "tests"],
             "Python compileall finished successfully.",
         ),
         (
@@ -43,7 +44,7 @@ def build_quality_gate_report(
         ),
         (
             "Pytest suite",
-            ["python3", "-m", "pytest", "-q"] if include_tests else None,
+            [sys.executable, "-m", "pytest", "-q"] if include_tests else None,
             "Pytest completed successfully.",
         ),
         (

@@ -45,6 +45,7 @@ def analyze_repair_outcome(
         )
 
     tests_passed = test_result.exit_code == 0
+    infrastructure_failure = _infrastructure_failure_category(test_result)
     if patch_generated and tests_passed:
         return RepairOutcomeAnalysis(
             status="validated",
@@ -58,6 +59,22 @@ def analyze_repair_outcome(
         )
 
     if patch_generated and not tests_passed:
+        if infrastructure_failure is not None:
+            return RepairOutcomeAnalysis(
+                status="unvalidated",
+                verdict="patch_validation_blocked",
+                summary=(
+                    "Patch candidate generated, but the sandbox command failed before "
+                    "it could validate repair quality."
+                ),
+                patch_generated=True,
+                tests_passed=False,
+                test_exit_code=test_result.exit_code,
+                failure_category=infrastructure_failure,
+                next_action=(
+                    "Fix the validation environment or test command before retrying the model."
+                ),
+            )
         return RepairOutcomeAnalysis(
             status="needs_followup",
             verdict="patch_failed_tests",
@@ -81,6 +98,21 @@ def analyze_repair_outcome(
             next_action="Check whether the issue reproduces under the selected test command.",
         )
 
+    if infrastructure_failure is not None:
+        return RepairOutcomeAnalysis(
+            status="unvalidated",
+            verdict="validation_blocked",
+            summary=(
+                "No patch candidate was generated and the sandbox command failed before "
+                "repair quality could be evaluated."
+            ),
+            patch_generated=False,
+            tests_passed=False,
+            test_exit_code=test_result.exit_code,
+            failure_category=infrastructure_failure,
+            next_action="Fix the validation environment or test command before retrying the model.",
+        )
+
     return RepairOutcomeAnalysis(
         status="unresolved",
         verdict="no_patch_tests_failed",
@@ -91,3 +123,18 @@ def analyze_repair_outcome(
         failure_category="no_patch_generated",
         next_action="Improve retrieval or planning before rerunning the sandbox command.",
     )
+
+
+def _infrastructure_failure_category(test_result: CommandResult) -> str | None:
+    combined_output = f"{test_result.stdout}\n{test_result.stderr}".lower()
+    if test_result.policy_decision and not test_result.policy_decision.allowed:
+        return "test_environment_policy_blocked"
+    if test_result.timed_out:
+        return "test_environment_timeout"
+    if "no module named pytest" in combined_output:
+        return "test_environment_missing_pytest"
+    if "pytest: command not found" in combined_output:
+        return "test_environment_missing_pytest"
+    if "no such file or directory" in combined_output and "pytest" in combined_output:
+        return "test_environment_missing_pytest"
+    return None

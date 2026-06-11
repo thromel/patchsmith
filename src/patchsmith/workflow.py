@@ -278,6 +278,7 @@ class RepairRunner:
                     request=request,
                     agent_result=agent_result,
                     test_result=test_result,
+                    repair_analysis=repair_analysis,
                     attempt=attempt,
                     max_feedback_retries=max_feedback_retries,
                 ):
