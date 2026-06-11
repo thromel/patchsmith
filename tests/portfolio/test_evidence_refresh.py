@@ -17,7 +17,7 @@ def test_evidence_refresh_report_runs_lightweight_status_refresh(
     json_output_path = tmp_path / "evidence_refresh.json"
 
     report = write_evidence_refresh_report(
-        project_root=Path("."),
+        project_root=Path(),
         artifacts_dir=artifacts_dir,
         output_path=output_path,
         json_output_path=json_output_path,
@@ -403,7 +403,7 @@ def test_evidence_refresh_can_refresh_docker_smoke(
     output_path = tmp_path / "evidence_refresh.md"
     json_output_path = tmp_path / "evidence_refresh.json"
     report = write_evidence_refresh_report(
-        project_root=Path("."),
+        project_root=Path(),
         artifacts_dir=artifacts_dir,
         output_path=output_path,
         json_output_path=json_output_path,

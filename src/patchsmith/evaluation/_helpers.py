@@ -198,7 +198,7 @@ def _validate_expected_repo_file(
     field_name: str,
     errors: list[str],
 ) -> None:
-    if relative_path.startswith("/") or relative_path.startswith("../") or "/../" in relative_path:
+    if relative_path.startswith(("/", "../")) or "/../" in relative_path:
         errors.append(f"{field_name} contains unsafe path: {relative_path}")
         return
     target = (repo_path / relative_path).resolve()

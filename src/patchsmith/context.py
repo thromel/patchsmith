@@ -430,7 +430,7 @@ def _append_ctxhelm_target(
 
 
 def _is_repo_relative_path(repo_path: Path, path: str) -> bool:
-    if path.startswith("/") or path.startswith("../") or "/../" in path:
+    if path.startswith(("/", "../")) or "/../" in path:
         return False
     try:
         (repo_path / path).resolve().relative_to(repo_path.resolve())

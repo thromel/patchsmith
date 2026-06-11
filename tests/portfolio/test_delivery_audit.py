@@ -182,7 +182,7 @@ def test_delivery_audit_maps_objective_to_current_evidence(
     output_path = tmp_path / "delivery_audit.md"
     json_output_path = tmp_path / "delivery_audit.json"
     report = write_delivery_audit_report(
-        project_root=Path("."),
+        project_root=Path(),
         artifacts_dir=artifacts_dir,
         output_path=output_path,
         json_output_path=json_output_path,

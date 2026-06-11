@@ -35,10 +35,12 @@ line-length = 100
 target-version = "py311"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF", "C4", "PIE", "RSE", "ISC", "PTH"]
 ignore = [
   # Line length is handled by the formatter; long report strings are common.
   "E501",
+  # Conflicts with the formatter.
+  "ISC001",
 ]
 
 [tool.ruff.lint.isort]

@@ -15,7 +15,7 @@ def test_quality_gate_report_runs_quick_verifiers(
     json_output_path = tmp_path / "quality_gate.json"
     logs_dir = tmp_path / "quality_gate_logs"
     report = write_quality_gate_report(
-        project_root=Path("."),
+        project_root=Path(),
         artifacts_dir=tmp_path / "artifacts",
         output_path=output_path,
         json_output_path=json_output_path,

@@ -39,7 +39,7 @@ def apply_text_replacement(
 
 
 def validate_repo_relative_path(*, repo_path: Path, relative_path: str) -> Path:
-    if relative_path.startswith("/") or relative_path.startswith("../") or "/../" in relative_path:
+    if relative_path.startswith(("/", "../")) or "/../" in relative_path:
         raise PatchSafetyError(f"unsafe relative path: {relative_path}")
     target = (repo_path / relative_path).resolve()
     try:

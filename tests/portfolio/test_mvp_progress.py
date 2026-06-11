@@ -18,7 +18,7 @@ def test_mvp_progress_report_scores_checklist_from_evidence(
     output_path = tmp_path / "mvp_progress.md"
     json_output_path = tmp_path / "mvp_progress.json"
     report = write_mvp_progress_report(
-        project_root=Path("."),
+        project_root=Path(),
         artifacts_dir=artifacts_dir,
         output_path=output_path,
         json_output_path=json_output_path,
@@ -77,7 +77,7 @@ def test_mvp_progress_report_counts_validated_public_issue_corpus(
     )
 
     report = write_mvp_progress_report(
-        project_root=Path("."),
+        project_root=Path(),
         artifacts_dir=artifacts_dir,
         output_path=tmp_path / "mvp_progress.md",
     )

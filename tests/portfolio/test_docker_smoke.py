@@ -24,7 +24,7 @@ def test_docker_smoke_report_records_unavailable_daemon(
     monkeypatch.setattr(subprocess, "run", fake_run)
 
     report = write_docker_smoke_report(
-        project_root=Path("."),
+        project_root=Path(),
         artifacts_dir=tmp_path / "artifacts",
         output_path=tmp_path / "docker_smoke.md",
         json_output_path=tmp_path / "docker_smoke.json",
@@ -88,7 +88,7 @@ def test_docker_smoke_report_can_stop_after_preflight(
     monkeypatch.setattr(subprocess, "run", fake_run)
 
     report = write_docker_smoke_report(
-        project_root=Path("."),
+        project_root=Path(),
         artifacts_dir=tmp_path / "artifacts",
         output_path=tmp_path / "docker_smoke.md",
         image="patchsmith-seeded-smoke:py312",

@@ -157,7 +157,7 @@ def test_project_status_report_summarizes_saved_evidence(
     output_path = tmp_path / "project_status.md"
     json_output_path = tmp_path / "project_status.json"
     report = write_project_status_report(
-        project_root=Path("."),
+        project_root=Path(),
         artifacts_dir=artifacts_dir,
         output_path=output_path,
         json_output_path=json_output_path,
