@@ -6,7 +6,7 @@ from typing import Any, TypedDict
 from patchsmith.models import PatchCandidate
 from patchsmith.patching import PatchSafetyError, apply_text_replacement
 from patchsmith.planning import HeuristicRepairPlanner, RepairPlan, RepairPlanner
-from patchsmith.runtime_core import (
+from patchsmith.runtime.core import (
     AgentResult,
     AgentTask,
     _no_patch_result,

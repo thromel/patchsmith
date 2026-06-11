@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from patchsmith.models import CommandResult, RunRequest
-from patchsmith.runtime import AgentResult
+from patchsmith.runtime.core import AgentResult
 from patchsmith.sandbox import SandboxRunner
 from patchsmith.tracing import RunTrace
 
