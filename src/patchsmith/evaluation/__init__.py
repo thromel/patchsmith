@@ -35,11 +35,13 @@ from patchsmith.evaluation.issue_corpus.public_issue_repairs import (
     check_public_issue_repair_readiness,
     execute_public_issue_repairs,
 )
+from patchsmith.evaluation.issue_corpus.public_issue_spec_validation import (
+    validate_public_issue_reproduction_specs,
+)
 from patchsmith.evaluation.issue_corpus.public_issues import (
     discover_public_issue_failure_signals,
     execute_public_issue_reproductions,
     plan_public_issue_reproductions,
-    validate_public_issue_reproduction_specs,
 )
 from patchsmith.evaluation.issue_corpus.validate import (
     validate_issue_corpus,
