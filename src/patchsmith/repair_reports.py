@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 from patchsmith.artifacts import format_cost as _format_cost
+from patchsmith.artifacts import sum_optional_float as _sum_optional_float
 from patchsmith.evaluation_models import (
     PatchSearchEvalResult,
     PatchSearchEvalSummary,
@@ -11,13 +11,6 @@ from patchsmith.evaluation_models import (
     RepairEvalSummary,
     ScaffoldComparisonResult,
 )
-
-
-def _sum_optional_float(values: Any) -> float | None:
-    values_list = [value for value in values if value is not None]
-    if not values_list:
-        return None
-    return float(sum(values_list))
 
 
 def render_repair_eval_report(

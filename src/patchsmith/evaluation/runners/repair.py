@@ -7,11 +7,11 @@ import json
 import time
 from pathlib import Path
 
+from patchsmith.artifacts import sum_optional_float as _sum_optional_float
 from patchsmith.evaluation._helpers import (
     _average,
     _model_usage_from_trace,
     _sum_optional,
-    _sum_optional_float,
     _trace_metrics_from_trace,
 )
 from patchsmith.evaluation.seeded import load_seeded_tasks

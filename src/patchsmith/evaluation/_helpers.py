@@ -364,13 +364,6 @@ def _sum_optional(values: Any) -> int | None:
     return sum(values_list)
 
 
-def _sum_optional_float(values: Any) -> float | None:
-    values_list = [value for value in values if value is not None]
-    if not values_list:
-        return None
-    return float(sum(values_list))
-
-
 def _average(values: Any) -> float:
     values_list = list(values)
     if not values_list:

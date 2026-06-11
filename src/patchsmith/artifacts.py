@@ -68,6 +68,14 @@ def write_csv(
                 writer.writerow(row)
 
 
+def sum_optional_float(values: Iterable[float | None]) -> float | None:
+    """Sum the non-None values, returning None when all are missing."""
+    present = [value for value in values if value is not None]
+    if not present:
+        return None
+    return float(sum(present))
+
+
 def format_cost(value: float | None) -> str:
     """Format a model-cost value for reports."""
     if value is None:
