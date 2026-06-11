@@ -237,19 +237,22 @@ def test_demo_readiness_report_summarizes_launch_evidence(
     )
     assert calibration_plan.plan_status == "blocked"
     assert calibration_plan.credentials_configured is False
-    assert len(calibration_plan.runs) == 4
+    assert len(calibration_plan.runs) == 6
     assert calibration_plan.runs[0].status == "blocked"
     assert calibration_plan.runs[0].requires_credentials
     assert "--planner openai" in calibration_plan.runs[0].command
     assert calibration_plan.runs[1].status == "blocked"
+    assert calibration_plan.runs[2].name == "DeepAgents native single-task smoke"
+    assert calibration_plan.runs[2].status == "blocked"
+    assert "--planner deepagents" in calibration_plan.runs[2].command
     plan_text = calibration_plan_output.read_text(encoding="utf-8")
     assert "# PatchSmith Live Calibration Plan" in plan_text
     assert "does not prove live model execution" in plan_text
     plan_payload = json.loads(calibration_plan_json_output.read_text(encoding="utf-8"))
     assert plan_payload["plan_status"] == "blocked"
-    assert plan_payload["run_count"] == 4
+    assert plan_payload["run_count"] == 6
     assert plan_payload["ready_runs"] == 0
-    assert plan_payload["blocked_runs"] == 2
+    assert plan_payload["blocked_runs"] == 4
 
     ready_plan = write_live_calibration_plan_report(
         artifacts_dir=artifacts_dir,
@@ -260,6 +263,8 @@ def test_demo_readiness_report_summarizes_launch_evidence(
     assert ready_plan.plan_status == "ready_to_run"
     assert ready_plan.runs[0].status == "ready"
     assert ready_plan.runs[1].status == "waiting_for_smoke"
+    assert ready_plan.runs[2].status == "ready"
+    assert ready_plan.runs[3].status == "waiting_for_smoke"
 
     cli_calibration_plan_output = tmp_path / "cli_live_calibration_plan.md"
     cli_calibration_plan_json_output = tmp_path / "cli_live_calibration_plan.json"
@@ -277,7 +282,7 @@ def test_demo_readiness_report_summarizes_launch_evidence(
     )
     assert exit_code == 0
     cli_calibration_plan_payload = json.loads(capsys.readouterr().out)
-    assert cli_calibration_plan_payload["run_count"] == 4
+    assert cli_calibration_plan_payload["run_count"] == 6
     assert cli_calibration_plan_payload["plan_status"] in {"blocked", "ready_to_run"}
     assert cli_calibration_plan_output.exists()
 

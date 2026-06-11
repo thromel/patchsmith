@@ -506,6 +506,16 @@ def _live_calibration_plan_runs(
         if live_smoke_status == "ready"
         else "blocked"
     )
+    deepagents_live_smoke_status = (
+        "ready" if deepagents_available and credentials_configured else "blocked"
+    )
+    deepagents_live_suite_status = (
+        "ready"
+        if saved_live_provider_count
+        else "waiting_for_smoke"
+        if deepagents_live_smoke_status == "ready"
+        else "blocked"
+    )
     return [
         LiveCalibrationPlanRun(
             name="OpenAI LangGraph single-task smoke",
@@ -552,6 +562,57 @@ def _live_calibration_plan_runs(
             claim_boundary=(
                 "Supports seeded-suite live-provider calibration only; public-issue "
                 "repair claims still require separate artifacts."
+            ),
+        ),
+        LiveCalibrationPlanRun(
+            name="DeepAgents native single-task smoke",
+            stage="required",
+            status=deepagents_live_smoke_status,
+            runtime="deepagents",
+            planner="deepagents",
+            context_provider="native_hybrid",
+            output_path="artifacts/runs/<run_id>",
+            requires_credentials=True,
+            command=(
+                "PYTHONPATH=src python3 -m patchsmith.cli run "
+                "--repo evals/tasks/seeded_bugs_v1/task_001_logic_bug/repo "
+                "--issue-file evals/tasks/seeded_bugs_v1/task_001_logic_bug/issue.md "
+                '--test-command "python3 -m pytest" '
+                "--runtime deepagents --planner deepagents --max-retries 1 "
+                "--context-provider native_hybrid --artifacts-dir artifacts --json"
+            ),
+            success_evidence=(
+                "Run trace contains model_provider `deepagents_openai_chat`, "
+                "DeepAgents package-backed runtime trace rows, token counts, and a saved report."
+            ),
+            claim_boundary=(
+                "Proves one native DeepAgents live smoke with bounded PatchSmith patch gating; "
+                "does not prove public-issue repair quality."
+            ),
+        ),
+        LiveCalibrationPlanRun(
+            name="DeepAgents native seeded-suite eval",
+            stage="follow_up",
+            status=deepagents_live_suite_status,
+            runtime="deepagents",
+            planner="deepagents",
+            context_provider="native_hybrid",
+            output_path="artifacts/experiments/deepagents_native_repair_eval_v1",
+            requires_credentials=True,
+            command=(
+                "PYTHONPATH=src python3 -m patchsmith.cli eval-repair "
+                "--dataset evals/tasks/seeded_bugs_v1 "
+                "--runtime deepagents --planner deepagents --max-retries 1 "
+                "--context-provider native_hybrid "
+                "--output artifacts/experiments/deepagents_native_repair_eval_v1 --json"
+            ),
+            success_evidence=(
+                "Repair evaluation summary includes `deepagents_openai_chat` provider metadata, "
+                "token/cost rows, and per-task DeepAgents traces."
+            ),
+            claim_boundary=(
+                "Supports seeded-suite native DeepAgents calibration only; public issue repair "
+                "claims require the public-issue repair-attempt lane."
             ),
         ),
         LiveCalibrationPlanRun(
@@ -642,6 +703,7 @@ def _live_calibration_commands() -> list[str]:
         (
             "export OPENAI_API_KEY=...\n"
             "export PATCHSMITH_OPENAI_MODEL=<model>\n"
+            "export PATCHSMITH_DEEPAGENTS_MODEL=<model>\n"
             "export PATCHSMITH_OPENAI_INPUT_COST_PER_1M=<input_rate>\n"
             "export PATCHSMITH_OPENAI_OUTPUT_COST_PER_1M=<output_rate>"
         ),
@@ -658,6 +720,21 @@ def _live_calibration_commands() -> list[str]:
             "--dataset evals/tasks/seeded_bugs_v1 "
             "--runtime langgraph --planner openai --context-provider native_hybrid "
             "--output artifacts/experiments/live_openai_repair_eval_v1 --json"
+        ),
+        (
+            "PYTHONPATH=src python3 -m patchsmith.cli run "
+            "--repo evals/tasks/seeded_bugs_v1/task_001_logic_bug/repo "
+            "--issue-file evals/tasks/seeded_bugs_v1/task_001_logic_bug/issue.md "
+            '--test-command "python3 -m pytest" '
+            "--runtime deepagents --planner deepagents --max-retries 1 "
+            "--context-provider native_hybrid --artifacts-dir artifacts --json"
+        ),
+        (
+            "PYTHONPATH=src python3 -m patchsmith.cli eval-repair "
+            "--dataset evals/tasks/seeded_bugs_v1 "
+            "--runtime deepagents --planner deepagents --max-retries 1 "
+            "--context-provider native_hybrid "
+            "--output artifacts/experiments/deepagents_native_repair_eval_v1 --json"
         ),
         (
             "PYTHONPATH=src python3 -m patchsmith.cli live-calibration "

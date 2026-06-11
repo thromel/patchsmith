@@ -3,6 +3,7 @@ from pathlib import Path
 
 from patchsmith.portfolio import (
     write_final_evaluation_report,
+    write_live_calibration_plan_report,
     write_live_calibration_report,
 )
 
@@ -206,3 +207,33 @@ def test_live_calibration_report_separates_deepagents_package_and_live_claims(
         "use saved deepagents_openai_chat rows for live DeepAgents model claims"
         in checks["Saved DeepAgents Package Evidence"].next_action
     )
+
+
+def test_live_calibration_plan_includes_native_deepagents_live_runs(
+    tmp_path: Path,
+) -> None:
+    plan = write_live_calibration_plan_report(
+        artifacts_dir=tmp_path / "artifacts",
+        output_path=tmp_path / "live_plan.md",
+        json_output_path=tmp_path / "live_plan.json",
+        environment={"OPENAI_API_KEY": "test-key"},
+        package_availability={"openai": True, "deepagents": True, "agents": False},
+    )
+
+    runs = {run.name: run for run in plan.runs}
+    smoke = runs["DeepAgents native single-task smoke"]
+    suite = runs["DeepAgents native seeded-suite eval"]
+    assert smoke.status == "ready"
+    assert smoke.runtime == "deepagents"
+    assert smoke.planner == "deepagents"
+    assert smoke.requires_credentials
+    assert "--runtime deepagents --planner deepagents --max-retries 1" in smoke.command
+    assert "deepagents_openai_chat" in smoke.success_evidence
+    assert suite.status == "waiting_for_smoke"
+    assert "deepagents_native_repair_eval_v1" in suite.output_path
+
+    rendered = (tmp_path / "live_plan.md").read_text(encoding="utf-8")
+    assert "DeepAgents native single-task smoke" in rendered
+    payload = json.loads((tmp_path / "live_plan.json").read_text(encoding="utf-8"))
+    assert payload["run_count"] == 6
+    assert payload["ready_runs"] == 3
