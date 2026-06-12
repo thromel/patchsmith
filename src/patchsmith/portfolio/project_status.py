@@ -4,26 +4,25 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
 from patchsmith.artifacts import write_json, write_markdown
 from patchsmith.portfolio._helpers import (
-    _format_age_seconds,
     _format_utc,
     _load_json_artifact,
-    _markdown_cell,
-    _parse_utc_datetime,
     _payload_float,
     _payload_int,
     _payload_string,
     _provider_summary,
 )
 from patchsmith.portfolio.models import (
-    PROJECT_STATUS_FRESHNESS_THRESHOLD_SECONDS,
-    ProjectEvidenceFreshness,
     ProjectStatusReport,
     ProjectStatusSurface,
 )
+from patchsmith.portfolio.project_status_freshness import (
+    project_evidence_freshness,
+    project_evidence_freshness_status,
+)
+from patchsmith.portfolio.project_status_reports import render_project_status_report
 
 
 def build_project_status_report(
@@ -70,7 +69,7 @@ def build_project_status_report(
         name: _load_json_artifact(artifacts_dir / source) for name, source in sources.items()
     }
     missing_sources = [source for name, source in sources.items() if payloads[name] is None]
-    evidence_freshness = _project_evidence_freshness(
+    evidence_freshness = project_evidence_freshness(
         sources=sources,
         payloads=payloads,
         as_of=generated_at_dt,
@@ -250,7 +249,7 @@ def build_project_status_report(
         metric_count=metric_count,
         blocker_count=blocker_count,
         warning_count=warning_count,
-        evidence_freshness_status=_project_evidence_freshness_status(evidence_freshness),
+        evidence_freshness_status=project_evidence_freshness_status(evidence_freshness),
         stale_source_count=stale_source_count,
         undated_source_count=undated_source_count,
         missing_sources=missing_sources,
@@ -275,91 +274,6 @@ def write_project_status_report(
         json_output_path.parent.mkdir(parents=True, exist_ok=True)
         write_json(json_output_path, report.to_dict(), trailing_newline=True)
     return report
-
-
-def render_project_status_report(report: ProjectStatusReport) -> str:
-    lines = [
-        "# PatchSmith Project Status Report",
-        "",
-        f"- Generated at: `{report.generated_at}`",
-        f"- Project root: `{report.project_root}`",
-        f"- Artifacts directory: `{report.artifacts_dir}`",
-        f"- Overall status: `{report.overall_status}`",
-        f"- MVP progress: `{report.mvp_completion_percent:.1f}%` (`{report.mvp_status}`)",
-        (
-            f"- Delivery audit: `{report.delivery_completion_percent:.1f}%` "
-            f"(`{report.delivery_status}`)"
-        ),
-        f"- Quality gate: `{report.quality_status}`",
-        f"- Launch status: `{report.launch_status}`",
-        f"- Release status: `{report.release_status}`",
-        f"- Docker smoke: `{report.docker_smoke_status}`",
-        f"- Environment readiness: `{report.environment_readiness_status}`",
-        f"- Live calibration: `{report.live_calibration_status}`",
-        f"- Saved live-provider runs: `{report.saved_live_provider_count}`",
-        f"- DeepAgents package-backed runs: `{report.deepagents_package_run_count}`",
-        f"- DeepAgents compatibility-mode runs: `{report.deepagents_compatibility_run_count}`",
-        f"- OpenAI Agents package-backed runs: `{report.openai_agents_package_run_count}`",
-        f"- OpenAI Agents compatibility-mode runs: `{report.openai_agents_compatibility_run_count}`",
-        f"- Indexed experiments: `{report.experiment_count}`",
-        f"- Indexed runs: `{report.run_count}`",
-        f"- Metric rows: `{report.metric_count}`",
-        f"- Launch blockers: `{report.blocker_count}`",
-        f"- Launch warnings: `{report.warning_count}`",
-        (
-            f"- Evidence freshness: `{report.evidence_freshness_status}` "
-            f"(`{report.stale_source_count}` stale, "
-            f"`{report.undated_source_count}` undated)"
-        ),
-        "",
-        "## Status Surfaces",
-        "",
-        "| Surface | Status | Evidence | Source |",
-        "|---|---|---|---|",
-    ]
-    for surface in report.surfaces:
-        lines.append(
-            "| "
-            f"{surface.name} | "
-            f"{surface.status} | "
-            f"{_markdown_cell(surface.evidence)} | "
-            f"`{surface.source}` |"
-        )
-    lines.extend(["", "## Missing Sources", ""])
-    if report.missing_sources:
-        lines.extend(f"- `{source}`" for source in report.missing_sources)
-    else:
-        lines.append("- None.")
-    lines.extend(
-        [
-            "",
-            "## Evidence Freshness",
-            "",
-            "| Source | Status | Generated At | Age | Detail |",
-            "|---|---|---|---|---|",
-        ]
-    )
-    for freshness in report.evidence_freshness:
-        lines.append(
-            "| "
-            f"`{freshness.source}` | "
-            f"{freshness.status} | "
-            f"{_project_freshness_generated_at(freshness)} | "
-            f"{_project_freshness_age(freshness)} | "
-            f"{_markdown_cell(freshness.detail)} |"
-        )
-    lines.extend(
-        [
-            "",
-            "## Claim Boundary",
-            "",
-            "- This report summarizes saved evidence artifacts; it does not rerun checks.",
-            "- Use `quality-gate` for executable verification.",
-            "- Use `docker-smoke` for Docker sandbox evidence.",
-            "- Use `live-calibration` for live model-provider evidence.",
-        ]
-    )
-    return "\n".join(lines) + "\n"
 
 
 def _project_status_surface(
@@ -405,95 +319,3 @@ def _project_overall_status(
     ):
         return "ready_with_caveats"
     return "ready"
-
-
-def _project_evidence_freshness(
-    *,
-    sources: dict[str, str],
-    payloads: dict[str, dict[str, Any] | None],
-    as_of: datetime,
-    threshold_seconds: int = PROJECT_STATUS_FRESHNESS_THRESHOLD_SECONDS,
-) -> list[ProjectEvidenceFreshness]:
-    return [
-        _project_source_freshness(
-            source=source,
-            payload=payloads.get(name),
-            as_of=as_of,
-            threshold_seconds=threshold_seconds,
-        )
-        for name, source in sources.items()
-    ]
-
-
-def _project_source_freshness(
-    *,
-    source: str,
-    payload: dict[str, Any] | None,
-    as_of: datetime,
-    threshold_seconds: int,
-) -> ProjectEvidenceFreshness:
-    if payload is None:
-        return ProjectEvidenceFreshness(
-            source=source,
-            status="missing",
-            generated_at=None,
-            age_seconds=None,
-            threshold_seconds=threshold_seconds,
-            detail="Artifact is missing or could not be parsed as JSON.",
-        )
-    generated_at = _payload_string(payload, "generated_at")
-    generated_at_dt = _parse_utc_datetime(generated_at)
-    if generated_at_dt is None:
-        return ProjectEvidenceFreshness(
-            source=source,
-            status="undated",
-            generated_at=generated_at or None,
-            age_seconds=None,
-            threshold_seconds=threshold_seconds,
-            detail="Artifact has no parseable generated_at timestamp.",
-        )
-    age_seconds = max(0, int((as_of - generated_at_dt).total_seconds()))
-    threshold_label = _format_age_seconds(threshold_seconds)
-    age_label = _format_age_seconds(age_seconds)
-    if age_seconds > threshold_seconds:
-        return ProjectEvidenceFreshness(
-            source=source,
-            status="stale",
-            generated_at=_format_utc(generated_at_dt),
-            age_seconds=age_seconds,
-            threshold_seconds=threshold_seconds,
-            detail=f"Generated {age_label} ago; exceeds {threshold_label} threshold.",
-        )
-    return ProjectEvidenceFreshness(
-        source=source,
-        status="fresh",
-        generated_at=_format_utc(generated_at_dt),
-        age_seconds=age_seconds,
-        threshold_seconds=threshold_seconds,
-        detail=f"Generated {age_label} ago; within {threshold_label} threshold.",
-    )
-
-
-def _project_evidence_freshness_status(
-    freshness: list[ProjectEvidenceFreshness],
-) -> str:
-    statuses = {item.status for item in freshness}
-    if "missing" in statuses:
-        return "missing"
-    if "stale" in statuses:
-        return "stale"
-    if "undated" in statuses:
-        return "undated"
-    return "fresh"
-
-
-def _project_freshness_generated_at(freshness: ProjectEvidenceFreshness) -> str:
-    if freshness.generated_at is None:
-        return ""
-    return f"`{freshness.generated_at}`"
-
-
-def _project_freshness_age(freshness: ProjectEvidenceFreshness) -> str:
-    if freshness.age_seconds is None:
-        return ""
-    return _format_age_seconds(freshness.age_seconds)
