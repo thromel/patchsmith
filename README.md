@@ -166,6 +166,7 @@ PYTHONPATH=src python -m patchsmith.cli eval-repair \
   --runtime deepagents \
   --planner deepagents \
   --max-retries 1 \
+  --max-tasks 10 \
   --context-provider native_hybrid \
   --output artifacts/experiments/deepagents_native_repair_eval_v1 \
   --json
@@ -174,6 +175,8 @@ PYTHONPATH=src python -m patchsmith.cli eval-repair \
 Do not cite model performance from a README command. Use the saved artifact
 directory for the exact run: model name, account, prompt, dataset, commit, diff,
 logs, and validation output all matter.
+Keep `--max-tasks` set on live runs unless you are intentionally expanding the
+benchmark and budget.
 
 ## Evaluation Commands
 

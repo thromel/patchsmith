@@ -245,6 +245,7 @@ def test_live_calibration_plan_includes_native_deepagents_live_runs(
     assert "deepagents_openai_chat" in smoke.success_evidence
     assert suite.status == "waiting_for_smoke"
     assert "deepagents_native_repair_eval_v1" in suite.output_path
+    assert "--max-tasks 10" in suite.command
 
     rendered = (tmp_path / "live_plan.md").read_text(encoding="utf-8")
     assert "DeepAgents native single-task smoke" in rendered

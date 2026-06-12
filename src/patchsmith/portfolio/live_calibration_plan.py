@@ -85,7 +85,8 @@ def live_calibration_plan_runs(
             command=(
                 "PYTHONPATH=src python3 -m patchsmith.cli eval-repair "
                 "--dataset evals/tasks/seeded_bugs_v1 "
-                "--runtime langgraph --planner openai --context-provider native_hybrid "
+                "--runtime langgraph --planner openai --max-tasks 10 "
+                "--context-provider native_hybrid "
                 "--output artifacts/experiments/live_openai_repair_eval_v1 --json"
             ),
             success_evidence=(
@@ -135,7 +136,7 @@ def live_calibration_plan_runs(
             command=(
                 "PYTHONPATH=src python3 -m patchsmith.cli eval-repair "
                 "--dataset evals/tasks/seeded_bugs_v1 "
-                "--runtime deepagents --planner deepagents --max-retries 1 "
+                "--runtime deepagents --planner deepagents --max-retries 1 --max-tasks 10 "
                 "--context-provider native_hybrid "
                 "--output artifacts/experiments/deepagents_native_repair_eval_v1 --json"
             ),
@@ -240,7 +241,8 @@ def live_calibration_commands() -> list[str]:
         (
             "PYTHONPATH=src python3 -m patchsmith.cli eval-repair "
             "--dataset evals/tasks/seeded_bugs_v1 "
-            "--runtime langgraph --planner openai --context-provider native_hybrid "
+            "--runtime langgraph --planner openai --max-tasks 10 "
+            "--context-provider native_hybrid "
             "--output artifacts/experiments/live_openai_repair_eval_v1 --json"
         ),
         (
@@ -254,7 +256,7 @@ def live_calibration_commands() -> list[str]:
         (
             "PYTHONPATH=src python3 -m patchsmith.cli eval-repair "
             "--dataset evals/tasks/seeded_bugs_v1 "
-            "--runtime deepagents --planner deepagents --max-retries 1 "
+            "--runtime deepagents --planner deepagents --max-retries 1 --max-tasks 10 "
             "--context-provider native_hybrid "
             "--output artifacts/experiments/deepagents_native_repair_eval_v1 --json"
         ),

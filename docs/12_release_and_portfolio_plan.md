@@ -128,7 +128,7 @@ PYTHONPATH=src python3 -m patchsmith.cli live-calibration-plan \
   --json
 ```
 
-Current live calibration plan output is `blocked` until `OPENAI_API_KEY` is configured. It records the required single-task live OpenAI smoke, follow-up seeded-suite eval, optional adapter refresh commands, success evidence, and claim boundaries without counting as live-provider evidence.
+Current live calibration plan output is credential-gated: it is `blocked` until `OPENAI_API_KEY` is configured in the executing environment, then it records the required single-task live OpenAI smoke, capped follow-up seeded-suite evals, optional adapter refresh commands, success evidence, and claim boundaries without counting the plan itself as live-provider evidence.
 
 Generate the final evaluation narrative:
 
