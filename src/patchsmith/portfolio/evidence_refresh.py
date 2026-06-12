@@ -6,14 +6,6 @@ from collections import Counter
 from pathlib import Path
 
 from patchsmith.artifacts import write_json, write_markdown
-from patchsmith.evaluation import (
-    check_public_issue_repair_readiness,
-    discover_public_issue_failure_signals,
-    execute_public_issue_repairs,
-    execute_public_issue_reproductions,
-    plan_public_issue_reproductions,
-    validate_public_issue_reproduction_specs,
-)
 from patchsmith.observability import (
     write_artifact_index,
     write_failure_report,
@@ -24,17 +16,16 @@ from patchsmith.portfolio.demo_assets import write_demo_media_assets, write_demo
 from patchsmith.portfolio.demo_readiness import write_demo_readiness_report
 from patchsmith.portfolio.docker_smoke import write_docker_smoke_report
 from patchsmith.portfolio.environment_readiness import write_environment_readiness_report
+from patchsmith.portfolio.evidence_refresh_public_issues import (
+    public_issue_evidence_refresh_steps,
+)
 from patchsmith.portfolio.evidence_refresh_support import (
     _evidence_refresh_status,
     _run_evidence_refresh_step,
     render_evidence_refresh_report,
 )
 from patchsmith.portfolio.final_evaluation import write_final_evaluation_report
-from patchsmith.portfolio.launch_blockers import (
-    _has_executed_public_repair_attempt_evidence,
-    _has_executed_public_reproduction_evidence,
-    write_launch_blocker_report,
-)
+from patchsmith.portfolio.launch_blockers import write_launch_blocker_report
 from patchsmith.portfolio.live_calibration import (
     write_live_calibration_plan_report,
     write_live_calibration_report,
@@ -224,285 +215,12 @@ def build_evidence_refresh_report(
             ),
         )
     )
-    public_tasks_dir = experiment_path("public_issue_corpus_v1/materialized_tasks")
-    public_focused_plan_path = experiment_path(
-        "public_issue_corpus_v1/focused_test_plan_results.json"
+    steps.extend(
+        public_issue_evidence_refresh_steps(
+            project_root=project_root,
+            experiments_dir=experiments_dir,
+        )
     )
-    public_reproduction_plan_path = experiment_path(
-        "public_issue_corpus_v1/public_issue_reproduction_plan_results.json"
-    )
-    public_reproduction_template_path = experiment_path(
-        "public_issue_corpus_v1/public_issue_reproduction_specs_template.json"
-    )
-    public_reviewed_reproduction_specs_path = (
-        project_root
-        / "evals"
-        / "issue_corpora"
-        / "public_issue_smoke_v1"
-        / "reproduction_specs.reviewed.json"
-    )
-    public_reproduction_specs_path = (
-        public_reviewed_reproduction_specs_path
-        if public_reviewed_reproduction_specs_path.exists()
-        else public_reproduction_template_path
-    )
-    if public_tasks_dir.exists() and public_tasks_dir.is_dir():
-        steps.append(
-            _run_evidence_refresh_step(
-                name="Public issue reproduction plan",
-                artifact_paths=output_paths(
-                    "public_issue_corpus_v1/public_issue_reproduction_plan_report.md",
-                    "public_issue_corpus_v1/public_issue_reproduction_plan_summary.json",
-                ),
-                action=lambda: plan_public_issue_reproductions(
-                    tasks_dir=public_tasks_dir,
-                    focused_plan_path=(
-                        public_focused_plan_path if public_focused_plan_path.exists() else None
-                    ),
-                    reproduction_specs_path=(
-                        public_reviewed_reproduction_specs_path
-                        if public_reviewed_reproduction_specs_path.exists()
-                        else None
-                    ),
-                    output_dir=experiment_path("public_issue_corpus_v1"),
-                )[1],
-            )
-        )
-        steps.append(
-            _run_evidence_refresh_step(
-                name="Public issue failure-signal discovery",
-                artifact_paths=output_paths(
-                    "public_issue_corpus_v1/public_issue_failure_signal_discovery_report.md",
-                    "public_issue_corpus_v1/public_issue_failure_signal_discovery_summary.json",
-                ),
-                action=lambda: discover_public_issue_failure_signals(
-                    plan_path=public_reproduction_plan_path,
-                    output_dir=experiment_path("public_issue_corpus_v1"),
-                )[1],
-            )
-        )
-        if public_reproduction_specs_path.exists():
-            steps.append(
-                _run_evidence_refresh_step(
-                    name="Public issue reproduction spec validation",
-                    artifact_paths=output_paths(
-                        (
-                            "public_issue_corpus_v1/"
-                            "public_issue_reproduction_spec_validation_report.md"
-                        ),
-                        (
-                            "public_issue_corpus_v1/"
-                            "public_issue_reproduction_spec_validation_summary.json"
-                        ),
-                    ),
-                    action=lambda: validate_public_issue_reproduction_specs(
-                        specs_path=public_reproduction_specs_path,
-                        tasks_dir=public_tasks_dir,
-                        focused_plan_path=(
-                            public_focused_plan_path if public_focused_plan_path.exists() else None
-                        ),
-                        output_dir=experiment_path("public_issue_corpus_v1"),
-                    )[1],
-                )
-            )
-        else:
-            steps.append(
-                EvidenceRefreshStep(
-                    name="Public issue reproduction spec validation",
-                    status="skipped",
-                    duration_ms=0,
-                    artifact_paths=output_paths(
-                        (
-                            "public_issue_corpus_v1/"
-                            "public_issue_reproduction_spec_validation_report.md"
-                        ),
-                        (
-                            "public_issue_corpus_v1/"
-                            "public_issue_reproduction_spec_validation_summary.json"
-                        ),
-                    ),
-                    summary="Skipped because the reproduction specs template is missing.",
-                )
-            )
-        public_reproduction_execution_summary_path = experiment_path(
-            "public_issue_corpus_v1/public_issue_reproduction_execution_summary.json"
-        )
-        if _has_executed_public_reproduction_evidence(public_reproduction_execution_summary_path):
-            steps.append(
-                EvidenceRefreshStep(
-                    name="Public issue reproduction execution",
-                    status="passed",
-                    duration_ms=0,
-                    artifact_paths=output_paths(
-                        "public_issue_corpus_v1/public_issue_reproduction_execution_report.md",
-                        ("public_issue_corpus_v1/public_issue_reproduction_execution_summary.json"),
-                    ),
-                    summary=(
-                        "Preserved existing executed reproduction evidence; rerun "
-                        "`execute-public-issue-reproductions --execute` explicitly to refresh it."
-                    ),
-                )
-            )
-        else:
-            steps.append(
-                _run_evidence_refresh_step(
-                    name="Public issue reproduction execution",
-                    artifact_paths=output_paths(
-                        "public_issue_corpus_v1/public_issue_reproduction_execution_report.md",
-                        ("public_issue_corpus_v1/public_issue_reproduction_execution_summary.json"),
-                    ),
-                    action=lambda: execute_public_issue_reproductions(
-                        plan_path=public_reproduction_plan_path,
-                        output_dir=experiment_path("public_issue_corpus_v1"),
-                    )[1],
-                )
-            )
-    else:
-        steps.append(
-            EvidenceRefreshStep(
-                name="Public issue reproduction plan",
-                status="skipped",
-                duration_ms=0,
-                artifact_paths=output_paths(
-                    "public_issue_corpus_v1/public_issue_reproduction_plan_report.md",
-                    "public_issue_corpus_v1/public_issue_reproduction_plan_summary.json",
-                ),
-                summary="Skipped because materialized public issue tasks are missing.",
-            )
-        )
-        steps.append(
-            EvidenceRefreshStep(
-                name="Public issue reproduction execution",
-                status="skipped",
-                duration_ms=0,
-                artifact_paths=output_paths(
-                    "public_issue_corpus_v1/public_issue_reproduction_execution_report.md",
-                    "public_issue_corpus_v1/public_issue_reproduction_execution_summary.json",
-                ),
-                summary="Skipped because materialized public issue tasks are missing.",
-            )
-        )
-        steps.append(
-            EvidenceRefreshStep(
-                name="Public issue failure-signal discovery",
-                status="skipped",
-                duration_ms=0,
-                artifact_paths=output_paths(
-                    "public_issue_corpus_v1/public_issue_failure_signal_discovery_report.md",
-                    "public_issue_corpus_v1/public_issue_failure_signal_discovery_summary.json",
-                ),
-                summary="Skipped because materialized public issue tasks are missing.",
-            )
-        )
-        steps.append(
-            EvidenceRefreshStep(
-                name="Public issue reproduction spec validation",
-                status="skipped",
-                duration_ms=0,
-                artifact_paths=output_paths(
-                    ("public_issue_corpus_v1/public_issue_reproduction_spec_validation_report.md"),
-                    (
-                        "public_issue_corpus_v1/"
-                        "public_issue_reproduction_spec_validation_summary.json"
-                    ),
-                ),
-                summary="Skipped because materialized public issue tasks are missing.",
-            )
-        )
-    public_repair_inputs = [
-        experiment_path("public_issue_corpus_v1/focused_test_run_results.json"),
-        experiment_path("public_issue_corpus_v1/focused_test_diagnosis_results.json"),
-        experiment_path("public_issue_corpus_v1/focused_test_setup_validation_results.json"),
-    ]
-    public_reproduction_execution_path = experiment_path(
-        "public_issue_corpus_v1/public_issue_reproduction_execution_results.json"
-    )
-    if all(path.exists() for path in public_repair_inputs):
-        steps.append(
-            _run_evidence_refresh_step(
-                name="Public issue repair readiness",
-                artifact_paths=output_paths(
-                    "public_issue_corpus_v1/public_issue_repair_readiness_report.md",
-                    "public_issue_corpus_v1/public_issue_repair_readiness_summary.json",
-                ),
-                action=lambda: check_public_issue_repair_readiness(
-                    focused_run_path=public_repair_inputs[0],
-                    diagnosis_path=public_repair_inputs[1],
-                    setup_validation_path=public_repair_inputs[2],
-                    reproduction_execution_path=(
-                        public_reproduction_execution_path
-                        if public_reproduction_execution_path.exists()
-                        else None
-                    ),
-                    tasks_dir=experiment_path("public_issue_corpus_v1/materialized_tasks"),
-                    output_dir=experiment_path("public_issue_corpus_v1"),
-                )[1],
-            )
-        )
-        steps.append(
-            EvidenceRefreshStep(
-                name="Public issue repair attempts",
-                status="passed",
-                duration_ms=0,
-                artifact_paths=output_paths(
-                    "public_issue_corpus_v1/public_issue_repair_attempt_report.md",
-                    "public_issue_corpus_v1/public_issue_repair_attempt_summary.json",
-                ),
-                summary=(
-                    "Preserved existing executed repair-attempt evidence; rerun "
-                    "`execute-public-issue-repairs --execute` explicitly to refresh it."
-                ),
-            )
-            if _has_executed_public_repair_attempt_evidence(
-                experiment_path("public_issue_corpus_v1/public_issue_repair_attempt_summary.json")
-            )
-            else _run_evidence_refresh_step(
-                name="Public issue repair attempts",
-                artifact_paths=output_paths(
-                    "public_issue_corpus_v1/public_issue_repair_attempt_report.md",
-                    "public_issue_corpus_v1/public_issue_repair_attempt_summary.json",
-                ),
-                action=lambda: execute_public_issue_repairs(
-                    readiness_path=experiment_path(
-                        "public_issue_corpus_v1/public_issue_repair_readiness_results.json"
-                    ),
-                    tasks_dir=experiment_path("public_issue_corpus_v1/materialized_tasks"),
-                    output_dir=experiment_path("public_issue_corpus_v1"),
-                    allow_warnings=True,
-                )[1],
-            )
-        )
-    else:
-        steps.append(
-            EvidenceRefreshStep(
-                name="Public issue repair readiness",
-                status="skipped",
-                duration_ms=0,
-                artifact_paths=output_paths(
-                    "public_issue_corpus_v1/public_issue_repair_readiness_report.md",
-                    "public_issue_corpus_v1/public_issue_repair_readiness_summary.json",
-                ),
-                summary=(
-                    "Skipped because focused public issue run, diagnosis, or setup-validation "
-                    "inputs are missing."
-                ),
-            )
-        )
-        steps.append(
-            EvidenceRefreshStep(
-                name="Public issue repair attempts",
-                status="skipped",
-                duration_ms=0,
-                artifact_paths=output_paths(
-                    "public_issue_corpus_v1/public_issue_repair_attempt_report.md",
-                    "public_issue_corpus_v1/public_issue_repair_attempt_summary.json",
-                ),
-                summary=(
-                    "Skipped because focused public issue run, diagnosis, or setup-validation "
-                    "inputs are missing."
-                ),
-            )
-        )
     steps.append(
         _run_evidence_refresh_step(
             name="Launch blockers",
