@@ -5,6 +5,9 @@ from patchsmith.cli import main
 from patchsmith.portfolio import (
     write_delivery_audit_report,
 )
+from patchsmith.portfolio.delivery_audit_public_issue_items import (
+    _delivery_public_repair_readiness_item,
+)
 
 
 def test_delivery_audit_maps_objective_to_current_evidence(
@@ -229,3 +232,28 @@ def test_delivery_audit_maps_objective_to_current_evidence(
     cli_payload = json.loads(capsys.readouterr().out)
     assert cli_payload["delivery_status"] == "in_progress_with_blockers"
     assert cli_output.exists()
+
+
+def test_delivery_audit_passes_warning_repair_readiness_after_validated_attempts() -> None:
+    item = _delivery_public_repair_readiness_item(
+        {
+            "task_count": 3,
+            "ready_tasks": 0,
+            "warning_tasks": 3,
+            "blocked_tasks": 0,
+            "repair_command_tasks": 3,
+            "missing_reproduction_tasks": 0,
+        },
+        public_repair_attempt_payload={
+            "dry_run": False,
+            "attempted_tasks": 3,
+            "validated_tasks": 3,
+            "failed_tasks": 0,
+            "blocked_tasks": 0,
+            "reproduced_input_tasks": 3,
+        },
+    )
+
+    assert item.status == "passed"
+    assert "validated_warning_repair_tasks=3" in item.evidence
+    assert "Keep warning-class setup" in item.next_action

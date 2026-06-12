@@ -205,7 +205,10 @@ def _delivery_audit_items(
         _delivery_public_failure_signal_discovery_item(failure_signal_discovery_payload),
         _delivery_public_reproduction_spec_validation_item(reproduction_spec_validation_payload),
         _delivery_public_reproduction_execution_item(reproduction_execution_payload),
-        _delivery_public_repair_readiness_item(public_repair_readiness_payload),
+        _delivery_public_repair_readiness_item(
+            public_repair_readiness_payload,
+            public_repair_attempt_payload=public_repair_attempt_payload,
+        ),
         _delivery_public_repair_attempt_item(public_repair_attempt_payload),
         _delivery_payload_status_item(
             requirement="Live LLM calibration has provider evidence.",

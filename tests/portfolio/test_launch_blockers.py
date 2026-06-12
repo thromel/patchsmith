@@ -131,3 +131,107 @@ def test_launch_blocker_report_prioritizes_readiness_artifacts(tmp_path: Path, c
     assert cli_payload["warning_count"] == 2
     assert cli_output.exists()
     assert cli_json_output.exists()
+
+
+def test_launch_blockers_clear_warning_paths_after_reviewed_execution(
+    tmp_path: Path,
+) -> None:
+    artifacts_dir = tmp_path / "artifacts"
+    experiments_dir = artifacts_dir / "experiments"
+    public_issue_dir = experiments_dir / "public_issue_corpus_v1"
+    public_issue_dir.mkdir(parents=True)
+
+    (experiments_dir / "docker_smoke.json").write_text(
+        json.dumps({"smoke_status": "passed"}),
+        encoding="utf-8",
+    )
+    (experiments_dir / "calibration_readiness.json").write_text(
+        json.dumps(
+            {
+                "calibration_status": "calibrated",
+                "saved_live_provider_count": 3,
+                "deepagents_package_run_count": 3,
+                "deepagents_compatibility_run_count": 0,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (experiments_dir / "release_hygiene.json").write_text(
+        json.dumps(
+            {
+                "release_status": "ready",
+                "passed_count": 13,
+                "warning_count": 0,
+                "blocked_count": 0,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (public_issue_dir / "focused_test_setup_readiness_summary.json").write_text(
+        json.dumps(
+            {
+                "docker_smoke_status": "passed",
+                "task_count": 3,
+                "ready_tasks": 0,
+                "warning_tasks": 3,
+                "blocked_tasks": 0,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (public_issue_dir / "focused_test_setup_validation_summary.json").write_text(
+        json.dumps(
+            {
+                "dry_run": False,
+                "task_count": 3,
+                "attempted_tasks": 3,
+                "passed_tasks": 3,
+                "failed_tasks": 0,
+                "timed_out_tasks": 0,
+                "blocked_tasks": 0,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (public_issue_dir / "public_issue_repair_readiness_summary.json").write_text(
+        json.dumps(
+            {
+                "task_count": 3,
+                "ready_tasks": 0,
+                "warning_tasks": 3,
+                "blocked_tasks": 0,
+                "repair_command_tasks": 3,
+                "missing_reproduction_tasks": 0,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (public_issue_dir / "public_issue_repair_attempt_summary.json").write_text(
+        json.dumps(
+            {
+                "dry_run": False,
+                "task_count": 3,
+                "attempted_tasks": 3,
+                "validated_tasks": 3,
+                "failed_tasks": 0,
+                "blocked_tasks": 0,
+                "reproduced_input_tasks": 3,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    report = write_launch_blocker_report(
+        artifacts_dir=artifacts_dir,
+        output_path=tmp_path / "launch_blockers.md",
+        json_output_path=tmp_path / "launch_blockers.json",
+    )
+
+    assert report.launch_status == "ready"
+    assert report.warning_count == 0
+    statuses = {item.blocker_id: item.status for item in report.items}
+    assert statuses["focused_setup_readiness"] == "ready"
+    assert statuses["public_repair_readiness"] == "ready"
+    evidence = {item.blocker_id: item.evidence for item in report.items}
+    assert "Warning-class setup path was executed" in evidence["focused_setup_readiness"]
+    assert "Warning-class repair path was executed" in evidence["public_repair_readiness"]

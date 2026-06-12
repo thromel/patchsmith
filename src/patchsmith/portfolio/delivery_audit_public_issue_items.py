@@ -206,6 +206,8 @@ def _delivery_public_reproduction_execution_item(
 
 def _delivery_public_repair_readiness_item(
     payload: dict[str, Any] | None,
+    *,
+    public_repair_attempt_payload: dict[str, Any] | None = None,
 ) -> DeliveryAuditItem:
     source = (
         "artifacts/experiments/public_issue_corpus_v1/public_issue_repair_readiness_summary.json"
@@ -223,10 +225,14 @@ def _delivery_public_repair_readiness_item(
     ready = _payload_int(payload, "ready_tasks")
     repair_commands = _payload_int(payload, "repair_command_tasks")
     missing_reproduction = _payload_int(payload, "missing_reproduction_tasks")
+    validated_warning_path = _all_public_repairs_validated_after_warning_review(
+        public_repair_attempt_payload,
+        task_count=ready + warning + blocked,
+    )
     if blocked:
         status = "blocked"
         next_action = "Resolve blocked public repair-readiness prerequisites."
-    elif warning:
+    elif warning and not validated_warning_path:
         status = "warning"
         next_action = (
             "Review warning-class setup and sandbox caveats before claiming public repair quality."
@@ -235,15 +241,25 @@ def _delivery_public_repair_readiness_item(
         )
     else:
         status = "passed"
-        next_action = "Run bounded public issue repair attempts and save run artifacts."
+        next_action = (
+            "Keep warning-class setup and sandbox caveats visible next to public repair claims."
+            if warning
+            else "Run bounded public issue repair attempts and save run artifacts."
+        )
+    evidence = (
+        f"ready_tasks={ready}, warning_tasks={warning}, blocked_tasks={blocked}, "
+        f"repair_command_tasks={repair_commands}, "
+        f"missing_reproduction_tasks={missing_reproduction}"
+    )
+    if validated_warning_path:
+        evidence += (
+            ", validated_warning_repair_tasks="
+            f"{_payload_int(public_repair_attempt_payload or {}, 'validated_tasks')}"
+        )
     return _delivery_item(
         requirement="Public issue repair attempts are readiness-gated.",
         status=status,
-        evidence=(
-            f"ready_tasks={ready}, warning_tasks={warning}, blocked_tasks={blocked}, "
-            f"repair_command_tasks={repair_commands}, "
-            f"missing_reproduction_tasks={missing_reproduction}"
-        ),
+        evidence=evidence,
         source=source,
         next_action=next_action,
     )
@@ -298,4 +314,21 @@ def _delivery_public_repair_attempt_item(
         ),
         source=source,
         next_action=next_action,
+    )
+
+
+def _all_public_repairs_validated_after_warning_review(
+    payload: dict[str, Any] | None,
+    *,
+    task_count: int,
+) -> bool:
+    if payload is None or task_count <= 0:
+        return False
+    return (
+        payload.get("dry_run") is False
+        and _payload_int(payload, "attempted_tasks") >= task_count
+        and _payload_int(payload, "validated_tasks") >= task_count
+        and _payload_int(payload, "reproduced_input_tasks") >= task_count
+        and _payload_int(payload, "failed_tasks") == 0
+        and _payload_int(payload, "blocked_tasks") == 0
     )
