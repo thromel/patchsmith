@@ -2,24 +2,23 @@
 
 from __future__ import annotations
 
-import tempfile
 from pathlib import Path
 from typing import Any
 
 from patchsmith.evaluation._helpers import (
-    _dedupe_preserve_order,
     _optional_string,
-    _path_has_text,
     _string_list,
 )
+from patchsmith.evaluation.issue_corpus.public_issue_repair_attempt_results import (
+    public_issue_repair_attempt_result as _attempt_result,
+)
+from patchsmith.evaluation.issue_corpus.public_issue_repair_attempt_runner import (
+    run_public_issue_repair_attempt,
+)
 from patchsmith.evaluation.issue_corpus.public_issue_repair_helpers import (
-    public_issue_repair_attempt_issue_text,
     public_issue_repair_issue_text,
-    source_hint_file_paths,
 )
 from patchsmith.evaluation_models import IssueCorpusPublicRepairAttemptResult
-from patchsmith.ingest import clone_or_copy_repository
-from patchsmith.models import RunRequest
 from patchsmith.public_issue_fixtures import (
     normalize_public_issue_fixture_files as _normalize_public_issue_fixture_files,
 )
@@ -28,12 +27,6 @@ from patchsmith.public_issue_fixtures import (
 )
 from patchsmith.public_issue_fixtures import (
     public_issue_fixture_paths as _public_issue_fixture_paths,
-)
-from patchsmith.public_issue_fixtures import (
-    public_issue_fixture_source_hints as _public_issue_fixture_source_hints,
-)
-from patchsmith.public_issue_fixtures import (
-    write_public_issue_fixture_files as _write_public_issue_fixture_files,
 )
 
 
@@ -176,67 +169,24 @@ def execute_public_issue_repair_record(
     assert runner is not None
     assert repo_path_value is not None
     assert issue_text is not None
-    run_repo = repo_path_value
-    source_hints = _dedupe_preserve_order(
-        [
-            *validation_source_hints,
-            *_public_issue_fixture_source_hints(
-                repo_path=Path(repo_path_value),
-                fixture_files=validation_fixture_files,
-            ),
-        ]
-    )
-    run_issue_text = public_issue_repair_attempt_issue_text(
-        issue_text=issue_text,
-        validation_command=validation_command,
-        validation_fixture_paths=validation_fixture_paths,
-        validation_fixture_files=validation_fixture_files,
-        source_hints=source_hints,
-    )
-    context_paths = tuple(source_hint_file_paths(source_hints))
+    assert validation_command is not None
     try:
-        if validation_fixture_files:
-            with tempfile.TemporaryDirectory(
-                prefix="patchsmith-public-repair-fixtures-"
-            ) as tmp_dir:
-                fixture_workspace = Path(tmp_dir) / "repo"
-                snapshot = clone_or_copy_repository(repo_path_value, fixture_workspace)
-                _write_public_issue_fixture_files(
-                    repo_path=snapshot.repo_path,
-                    fixture_files=validation_fixture_files,
-                )
-                run_repo = str(snapshot.repo_path)
-                run_result = runner.run(
-                    RunRequest(
-                        repo=run_repo,
-                        issue_text=run_issue_text,
-                        issue_url=issue_url,
-                        test_command=validation_command,
-                        runtime=runtime,
-                        planner=planner,
-                        max_retries=max_retries,
-                        context_provider=context_provider,
-                        sandbox_mode=sandbox_mode,
-                        sandbox_image=sandbox_image,
-                        context_paths=context_paths,
-                    )
-                )
-        else:
-            run_result = runner.run(
-                RunRequest(
-                    repo=run_repo,
-                    issue_text=run_issue_text,
-                    issue_url=issue_url,
-                    test_command=validation_command,
-                    runtime=runtime,
-                    planner=planner,
-                    max_retries=max_retries,
-                    context_provider=context_provider,
-                    sandbox_mode=sandbox_mode,
-                    sandbox_image=sandbox_image,
-                    context_paths=context_paths,
-                )
-            )
+        run_outcome = run_public_issue_repair_attempt(
+            runner=runner,
+            repo_path=repo_path_value,
+            issue_text=issue_text,
+            issue_url=issue_url,
+            validation_command=validation_command,
+            validation_fixture_paths=validation_fixture_paths,
+            validation_fixture_files=validation_fixture_files,
+            validation_source_hints=validation_source_hints,
+            runtime=runtime,
+            planner=planner,
+            context_provider=context_provider,
+            sandbox_mode=sandbox_mode,
+            sandbox_image=sandbox_image,
+            max_retries=max_retries,
+        )
     except Exception as error:
         errors.append(f"PatchSmith repair run failed: {error}")
         return _attempt_result(
@@ -270,15 +220,13 @@ def execute_public_issue_repair_record(
             next_actions=[*next_actions, "inspect the failed PatchSmith run before retrying"],
         )
 
-    run_id = run_result.run_id
-    run_status = run_result.status
-    report_path = str(run_result.report_path)
-    trace_path = str(run_result.trace_path)
-    final_diff_path = str(run_result.final_diff_path)
-    test_exit_code = (
-        run_result.test_result.exit_code if run_result.test_result is not None else None
-    )
-    patch_generated = _path_has_text(run_result.final_diff_path)
+    run_id = run_outcome.run_id
+    run_status = run_outcome.run_status
+    report_path = run_outcome.report_path
+    trace_path = run_outcome.trace_path
+    final_diff_path = run_outcome.final_diff_path
+    test_exit_code = run_outcome.test_exit_code
+    patch_generated = run_outcome.patch_generated
     if patch_generated:
         evidence.append("PatchSmith generated a final diff")
     if test_exit_code == 0 and patch_generated:
@@ -323,67 +271,4 @@ def execute_public_issue_repair_record(
         warnings=warnings,
         evidence=evidence,
         next_actions=next_actions,
-    )
-
-
-def _attempt_result(
-    *,
-    task_id: str | None,
-    repository: str | None,
-    issue_url: str | None,
-    status: str,
-    readiness_status: str,
-    repo_path: str | None,
-    repo_exists: bool,
-    repair_command: str | None,
-    validation_command: str | None,
-    validation_fixture_paths: list[str],
-    reproduction_execution_status: str | None,
-    runtime: str,
-    planner: str,
-    context_provider: str,
-    sandbox_mode: str,
-    sandbox_image: str,
-    dry_run: bool,
-    run_id: str | None,
-    run_status: str | None,
-    report_path: str | None,
-    trace_path: str | None,
-    final_diff_path: str | None,
-    test_exit_code: int | None,
-    patch_generated: bool,
-    errors: list[str],
-    warnings: list[str],
-    evidence: list[str],
-    next_actions: list[str],
-) -> IssueCorpusPublicRepairAttemptResult:
-    return IssueCorpusPublicRepairAttemptResult(
-        task_id=task_id,
-        repository=repository,
-        issue_url=issue_url,
-        status=status,
-        readiness_status=readiness_status,
-        repo_path=repo_path,
-        repo_exists=repo_exists,
-        repair_command=repair_command,
-        validation_command=validation_command,
-        validation_fixture_paths=validation_fixture_paths,
-        reproduction_execution_status=reproduction_execution_status,
-        runtime=runtime,
-        planner=planner,
-        context_provider=context_provider,
-        sandbox_mode=sandbox_mode,
-        sandbox_image=sandbox_image,
-        dry_run=dry_run,
-        run_id=run_id,
-        run_status=run_status,
-        report_path=report_path,
-        trace_path=trace_path,
-        final_diff_path=final_diff_path,
-        test_exit_code=test_exit_code,
-        patch_generated=patch_generated,
-        errors=_dedupe_preserve_order(errors),
-        warnings=_dedupe_preserve_order(warnings),
-        evidence=_dedupe_preserve_order(evidence),
-        next_actions=_dedupe_preserve_order(next_actions),
     )
