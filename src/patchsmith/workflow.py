@@ -5,15 +5,6 @@ import time
 from pathlib import Path
 
 from patchsmith.analysis import analyze_repair_outcome
-from patchsmith.context import (
-    ContextBrokerError,
-    ContextBrokerRequest,
-    CtxhelmCliBroker,
-    PatchSmithNativeBroker,
-    fallback_bundle,
-    promote_active_context_targets,
-    retrieved_context_from_bundle,
-)
 from patchsmith.deepagents_planner import DeepAgentsRepairPlanner
 from patchsmith.ingest import clone_or_copy_repository, index_repository
 from patchsmith.models import RepairRunResult, RunRequest, new_id
@@ -24,7 +15,6 @@ from patchsmith.planning import (
     SeededFakeRepairModelClient,
 )
 from patchsmith.reporting import render_run_report
-from patchsmith.retrieval import GraphRetriever, HybridRetriever, KeywordRetriever
 from patchsmith.runtime import (
     AgentlessRuntime,
     AgentRuntime,
@@ -43,22 +33,13 @@ from patchsmith.runtime.attempts import (
 )
 from patchsmith.sandbox import create_sandbox_runner
 from patchsmith.tracing import RunTrace
+from patchsmith.workflow_context import WorkflowContextSelector
 
 
 class RepairRunner:
     def __init__(self, *, artifacts_dir: Path) -> None:
         self.artifacts_dir = artifacts_dir
-        self.retriever = KeywordRetriever()
-        self.native_broker = PatchSmithNativeBroker(self.retriever)
-        self.hybrid_retriever = HybridRetriever()
-        self.hybrid_broker = PatchSmithNativeBroker(
-            self.hybrid_retriever, provider_name="patchsmith_native_hybrid"
-        )
-        self.graph_retriever = GraphRetriever()
-        self.graph_broker = PatchSmithNativeBroker(
-            self.graph_retriever, provider_name="patchsmith_native_graph"
-        )
-        self.ctxhelm_broker = CtxhelmCliBroker()
+        self.context_selector = WorkflowContextSelector()
 
     def run(self, request: RunRequest) -> RepairRunResult:
         run_id = new_id()
@@ -112,107 +93,14 @@ class RepairRunner:
                 started=started,
             )
 
-            started = time.perf_counter()
-            native_context = self.retriever.retrieve(
+            context_selection = self.context_selector.select(
+                request=request,
                 repo_path=repo_path,
-                repo_index=repo_index,
-                issue_text=request.issue_text,
-                top_k=request.top_k,
-            )
-            hybrid_context = self.hybrid_retriever.retrieve(
-                repo_path=repo_path,
-                repo_index=repo_index,
-                issue_text=request.issue_text,
-                top_k=request.top_k,
-            )
-            graph_context = self.graph_retriever.retrieve(
-                repo_path=repo_path,
-                repo_index=repo_index,
-                issue_text=request.issue_text,
-                top_k=request.top_k,
-            )
-            trace.time_event(
-                node_name="retrieve",
-                event_type="keyword_search",
-                status="completed",
-                input_summary=request.issue_text[:160],
-                output_summary=(
-                    ", ".join(context.path for context in native_context) or "no matches"
-                ),
-                payload={"contexts": [context.to_dict() for context in native_context]},
-                started=started,
-            )
-
-            broker_request = ContextBrokerRequest(
-                repo_path=repo_path,
-                task=request.issue_text,
-                active_paths=request.context_paths,
-            )
-            native_bundle = self.native_broker.prepare(
-                broker_request,
                 repo_index=repo_index,
                 artifact_dir=context_dir,
+                trace=trace,
             )
-            context_bundle = native_bundle
-            fallback_contexts = native_context
-            if request.context_provider == "native_hybrid":
-                context_bundle = self.hybrid_broker.prepare(
-                    broker_request,
-                    repo_index=repo_index,
-                    artifact_dir=context_dir,
-                )
-                fallback_contexts = hybrid_context
-            if request.context_provider == "native_graph":
-                context_bundle = self.graph_broker.prepare(
-                    broker_request,
-                    repo_index=repo_index,
-                    artifact_dir=context_dir,
-                )
-                fallback_contexts = graph_context
-            if request.context_provider in {"ctxhelm_cli", "auto"}:
-                try:
-                    context_bundle = self.ctxhelm_broker.prepare(
-                        broker_request,
-                        repo_index=repo_index,
-                        artifact_dir=context_dir,
-                    )
-                except ContextBrokerError as error:
-                    context_bundle = fallback_bundle(
-                        provider="ctxhelm_cli",
-                        reason=str(error),
-                        native_bundle=native_bundle,
-                    )
-                if not context_bundle.targets:
-                    context_bundle = fallback_bundle(
-                        provider="ctxhelm_cli",
-                        reason="ctxhelm returned no target files; using native keyword contexts",
-                        native_bundle=native_bundle,
-                    )
-            context_bundle = promote_active_context_targets(
-                bundle=context_bundle,
-                repo_path=repo_path,
-                active_paths=request.context_paths,
-            )
-
-            trace.emit(
-                node_name="context_broker",
-                event_type="context_broker_call",
-                status="fallback" if context_bundle.fallback_used else "completed",
-                input_summary=request.context_provider,
-                output_summary=(
-                    f"{context_bundle.provider} targets={len(context_bundle.targets)} "
-                    f"tests={len(context_bundle.related_tests)}"
-                ),
-                payload=context_bundle.to_dict(),
-                latency_ms=context_bundle.latency_ms,
-            )
-
-            retrieved_context = retrieved_context_from_bundle(
-                bundle=context_bundle,
-                repo_path=repo_path,
-                fallback_contexts=fallback_contexts,
-                top_k=request.top_k,
-            )
+            retrieved_context = context_selection.retrieved_context
 
             runtime = _runtime_for(request.runtime, request.planner)
             command = request.test_command or (
