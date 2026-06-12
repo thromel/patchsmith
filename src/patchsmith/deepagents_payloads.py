@@ -48,13 +48,21 @@ def normalize_patch_payload(
         return payload
     fallback: dict[str, Any] | None = None
     for old_candidate in [old, *old_span_candidates(old)]:
-        if old_candidate not in content:
+        source_old = (
+            old_candidate
+            if old_candidate in content
+            else unique_stripped_line_span(
+                content,
+                old_candidate,
+            )
+        )
+        if source_old is None:
             continue
         for new_candidate in [new, *new_span_candidates(new)]:
-            candidate_payload = {**payload, "old": old_candidate, "new": new_candidate}
+            candidate_payload = {**payload, "old": source_old, "new": new_candidate}
             if not requires_python_compile(path):
                 return candidate_payload
-            candidate_content = content.replace(old_candidate, new_candidate, 1)
+            candidate_content = content.replace(source_old, new_candidate, 1)
             if python_compiles(candidate_content, path):
                 return candidate_payload
             if fallback is None:
@@ -93,6 +101,25 @@ def strip_common_leading_tab(text: str) -> str:
     if not nonblank or not all(line.startswith("\t") for line in nonblank):
         return text
     return "\n".join(line[1:] if line.startswith("\t") else line for line in lines)
+
+
+def unique_stripped_line_span(content: str, candidate: str) -> str | None:
+    candidate_lines = candidate.splitlines()
+    if not candidate_lines:
+        return None
+    source_lines = content.splitlines(keepends=True)
+    if len(candidate_lines) > len(source_lines):
+        return None
+
+    matches: list[str] = []
+    normalized_candidate = [line.strip() for line in candidate_lines]
+    for start in range(len(source_lines) - len(candidate_lines) + 1):
+        source_window = source_lines[start : start + len(candidate_lines)]
+        if [line.strip() for line in source_window] == normalized_candidate:
+            matches.append("".join(source_window))
+            if len(matches) > 1:
+                return None
+    return matches[0] if len(matches) == 1 else None
 
 
 def requires_python_compile(path: str) -> bool:

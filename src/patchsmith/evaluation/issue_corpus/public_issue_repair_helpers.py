@@ -83,14 +83,26 @@ def public_issue_repair_attempt_issue_text(
     return "\n".join(sections)
 
 
-def source_hint_file_paths(source_hints: list[str]) -> list[str]:
-    return _dedupe_preserve_order(
-        [
-            Path(hint.partition("#")[0]).as_posix()
-            for hint in source_hints
-            if isinstance(hint, str) and hint.partition("#")[0].strip()
-        ]
-    )
+def source_hint_context_paths(source_hints: list[str]) -> list[str]:
+    context_paths: list[str] = []
+    for hint in source_hints:
+        if not isinstance(hint, str):
+            continue
+        context_path = _normalize_source_hint_context_path(hint)
+        if context_path:
+            context_paths.append(context_path)
+    return _dedupe_preserve_order(context_paths)
+
+
+def _normalize_source_hint_context_path(hint: str) -> str:
+    path_text, separator, symbol = hint.strip().partition("#")
+    if not path_text:
+        return ""
+    normalized_path = Path(path_text).as_posix()
+    normalized_symbol = symbol.strip()
+    if separator and normalized_symbol:
+        return f"{normalized_path}#{normalized_symbol}"
+    return normalized_path
 
 
 def load_public_issue_task_manifests(tasks_dir: Path | None) -> dict[str, dict[str, Any]]:

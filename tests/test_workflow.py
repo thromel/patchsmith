@@ -200,6 +200,8 @@ def test_deepagents_runner_retries_with_sandbox_feedback(
     assert "Previous DeepAgents repair attempt 1 did not validate" in planner.issue_texts[1]
     assert "failed patch has been reverted" in planner.issue_texts[1]
     assert "Do not return the same failed diff unchanged" in planner.issue_texts[1]
+    assert "Sandbox feedback summary" in planner.issue_texts[1]
+    assert "Previous changed hunks" in planner.issue_texts[1]
     assert "previous patch is on the code path reached" in planner.issue_texts[1]
     assert "failure from attempt 1" in planner.issue_texts[1]
     assert len(sandbox.calls) == 2

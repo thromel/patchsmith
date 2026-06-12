@@ -5,6 +5,7 @@ from pathlib import Path
 from patchsmith.analysis import RepairOutcomeAnalysis
 from patchsmith.models import CommandResult, RunRequest
 from patchsmith.runtime.core import AgentResult
+from patchsmith.runtime.feedback import sandbox_feedback_summary
 from patchsmith.sandbox import SandboxRunner
 from patchsmith.tracing import RunTrace
 
@@ -160,6 +161,8 @@ def issue_with_test_feedback(
         ),
         f"Previous agent status:\n{agent_status}",
         f"Previous agent summary:\n{_truncate_feedback(agent_summary)}",
+        "Sandbox feedback summary:\n"
+        + sandbox_feedback_summary(test_result=test_result, final_diff=final_diff),
     ]
     if test_result is not None:
         sections.extend(

@@ -656,6 +656,37 @@ def test_deepagents_repair_planner_prefers_compile_valid_replacement_candidate()
     assert plan.new == "def add(left, right):\n    return left + right"
 
 
+def test_deepagents_repair_planner_normalizes_unique_stripped_old_span() -> None:
+    class FakeAgent:
+        def invoke(self, payload: dict[str, object]) -> dict[str, object]:
+            return {
+                "messages": [
+                    AIMessage(
+                        content=(
+                            '{"path":"/src/simple_calc.py",'
+                            '"old":"def add(left, right):\\nreturn left - right",'
+                            '"new":"def add(left, right):\\n    return left + right",'
+                            '"summary":"Fix add."}'
+                        )
+                    )
+                ],
+            }
+
+    planner = DeepAgentsRepairPlanner(
+        DeepAgentsPlannerConfig(model="gpt-test"),
+        agent_factory=lambda config: FakeAgent(),
+    )
+
+    plan = planner.plan(
+        issue_text="add returns the wrong result",
+        retrieved_context=[_context("src/simple_calc.py")],
+    )
+
+    assert plan is not None
+    assert plan.old == "def add(left, right):\n    return left - right"
+    assert plan.new == "def add(left, right):\n    return left + right"
+
+
 def _context(path: str) -> RetrievedContext:
     return RetrievedContext(
         path=path,

@@ -155,7 +155,7 @@ def _normalize_active_context_path(path: str) -> tuple[str, str | None] | None:
     if not file_path:
         return None
     normalized_symbol = symbol.strip() or None
-    if normalized_symbol is not None and not _is_python_identifier(normalized_symbol):
+    if normalized_symbol is not None and not _is_python_symbol(normalized_symbol):
         normalized_symbol = None
     return Path(file_path).as_posix(), normalized_symbol
 
@@ -219,11 +219,11 @@ def _target_symbol(target: ContextTarget) -> str | None:
     if not reason.startswith(ACTIVE_CONTEXT_SYMBOL_REASON_PREFIX):
         return None
     symbol = reason.removeprefix(ACTIVE_CONTEXT_SYMBOL_REASON_PREFIX).strip()
-    return symbol if _is_python_identifier(symbol) else None
+    return symbol if _is_python_symbol(symbol) else None
 
 
-def _is_python_identifier(value: str) -> bool:
-    return value.isidentifier()
+def _is_python_symbol(value: str) -> bool:
+    return all(part.isidentifier() for part in value.split("."))
 
 
 def _read_excerpt(
@@ -232,6 +232,7 @@ def _read_excerpt(
     max_lines: int = 8,
     symbol: str | None = None,
     context_lines: int = 4,
+    symbol_max_lines: int = 120,
 ) -> str:
     try:
         lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
@@ -241,7 +242,7 @@ def _read_excerpt(
         symbol_index = _symbol_line_index(lines, symbol)
         if symbol_index is not None:
             start = max(0, symbol_index - context_lines)
-            stop = min(len(lines), symbol_index + context_lines + 1)
+            stop = min(len(lines), symbol_index + symbol_max_lines)
             return "\n".join(
                 f"{index + 1}: {line}" for index, line in enumerate(lines[start:stop], start=start)
             )
@@ -249,11 +250,12 @@ def _read_excerpt(
 
 
 def _symbol_line_index(lines: list[str], symbol: str) -> int | None:
-    pattern = re.compile(rf"\b(?:async\s+def|def|class)\s+{re.escape(symbol)}\b")
+    search_name = symbol.rsplit(".", 1)[-1]
+    pattern = re.compile(rf"\b(?:async\s+def|def|class)\s+{re.escape(search_name)}\b")
     for index, line in enumerate(lines):
         if pattern.search(line):
             return index
-    fallback = re.compile(rf"\b{re.escape(symbol)}\b")
+    fallback = re.compile(rf"\b{re.escape(search_name)}\b")
     for index, line in enumerate(lines):
         if fallback.search(line):
             return index

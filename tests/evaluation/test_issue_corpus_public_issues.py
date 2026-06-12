@@ -1364,7 +1364,7 @@ def test_execute_public_issue_repairs_passes_source_hints_as_context_paths(
     assert summary.attempted_tasks == 1
     assert results[0].status == "failed"
     assert len(captured_requests) == 1
-    assert captured_requests[0].context_paths == ("src/example.py",)
+    assert captured_requests[0].context_paths == ("src/example.py#target_symbol",)
     assert "`src/example.py#target_symbol`" in captured_requests[0].issue_text
 
 

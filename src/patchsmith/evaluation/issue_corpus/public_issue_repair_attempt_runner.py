@@ -10,7 +10,7 @@ from typing import Any
 from patchsmith.evaluation._helpers import _dedupe_preserve_order, _path_has_text
 from patchsmith.evaluation.issue_corpus.public_issue_repair_helpers import (
     public_issue_repair_attempt_issue_text,
-    source_hint_file_paths,
+    source_hint_context_paths,
 )
 from patchsmith.ingest import clone_or_copy_repository
 from patchsmith.models import RunRequest
@@ -67,7 +67,7 @@ def run_public_issue_repair_attempt(
         validation_fixture_files=validation_fixture_files,
         source_hints=source_hints,
     )
-    context_paths = tuple(source_hint_file_paths(source_hints))
+    context_paths = tuple(source_hint_context_paths(source_hints))
     if validation_fixture_files:
         with tempfile.TemporaryDirectory(prefix="patchsmith-public-repair-fixtures-") as tmp_dir:
             fixture_workspace = Path(tmp_dir) / "repo"
