@@ -3,13 +3,18 @@
 from __future__ import annotations
 
 import json
-import os
-import shutil
-import subprocess
 from pathlib import Path
 
 from patchsmith.artifacts import write_json, write_markdown
-from patchsmith.portfolio._helpers import _markdown_cell, _utc_now
+from patchsmith.portfolio._helpers import _utc_now
+from patchsmith.portfolio.docker_smoke_checks import (
+    docker_daemon_check,
+    docker_environment_snapshot,
+    docker_image_check,
+    docker_remediation_commands,
+    docker_smoke_status,
+)
+from patchsmith.portfolio.docker_smoke_reports import render_docker_smoke_report
 from patchsmith.portfolio.models import DockerSmokeCheck, DockerSmokeReport
 
 
@@ -39,7 +44,7 @@ def build_docker_smoke_report(
     run_id: str | None = None
     test_exit_code: int | None = None
 
-    docker_check = _docker_daemon_check(docker_binary)
+    docker_check = docker_daemon_check(docker_binary)
     checks.append(docker_check)
     if docker_check.status != "passed":
         checks.append(
@@ -59,7 +64,7 @@ def build_docker_smoke_report(
             )
         )
     else:
-        image_check = _docker_image_check(docker_binary, image)
+        image_check = docker_image_check(docker_binary, image)
         checks.append(image_check)
         if image_check.status != "passed":
             checks.append(
@@ -111,12 +116,12 @@ def build_docker_smoke_report(
 
     build_command = f"{docker_binary} build -f docker/seeded-smoke.Dockerfile -t {image} ."
     smoke_command = f"PYTHONPATH=src python3 -m patchsmith.cli docker-smoke --image {image} --json"
-    environment_snapshot = _docker_environment_snapshot(docker_binary)
+    environment_snapshot = docker_environment_snapshot(docker_binary)
     return DockerSmokeReport(
         project_root=str(project_root),
         artifacts_dir=str(artifacts_dir),
         generated_at=_utc_now(),
-        smoke_status=_docker_smoke_status(checks),
+        smoke_status=docker_smoke_status(checks),
         docker_binary=docker_binary,
         image=image,
         task_dir=str(task_dir),
@@ -129,7 +134,7 @@ def build_docker_smoke_report(
         test_exit_code=test_exit_code,
         checks=checks,
         environment=environment_snapshot,
-        remediation_commands=_docker_remediation_commands(
+        remediation_commands=docker_remediation_commands(
             docker_binary=docker_binary,
             build_command=build_command,
             smoke_command=smoke_command,
@@ -170,81 +175,6 @@ def write_docker_smoke_report(
         json_output_path.parent.mkdir(parents=True, exist_ok=True)
         write_json(json_output_path, report.to_dict(), trailing_newline=True)
     return report
-
-
-def render_docker_smoke_report(report: DockerSmokeReport) -> str:
-    lines = [
-        "# PatchSmith Docker Smoke Report",
-        "",
-        f"- Generated at: `{report.generated_at}`",
-        f"- Project root: `{report.project_root}`",
-        f"- Artifacts directory: `{report.artifacts_dir}`",
-        f"- Smoke status: `{report.smoke_status}`",
-        f"- Docker binary: `{report.docker_binary}`",
-        f"- Image: `{report.image}`",
-        f"- Task directory: `{report.task_dir}`",
-        f"- Test command: `{report.test_command}`",
-        f"- Runtime: `{report.runtime}`",
-        f"- Context provider: `{report.context_provider}`",
-        f"- Run ID: `{report.run_id or 'n/a'}`",
-        f"- Test exit code: `{report.test_exit_code if report.test_exit_code is not None else 'n/a'}`",
-        "",
-        "## Checks",
-        "",
-        "| Check | Status | Evidence | Next Action |",
-        "|---|---|---|---|",
-    ]
-    for check in report.checks:
-        lines.append(
-            "| "
-            f"{check.name} | "
-            f"{check.status} | "
-            f"{_markdown_cell(check.evidence)} | "
-            f"{_markdown_cell(check.next_action)} |"
-        )
-    lines.extend(
-        [
-            "",
-            "## Environment",
-            "",
-            "| Key | Value |",
-            "|---|---|",
-        ]
-    )
-    for key, value in report.environment.items():
-        lines.append(f"| {key} | {_markdown_cell(value)} |")
-    lines.extend(
-        [
-            "",
-            "## Commands",
-            "",
-            "Diagnostic and remediation commands:",
-            "",
-            "```bash",
-            *report.remediation_commands,
-            "```",
-            "",
-            "Build the seeded smoke image:",
-            "",
-            "```bash",
-            report.build_command,
-            "```",
-            "",
-            "Run the smoke:",
-            "",
-            "```bash",
-            report.smoke_command,
-            "```",
-        ]
-    )
-    if report.run_report_path or report.run_trace_path:
-        lines.extend(["", "## Run Artifacts", ""])
-        if report.run_report_path:
-            lines.append(f"- Report: `{report.run_report_path}`")
-        if report.run_trace_path:
-            lines.append(f"- Trace: `{report.run_trace_path}`")
-    lines.extend(["", "## Decision", "", _docker_smoke_decision(report)])
-    return "\n".join(lines) + "\n"
 
 
 def _docker_sandbox_success_count(artifacts_dir: Path) -> int:
@@ -301,112 +231,6 @@ def _latest_docker_smoke_status(artifacts_dir: Path) -> str | None:
     return None
 
 
-def _docker_daemon_check(docker_binary: str) -> DockerSmokeCheck:
-    try:
-        result = subprocess.run(
-            [docker_binary, "version", "--format", "{{.Server.Version}}"],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-    except (OSError, subprocess.TimeoutExpired) as error:
-        return DockerSmokeCheck(
-            name="Docker Daemon",
-            status="missing",
-            evidence=f"Docker daemon check failed: {error}.",
-            next_action="Start Docker Desktop or point DOCKER_HOST at a reachable daemon.",
-        )
-    if result.returncode != 0:
-        stderr = result.stderr.strip() or result.stdout.strip() or "no output"
-        return DockerSmokeCheck(
-            name="Docker Daemon",
-            status="missing",
-            evidence=f"`{docker_binary} version` failed: {stderr}",
-            next_action="Start Docker Desktop or point DOCKER_HOST at a reachable daemon.",
-        )
-    version = result.stdout.strip() or "unknown"
-    return DockerSmokeCheck(
-        name="Docker Daemon",
-        status="passed",
-        evidence=f"Docker server version `{version}` is reachable.",
-        next_action="No action needed.",
-    )
-
-
-def _docker_image_check(docker_binary: str, image: str) -> DockerSmokeCheck:
-    try:
-        result = subprocess.run(
-            [docker_binary, "image", "inspect", image],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-    except (OSError, subprocess.TimeoutExpired) as error:
-        return DockerSmokeCheck(
-            name="Smoke Image",
-            status="missing",
-            evidence=f"Docker image inspection failed: {error}.",
-            next_action=f"Build `{image}` before running the smoke.",
-        )
-    if result.returncode != 0:
-        stderr = result.stderr.strip() or result.stdout.strip() or "image not found"
-        return DockerSmokeCheck(
-            name="Smoke Image",
-            status="missing",
-            evidence=f"`{image}` is not available locally: {stderr}",
-            next_action=f"Run `docker build -f docker/seeded-smoke.Dockerfile -t {image} .`.",
-        )
-    return DockerSmokeCheck(
-        name="Smoke Image",
-        status="passed",
-        evidence=f"`{image}` is available locally.",
-        next_action="No action needed.",
-    )
-
-
-def _docker_environment_snapshot(docker_binary: str) -> dict[str, str]:
-    home_socket = Path.home() / ".docker" / "run" / "docker.sock"
-    default_socket = Path("/var/run/docker.sock")
-    docker_desktop_paths = [
-        Path("/Applications/Docker.app"),
-        Path.home() / "Applications" / "Docker.app",
-    ]
-    return {
-        "docker_binary": docker_binary,
-        "docker_cli_path": shutil.which(docker_binary) or "missing",
-        "DOCKER_HOST": os.environ.get("DOCKER_HOST", "unset"),
-        "DOCKER_CONTEXT": os.environ.get("DOCKER_CONTEXT", "unset"),
-        "DOCKER_CONFIG": os.environ.get("DOCKER_CONFIG", "unset"),
-        "docker_desktop_application": (
-            "exists" if any(path.exists() for path in docker_desktop_paths) else "missing"
-        ),
-        "colima_binary": shutil.which("colima") or "missing",
-        str(home_socket): "exists" if home_socket.exists() else "missing",
-        str(default_socket): "exists" if default_socket.exists() else "missing",
-    }
-
-
-def _docker_remediation_commands(
-    *,
-    docker_binary: str,
-    build_command: str,
-    smoke_command: str,
-    environment: dict[str, str],
-) -> list[str]:
-    commands = [
-        f"{docker_binary} context ls",
-        f"{docker_binary} version",
-    ]
-    if environment.get("docker_desktop_application") == "exists":
-        commands.append("open -a Docker")
-    if environment.get("colima_binary", "missing") != "missing":
-        commands.append("colima start")
-    commands.extend([build_command, smoke_command])
-    return commands
-
-
 def _run_docker_seeded_smoke(
     *,
     task_dir: Path,
@@ -435,24 +259,3 @@ def _run_docker_seeded_smoke(
             sandbox_image=sandbox_image,
         )
     )
-
-
-def _docker_smoke_status(checks: list[DockerSmokeCheck]) -> str:
-    statuses = [check.status for check in checks]
-    if "failed" in statuses:
-        return "failed"
-    if "missing" in statuses:
-        return "not_available"
-    if "skipped" in statuses:
-        return "skipped"
-    return "passed"
-
-
-def _docker_smoke_decision(report: DockerSmokeReport) -> str:
-    if report.smoke_status == "passed":
-        return "Docker sandbox smoke passed. The MVP Docker-sandbox evidence can be cited."
-    if report.smoke_status == "failed":
-        return "Docker sandbox smoke ran but failed. Inspect the run artifacts before claiming Docker readiness."
-    if report.smoke_status == "skipped":
-        return "Docker preflight passed but the executable seeded run was skipped."
-    return "Docker sandbox smoke is not available in this environment. Keep Docker readiness as a caveat."
