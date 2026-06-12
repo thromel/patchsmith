@@ -175,17 +175,33 @@ class DeepAgentsRepairPlanner:
             deepagents_contract=contract,
         )
         agent = self._build_agent(files=files, subagents=subagents)
-        result = agent.invoke(
-            {
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": deepagents_planner_prompt(issue_text, virtual_to_repo),
-                    }
-                ],
-                "files": agent_files,
-            }
-        )
+        try:
+            result = agent.invoke(
+                {
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": deepagents_planner_prompt(issue_text, virtual_to_repo),
+                        }
+                    ],
+                    "files": agent_files,
+                }
+            )
+        except Exception as error:
+            self.last_model_metadata = ModelCallMetadata(
+                provider=DEEPAGENTS_PROVIDER,
+                model=self.config.model,
+                status=_agent_failure_status(error),
+            )
+            self.last_plan_metadata = combine_plan_metadata(
+                model_call={
+                    **self.last_model_metadata.to_dict(),
+                    "error_type": type(error).__name__,
+                    "error_summary": _error_summary(error),
+                },
+                deepagents_contract=contract,
+            )
+            return None
         metadata = _metadata_from_result(
             result=result,
             provider=DEEPAGENTS_PROVIDER,
@@ -275,3 +291,17 @@ def _bool_env(env: Mapping[str, str], key: str, default: bool) -> bool:
     if value is None or not value.strip():
         return default
     return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _agent_failure_status(error: Exception) -> str:
+    message = str(error).lower()
+    if "structured output" in message and "parsing failed" in message:
+        return "structured_output_parse_failed"
+    return "agent_invoke_failed"
+
+
+def _error_summary(error: Exception, *, limit: int = 360) -> str:
+    compact = " ".join(str(error).split())
+    if len(compact) <= limit:
+        return compact
+    return compact[: limit - 15] + "...[truncated]"

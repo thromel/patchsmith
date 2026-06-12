@@ -1285,6 +1285,9 @@ def test_execute_public_issue_repairs_passes_source_hints_as_context_paths(
     src_dir = repo_dir / "src"
     src_dir.mkdir(parents=True)
     (src_dir / "example.py").write_text("def target_symbol():\n    pass\n", encoding="utf-8")
+    tests_dir = repo_dir / "tests"
+    tests_dir.mkdir()
+    (tests_dir / "test_bug.py").write_text("def test_bug():\n    assert False\n", encoding="utf-8")
     tasks_dir = tmp_path / "materialized_tasks"
     task_dir = tasks_dir / "public_task"
     task_dir.mkdir(parents=True)
@@ -1313,6 +1316,12 @@ def test_execute_public_issue_repairs_passes_source_hints_as_context_paths(
                     "repo_exists": True,
                     "repair_command": "PYTHONPATH=src python3 -m patchsmith.cli run --json",
                     "validation_command": "python3 -m pytest tests/test_bug.py",
+                    "validation_fixture_files": [
+                        {
+                            "path": "tests/test_bug.py",
+                            "content": "def test_bug():\n    assert False\n",
+                        }
+                    ],
                     "validation_source_hints": ["src/example.py#target_symbol"],
                     "reproduction_execution_status": "reproduced",
                     "blockers": [],
@@ -1364,8 +1373,12 @@ def test_execute_public_issue_repairs_passes_source_hints_as_context_paths(
     assert summary.attempted_tasks == 1
     assert results[0].status == "failed"
     assert len(captured_requests) == 1
-    assert captured_requests[0].context_paths == ("src/example.py#target_symbol",)
+    assert captured_requests[0].context_paths == (
+        "src/example.py#target_symbol",
+        "tests/test_bug.py",
+    )
     assert "`src/example.py#target_symbol`" in captured_requests[0].issue_text
+    assert "`tests/test_bug.py`" in captured_requests[0].issue_text
 
 
 def test_execute_public_issue_repairs_executes_local_heuristic_repair(

@@ -266,6 +266,48 @@ def test_deepagents_runtime_records_native_planning_contract_on_no_plan(
     assert contract["planning_policy"]["filesystem_reads_required"] is True
 
 
+def test_deepagents_runtime_handles_native_structured_output_parse_errors(
+    tmp_path: Path,
+) -> None:
+    fixture = Path("evals/tasks/seeded_bugs_v1/task_001_logic_bug")
+    snapshot = clone_or_copy_repository(str(fixture / "repo"), tmp_path / "repo")
+    repo_index = index_repository(snapshot.repo_path)
+    issue_text = (fixture / "issue.md").read_text(encoding="utf-8")
+    contexts = HybridRetriever().retrieve(
+        repo_path=snapshot.repo_path,
+        repo_index=repo_index,
+        issue_text=issue_text,
+    )
+
+    class FakeAgent:
+        def invoke(self, payload: dict[str, object]) -> dict[str, object]:
+            raise RuntimeError(
+                "Failed to parse structured output for tool 'PatchPlan': "
+                "Native structured output expected valid JSON for PatchPlan, but parsing failed."
+            )
+
+    planner = DeepAgentsRepairPlanner(
+        DeepAgentsPlannerConfig(model="gpt-test"),
+        agent_factory=lambda config: FakeAgent(),
+    )
+
+    result = DeepAgentsRuntime(planner=planner).run(
+        AgentTask(
+            run_id="test-run",
+            repo_path=str(snapshot.repo_path),
+            issue_text=issue_text,
+            retrieved_context=contexts,
+            test_command="python3 -m pytest",
+        )
+    )
+
+    plan_event = next(event for event in result.runtime_trace if event["node"] == "plan")
+    assert result.status == "no_patch_generated"
+    assert plan_event["status"] == "no_match"
+    assert plan_event["metadata"]["model_call"]["status"] == "structured_output_parse_failed"
+    assert "error_summary" in plan_event["metadata"]["model_call"]
+
+
 def test_repair_runner_deepagents_runtime_emits_runtime_node_traces(tmp_path: Path) -> None:
     fixture = Path("evals/tasks/seeded_bugs_v1/task_001_logic_bug")
 

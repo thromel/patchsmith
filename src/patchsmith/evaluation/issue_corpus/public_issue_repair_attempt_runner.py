@@ -67,7 +67,14 @@ def run_public_issue_repair_attempt(
         validation_fixture_files=validation_fixture_files,
         source_hints=source_hints,
     )
-    context_paths = tuple(source_hint_context_paths(source_hints))
+    context_paths = tuple(
+        _dedupe_preserve_order(
+            [
+                *source_hint_context_paths(source_hints),
+                *validation_fixture_paths,
+            ]
+        )
+    )
     if validation_fixture_files:
         with tempfile.TemporaryDirectory(prefix="patchsmith-public-repair-fixtures-") as tmp_dir:
             fixture_workspace = Path(tmp_dir) / "repo"

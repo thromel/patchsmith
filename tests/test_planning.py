@@ -568,6 +568,35 @@ def test_deepagents_repair_planner_preserves_usage_when_json_is_invalid() -> Non
     )
 
 
+def test_deepagents_repair_planner_preserves_contract_when_agent_invoke_fails() -> None:
+    class FakeAgent:
+        def invoke(self, payload: dict[str, object]) -> dict[str, object]:
+            raise RuntimeError(
+                "Failed to parse structured output for tool 'PatchPlan': "
+                "Native structured output expected valid JSON for PatchPlan, but parsing failed."
+            )
+
+    planner = DeepAgentsRepairPlanner(
+        DeepAgentsPlannerConfig(model="gpt-test"),
+        agent_factory=lambda config: FakeAgent(),
+    )
+
+    plan = planner.plan(
+        issue_text="add returns the wrong result",
+        retrieved_context=[_context("src/simple_calc.py")],
+    )
+
+    assert plan is None
+    assert planner.last_plan_metadata is not None
+    model_call = planner.last_plan_metadata["model_call"]
+    assert model_call["provider"] == "deepagents_openai_chat"
+    assert model_call["model"] == "gpt-test"
+    assert model_call["status"] == "structured_output_parse_failed"
+    assert model_call["error_type"] == "RuntimeError"
+    assert "Failed to parse structured output" in model_call["error_summary"]
+    assert planner.last_plan_metadata["deepagents_contract"]["virtual_file_count"] == 1
+
+
 def test_deepagents_repair_planner_normalizes_line_numbered_old_span() -> None:
     class FakeAgent:
         def invoke(self, payload: dict[str, object]) -> dict[str, object]:
