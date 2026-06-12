@@ -16,10 +16,10 @@ from patchsmith.portfolio.models import (
     ReleaseHygieneReport,
 )
 from patchsmith.portfolio.release_hygiene_checks import (
-    _run_git as _run_git,
-)
-from patchsmith.portfolio.release_hygiene_checks import (
     release_hygiene_checks as _release_hygiene_checks,
+)
+from patchsmith.portfolio.release_hygiene_project_checks import (
+    _run_git as _run_git,
 )
 
 
