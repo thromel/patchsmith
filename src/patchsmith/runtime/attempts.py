@@ -147,7 +147,11 @@ def issue_with_test_feedback(
         original_issue.strip(),
         (
             f"Previous DeepAgents repair attempt {attempt} did not validate. "
-            "Repair the current workspace state with one bounded replacement. "
+            "The failed patch has been reverted before this retry; repair the "
+            "clean workspace state with one bounded replacement. "
+            "Do not return the same failed diff unchanged; use the sandbox "
+            "failure to move the edit to the branch or cache site that still "
+            "controls the observed behavior. "
             "You may fix a prior bad patch or provide a different exact old span "
             "if the previous edit was rejected. Before choosing the next edit, "
             "check whether the previous patch is on the code path reached by the "

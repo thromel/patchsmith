@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from patchsmith.context_models import ContextBundle, ContextTarget
 from patchsmith.models import RetrievedContext
+
+ACTIVE_CONTEXT_SYMBOL_REASON_PREFIX = "reviewed source hint symbol:"
 
 
 def retrieved_context_from_bundle(
@@ -21,6 +24,11 @@ def retrieved_context_from_bundle(
             continue
         seen.add(target.path)
         fallback = fallback_by_path.get(target.path)
+        target_excerpt = _target_excerpt(
+            target=target,
+            repo_path=repo_path,
+            fallback=fallback,
+        )
         contexts.append(
             RetrievedContext(
                 path=target.path,
@@ -28,15 +36,9 @@ def retrieved_context_from_bundle(
                 score=float(target.confidence or (fallback.score if fallback else 0.0)),
                 method=bundle.provider,
                 matched_terms=(
-                    [target.role, target.source, *fallback.matched_terms]
-                    if fallback
-                    else [target.role, target.source]
+                    _target_matched_terms(target) + (fallback.matched_terms if fallback else [])
                 ),
-                excerpt=(
-                    fallback.excerpt
-                    if fallback and fallback.excerpt.strip()
-                    else _read_excerpt(repo_path / target.path)
-                ),
+                excerpt=target_excerpt,
             )
         )
         if len(contexts) >= top_k:
@@ -122,8 +124,11 @@ def _active_context_targets(
     targets: list[ContextTarget] = []
     seen_paths: set[str] = set()
     for raw_path in active_paths:
-        path = _normalize_active_context_path(raw_path)
-        if path is None or path in seen_paths:
+        normalized = _normalize_active_context_path(raw_path)
+        if normalized is None:
+            continue
+        path, symbol = normalized
+        if path in seen_paths:
             continue
         if not _is_repo_relative_path(repo_path, path):
             continue
@@ -136,20 +141,23 @@ def _active_context_targets(
                 role="reviewed_source_hint",
                 rank=len(targets) + 1,
                 confidence=1.0,
-                reason="reviewed source hint",
+                reason=_active_context_reason(symbol),
                 source="active_path",
             )
         )
     return targets
 
 
-def _normalize_active_context_path(path: str) -> str | None:
+def _normalize_active_context_path(path: str) -> tuple[str, str | None] | None:
     if not isinstance(path, str):
         return None
-    file_path = path.strip().strip("`").partition("#")[0]
+    file_path, _, symbol = path.strip().strip("`").partition("#")
     if not file_path:
         return None
-    return Path(file_path).as_posix()
+    normalized_symbol = symbol.strip() or None
+    if normalized_symbol is not None and not _is_python_identifier(normalized_symbol):
+        normalized_symbol = None
+    return Path(file_path).as_posix(), normalized_symbol
 
 
 def _renumber_context_targets(targets: list[ContextTarget]) -> list[ContextTarget]:
@@ -176,12 +184,80 @@ def _is_repo_relative_path(repo_path: Path, path: str) -> bool:
     return True
 
 
-def _read_excerpt(path: Path, max_lines: int = 8) -> str:
+def _target_excerpt(
+    *,
+    target: ContextTarget,
+    repo_path: Path,
+    fallback: RetrievedContext | None,
+) -> str:
+    symbol = _target_symbol(target)
+    if symbol:
+        symbol_excerpt = _read_excerpt(repo_path / target.path, symbol=symbol)
+        if symbol_excerpt.strip():
+            return symbol_excerpt
+    if fallback and fallback.excerpt.strip():
+        return fallback.excerpt
+    return _read_excerpt(repo_path / target.path)
+
+
+def _target_matched_terms(target: ContextTarget) -> list[str]:
+    terms = [target.role, target.source]
+    symbol = _target_symbol(target)
+    if symbol:
+        terms.append(f"symbol:{symbol}")
+    return terms
+
+
+def _active_context_reason(symbol: str | None) -> str:
+    if symbol:
+        return f"{ACTIVE_CONTEXT_SYMBOL_REASON_PREFIX} {symbol}"
+    return "reviewed source hint"
+
+
+def _target_symbol(target: ContextTarget) -> str | None:
+    reason = target.reason or ""
+    if not reason.startswith(ACTIVE_CONTEXT_SYMBOL_REASON_PREFIX):
+        return None
+    symbol = reason.removeprefix(ACTIVE_CONTEXT_SYMBOL_REASON_PREFIX).strip()
+    return symbol if _is_python_identifier(symbol) else None
+
+
+def _is_python_identifier(value: str) -> bool:
+    return value.isidentifier()
+
+
+def _read_excerpt(
+    path: Path,
+    *,
+    max_lines: int = 8,
+    symbol: str | None = None,
+    context_lines: int = 4,
+) -> str:
     try:
         lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
     except OSError:
         return ""
+    if symbol:
+        symbol_index = _symbol_line_index(lines, symbol)
+        if symbol_index is not None:
+            start = max(0, symbol_index - context_lines)
+            stop = min(len(lines), symbol_index + context_lines + 1)
+            return "\n".join(
+                f"{index + 1}: {line}" for index, line in enumerate(lines[start:stop], start=start)
+            )
     return "\n".join(f"{index + 1}: {line}" for index, line in enumerate(lines[:max_lines]))
+
+
+def _symbol_line_index(lines: list[str], symbol: str) -> int | None:
+    pattern = re.compile(rf"\b(?:async\s+def|def|class)\s+{re.escape(symbol)}\b")
+    for index, line in enumerate(lines):
+        if pattern.search(line):
+            return index
+    fallback = re.compile(rf"\b{re.escape(symbol)}\b")
+    for index, line in enumerate(lines):
+        if fallback.search(line):
+            return index
+    return None
 
 
 __all__ = [

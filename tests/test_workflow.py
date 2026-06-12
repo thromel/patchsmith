@@ -84,6 +84,8 @@ def test_repair_runner_promotes_context_paths_into_retrieved_context(tmp_path: P
         "reviewed_source_hint",
         "active_path",
     ]
+    assert "symbol:hidden_fix_site" in result.retrieved_context[0].matched_terms
+    assert "def hidden_fix_site" in result.retrieved_context[0].excerpt
 
 
 def test_repair_runner_heuristic_runtime_generates_passing_patch(tmp_path: Path) -> None:
@@ -196,6 +198,8 @@ def test_deepagents_runner_retries_with_sandbox_feedback(
     assert result.test_result.exit_code == 0
     assert len(planner.issue_texts) == 2
     assert "Previous DeepAgents repair attempt 1 did not validate" in planner.issue_texts[1]
+    assert "failed patch has been reverted" in planner.issue_texts[1]
+    assert "Do not return the same failed diff unchanged" in planner.issue_texts[1]
     assert "previous patch is on the code path reached" in planner.issue_texts[1]
     assert "failure from attempt 1" in planner.issue_texts[1]
     assert len(sandbox.calls) == 2
@@ -207,6 +211,10 @@ def test_deepagents_runner_retries_with_sandbox_feedback(
     ]
     retry_event = next(event for event in trace_events if event["node_name"] == "feedback_retry")
     assert retry_event["payload"]["next_attempt"] == 2
+    restore_event = next(
+        event for event in trace_events if event["node_name"] == "workspace_restore"
+    )
+    assert restore_event["payload"]["next_attempt"] == 2
     test_events = [event for event in trace_events if event["event_type"] == "sandbox_command"]
     assert [event["payload"]["attempt"] for event in test_events] == [1, 2]
 
@@ -318,7 +326,7 @@ class SequencedFeedbackPlanner:
         return RepairPlan(
             name="feedback_patch",
             path="src/simple_calc.py",
-            old="return left + 0",
+            old="return left - right",
             new="return left + right",
             summary="Use sandbox feedback to repair the failed attempt.",
         )

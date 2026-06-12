@@ -150,3 +150,58 @@ def test_promote_active_context_targets_prepend_existing_reviewed_paths(
     assert [target.rank for target in promoted.targets] == [1, 2]
     assert promoted.targets[0].role == "reviewed_source_hint"
     assert promoted.targets[0].source == "active_path"
+    assert promoted.targets[0].reason == "reviewed source hint symbol: target"
+
+
+def test_retrieved_context_from_active_symbol_hint_uses_symbol_excerpt(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    source = repo / "src" / "hinted.py"
+    source.parent.mkdir(parents=True)
+    source.write_text(
+        "\n".join(
+            [
+                "def unrelated():",
+                "    return 'ignore'",
+                "",
+                "",
+                "",
+                "",
+                "def target_symbol():",
+                "    return 'useful'",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    bundle = ContextBundle(
+        provider="patchsmith_native_hybrid",
+        provider_version=None,
+        targets=[],
+        related_tests=[],
+        validation_commands=[],
+        diagnostics=[],
+        warnings=[],
+        pack_uri=None,
+        source_text_logged=False,
+        raw_artifact_path=None,
+        latency_ms=0,
+    )
+
+    promoted = promote_active_context_targets(
+        bundle=bundle,
+        repo_path=repo,
+        active_paths=("src/hinted.py#target_symbol",),
+    )
+    contexts = retrieved_context_from_bundle(
+        bundle=promoted,
+        repo_path=repo,
+        fallback_contexts=[],
+        top_k=1,
+    )
+
+    assert contexts[0].path == "src/hinted.py"
+    assert "symbol:target_symbol" in contexts[0].matched_terms
+    assert "7: def target_symbol():" in contexts[0].excerpt
+    assert "1: def unrelated():" not in contexts[0].excerpt

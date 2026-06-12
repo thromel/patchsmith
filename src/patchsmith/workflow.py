@@ -34,6 +34,7 @@ from patchsmith.runtime.attempts import (
 from patchsmith.sandbox import create_sandbox_runner
 from patchsmith.tracing import RunTrace
 from patchsmith.workflow_context import WorkflowContextSelector
+from patchsmith.workspace_restore import WorkspaceRestorer
 
 
 class RepairRunner:
@@ -113,6 +114,11 @@ class RepairRunner:
             attempt_issue_text = request.issue_text
             attempt = 0
             max_feedback_retries = test_feedback_retry_budget(request)
+            workspace_restorer = WorkspaceRestorer.create(
+                repo_path=repo_path,
+                baseline_path=run_dir / ".retry_baseline_repo",
+                enabled=max_feedback_retries > 0,
+            )
             while True:
                 attempt += 1
                 agent_result = runtime.run(
@@ -193,6 +199,20 @@ class RepairRunner:
                     final_diff=final_diff,
                     attempt=attempt,
                 )
+                started = time.perf_counter()
+                workspace_restorer.restore()
+                trace.time_event(
+                    node_name="workspace_restore",
+                    event_type="repair_retry_workspace",
+                    status="completed",
+                    output_summary="restored clean workspace before feedback retry",
+                    payload={
+                        "attempt": attempt,
+                        "next_attempt": attempt + 1,
+                        "baseline_path": str(workspace_restorer.baseline_path),
+                    },
+                    started=started,
+                )
             final_diff_path.write_text(final_diff, encoding="utf-8")
             report = render_run_report(
                 run_id=run_id,
@@ -215,6 +235,7 @@ class RepairRunner:
                 output_summary=str(report_path),
                 payload={"report_path": str(report_path), "final_diff_path": str(final_diff_path)},
             )
+            workspace_restorer.cleanup()
         except Exception as error:
             status = "failed"
             trace.emit(
