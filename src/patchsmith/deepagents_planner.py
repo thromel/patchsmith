@@ -24,6 +24,7 @@ from patchsmith.deepagents_payloads import (
 )
 from patchsmith.deepagents_prompts import (
     PATCHSMITH_DEEPAGENTS_MEMORY_PATH,
+    PATCHSMITH_DEEPAGENTS_SKILL_DIR,
     deepagents_patch_review_subagents,
     deepagents_planner_prompt,
     deepagents_system_prompt,
@@ -246,6 +247,7 @@ class DeepAgentsRepairPlanner:
             tools=[],
             system_prompt=deepagents_system_prompt(),
             subagents=configured_subagents,  # type: ignore[arg-type]
+            skills=[PATCHSMITH_DEEPAGENTS_SKILL_DIR],
             memory=[PATCHSMITH_DEEPAGENTS_MEMORY_PATH],
             backend=StateBackend(),
             permissions=_read_only_filesystem_permissions(

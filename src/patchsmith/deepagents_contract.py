@@ -5,7 +5,11 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from typing import Any
 
-from patchsmith.deepagents_prompts import PATCHSMITH_DEEPAGENTS_MEMORY_PATH
+from patchsmith.deepagents_prompts import (
+    PATCHSMITH_DEEPAGENTS_MEMORY_PATH,
+    PATCHSMITH_DEEPAGENTS_REPAIR_SKILL_PATH,
+    PATCHSMITH_DEEPAGENTS_SKILL_DIR,
+)
 from patchsmith.deepagents_schema import patch_plan_response_schema
 
 
@@ -18,7 +22,9 @@ def deepagents_planning_contract(
 ) -> dict[str, Any]:
     file_paths = sorted({path for path in virtual_file_paths if path})
     memory_paths = [PATCHSMITH_DEEPAGENTS_MEMORY_PATH]
-    allowed_reads = sorted({*file_paths, *memory_paths})
+    skill_sources = [PATCHSMITH_DEEPAGENTS_SKILL_DIR]
+    skill_paths = [PATCHSMITH_DEEPAGENTS_REPAIR_SKILL_PATH]
+    allowed_reads = sorted({*file_paths, *memory_paths, *skill_paths})
     return {
         "framework": "deepagents",
         "mode": "custom_agent_factory" if custom_agent_factory else "native_create_deep_agent",
@@ -30,6 +36,8 @@ def deepagents_planning_contract(
         "store": bool(getattr(config, "store", False)),
         "state_backend": "deepagents.backends.StateBackend",
         "memory_paths": memory_paths,
+        "skill_sources": skill_sources,
+        "skill_paths": skill_paths,
         "virtual_file_count": len(file_paths),
         "virtual_file_paths": file_paths,
         "filesystem_policy": {

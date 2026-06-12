@@ -10,7 +10,9 @@ from typing import Any
 
 from patchsmith.deepagents_prompts import (
     PATCHSMITH_DEEPAGENTS_MEMORY_PATH,
+    PATCHSMITH_DEEPAGENTS_REPAIR_SKILL_PATH,
     deepagents_agents_md,
+    deepagents_repair_skill_md,
 )
 from patchsmith.models import RetrievedContext
 
@@ -45,6 +47,12 @@ def agent_files(files: dict[str, dict[str, str]]) -> dict[str, dict[str, str]]:
         **files,
         PATCHSMITH_DEEPAGENTS_MEMORY_PATH: {
             "content": deepagents_agents_md(),
+            "encoding": "utf-8",
+            "created_at": stable_timestamp(),
+            "modified_at": stable_timestamp(),
+        },
+        PATCHSMITH_DEEPAGENTS_REPAIR_SKILL_PATH: {
+            "content": deepagents_repair_skill_md(),
             "encoding": "utf-8",
             "created_at": stable_timestamp(),
             "modified_at": stable_timestamp(),

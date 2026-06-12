@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 PATCHSMITH_DEEPAGENTS_MEMORY_PATH = "/.patchsmith/AGENTS.md"
+PATCHSMITH_DEEPAGENTS_SKILL_DIR = "/.patchsmith/skills/"
+PATCHSMITH_DEEPAGENTS_REPAIR_SKILL_PATH = (
+    f"{PATCHSMITH_DEEPAGENTS_SKILL_DIR}patchsmith-repair/SKILL.md"
+)
 
 
 def deepagents_system_prompt() -> str:
@@ -34,6 +38,33 @@ def deepagents_agents_md() -> str:
         "subagent to review the intended bounded replacement before returning the patch plan.\n"
         "6. Return exactly one structured bounded replacement: path, old, new, and summary. "
         "The path must be one provided repository path and old must be an exact text span."
+    )
+
+
+def deepagents_repair_skill_md() -> str:
+    return (
+        "---\n"
+        "name: patchsmith-repair\n"
+        "description: Use for PatchSmith bug repair planning when producing a bounded source "
+        "patch from retrieved files, tests, or sandbox feedback.\n"
+        "compatibility: deepagents>=0.6.8\n"
+        "---\n\n"
+        "# PatchSmith Repair Skill\n\n"
+        "Use this skill when the task is to turn issue evidence, retrieved source, "
+        "test output, or sandbox feedback into one bounded PatchSmith patch plan.\n\n"
+        "## Workflow\n"
+        "1. Keep a short todo list and update it as evidence changes.\n"
+        "2. Read the provided files through the virtual filesystem before choosing an edit.\n"
+        "3. Tie the fix to the failing runtime mechanism, not to incidental wording.\n"
+        "4. Prefer source fixes over test, fixture, or report-only changes.\n"
+        "5. For ambiguous, multi-file, or retry-after-feedback cases, ask the "
+        "patch-reviewer subagent to review the intended replacement.\n"
+        "6. Return one structured bounded replacement with path, old, new, and summary.\n\n"
+        "## Boundaries\n"
+        "- Use only provided repository paths.\n"
+        "- The old span must be exact source text from the selected file.\n"
+        "- Do not write files, install dependencies, or run shell commands.\n"
+        "- Keep explanations out of the final structured patch payload.\n"
     )
 
 

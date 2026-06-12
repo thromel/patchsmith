@@ -168,7 +168,7 @@ class AgentRuntime:
 Supported runtimes:
 
 - `LangGraphRuntime`: primary production workflow,
-- `DeepAgentsRuntime`: dependency-gated DeepAgents scaffold adapter plus native DeepAgents planner path with state-backed file reads, read-only virtual filesystem permissions, patch-review subagent support, structured patch output, and explicit sandbox-feedback retries,
+- `DeepAgentsRuntime`: dependency-gated DeepAgents scaffold adapter plus native DeepAgents planner path with state-backed file reads, a skills-backed PatchSmith repair contract, read-only virtual filesystem permissions, patch-review subagent support, structured patch output, and explicit sandbox-feedback retries,
 - `OpenAIAgentsRuntime`: dependency-gated OpenAI Agents SDK scaffold adapter,
 - `AgentlessRuntime`: baseline localization-repair-validation runtime,
 - `TreeSearchRuntime`: research mode for test-time exploration.

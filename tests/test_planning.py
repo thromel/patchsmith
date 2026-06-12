@@ -5,6 +5,7 @@ import urllib.request
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 
+import pytest
 from langchain_core.messages import AIMessage
 
 from patchsmith.deepagents_planner import (
@@ -14,9 +15,12 @@ from patchsmith.deepagents_planner import (
 )
 from patchsmith.deepagents_prompts import (
     PATCHSMITH_DEEPAGENTS_MEMORY_PATH,
+    PATCHSMITH_DEEPAGENTS_REPAIR_SKILL_PATH,
+    PATCHSMITH_DEEPAGENTS_SKILL_DIR,
     deepagents_agents_md,
     deepagents_patch_review_subagents,
     deepagents_planner_prompt,
+    deepagents_repair_skill_md,
     deepagents_system_prompt,
 )
 from patchsmith.deepagents_schema import PatchPlan, patch_plan_response_schema
@@ -267,8 +271,26 @@ def test_deepagents_prompts_keep_planning_and_bounded_output_contract() -> None:
     assert "exact text span" in system_prompt
     assert "PatchSmith DeepAgents Repair Contract" in deepagents_agents_md()
     assert "patch-reviewer" in deepagents_agents_md()
+    repair_skill = deepagents_repair_skill_md()
+    assert "name: patchsmith-repair" in repair_skill
+    assert "bounded PatchSmith patch plan" in repair_skill
     assert "src/simple_calc.py" in planner_prompt
     assert subagents[0]["name"] == "patch-reviewer"
+
+
+def test_deepagents_repair_skill_matches_installed_metadata_parser() -> None:
+    skills_module = pytest.importorskip("deepagents.middleware.skills")
+
+    metadata = skills_module._parse_skill_metadata(
+        deepagents_repair_skill_md(),
+        PATCHSMITH_DEEPAGENTS_REPAIR_SKILL_PATH,
+        "patchsmith-repair",
+    )
+
+    assert metadata is not None
+    assert metadata["name"] == "patchsmith-repair"
+    assert metadata["path"] == PATCHSMITH_DEEPAGENTS_REPAIR_SKILL_PATH
+    assert metadata["compatibility"] == "deepagents>=0.6.8"
 
 
 def test_deepagents_patch_plan_schema_is_explicit_and_required() -> None:
@@ -330,12 +352,17 @@ def test_deepagents_repair_planner_builds_agent_with_read_only_permissions(
     assert model.kwargs["store"] is False
     assert model.kwargs["include"] == ["reasoning.encrypted_content"]
     assert captured["tools"] == []
+    assert captured["skills"] == [PATCHSMITH_DEEPAGENTS_SKILL_DIR]
     assert captured["memory"] == [PATCHSMITH_DEEPAGENTS_MEMORY_PATH]
     assert isinstance(captured["backend"], FakeStateBackend)
     permissions = captured["permissions"]
     assert len(permissions) == 2
     assert permissions[0].operations == ["read"]
-    assert permissions[0].paths == [PATCHSMITH_DEEPAGENTS_MEMORY_PATH, "/src/simple_calc.py"]
+    assert permissions[0].paths == [
+        PATCHSMITH_DEEPAGENTS_MEMORY_PATH,
+        PATCHSMITH_DEEPAGENTS_REPAIR_SKILL_PATH,
+        "/src/simple_calc.py",
+    ]
     assert permissions[0].mode == "allow"
     assert permissions[1].operations == ["read", "write"]
     assert permissions[1].paths == ["/**"]
@@ -405,9 +432,12 @@ def test_deepagents_repair_planner_maps_virtual_path_and_usage_metadata() -> Non
     assert contract["use_responses_api"] is True
     assert contract["store"] is False
     assert contract["memory_paths"] == [PATCHSMITH_DEEPAGENTS_MEMORY_PATH]
+    assert contract["skill_sources"] == [PATCHSMITH_DEEPAGENTS_SKILL_DIR]
+    assert contract["skill_paths"] == [PATCHSMITH_DEEPAGENTS_REPAIR_SKILL_PATH]
     assert contract["virtual_file_paths"] == ["/src/simple_calc.py"]
     assert contract["filesystem_policy"]["allowed_read_paths"] == [
         PATCHSMITH_DEEPAGENTS_MEMORY_PATH,
+        PATCHSMITH_DEEPAGENTS_REPAIR_SKILL_PATH,
         "/src/simple_calc.py",
     ]
     assert contract["subagents"][0]["name"] == "patch-reviewer"
@@ -417,6 +447,9 @@ def test_deepagents_repair_planner_maps_virtual_path_and_usage_metadata() -> Non
     assert fake_agent.input_payload is not None
     files = fake_agent.input_payload["files"]
     assert "/src/simple_calc.py" in files
+    assert PATCHSMITH_DEEPAGENTS_MEMORY_PATH in files
+    assert PATCHSMITH_DEEPAGENTS_REPAIR_SKILL_PATH in files
+    assert "name: patchsmith-repair" in files[PATCHSMITH_DEEPAGENTS_REPAIR_SKILL_PATH]["content"]
     assert files["/src/simple_calc.py"]["encoding"] == "utf-8"
     assert files["/src/simple_calc.py"]["created_at"]
     assert files["/src/simple_calc.py"]["modified_at"]

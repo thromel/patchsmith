@@ -31,8 +31,9 @@ command, patch, validation output, and model metadata.
 - Supports native keyword, hybrid, graph, and `ctxhelm` context providers.
 - Runs repair attempts through `agentless`, `heuristic`, `langgraph`,
   `deepagents`, and `openai_agents` runtime adapters.
-- Includes a native DeepAgents planner with file reads, todo state, structured
-  patch output, a patch-review subagent, and sandbox-feedback retries.
+- Includes a native DeepAgents planner with file reads, todo state, a
+  skills-backed repair contract, structured patch output, a patch-review
+  subagent, and sandbox-feedback retries.
 - Applies model output through PatchSmith's own bounded text-replacement gate.
 - Runs local or Docker sandbox validation with command-policy checks.
 - Produces Markdown, JSON, HTML, trace, diff, stdout, stderr, timing, and cost
@@ -140,6 +141,11 @@ PatchSmith has two DeepAgents modes:
 - `runtime=deepagents, planner=heuristic`: adapter and scaffold compatibility.
 - `runtime=deepagents, planner=deepagents`: native DeepAgents planning with a
   live OpenAI-compatible chat model.
+
+The native planner seeds DeepAgents with a state-backed virtual filesystem,
+read-only file permissions, a PatchSmith repair skill, a durable memory file,
+structured `PatchPlan` output, and a `patch-reviewer` subagent for ambiguous or
+feedback-driven repairs.
 
 Preflight a model before spending money:
 
@@ -301,6 +307,7 @@ src/patchsmith/
   portfolio/               readiness, release, and demo reports
   runtime/                 agent runtime adapters
   deepagents_planner.py    native DeepAgents planner
+  deepagents_prompts.py    native DeepAgents prompts, memory, and skill text
   deepagents_schema.py     native DeepAgents structured output schema
   retrieval.py             native retrieval providers
   sandbox.py               local and Docker command execution
