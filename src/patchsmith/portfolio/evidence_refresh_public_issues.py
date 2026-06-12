@@ -14,7 +14,7 @@ from patchsmith.evaluation import (
     validate_public_issue_reproduction_specs,
 )
 from patchsmith.portfolio.evidence_refresh_support import _run_evidence_refresh_step
-from patchsmith.portfolio.launch_blockers import (
+from patchsmith.portfolio.launch_blocker_items import (
     _has_executed_public_repair_attempt_evidence,
     _has_executed_public_reproduction_evidence,
 )
