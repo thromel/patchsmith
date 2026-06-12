@@ -264,6 +264,8 @@ def test_deepagents_runtime_records_native_planning_contract_on_no_plan(
     assert PATCHSMITH_DEEPAGENTS_MEMORY_PATH in contract["memory_paths"]
     assert contract["response_schema"] == patch_plan_response_schema()
     assert contract["planning_policy"]["filesystem_reads_required"] is True
+    assert contract["planning_policy"]["validation_fixtures_read_first"] is True
+    assert contract["planning_policy"]["failure_localizer_subagent_for_validation_fixtures"] is True
 
 
 def test_deepagents_runtime_handles_native_structured_output_parse_errors(

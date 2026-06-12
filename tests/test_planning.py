@@ -271,14 +271,21 @@ def test_deepagents_prompts_keep_planning_and_bounded_output_contract() -> None:
     subagents = deepagents_patch_review_subagents()
 
     assert "create and update todos" in system_prompt
+    assert "validation fixture files" in system_prompt
+    assert "failure-localizer" in system_prompt
     assert "exact text span" in system_prompt
     assert "PatchSmith DeepAgents Repair Contract" in deepagents_agents_md()
+    assert "failure-localizer" in deepagents_agents_md()
     assert "patch-reviewer" in deepagents_agents_md()
     repair_skill = deepagents_repair_skill_md()
     assert "name: patchsmith-repair" in repair_skill
     assert "bounded PatchSmith patch plan" in repair_skill
+    assert "Read validation fixture files first" in repair_skill
     assert "src/simple_calc.py" in planner_prompt
-    assert subagents[0]["name"] == "patch-reviewer"
+    assert [subagent["name"] for subagent in subagents] == [
+        "failure-localizer",
+        "patch-reviewer",
+    ]
 
 
 def test_deepagents_repair_skill_matches_installed_metadata_parser() -> None:
@@ -371,7 +378,10 @@ def test_deepagents_repair_planner_builds_agent_with_read_only_permissions(
     assert permissions[1].paths == ["/**"]
     assert permissions[1].mode == "deny"
     subagents = captured["subagents"]
-    assert subagents[0]["name"] == "patch-reviewer"
+    assert [subagent["name"] for subagent in subagents] == [
+        "failure-localizer",
+        "patch-reviewer",
+    ]
     assert captured["response_format"] is PatchPlan
 
 
@@ -443,10 +453,15 @@ def test_deepagents_repair_planner_maps_virtual_path_and_usage_metadata() -> Non
         PATCHSMITH_DEEPAGENTS_REPAIR_SKILL_PATH,
         "/src/simple_calc.py",
     ]
-    assert contract["subagents"][0]["name"] == "patch-reviewer"
+    assert [subagent["name"] for subagent in contract["subagents"]] == [
+        "failure-localizer",
+        "patch-reviewer",
+    ]
     assert contract["response_format"] == "PatchPlan"
     assert contract["response_schema"] == patch_plan_response_schema()
     assert contract["planning_policy"]["todos_required"] is True
+    assert contract["planning_policy"]["validation_fixtures_read_first"] is True
+    assert contract["planning_policy"]["failure_localizer_subagent_for_validation_fixtures"] is True
     assert fake_agent.input_payload is not None
     files = fake_agent.input_payload["files"]
     assert "/src/simple_calc.py" in files

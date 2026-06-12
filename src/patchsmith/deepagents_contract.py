@@ -57,6 +57,8 @@ def deepagents_planning_contract(
         "planning_policy": {
             "todos_required": True,
             "filesystem_reads_required": True,
+            "validation_fixtures_read_first": True,
+            "failure_localizer_subagent_for_validation_fixtures": True,
             "patch_review_subagent_for_ambiguous_repairs": True,
             "one_bounded_replacement": True,
             "retrieval_bound_paths": True,

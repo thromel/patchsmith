@@ -1379,6 +1379,9 @@ def test_execute_public_issue_repairs_passes_source_hints_as_context_paths(
     )
     assert "`src/example.py#target_symbol`" in captured_requests[0].issue_text
     assert "`tests/test_bug.py`" in captured_requests[0].issue_text
+    assert "Read the validation fixture file(s) before choosing a source edit" in (
+        captured_requests[0].issue_text
+    )
 
 
 def test_execute_public_issue_repairs_executes_local_heuristic_repair(

@@ -83,3 +83,14 @@ def test_public_issue_reproduction_specs_template_keeps_review_placeholders() ->
     assert template["specs"][0]["task_id"] == "task_one"
     assert template["specs"][0]["expected_failure_signals"] == []
     assert template["specs"][0]["fixture_files"] == []
+
+
+def test_reviewed_pytest_14552_spec_keeps_assertion_rewrite_mechanism_hint() -> None:
+    specs = load_public_issue_reproduction_specs(
+        Path("evals/issue_corpora/public_issue_smoke_v1/reproduction_specs.reviewed.json")
+    )
+
+    source_hints = specs["pytest_14552_moved_file_filename"]["source_hints"]
+    review_notes = specs["pytest_14552_moved_file_filename"]["review_notes"]
+    assert "src/_pytest/assertion/rewrite.py#_read_pyc" in source_hints
+    assert "_read_pyc should reject stale code filenames" in review_notes

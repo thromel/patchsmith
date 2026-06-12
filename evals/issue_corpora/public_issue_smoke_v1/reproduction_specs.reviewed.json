@@ -23,9 +23,10 @@
       "source_hints": [
         "src/_pytest/pytester.py",
         "src/_pytest/pathlib.py#import_path",
-        "src/_pytest/python.py"
+        "src/_pytest/python.py",
+        "src/_pytest/assertion/rewrite.py#_read_pyc"
       ],
-      "review_notes": "Reviewed against pytest-dev/pytest#14552: the second run after moving test1 to test2 should pass, but the current snapshot reports the old test1 co_filename."
+      "review_notes": "Reviewed against pytest-dev/pytest#14552: the second run after moving test1 to test2 should pass, but the current snapshot reports the old test1 co_filename. Manual localization showed the moved __pycache__ can carry pytest-tagged rewritten bytecode whose code object still has the old filename; _read_pyc should reject stale code filenames."
     },
     {
       "task_id": "requests_7223_chardet_extra",

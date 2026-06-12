@@ -57,6 +57,10 @@ def public_issue_repair_attempt_issue_text(
             "Fixture files already added to the disposable repair workspace: "
             + ", ".join(f"`{path}`" for path in validation_fixture_paths)
         )
+        details.append(
+            "Read the validation fixture file(s) before choosing a source edit; "
+            "they are the executable reproduction and often reveal the controlling mechanism."
+        )
     if source_hints:
         details.append(
             "Reviewed source files and fixture import hints: "
