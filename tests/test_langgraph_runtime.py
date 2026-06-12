@@ -142,6 +142,54 @@ def test_deepagents_runtime_preserves_model_usage_metadata(tmp_path: Path) -> No
     plan_event = next(event for event in result.runtime_trace if event["node"] == "plan")
     assert result.status == "patch_generated"
     assert plan_event["metadata"]["model_call"]["provider"] == "unit_model"
+    assert plan_event["patch_plan"]["path"] == "src/simple_calc.py"
+    assert plan_event["patch_plan"]["old_found"] is True
+    assert plan_event["patch_plan"]["old_occurrences"] == 2
+
+
+def test_deepagents_runtime_records_patch_plan_diagnostics_for_rejected_edit(
+    tmp_path: Path,
+) -> None:
+    fixture = Path("evals/tasks/seeded_bugs_v1/task_001_logic_bug")
+    snapshot = clone_or_copy_repository(str(fixture / "repo"), tmp_path / "repo")
+    repo_index = index_repository(snapshot.repo_path)
+    issue_text = (fixture / "issue.md").read_text(encoding="utf-8")
+    contexts = HybridRetriever().retrieve(
+        repo_path=snapshot.repo_path,
+        repo_index=repo_index,
+        issue_text=issue_text,
+    )
+    planner = ModelBackedRepairPlanner(
+        StaticResponseModelClient(
+            """
+            {
+              "path": "src/simple_calc.py",
+              "old": "return does_not_exist",
+              "new": "return left + right",
+              "summary": "Try a bad old span."
+            }
+            """,
+            provider="unit_model",
+        )
+    )
+
+    result = DeepAgentsRuntime(planner=planner).run(
+        AgentTask(
+            run_id="test-run",
+            repo_path=str(snapshot.repo_path),
+            issue_text=issue_text,
+            retrieved_context=contexts,
+            test_command="python3 -m pytest",
+        )
+    )
+
+    plan_event = next(event for event in result.runtime_trace if event["node"] == "plan")
+    edit_event = next(event for event in result.runtime_trace if event["node"] == "edit")
+    assert result.status == "no_patch_generated"
+    assert edit_event["status"] == "failed"
+    assert plan_event["patch_plan"]["old_found"] is False
+    assert edit_event["patch_plan"]["old_occurrences"] == 0
+    assert edit_event["patch_plan"]["old"]["first_line_preview"] == "return does_not_exist"
 
 
 def test_deepagents_runtime_preserves_failed_model_usage_metadata(tmp_path: Path) -> None:
@@ -354,6 +402,30 @@ def test_langgraph_runtime_retries_no_plan_until_budget_exhausted(tmp_path: Path
     assert retry_events[-1]["max_retries"] == 1
 
 
+def test_langgraph_runtime_records_patch_plan_diagnostics_for_rejected_edit(
+    tmp_path: Path,
+) -> None:
+    fixture = Path("evals/tasks/seeded_bugs_v1/task_001_logic_bug")
+    snapshot = clone_or_copy_repository(str(fixture / "repo"), tmp_path / "repo")
+
+    result = LangGraphRuntime(planner=BadSpanPlanner()).run(
+        AgentTask(
+            run_id="test-run",
+            repo_path=str(snapshot.repo_path),
+            issue_text=(fixture / "issue.md").read_text(encoding="utf-8"),
+            retrieved_context=[],
+            test_command="python3 -m pytest",
+        )
+    )
+
+    plan_event = next(event for event in result.runtime_trace if event["node"] == "plan")
+    edit_event = next(event for event in result.runtime_trace if event["node"] == "edit")
+    assert result.status == "no_patch_generated"
+    assert edit_event["status"] == "failed"
+    assert plan_event["patch_plan"]["old_found"] is False
+    assert edit_event["patch_plan"]["old_occurrences"] == 0
+
+
 class NoPlanPlanner:
     def plan(
         self,
@@ -362,3 +434,19 @@ class NoPlanPlanner:
         retrieved_context: list[object],
     ) -> RepairPlan | None:
         return None
+
+
+class BadSpanPlanner:
+    def plan(
+        self,
+        *,
+        issue_text: str,
+        retrieved_context: list[object],
+    ) -> RepairPlan | None:
+        return RepairPlan(
+            name="bad_span",
+            path="src/simple_calc.py",
+            old="return does_not_exist",
+            new="return left + right",
+            summary="Use an old span that does not exist.",
+        )

@@ -14,6 +14,7 @@ from patchsmith.runtime.core import (
     _plan_for_task,
     _plan_or_planner_metadata,
 )
+from patchsmith.runtime.plan_diagnostics import repair_plan_diagnostics
 
 
 class OpenAIAgentsRuntime:
@@ -79,6 +80,8 @@ class OpenAIAgentsRuntime:
         metadata = _plan_or_planner_metadata(plan, self.planner)
         if metadata:
             plan_event["metadata"] = metadata
+        if plan:
+            plan_event["patch_plan"] = repair_plan_diagnostics(plan, repo_path=repo_path)
         trace.append(plan_event)
         if not plan:
             trace.append(
@@ -132,6 +135,7 @@ class OpenAIAgentsRuntime:
                         "node": "edit",
                         "status": "failed",
                         "summary": str(error),
+                        "patch_plan": repair_plan_diagnostics(plan, repo_path=repo_path),
                     },
                     {
                         "node": "review",

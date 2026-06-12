@@ -14,6 +14,7 @@ from patchsmith.runtime.core import (
     _plan_or_planner_metadata,
     _runtime_config_int,
 )
+from patchsmith.runtime.plan_diagnostics import repair_plan_diagnostics
 
 
 class LangGraphRepairState(TypedDict, total=False):
@@ -46,6 +47,7 @@ class LangGraphRuntime:
         from langgraph.graph import END, StateGraph
 
         max_retries = _runtime_config_int(task.runtime_config, "max_retries", 0)
+        repo_path = Path(task.repo_path)
 
         def triage_node(state: LangGraphRepairState) -> LangGraphRepairState:
             trace = list(state.get("trace", []))
@@ -72,6 +74,8 @@ class LangGraphRuntime:
             metadata = _plan_or_planner_metadata(plan, self.planner)
             if metadata:
                 event["metadata"] = metadata
+            if plan:
+                event["patch_plan"] = repair_plan_diagnostics(plan, repo_path=repo_path)
             trace.append(event)
             return {"plan": plan, "trace": trace}
 
@@ -101,7 +105,7 @@ class LangGraphRuntime:
 
             try:
                 edit = apply_text_replacement(
-                    repo_path=Path(task.repo_path),
+                    repo_path=repo_path,
                     relative_path=plan.path,
                     old=plan.old,
                     new=plan.new,
@@ -131,6 +135,7 @@ class LangGraphRuntime:
                         "status": "failed",
                         "summary": str(error),
                         "attempt": attempt,
+                        "patch_plan": repair_plan_diagnostics(plan, repo_path=repo_path),
                     }
                 )
                 return {

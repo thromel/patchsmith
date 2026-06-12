@@ -7,6 +7,7 @@ from typing import Any, Protocol
 from patchsmith.models import CommandResult, PatchCandidate, RetrievedContext
 from patchsmith.patching import PatchSafetyError, apply_text_replacement
 from patchsmith.planning import HeuristicRepairPlanner, RepairPlan, RepairPlanner
+from patchsmith.runtime.plan_diagnostics import repair_plan_diagnostics
 
 
 @dataclass(frozen=True)
@@ -89,7 +90,15 @@ class HeuristicRuntime:
                         "Review before using outside controlled fixtures.",
                     ],
                     runtime_trace=[
-                        {"node": "plan", "status": "completed", "summary": plan.summary},
+                        {
+                            "node": "plan",
+                            "status": "completed",
+                            "summary": plan.summary,
+                            "patch_plan": repair_plan_diagnostics(
+                                plan,
+                                repo_path=repo_path,
+                            ),
+                        },
                         {"node": "edit", "status": "completed", "summary": plan.path},
                         {
                             "node": "review",
