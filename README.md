@@ -24,6 +24,12 @@ Treat public-issue repair results as experimental unless they come with a saved
 artifact directory that includes the repository state, issue spec, reproduction
 command, patch, validation output, and model metadata.
 
+Current public status is `ready_with_caveats`: the offline seeded-suite demo is
+coherent and the saved DeepAgents `gpt-5.4-mini` runs provide live LLM
+calibration evidence for that benchmark lane only. Do not generalize those
+results to public-issue repair quality without matching reproduction and
+validation artifacts.
+
 ## What It Does
 
 - Clones or copies target repositories into controlled workspaces.
