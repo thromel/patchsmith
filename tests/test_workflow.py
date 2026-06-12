@@ -253,6 +253,10 @@ def test_deepagents_runner_retries_after_rejected_edit(
     assert len(planner.issue_texts) == 2
     assert "Previous agent status:\nno_patch_generated" in planner.issue_texts[1]
     assert "replacement text not found" in planner.issue_texts[1]
+    assert "Previous patch plan diagnostics" in planner.issue_texts[1]
+    assert "Old span found in clean target: False" in planner.issue_texts[1]
+    assert "Old span occurrences: 0" in planner.issue_texts[1]
+    assert "return does_not_exist" in planner.issue_texts[1]
     assert len(sandbox.calls) == 2
     assert "return left + right" in (result.repo_path / "src/simple_calc.py").read_text(
         encoding="utf-8"

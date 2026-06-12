@@ -198,6 +198,7 @@ class RepairRunner:
                     test_result=test_result,
                     final_diff=final_diff,
                     attempt=attempt,
+                    runtime_trace=agent_result.runtime_trace,
                 )
                 started = time.perf_counter()
                 workspace_restorer.restore()

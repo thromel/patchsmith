@@ -5,7 +5,7 @@ from pathlib import Path
 from patchsmith.analysis import RepairOutcomeAnalysis
 from patchsmith.models import CommandResult, RunRequest
 from patchsmith.runtime.core import AgentResult
-from patchsmith.runtime.feedback import sandbox_feedback_summary
+from patchsmith.runtime.feedback import patch_plan_feedback_summary, sandbox_feedback_summary
 from patchsmith.sandbox import SandboxRunner
 from patchsmith.tracing import RunTrace
 
@@ -143,7 +143,9 @@ def issue_with_test_feedback(
     test_result: CommandResult | None,
     final_diff: str,
     attempt: int,
+    runtime_trace: list[dict[str, object]] | None = None,
 ) -> str:
+    plan_feedback = patch_plan_feedback_summary(runtime_trace or [])
     sections = [
         original_issue.strip(),
         (
@@ -164,6 +166,8 @@ def issue_with_test_feedback(
         "Sandbox feedback summary:\n"
         + sandbox_feedback_summary(test_result=test_result, final_diff=final_diff),
     ]
+    if plan_feedback:
+        sections.insert(4, plan_feedback)
     if test_result is not None:
         sections.extend(
             [

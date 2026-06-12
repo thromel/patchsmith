@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from patchsmith.models import CommandResult
 
 FAILURE_MARKERS = (
@@ -28,6 +30,62 @@ def sandbox_feedback_summary(
     if hunks:
         sections.extend(["Previous changed hunks:", *_bullet_lines(hunks)])
     return "\n".join(sections) if sections else "No compact sandbox feedback available."
+
+
+def patch_plan_feedback_summary(runtime_trace: list[dict[str, Any]]) -> str:
+    diagnostics = _latest_patch_plan_diagnostics(runtime_trace)
+    if not diagnostics:
+        return ""
+
+    lines = [
+        "Previous patch plan diagnostics:",
+        f"- Path: {_clean_feedback_value(diagnostics.get('path', ''))}",
+    ]
+    if "target_read_error" in diagnostics:
+        lines.append(
+            f"- Target read error: {_clean_feedback_value(diagnostics.get('target_read_error', ''))}"
+        )
+    if "target_char_count" in diagnostics:
+        lines.append(f"- Target chars: {diagnostics.get('target_char_count')}")
+    if "old_found" in diagnostics:
+        lines.append(f"- Old span found in clean target: {bool(diagnostics.get('old_found'))}")
+    if "old_occurrences" in diagnostics:
+        lines.append(f"- Old span occurrences: {diagnostics.get('old_occurrences')}")
+    old = diagnostics.get("old")
+    if isinstance(old, dict):
+        lines.extend(_span_summary_lines("Old span", old))
+    new = diagnostics.get("new")
+    if isinstance(new, dict):
+        lines.extend(_span_summary_lines("New span", new))
+    return "\n".join(lines)
+
+
+def _latest_patch_plan_diagnostics(
+    runtime_trace: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    for event in reversed(runtime_trace):
+        diagnostics = event.get("patch_plan")
+        if isinstance(diagnostics, dict):
+            return diagnostics
+    return None
+
+
+def _span_summary_lines(label: str, span: dict[str, Any]) -> list[str]:
+    return [
+        (
+            f"- {label}: lines={span.get('line_count')}, chars={span.get('char_count')}, "
+            f"sha256_12={_clean_feedback_value(span.get('sha256_12', ''))}"
+        ),
+        f"- {label} first line: {_clean_feedback_value(span.get('first_line_preview', ''))}",
+        f"- {label} last line: {_clean_feedback_value(span.get('last_line_preview', ''))}",
+    ]
+
+
+def _clean_feedback_value(value: object, *, limit: int = 240) -> str:
+    compact = " ".join(str(value).split())
+    if len(compact) <= limit:
+        return compact
+    return compact[: limit - 15] + "...[truncated]"
 
 
 def _failure_signals(text: str, *, limit: int = 8) -> list[str]:
@@ -77,4 +135,4 @@ def _dedupe_preserve_order(values: list[str]) -> list[str]:
     return deduped
 
 
-__all__ = ["sandbox_feedback_summary"]
+__all__ = ["patch_plan_feedback_summary", "sandbox_feedback_summary"]
