@@ -6,6 +6,7 @@ from typing import Any
 
 import pytest
 
+from patchsmith.deepagents_agent import deepagents_model_kwargs
 from patchsmith.deepagents_planner import (
     DeepAgentsPlannerConfig,
     DeepAgentsRepairPlanner,
@@ -46,6 +47,25 @@ def test_from_env_reads_configuration() -> None:
     )
     assert planner.config.model == "gpt-test"
     assert planner.config.max_output_tokens == 1234
+
+
+def test_deepagents_model_kwargs_omit_responses_only_options_when_disabled() -> None:
+    kwargs = deepagents_model_kwargs(
+        DeepAgentsPlannerConfig(
+            model="gpt-test",
+            max_output_tokens=123,
+            reasoning_effort="medium",
+            use_responses_api=False,
+            store=True,
+        )
+    )
+
+    assert kwargs == {
+        "model": "gpt-test",
+        "use_responses_api": False,
+        "max_completion_tokens": 123,
+        "reasoning_effort": "medium",
+    }
 
 
 def test_plan_returns_none_without_context() -> None:
