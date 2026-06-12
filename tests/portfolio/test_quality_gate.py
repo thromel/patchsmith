@@ -8,6 +8,11 @@ from patchsmith.portfolio import quality_gate as quality_gate_module
 from patchsmith.portfolio import (
     write_quality_gate_report,
 )
+from patchsmith.portfolio.quality_gate import DEFAULT_QUALITY_GATE_TIMEOUT_SECONDS
+
+
+def test_quality_gate_default_timeout_allows_optional_integration_imports() -> None:
+    assert DEFAULT_QUALITY_GATE_TIMEOUT_SECONDS >= 600
 
 
 def test_quality_gate_report_runs_quick_verifiers(

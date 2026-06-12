@@ -20,10 +20,10 @@ def test_delivery_audit_maps_objective_to_current_evidence(
     (experiments_dir / "mvp_progress.json").write_text(
         json.dumps(
             {
-                "status": "ready_with_caveats",
-                "completion_percent": 96.7,
+                "status": "complete",
+                "completion_percent": 100.0,
                 "blocked_count": 0,
-                "warning_count": 2,
+                "warning_count": 0,
             }
         ),
         encoding="utf-8",
@@ -192,6 +192,7 @@ def test_delivery_audit_maps_objective_to_current_evidence(
     assert report.completion_percent > 50.0
     item_statuses = {item.requirement: item.status for item in report.items}
     assert item_statuses["Roadmap is decomposed into sprint plans."] == "passed"
+    assert item_statuses["MVP checklist progress is evidence-backed."] == "passed"
     assert item_statuses["Environment readiness prerequisites are captured."] == "blocked"
     assert item_statuses["Docker sandbox smoke has executable evidence."] == "blocked"
     assert item_statuses["Public issue reproduction execution is safely gated."] == "warning"

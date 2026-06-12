@@ -157,7 +157,7 @@ def _delivery_audit_items(
             requirement="MVP checklist progress is evidence-backed.",
             payload=mvp_payload,
             status_key="status",
-            pass_values={"ready"},
+            pass_values={"complete", "ready"},
             warning_values={"ready_with_caveats"},
             blocked_values={"blocked"},
             evidence_keys=["completion_percent", "blocked_count", "warning_count"],

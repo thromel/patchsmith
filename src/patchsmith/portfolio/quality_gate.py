@@ -13,7 +13,7 @@ from patchsmith.artifacts import safe_artifact_name, write_json, write_markdown
 from patchsmith.portfolio._helpers import _markdown_cell, _utc_now
 from patchsmith.portfolio.models import QualityGateCheck, QualityGateReport
 
-DEFAULT_QUALITY_GATE_TIMEOUT_SECONDS = 300
+DEFAULT_QUALITY_GATE_TIMEOUT_SECONDS = 600
 
 
 def build_quality_gate_report(
