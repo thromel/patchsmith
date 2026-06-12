@@ -64,6 +64,28 @@ def openai_model_preflight(
     timeout_seconds: float = 30.0,
     opener: Callable[[urllib.request.Request, float], bytes] | None = None,
 ) -> ModelPreflightResult:
+    api_key = api_key.strip()
+    if not api_key:
+        return ModelPreflightResult(
+            provider="openai_models",
+            model=model,
+            endpoint=endpoint,
+            status="missing_credentials",
+            available=False,
+            error="OPENAI_API_KEY is required for model availability preflight.",
+        )
+    if _unsafe_header_value(api_key):
+        return ModelPreflightResult(
+            provider="openai_models",
+            model=model,
+            endpoint=endpoint,
+            status="invalid_credentials",
+            available=False,
+            error=(
+                "OPENAI_API_KEY contains whitespace or non-ASCII characters and cannot "
+                "be sent as an HTTP authorization header."
+            ),
+        )
     request = urllib.request.Request(
         endpoint,
         headers={"Authorization": f"Bearer {api_key}"},
@@ -90,6 +112,18 @@ def openai_model_preflight(
             status="request_error",
             available=False,
             error=f"OpenAI Models API request failed: {error.reason}",
+        )
+    except UnicodeError:
+        return ModelPreflightResult(
+            provider="openai_models",
+            model=model,
+            endpoint=endpoint,
+            status="invalid_credentials",
+            available=False,
+            error=(
+                "OPENAI_API_KEY contains characters that cannot be encoded for the "
+                "HTTP authorization header."
+            ),
         )
 
     try:
@@ -162,3 +196,7 @@ def _http_error_message(error: urllib.error.HTTPError) -> str:
 def _open_url(request: urllib.request.Request, timeout_seconds: float) -> bytes:
     with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
         return response.read()
+
+
+def _unsafe_header_value(value: str) -> bool:
+    return any(character.isspace() or ord(character) > 127 for character in value)

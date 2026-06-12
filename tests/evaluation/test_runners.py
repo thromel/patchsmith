@@ -90,6 +90,23 @@ def test_run_repair_evaluation_heuristic_writes_outputs(tmp_path: Path) -> None:
     assert (tmp_path / "repair_eval" / "repair_results.csv").exists()
 
 
+def test_run_repair_evaluation_respects_max_tasks(tmp_path: Path) -> None:
+    results, summary = run_repair_evaluation(
+        dataset_dir=Path("evals/tasks/seeded_bugs_v1"),
+        runtime="heuristic",
+        context_provider="native_hybrid",
+        output_dir=tmp_path / "repair_eval_limited",
+        max_tasks=2,
+    )
+
+    assert [result.task_id for result in results] == [
+        "task_001_logic_bug",
+        "task_002_import_bug",
+    ]
+    assert summary.attempted_tasks == 2
+    assert summary.completed_tasks == 2
+
+
 def test_run_repair_evaluation_langgraph_fake_model_tracks_usage(tmp_path: Path) -> None:
     results, summary = run_repair_evaluation(
         dataset_dir=Path("evals/tasks/seeded_bugs_v1"),

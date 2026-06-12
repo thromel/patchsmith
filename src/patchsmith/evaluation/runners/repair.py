@@ -32,12 +32,15 @@ def run_repair_evaluation(
     runtime: str,
     planner: str = "heuristic",
     max_retries: int = 0,
+    max_tasks: int | None = None,
     context_provider: str,
     output_dir: Path,
     sandbox_mode: str = "local",
     sandbox_image: str = "python:3.12-slim",
 ) -> tuple[list[RepairEvalResult], RepairEvalSummary]:
     tasks = load_seeded_tasks(dataset_dir)
+    if max_tasks is not None and max_tasks > 0:
+        tasks = tasks[:max_tasks]
     output_dir.mkdir(parents=True, exist_ok=True)
     run_artifacts_dir = output_dir / "run_artifacts"
     runner = RepairRunner(artifacts_dir=run_artifacts_dir)

@@ -83,6 +83,12 @@ def register(subparsers: argparse._SubParsersAction) -> dict[str, CommandHandler
         help="Maximum extra LangGraph planning/edit retries after the first attempt.",
     )
     eval_repair.add_argument(
+        "--max-tasks",
+        type=int,
+        default=0,
+        help="Maximum seeded tasks to run; 0 runs the full dataset.",
+    )
+    eval_repair.add_argument(
         "--context-provider",
         choices=["native", "native_hybrid", "native_graph", "ctxhelm_cli", "auto"],
         default="native_hybrid",
@@ -230,6 +236,7 @@ def _eval_repair_command(args: argparse.Namespace) -> int:
         runtime=args.runtime,
         planner=args.planner,
         max_retries=args.max_retries,
+        max_tasks=None if args.max_tasks == 0 else args.max_tasks,
         context_provider=args.context_provider,
         output_dir=Path(args.output),
         sandbox_mode=args.sandbox_mode,

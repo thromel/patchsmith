@@ -83,6 +83,27 @@ def test_openai_model_preflight_redacts_http_error_body() -> None:
     assert "sk-secret" not in result.error
 
 
+def test_openai_model_preflight_rejects_unencodable_api_key() -> None:
+    result = openai_model_preflight(
+        api_key="sk-test—extra",
+        model="gpt-5.4-mini",
+    )
+
+    assert result.status == "invalid_credentials"
+    assert result.available is False
+    assert "sk-test" not in (result.error or "")
+
+
+def test_openai_model_preflight_rejects_multiline_api_key() -> None:
+    result = openai_model_preflight(
+        api_key="sk-test\nextra",
+        model="gpt-5.4-mini",
+    )
+
+    assert result.status == "invalid_credentials"
+    assert result.available is False
+
+
 def test_openai_model_preflight_from_env_requires_api_key() -> None:
     result = openai_model_preflight_from_env(environ={})
 
