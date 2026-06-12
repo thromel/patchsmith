@@ -203,6 +203,8 @@ def test_deepagents_runner_retries_with_sandbox_feedback(
     assert "Sandbox feedback summary" in planner.issue_texts[1]
     assert "Previous changed hunks" in planner.issue_texts[1]
     assert "previous patch is on the code path reached" in planner.issue_texts[1]
+    assert "previous patch applied cleanly, but validation still failed" in planner.issue_texts[1]
+    assert "Do not reuse the same old-span hash" in planner.issue_texts[1]
     assert "failure from attempt 1" in planner.issue_texts[1]
     assert len(sandbox.calls) == 2
     assert "return left + right" in (result.repo_path / "src/simple_calc.py").read_text(
@@ -253,6 +255,7 @@ def test_deepagents_runner_retries_after_rejected_edit(
     assert len(planner.issue_texts) == 2
     assert "Previous agent status:\nno_patch_generated" in planner.issue_texts[1]
     assert "replacement text not found" in planner.issue_texts[1]
+    assert "previous edit was rejected or no patch was generated" in planner.issue_texts[1]
     assert "Previous patch plan diagnostics" in planner.issue_texts[1]
     assert "Old span found in clean target: False" in planner.issue_texts[1]
     assert "Old span occurrences: 0" in planner.issue_texts[1]

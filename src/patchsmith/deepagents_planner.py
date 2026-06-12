@@ -40,6 +40,7 @@ from patchsmith.planning import (
 )
 
 DEFAULT_DEEPAGENTS_MODEL = DEFAULT_OPENAI_MODEL
+DEFAULT_DEEPAGENTS_MAX_FILE_CHARS = 20_000
 DEEPAGENTS_PROVIDER = "deepagents_openai_chat"
 
 
@@ -47,7 +48,7 @@ DEEPAGENTS_PROVIDER = "deepagents_openai_chat"
 class DeepAgentsPlannerConfig:
     model: str = DEFAULT_DEEPAGENTS_MODEL
     max_output_tokens: int = 3200
-    max_file_chars: int = 40_000
+    max_file_chars: int = DEFAULT_DEEPAGENTS_MAX_FILE_CHARS
     reasoning_effort: str | None = None
     use_responses_api: bool = True
     store: bool = False
@@ -113,7 +114,11 @@ class DeepAgentsRepairPlanner:
             DeepAgentsPlannerConfig(
                 model=model,
                 max_output_tokens=_int_env(env, "PATCHSMITH_DEEPAGENTS_MAX_OUTPUT_TOKENS", 3200),
-                max_file_chars=_int_env(env, "PATCHSMITH_DEEPAGENTS_MAX_FILE_CHARS", 40_000),
+                max_file_chars=_int_env(
+                    env,
+                    "PATCHSMITH_DEEPAGENTS_MAX_FILE_CHARS",
+                    DEFAULT_DEEPAGENTS_MAX_FILE_CHARS,
+                ),
                 reasoning_effort=env.get("PATCHSMITH_DEEPAGENTS_REASONING_EFFORT", "").strip()
                 or None,
                 use_responses_api=_bool_env(

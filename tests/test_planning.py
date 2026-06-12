@@ -9,6 +9,7 @@ import pytest
 from langchain_core.messages import AIMessage
 
 from patchsmith.deepagents_planner import (
+    DEFAULT_DEEPAGENTS_MAX_FILE_CHARS,
     DeepAgentsPlannerConfig,
     DeepAgentsRepairPlanner,
     _read_only_filesystem_permissions,
@@ -203,6 +204,8 @@ def test_deepagents_repair_planner_from_env_uses_default_model_pricing() -> None
 
     assert planner.config.model == DEFAULT_OPENAI_MODEL
     assert planner.config.reasoning_effort is None
+    assert planner.config.max_file_chars == DEFAULT_DEEPAGENTS_MAX_FILE_CHARS
+    assert DEFAULT_DEEPAGENTS_MAX_FILE_CHARS == 20_000
     assert planner.config.input_cost_per_1m == 0.75
     assert planner.config.output_cost_per_1m == 4.50
 

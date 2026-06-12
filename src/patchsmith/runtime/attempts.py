@@ -146,6 +146,10 @@ def issue_with_test_feedback(
     runtime_trace: list[dict[str, object]] | None = None,
 ) -> str:
     plan_feedback = patch_plan_feedback_summary(runtime_trace or [])
+    retry_guidance = _retry_guidance(
+        agent_status=agent_status,
+        test_result=test_result,
+    )
     sections = [
         original_issue.strip(),
         (
@@ -166,8 +170,10 @@ def issue_with_test_feedback(
         "Sandbox feedback summary:\n"
         + sandbox_feedback_summary(test_result=test_result, final_diff=final_diff),
     ]
+    if retry_guidance:
+        sections.insert(4, retry_guidance)
     if plan_feedback:
-        sections.insert(4, plan_feedback)
+        sections.insert(5 if retry_guidance else 4, plan_feedback)
     if test_result is not None:
         sections.extend(
             [
@@ -179,6 +185,29 @@ def issue_with_test_feedback(
         )
     sections.append(f"Current diff after failed attempt:\n{_truncate_feedback(final_diff)}")
     return "\n\n".join(sections)
+
+
+def _retry_guidance(
+    *,
+    agent_status: str,
+    test_result: CommandResult | None,
+) -> str:
+    if agent_status == "patch_generated" and test_result is not None and test_result.exit_code != 0:
+        return (
+            "Retry diagnosis:\n"
+            "The previous patch applied cleanly, but validation still failed. Treat the "
+            "chosen edit location or behavior as insufficient, not as an exact-span problem. "
+            "Do not reuse the same old-span hash or return a cosmetic variation of the "
+            "previous diff; inspect a different controlling branch, cache, module registry, "
+            "or dispatch site if the failure signature is unchanged."
+        )
+    if agent_status == "no_patch_generated":
+        return (
+            "Retry diagnosis:\n"
+            "The previous edit was rejected or no patch was generated. First repair the "
+            "target path and exact old span before changing behavior."
+        )
+    return ""
 
 
 def _truncate_feedback(text: str, limit: int = 4_000) -> str:
