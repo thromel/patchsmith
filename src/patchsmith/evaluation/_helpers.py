@@ -8,6 +8,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from patchsmith.evaluation.trajectory import agent_trajectory_metrics
 from patchsmith.evaluation_models import (
     SeededTaskValidationResult,
 )
@@ -247,6 +248,7 @@ def _model_usage_from_trace(trace_path: Path) -> dict[str, Any]:
     output_tokens: list[int] = []
     total_tokens: list[int] = []
     estimated_costs: list[float] = []
+    response_counts: list[int] = []
 
     try:
         lines = trace_path.read_text(encoding="utf-8").splitlines()
@@ -273,9 +275,11 @@ def _model_usage_from_trace(trace_path: Path) -> dict[str, Any]:
         _append_int(output_tokens, model_call.get("output_tokens"))
         _append_int(total_tokens, model_call.get("total_tokens"))
         _append_float(estimated_costs, model_call.get("estimated_cost_usd"))
+        _append_int(response_counts, _model_response_count(model_call))
 
     return {
         "model_provider": ",".join(providers) if providers else None,
+        "response_count": sum(response_counts) if response_counts else None,
         "input_tokens": sum(input_tokens) if input_tokens else None,
         "output_tokens": sum(output_tokens) if output_tokens else None,
         "total_tokens": sum(total_tokens) if total_tokens else None,
@@ -283,8 +287,24 @@ def _model_usage_from_trace(trace_path: Path) -> dict[str, Any]:
     }
 
 
+def _model_response_count(model_call: dict[str, Any]) -> int | None:
+    explicit = model_call.get("response_count")
+    if isinstance(explicit, bool):
+        return None
+    if isinstance(explicit, int) and explicit > 0:
+        return explicit
+    response_id = model_call.get("response_id")
+    if not isinstance(response_id, str):
+        return None
+    ids = [part for part in (part.strip() for part in response_id.split(",")) if part]
+    return len(ids) or None
+
+
 def _trace_metrics_from_trace(trace_path: Path) -> dict[str, Any]:
     events = _trace_events(trace_path)
+    trajectory = agent_trajectory_metrics(events)
+    retry_labels = _retry_labels_from_events(events)
+    retry_failure_classes = _retry_failure_classes_from_events(events)
     node_names = {
         str(event.get("node_name")) for event in events if isinstance(event.get("node_name"), str)
     }
@@ -303,8 +323,8 @@ def _trace_metrics_from_trace(trace_path: Path) -> dict[str, Any]:
     retry_event_count = sum(
         1
         for event in events
-        if str(event.get("node_name", "")) == "runtime.retry"
-        or str(event.get("event_type", "")) == "retry"
+        if str(event.get("node_name", "")) in {"runtime.retry", "feedback_retry"}
+        or str(event.get("event_type", "")) in {"retry", "repair_retry"}
     )
     debuggability_score = 0.0
     if events:
@@ -323,7 +343,102 @@ def _trace_metrics_from_trace(trace_path: Path) -> dict[str, Any]:
         "runtime_node_count": runtime_node_count,
         "failed_trace_event_count": failed_event_count,
         "retry_event_count": retry_event_count,
+        "retry_labels": tuple(retry_labels),
+        "retry_label_counts": _label_counts(retry_labels),
+        "retry_failure_classes": tuple(retry_failure_classes),
+        "retry_failure_class_counts": _label_counts(retry_failure_classes),
         "debuggability_score": debuggability_score,
+        "agent_trajectory_score": trajectory.score,
+        "todo_planning": trajectory.todo_planning,
+        "constrained_filesystem": trajectory.constrained_filesystem,
+        "specialist_review": trajectory.specialist_review,
+        "guardrails": trajectory.guardrails,
+        "structured_output": trajectory.structured_output,
+        "retry_feedback": trajectory.retry_feedback,
+        "patch_diagnostics": trajectory.patch_diagnostics,
+        "contextual_verifier": trajectory.contextual_verifier,
+        "process_quality_label": trajectory.process_quality_label,
+        "process_quality_score": trajectory.process_quality_score,
+        "process_quality_flags": trajectory.process_quality_flags,
+    }
+
+
+def _retry_labels_from_events(events: list[dict[str, Any]]) -> list[str]:
+    labels: list[str] = []
+    for event in events:
+        if str(event.get("node_name", "")) != "feedback_retry":
+            continue
+        payload = event.get("payload")
+        if not isinstance(payload, dict):
+            continue
+        raw_labels = payload.get("retry_labels")
+        if not isinstance(raw_labels, list):
+            labels.append("unclassified_retry")
+            continue
+        added = False
+        for label in raw_labels:
+            if isinstance(label, str) and label:
+                labels.append(label)
+                added = True
+        if not added:
+            labels.append("unclassified_retry")
+    return labels
+
+
+def _retry_failure_classes_from_events(events: list[dict[str, Any]]) -> list[str]:
+    classes: list[str] = []
+    for event in events:
+        if str(event.get("node_name", "")) != "feedback_retry":
+            continue
+        payload = event.get("payload")
+        if not isinstance(payload, dict):
+            continue
+        failure_class = payload.get("retry_failure_class")
+        if isinstance(failure_class, str) and failure_class:
+            classes.append(failure_class)
+        else:
+            classes.append("unclassified_retry")
+    return classes
+
+
+def _label_counts(labels: list[str]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for label in labels:
+        counts[label] = counts.get(label, 0) + 1
+    return counts
+
+
+def _patch_quality_from_trace(trace_path: Path) -> dict[str, Any]:
+    events = _trace_events(trace_path)
+    severity: str | None = None
+    warning = False
+    finding_codes: list[str] = []
+    for event in events:
+        payload = event.get("payload")
+        if not isinstance(payload, dict):
+            continue
+        quality = payload.get("quality")
+        if isinstance(quality, dict):
+            candidate_severity = quality.get("severity")
+            if isinstance(candidate_severity, str) and candidate_severity:
+                severity = candidate_severity
+                warning = warning or candidate_severity == "high"
+            _extend_quality_finding_codes(finding_codes, quality.get("findings"))
+        if event.get("event_type") == "repair_outcome":
+            verdict = payload.get("verdict")
+            if verdict == "patch_validated_quality_warning":
+                warning = True
+            outcome_severity = payload.get("patch_quality_severity")
+            if isinstance(outcome_severity, str) and outcome_severity:
+                severity = outcome_severity
+            _extend_quality_finding_codes(
+                finding_codes,
+                payload.get("patch_quality_findings"),
+            )
+    return {
+        "patch_quality_severity": severity,
+        "patch_quality_warning": warning,
+        "patch_quality_codes": tuple(finding_codes),
     }
 
 
@@ -341,6 +456,22 @@ def _trace_events(trace_path: Path) -> list[dict[str, Any]]:
         if isinstance(event, dict):
             events.append(event)
     return events
+
+
+def _extend_quality_finding_codes(
+    codes: list[str],
+    findings: object,
+) -> None:
+    if not isinstance(findings, list):
+        return
+    for finding in findings:
+        code = None
+        if isinstance(finding, dict):
+            code = finding.get("code")
+        elif isinstance(finding, str):
+            code = finding
+        if isinstance(code, str) and code and code not in codes:
+            codes.append(code)
 
 
 def _append_int(values: list[int], value: object) -> None:

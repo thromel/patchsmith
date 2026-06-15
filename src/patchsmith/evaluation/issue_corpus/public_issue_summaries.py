@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -197,7 +198,29 @@ def summarize_public_issue_repair_attempts(
     sandbox_mode: str,
     sandbox_image: str,
     max_retries: int,
+    stop_on_validated: bool = False,
+    repeat_count: int = 1,
+    deepagents_max_context_files: int | None = None,
+    max_actual_model_responses: int | None = None,
+    max_actual_model_tokens: int | None = None,
 ) -> IssueCorpusPublicRepairAttemptSummary:
+    results_by_task: dict[str, list[IssueCorpusPublicRepairAttemptResult]] = {}
+    for index, result in enumerate(results, start=1):
+        results_by_task.setdefault(_repair_attempt_task_key(index, result), []).append(result)
+    unique_task_count = len(results_by_task)
+    tasks_with_validated_attempt = sum(
+        1
+        for task_results in results_by_task.values()
+        if any(result.status == "validated" for result in task_results)
+    )
+    tasks_with_failed_attempts_only = sum(
+        1
+        for task_results in results_by_task.values()
+        if (
+            any(result.status == "failed" for result in task_results)
+            and not any(result.status == "validated" for result in task_results)
+        )
+    )
     return IssueCorpusPublicRepairAttemptSummary(
         generated_at=_generated_at(),
         readiness_path=str(readiness_path),
@@ -211,6 +234,7 @@ def summarize_public_issue_repair_attempts(
         sandbox_mode=sandbox_mode,
         sandbox_image=sandbox_image,
         max_retries=max_retries,
+        stop_on_validated=stop_on_validated,
         dry_run_tasks=sum(1 for result in results if result.status == "dry_run"),
         attempted_tasks=sum(1 for result in results if result.status in {"validated", "failed"}),
         validated_tasks=sum(1 for result in results if result.status == "validated"),
@@ -220,8 +244,78 @@ def summarize_public_issue_repair_attempts(
         reproduced_input_tasks=sum(
             1 for result in results if result.reproduction_execution_status == "reproduced"
         ),
+        deepagents_max_context_files=deepagents_max_context_files,
+        repeat_count=max(1, repeat_count),
+        unique_task_count=unique_task_count,
+        tasks_with_validated_attempt=tasks_with_validated_attempt,
+        tasks_with_failed_attempts_only=tasks_with_failed_attempts_only,
+        validated_task_pass_at_n_rate=(
+            tasks_with_validated_attempt / unique_task_count if unique_task_count else 0.0
+        ),
+        model_call_count=_sum_optional_int(
+            _optional_int_attr(result, "model_call_count") for result in results
+        ),
+        model_response_count=_sum_optional_int(
+            _optional_int_attr(result, "model_response_count") for result in results
+        ),
+        model_total_tokens=_sum_optional_int(
+            _optional_int_attr(result, "model_total_tokens") for result in results
+        ),
+        estimated_model_cost_usd=_sum_optional_float(
+            _optional_float_attr(result, "estimated_model_cost_usd") for result in results
+        ),
+        max_actual_model_responses=max_actual_model_responses,
+        max_actual_model_tokens=max_actual_model_tokens,
     )
+
+
+def _repair_attempt_task_key(
+    index: int,
+    result: IssueCorpusPublicRepairAttemptResult,
+) -> str:
+    task_id = getattr(result, "task_id", None)
+    if isinstance(task_id, str) and task_id:
+        return task_id
+    return f"row:{index}"
 
 
 def _generated_at() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _sum_optional_int(values: Iterable[int | None]) -> int | None:
+    total = 0
+    seen = False
+    for value in values:
+        if value is None:
+            continue
+        total += value
+        seen = True
+    return total if seen else None
+
+
+def _sum_optional_float(values: Iterable[float | None]) -> float | None:
+    total = 0.0
+    seen = False
+    for value in values:
+        if value is None:
+            continue
+        total += value
+        seen = True
+    return total if seen else None
+
+
+def _optional_int_attr(value: object, name: str) -> int | None:
+    attr = getattr(value, name, None)
+    if isinstance(attr, bool):
+        return None
+    return attr if isinstance(attr, int) else None
+
+
+def _optional_float_attr(value: object, name: str) -> float | None:
+    attr = getattr(value, name, None)
+    if isinstance(attr, bool):
+        return None
+    if isinstance(attr, (int, float)):
+        return float(attr)
+    return None

@@ -36,6 +36,16 @@ def public_issue_repair_attempt_result(
     warnings: list[str],
     evidence: list[str],
     next_actions: list[str],
+    model_call_count: int | None = None,
+    model_response_count: int | None = None,
+    model_input_tokens: int | None = None,
+    model_output_tokens: int | None = None,
+    model_total_tokens: int | None = None,
+    estimated_model_cost_usd: float | None = None,
+    attempt_index: int = 1,
+    attempt_count: int = 1,
+    preflight_status: str = "not_applicable",
+    preflight_gates: list[dict[str, str]] | None = None,
 ) -> IssueCorpusPublicRepairAttemptResult:
     return IssueCorpusPublicRepairAttemptResult(
         task_id=task_id,
@@ -62,11 +72,36 @@ def public_issue_repair_attempt_result(
         final_diff_path=final_diff_path,
         test_exit_code=test_exit_code,
         patch_generated=patch_generated,
+        model_call_count=model_call_count,
+        model_response_count=model_response_count,
+        model_input_tokens=model_input_tokens,
+        model_output_tokens=model_output_tokens,
+        model_total_tokens=model_total_tokens,
+        estimated_model_cost_usd=estimated_model_cost_usd,
         errors=_dedupe_preserve_order(errors),
         warnings=_dedupe_preserve_order(warnings),
         evidence=_dedupe_preserve_order(evidence),
         next_actions=_dedupe_preserve_order(next_actions),
+        attempt_index=attempt_index,
+        attempt_count=attempt_count,
+        preflight_status=preflight_status,
+        preflight_gates=_normalize_preflight_gates(preflight_gates),
     )
+
+
+def _normalize_preflight_gates(
+    gates: list[dict[str, str]] | None,
+) -> list[dict[str, str]]:
+    normalized: list[dict[str, str]] = []
+    for gate in gates or []:
+        normalized.append(
+            {
+                str(key): str(value)
+                for key, value in gate.items()
+                if value is not None
+            }
+        )
+    return normalized
 
 
 __all__ = ["public_issue_repair_attempt_result"]

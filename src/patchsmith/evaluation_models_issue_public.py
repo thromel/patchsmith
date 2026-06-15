@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from typing import Any
 
 
@@ -297,6 +297,16 @@ class IssueCorpusPublicRepairAttemptResult:
     warnings: list[str]
     evidence: list[str]
     next_actions: list[str]
+    model_call_count: int | None = None
+    model_response_count: int | None = None
+    model_input_tokens: int | None = None
+    model_output_tokens: int | None = None
+    model_total_tokens: int | None = None
+    estimated_model_cost_usd: float | None = None
+    attempt_index: int = 1
+    attempt_count: int = 1
+    preflight_status: str = "not_applicable"
+    preflight_gates: list[dict[str, str]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -316,6 +326,7 @@ class IssueCorpusPublicRepairAttemptSummary:
     sandbox_mode: str
     sandbox_image: str
     max_retries: int
+    stop_on_validated: bool
     dry_run_tasks: int
     attempted_tasks: int
     validated_tasks: int
@@ -323,6 +334,18 @@ class IssueCorpusPublicRepairAttemptSummary:
     blocked_tasks: int
     warning_tasks: int
     reproduced_input_tasks: int
+    deepagents_max_context_files: int | None = None
+    repeat_count: int = 1
+    unique_task_count: int = 0
+    tasks_with_validated_attempt: int = 0
+    tasks_with_failed_attempts_only: int = 0
+    validated_task_pass_at_n_rate: float = 0.0
+    model_call_count: int | None = None
+    model_response_count: int | None = None
+    model_total_tokens: int | None = None
+    estimated_model_cost_usd: float | None = None
+    max_actual_model_responses: int | None = None
+    max_actual_model_tokens: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from patchsmith.evaluation_models_benchmarks import (
     SCAFFOLD_VARIANTS,
+    ComplexBenchmarkFollowupCandidate,
+    ComplexBenchmarkResult,
+    ComplexBenchmarkSelection,
+    ComplexBenchmarkSummary,
     PatchSearchCandidateResult,
     PatchSearchEvalResult,
     PatchSearchEvalSummary,
@@ -63,6 +67,10 @@ from patchsmith.evaluation_models_seeded import (
 
 __all__ = [
     "SCAFFOLD_VARIANTS",
+    "ComplexBenchmarkFollowupCandidate",
+    "ComplexBenchmarkResult",
+    "ComplexBenchmarkSelection",
+    "ComplexBenchmarkSummary",
     "IssueCorpusContextPreviewResult",
     "IssueCorpusContextPreviewSummary",
     "IssueCorpusEntryValidationResult",

@@ -23,6 +23,7 @@ def run_scaffold_comparison(
     variants: list[str],
     context_provider: str,
     output_dir: Path,
+    max_tasks: int | None = None,
     sandbox_mode: str = "local",
     sandbox_image: str = "python:3.12-slim",
 ) -> list[ScaffoldComparisonResult]:
@@ -38,6 +39,7 @@ def run_scaffold_comparison(
             planner=variant.planner,
             context_provider=context_provider,
             output_dir=variant_output_dir,
+            max_tasks=max_tasks,
             sandbox_mode=sandbox_mode,
             sandbox_image=sandbox_image,
         )
@@ -56,8 +58,19 @@ def run_scaffold_comparison(
                 avg_runtime_nodes=summary.avg_runtime_nodes,
                 failed_trace_event_count=summary.failed_trace_event_count,
                 avg_retry_events=summary.avg_retry_events,
+                retry_label_counts=summary.retry_label_counts,
                 avg_debuggability_score=summary.avg_debuggability_score,
+                avg_agent_trajectory_score=summary.avg_agent_trajectory_score,
+                todo_planning_rate=summary.todo_planning_rate,
+                constrained_filesystem_rate=summary.constrained_filesystem_rate,
+                specialist_review_rate=summary.specialist_review_rate,
+                guardrails_rate=summary.guardrails_rate,
+                structured_output_rate=summary.structured_output_rate,
+                retry_feedback_rate=summary.retry_feedback_rate,
+                patch_diagnostics_rate=summary.patch_diagnostics_rate,
+                contextual_verifier_rate=summary.contextual_verifier_rate,
                 model_provider=summary.model_provider,
+                response_count=summary.response_count,
                 input_tokens=summary.input_tokens,
                 output_tokens=summary.output_tokens,
                 total_tokens=summary.total_tokens,
@@ -92,7 +105,9 @@ def write_scaffold_comparison_outputs(
         if results:
             writer.writeheader()
             for result in results:
-                writer.writerow(result.to_dict())
+                row = result.to_dict()
+                row["retry_label_counts"] = _format_label_counts(result.retry_label_counts)
+                writer.writerow(row)
 
     report_path.write_text(
         render_scaffold_comparison_report(dataset_dir=dataset_dir, results=results),
@@ -106,3 +121,9 @@ def _scaffold_variant(name: str) -> ScaffoldVariant:
     except KeyError as error:
         supported = ", ".join(sorted(SCAFFOLD_VARIANTS))
         raise ValueError(f"unsupported scaffold variant: {name}; supported: {supported}") from error
+
+
+def _format_label_counts(counts: dict[str, int]) -> str:
+    if not counts:
+        return "none"
+    return ", ".join(f"{label}={count}" for label, count in sorted(counts.items()))

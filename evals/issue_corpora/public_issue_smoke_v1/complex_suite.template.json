@@ -1,0 +1,37 @@
+{
+  "benchmark": "public_issue_repair_attempts",
+  "attempt_dirs": [
+    "artifacts/experiments/public_issue_corpus_v1/requests_7341_fresh_live_20260614_031542",
+    "artifacts/experiments/public_issue_corpus_v1/requests_7223_live_deepagents_20260613_211301",
+    "artifacts/experiments/public_issue_corpus_v1/pytest_14552_source_recompile_prompt_20260614_011456"
+  ],
+  "output_dir": "artifacts/experiments/complex_live_deepagents_public_issue_suite_3task_20260614",
+  "gate": {
+    "min_validation_rate": 1.0,
+    "min_live_provider_tasks": 3,
+    "min_unique_tasks": 3,
+    "max_attempted_cost_per_validated_task_usd": 0.07,
+    "max_attempted_tokens_per_validated_task": 90000,
+    "max_attempted_responses_per_validated_task": 6,
+    "max_attempted_task_cost_usd": 0.1,
+    "max_attempted_task_tokens": 130000,
+    "max_attempted_task_responses": 8,
+    "max_selected_cost_per_validated_task_usd": 0.07,
+    "max_selected_tokens_per_validated_task": 90000,
+    "max_selected_responses_per_validated_task": 6,
+    "max_selected_virtual_files_per_validated_task": 5,
+    "max_selected_tokens_per_virtual_file": 20000,
+    "max_selected_responses_per_virtual_file": 1.5,
+    "min_selected_progress_score": 1.0,
+    "min_selected_context_target_recall": 1.0,
+    "min_selected_context_target_precision": 0.2,
+    "max_selected_task_cost_usd": 0.1,
+    "max_selected_task_tokens": 130000,
+    "max_selected_task_responses": 8,
+    "max_live_cost_budget_overage_tasks": 0,
+    "min_agent_trajectory_score": 0.8,
+    "min_process_quality_score": 1.0,
+    "max_process_risky_validated_tasks": 0,
+    "min_target_alignment_rate": 1.0
+  }
+}

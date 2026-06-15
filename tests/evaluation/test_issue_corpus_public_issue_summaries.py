@@ -88,18 +88,45 @@ def test_public_issue_repair_attempt_summary_counts_validated_failed_and_blocked
         sandbox_mode="local",
         sandbox_image="python:3.12-slim",
         max_retries=1,
+        repeat_count=2,
         results=[
-            SimpleNamespace(status="validated", reproduction_execution_status="reproduced"),
-            SimpleNamespace(status="failed", reproduction_execution_status="reproduced"),
-            SimpleNamespace(status="blocked", reproduction_execution_status="blocked"),
-            SimpleNamespace(status="warning", reproduction_execution_status="reproduced"),
+            SimpleNamespace(
+                task_id="task-a",
+                status="validated",
+                reproduction_execution_status="reproduced",
+            ),
+            SimpleNamespace(
+                task_id="task-a",
+                status="failed",
+                reproduction_execution_status="reproduced",
+            ),
+            SimpleNamespace(
+                task_id="task-b",
+                status="failed",
+                reproduction_execution_status="reproduced",
+            ),
+            SimpleNamespace(
+                task_id="task-c",
+                status="blocked",
+                reproduction_execution_status="blocked",
+            ),
+            SimpleNamespace(
+                task_id="task-d",
+                status="warning",
+                reproduction_execution_status="reproduced",
+            ),
         ],
     )
 
-    assert summary.task_count == 4
-    assert summary.attempted_tasks == 2
+    assert summary.task_count == 5
+    assert summary.attempted_tasks == 3
     assert summary.validated_tasks == 1
-    assert summary.failed_tasks == 1
+    assert summary.failed_tasks == 2
     assert summary.blocked_tasks == 1
     assert summary.warning_tasks == 1
-    assert summary.reproduced_input_tasks == 3
+    assert summary.reproduced_input_tasks == 4
+    assert summary.repeat_count == 2
+    assert summary.unique_task_count == 4
+    assert summary.tasks_with_validated_attempt == 1
+    assert summary.tasks_with_failed_attempts_only == 1
+    assert summary.validated_task_pass_at_n_rate == 0.25

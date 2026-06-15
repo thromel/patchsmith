@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import json
 from pathlib import Path
 
 from patchsmith.artifacts import write_json
@@ -144,6 +145,8 @@ def write_public_issue_repair_attempt_outputs(
             handle,
             fieldnames=[
                 "task_id",
+                "attempt_index",
+                "attempt_count",
                 "repository",
                 "issue_url",
                 "status",
@@ -160,6 +163,8 @@ def write_public_issue_repair_attempt_outputs(
                 "sandbox_mode",
                 "sandbox_image",
                 "dry_run",
+                "preflight_status",
+                "preflight_gates",
                 "run_id",
                 "run_status",
                 "report_path",
@@ -167,6 +172,12 @@ def write_public_issue_repair_attempt_outputs(
                 "final_diff_path",
                 "test_exit_code",
                 "patch_generated",
+                "model_call_count",
+                "model_response_count",
+                "model_input_tokens",
+                "model_output_tokens",
+                "model_total_tokens",
+                "estimated_model_cost_usd",
                 "errors",
                 "warnings",
                 "evidence",
@@ -178,6 +189,8 @@ def write_public_issue_repair_attempt_outputs(
             writer.writerow(
                 {
                     "task_id": result.task_id,
+                    "attempt_index": result.attempt_index,
+                    "attempt_count": result.attempt_count,
                     "repository": result.repository,
                     "issue_url": result.issue_url,
                     "status": result.status,
@@ -194,6 +207,11 @@ def write_public_issue_repair_attempt_outputs(
                     "sandbox_mode": result.sandbox_mode,
                     "sandbox_image": result.sandbox_image,
                     "dry_run": result.dry_run,
+                    "preflight_status": result.preflight_status,
+                    "preflight_gates": json.dumps(
+                        result.preflight_gates,
+                        sort_keys=True,
+                    ),
                     "run_id": result.run_id,
                     "run_status": result.run_status,
                     "report_path": result.report_path,
@@ -201,6 +219,12 @@ def write_public_issue_repair_attempt_outputs(
                     "final_diff_path": result.final_diff_path,
                     "test_exit_code": result.test_exit_code,
                     "patch_generated": result.patch_generated,
+                    "model_call_count": result.model_call_count,
+                    "model_response_count": result.model_response_count,
+                    "model_input_tokens": result.model_input_tokens,
+                    "model_output_tokens": result.model_output_tokens,
+                    "model_total_tokens": result.model_total_tokens,
+                    "estimated_model_cost_usd": result.estimated_model_cost_usd,
                     "errors": ";".join(result.errors),
                     "warnings": ";".join(result.warnings),
                     "evidence": ";".join(result.evidence),

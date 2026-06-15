@@ -62,10 +62,7 @@ def public_issue_repair_attempt_issue_text(
             "they are the executable reproduction and often reveal the controlling mechanism."
         )
     if source_hints:
-        details.append(
-            "Reviewed source files and fixture import hints: "
-            + ", ".join(f"`{path}`" for path in source_hints)
-        )
+        details.extend(_source_hint_guidance(source_hints))
     if details:
         sections.extend(["", "## Reviewed Reproduction", "", *details])
     for fixture in validation_fixture_files[:3]:
@@ -85,6 +82,30 @@ def public_issue_repair_attempt_issue_text(
             ]
         )
     return "\n".join(sections)
+
+
+def _source_hint_guidance(source_hints: list[str]) -> list[str]:
+    symbol_hints = [hint for hint in source_hints if "#" in hint]
+    file_hints = [hint for hint in source_hints if "#" not in hint]
+    details = [
+        "Reviewed source files and fixture import hints: "
+        + ", ".join(f"`{path}`" for path in source_hints)
+    ]
+    if symbol_hints:
+        details.append(
+            "Symbol-qualified source hints to inspect before broad module edits: "
+            + ", ".join(f"`{path}`" for path in symbol_hints)
+        )
+        details.append(
+            "Before editing a different file or function, explain why the symbol-qualified "
+            "hint is not the controlling code path for the reproduced failure."
+        )
+    if file_hints:
+        details.append(
+            "Broader source-file hints for adjacent context: "
+            + ", ".join(f"`{path}`" for path in file_hints)
+        )
+    return details
 
 
 def source_hint_context_paths(source_hints: list[str]) -> list[str]:

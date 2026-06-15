@@ -54,6 +54,19 @@ from patchsmith.evaluation.metrics import (
     recall,
     top_k_recall,
 )
+from patchsmith.evaluation.runners.complex import (
+    ComplexBenchmarkSuiteConfig,
+    ComplexBenchmarkSuitePreflight,
+    ComplexBenchmarkSuiteSpec,
+    ComplexBenchmarkSuiteThresholds,
+    complex_benchmark_suite_gate,
+    load_complex_benchmark_suite_spec,
+    resolve_complex_benchmark_suite_config,
+    resolve_complex_benchmark_suite_thresholds,
+    summarize_complex_benchmark,
+    summarize_complex_benchmark_suite,
+    validate_complex_benchmark_suite_inputs,
+)
 from patchsmith.evaluation.runners.patch_search import run_patch_search_evaluation
 from patchsmith.evaluation.runners.repair import run_repair_evaluation
 from patchsmith.evaluation.runners.retrieval import run_retrieval_evaluation
@@ -64,14 +77,20 @@ from patchsmith.evaluation.seeded import (
 )
 
 __all__ = [
+    "ComplexBenchmarkSuiteConfig",
+    "ComplexBenchmarkSuitePreflight",
+    "ComplexBenchmarkSuiteSpec",
+    "ComplexBenchmarkSuiteThresholds",
     "check_focused_test_setup_readiness",
     "check_materialized_issue_run_readiness",
     "check_public_issue_repair_readiness",
+    "complex_benchmark_suite_gate",
     "diagnose_focused_test_runs",
     "discover_public_issue_failure_signals",
     "execute_focused_test_setups",
     "execute_public_issue_repairs",
     "execute_public_issue_reproductions",
+    "load_complex_benchmark_suite_spec",
     "load_seeded_tasks",
     "materialize_issue_corpus_tasks",
     "plan_focused_test_setups",
@@ -80,12 +99,17 @@ __all__ = [
     "preflight_issue_corpus_repositories",
     "preview_issue_corpus_context",
     "recall",
+    "resolve_complex_benchmark_suite_config",
+    "resolve_complex_benchmark_suite_thresholds",
     "run_materialized_issue_focused_tests",
     "run_patch_search_evaluation",
     "run_repair_evaluation",
     "run_retrieval_evaluation",
     "run_scaffold_comparison",
+    "summarize_complex_benchmark",
+    "summarize_complex_benchmark_suite",
     "top_k_recall",
+    "validate_complex_benchmark_suite_inputs",
     "validate_focused_test_setups",
     "validate_issue_corpus",
     "validate_materialized_issue_tasks",

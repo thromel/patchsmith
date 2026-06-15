@@ -11,6 +11,72 @@ from patchsmith.evaluation import (
     plan_public_issue_reproductions,
     validate_public_issue_reproduction_specs,
 )
+from patchsmith.evaluation.issue_corpus.public_issue_repairs import (
+    PublicRepairSandboxPreflight,
+)
+from patchsmith.model_preflight import ModelPreflightResult
+
+
+def _passed_public_repair_sandbox_preflight(
+    _mode: str,
+    _image: str,
+) -> PublicRepairSandboxPreflight:
+    return PublicRepairSandboxPreflight(evidence=("test sandbox preflight passed",))
+
+
+def _passed_public_repair_model_preflight(_planner: str) -> ModelPreflightResult:
+    return ModelPreflightResult(
+        provider="openai_models",
+        model="gpt-test",
+        endpoint="https://api.openai.test/v1/models",
+        status="available",
+        available=True,
+        available_model_count=1,
+    )
+
+
+def _write_ready_public_repair_fixture(tmp_path: Path) -> tuple[Path, Path]:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    tasks_dir = tmp_path / "materialized_tasks"
+    task_dir = tasks_dir / "public_task"
+    task_dir.mkdir(parents=True)
+    issue_path = task_dir / "issue.md"
+    issue_path.write_text("repair this public issue\n", encoding="utf-8")
+    (task_dir / "task_manifest.json").write_text(
+        json.dumps(
+            {
+                "task_id": "public_task",
+                "issue_file": str(issue_path),
+                "suggested_commands": ["PYTHONPATH=src python3 -m patchsmith.cli run --json"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    readiness_path = tmp_path / "public_issue_repair_readiness_results.json"
+    readiness_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "public_task",
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/10",
+                    "status": "ready",
+                    "repo_path": str(repo_dir),
+                    "repo_exists": True,
+                    "repair_command": "PYTHONPATH=src python3 -m patchsmith.cli run --json",
+                    "validation_command": "python3 -m pytest tests/test_bug.py",
+                    "reproduction_execution_status": "reproduced",
+                    "blockers": [],
+                    "warnings": [],
+                    "evidence": ["public issue reproduction execution saved failing evidence"],
+                    "next_actions": [],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return tasks_dir, readiness_path
 
 
 def test_plan_public_issue_reproductions_warns_without_expected_failure_spec(
@@ -1267,14 +1333,814 @@ def test_execute_public_issue_repairs_dry_runs_ready_task(tmp_path: Path) -> Non
         runtime="heuristic",
         planner="heuristic",
         sandbox_mode="local",
+        repeats=3,
     )
 
-    assert summary.dry_run_tasks == 1
+    assert summary.task_count == 3
+    assert summary.dry_run_tasks == 3
     assert summary.blocked_tasks == 0
-    assert summary.reproduced_input_tasks == 1
+    assert summary.reproduced_input_tasks == 3
     assert summary.max_retries == 0
-    assert results[0].status == "dry_run"
+    assert summary.repeat_count == 3
+    assert summary.unique_task_count == 1
+    assert summary.tasks_with_validated_attempt == 0
+    assert summary.validated_task_pass_at_n_rate == 0.0
+    assert [result.attempt_index for result in results] == [1, 2, 3]
+    assert {result.attempt_count for result in results} == {3}
+    assert {result.status for result in results} == {"dry_run"}
     assert "repair attempt passed dry-run gating" in ";".join(results[0].evidence)
+    report = (tmp_path / "repair_attempts" / "public_issue_repair_attempt_report.md").read_text(
+        encoding="utf-8"
+    )
+    assert "Repeat count: `3`" in report
+    assert "Validated task pass@N rate: `0.000`" in report
+    assert "saved patch-quality evidence did not mark the final patch high-risk" in report
+    assert "passing tests but high-risk final patch quality" in report
+    assert "cleanly validated" in report
+    csv_text = (tmp_path / "repair_attempts" / "public_issue_repair_attempt_results.csv").read_text(
+        encoding="utf-8"
+    )
+    assert "attempt_index,attempt_count" in csv_text
+
+
+def test_execute_public_issue_repairs_blocks_docker_preflight_before_run(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    tasks_dir = tmp_path / "materialized_tasks"
+    task_dir = tasks_dir / "public_task"
+    task_dir.mkdir(parents=True)
+    issue_path = task_dir / "issue.md"
+    issue_path.write_text("repair this public issue\n", encoding="utf-8")
+    (task_dir / "task_manifest.json").write_text(
+        json.dumps(
+            {
+                "task_id": "public_task",
+                "issue_file": str(issue_path),
+                "suggested_commands": ["PYTHONPATH=src python3 -m patchsmith.cli run --json"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    readiness_path = tmp_path / "public_issue_repair_readiness_results.json"
+    readiness_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "public_task",
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/10",
+                    "status": "ready",
+                    "repo_path": str(repo_dir),
+                    "repo_exists": True,
+                    "repair_command": "PYTHONPATH=src python3 -m patchsmith.cli run --json",
+                    "validation_command": "python3 -m pytest tests/test_bug.py",
+                    "reproduction_execution_status": "reproduced",
+                    "blockers": [],
+                    "warnings": [],
+                    "evidence": ["public issue reproduction execution saved failing evidence"],
+                    "next_actions": [],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    output_dir = tmp_path / "repair_attempts"
+    results, summary = execute_public_issue_repairs(
+        readiness_path=readiness_path,
+        output_dir=output_dir,
+        tasks_dir=tasks_dir,
+        runtime="deepagents",
+        planner="deepagents",
+        sandbox_mode="docker",
+        dry_run=False,
+        sandbox_preflight=lambda _mode, _image: PublicRepairSandboxPreflight(
+            errors=("Docker sandbox preflight failed: daemon unavailable.",),
+            next_actions=("Start Docker Desktop.",),
+        ),
+    )
+
+    assert summary.dry_run is False
+    assert summary.attempted_tasks == 0
+    assert summary.blocked_tasks == 1
+    assert results[0].status == "blocked"
+    assert results[0].run_id is None
+    assert results[0].patch_generated is False
+    assert "Docker sandbox preflight failed" in ";".join(results[0].errors)
+    assert "Start Docker Desktop." in results[0].next_actions
+    assert not (output_dir / "public_issue_repair_attempts").exists()
+    report = (output_dir / "public_issue_repair_attempt_report.md").read_text(
+        encoding="utf-8"
+    )
+    assert "Docker sandbox preflight failed" in report
+
+
+def test_execute_public_issue_repairs_blocks_model_preflight_before_run(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    tasks_dir = tmp_path / "materialized_tasks"
+    task_dir = tasks_dir / "public_task"
+    task_dir.mkdir(parents=True)
+    issue_path = task_dir / "issue.md"
+    issue_path.write_text("repair this public issue\n", encoding="utf-8")
+    (task_dir / "task_manifest.json").write_text(
+        json.dumps(
+            {
+                "task_id": "public_task",
+                "issue_file": str(issue_path),
+                "suggested_commands": ["PYTHONPATH=src python3 -m patchsmith.cli run --json"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    readiness_path = tmp_path / "public_issue_repair_readiness_results.json"
+    readiness_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "public_task",
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/10",
+                    "status": "ready",
+                    "repo_path": str(repo_dir),
+                    "repo_exists": True,
+                    "repair_command": "PYTHONPATH=src python3 -m patchsmith.cli run --json",
+                    "validation_command": "python3 -m pytest tests/test_bug.py",
+                    "reproduction_execution_status": "reproduced",
+                    "blockers": [],
+                    "warnings": [],
+                    "evidence": ["public issue reproduction execution saved failing evidence"],
+                    "next_actions": [],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    output_dir = tmp_path / "repair_attempts"
+    results, summary = execute_public_issue_repairs(
+        readiness_path=readiness_path,
+        output_dir=output_dir,
+        tasks_dir=tasks_dir,
+        runtime="deepagents",
+        planner="deepagents",
+        sandbox_mode="local",
+        dry_run=False,
+        model_preflight=lambda _planner: ModelPreflightResult(
+            provider="openai_models",
+            model="gpt-test",
+            endpoint="https://api.openai.test/v1/models",
+            status="missing_credentials",
+            available=False,
+            error="OPENAI_API_KEY is required for model availability preflight.",
+        ),
+    )
+
+    assert summary.dry_run is False
+    assert summary.attempted_tasks == 0
+    assert summary.blocked_tasks == 1
+    assert results[0].status == "blocked"
+    assert results[0].run_id is None
+    assert results[0].patch_generated is False
+    assert results[0].preflight_status == "blocked"
+    assert results[0].preflight_gates == [
+        {
+            "name": "sandbox",
+            "status": "skipped",
+            "detail": "sandbox preflight skipped for local mode",
+            "mode": "local",
+        },
+        {
+            "name": "model",
+            "status": "blocked",
+            "detail": "OPENAI_API_KEY is required for model availability preflight.",
+            "provider": "openai_models",
+            "model": "gpt-test",
+            "endpoint": "https://api.openai.test/v1/models",
+            "provider_status": "missing_credentials",
+        },
+    ]
+    assert "OpenAI model preflight failed" in ";".join(results[0].errors)
+    assert "OPENAI_API_KEY" in ";".join(results[0].errors)
+    assert not (output_dir / "public_issue_repair_attempts").exists()
+    report = (output_dir / "public_issue_repair_attempt_report.md").read_text(
+        encoding="utf-8"
+    )
+    assert "blocked (sandbox:skipped; model:blocked)" in report
+
+
+def test_execute_public_issue_repairs_allows_live_planner_after_model_preflight(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    tasks_dir = tmp_path / "materialized_tasks"
+    task_dir = tasks_dir / "public_task"
+    task_dir.mkdir(parents=True)
+    issue_path = task_dir / "issue.md"
+    issue_path.write_text("repair this public issue\n", encoding="utf-8")
+    (task_dir / "task_manifest.json").write_text(
+        json.dumps(
+            {
+                "task_id": "public_task",
+                "issue_file": str(issue_path),
+                "suggested_commands": ["PYTHONPATH=src python3 -m patchsmith.cli run --json"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    readiness_path = tmp_path / "public_issue_repair_readiness_results.json"
+    readiness_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "public_task",
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/10",
+                    "status": "ready",
+                    "repo_path": str(repo_dir),
+                    "repo_exists": True,
+                    "repair_command": "PYTHONPATH=src python3 -m patchsmith.cli run --json",
+                    "validation_command": "python3 -m pytest tests/test_bug.py",
+                    "reproduction_execution_status": "reproduced",
+                    "blockers": [],
+                    "warnings": [],
+                    "evidence": ["public issue reproduction execution saved failing evidence"],
+                    "next_actions": [],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    captured_requests = []
+
+    class FakeRepairRunner:
+        def __init__(self, *, artifacts_dir: Path) -> None:
+            self.artifacts_dir = artifacts_dir
+
+        def run(self, request):
+            captured_requests.append(request)
+            run_dir = self.artifacts_dir / "runs" / "fake-run"
+            run_dir.mkdir(parents=True)
+            report_path = run_dir / "report.md"
+            trace_path = run_dir / "traces.jsonl"
+            diff_path = run_dir / "final.diff"
+            report_path.write_text("fake report\n", encoding="utf-8")
+            trace_path.write_text("", encoding="utf-8")
+            diff_path.write_text(
+                "diff --git a/src/example.py b/src/example.py\n+return 2\n",
+                encoding="utf-8",
+            )
+            return SimpleNamespace(
+                run_id="fake-run",
+                status="completed",
+                report_path=report_path,
+                trace_path=trace_path,
+                final_diff_path=diff_path,
+                test_result=SimpleNamespace(exit_code=0),
+                model_usage={
+                    "call_count": 1,
+                    "response_count": 4,
+                    "input_tokens": 1000,
+                    "output_tokens": 200,
+                    "total_tokens": 1200,
+                    "estimated_cost_usd": 0.0123,
+                },
+            )
+
+    monkeypatch.setattr(
+        "patchsmith.evaluation.issue_corpus.public_issue_repairs.RepairRunner",
+        FakeRepairRunner,
+    )
+
+    output_dir = tmp_path / "repair_attempts"
+    results, summary = execute_public_issue_repairs(
+        readiness_path=readiness_path,
+        output_dir=output_dir,
+        tasks_dir=tasks_dir,
+        runtime="deepagents",
+        planner="deepagents",
+        sandbox_mode="local",
+        dry_run=False,
+        model_preflight=_passed_public_repair_model_preflight,
+        deepagents_max_context_files=4,
+    )
+
+    assert summary.attempted_tasks == 1
+    assert summary.validated_tasks == 1
+    assert summary.deepagents_max_context_files == 4
+    assert summary.model_call_count == 1
+    assert summary.model_total_tokens == 1200
+    assert summary.estimated_model_cost_usd == 0.0123
+    assert results[0].status == "validated"
+    assert results[0].model_response_count == 4
+    assert results[0].estimated_model_cost_usd == 0.0123
+    assert results[0].preflight_status == "passed"
+    assert results[0].preflight_gates[0]["name"] == "sandbox"
+    assert results[0].preflight_gates[0]["status"] == "skipped"
+    assert results[0].preflight_gates[1]["name"] == "model"
+    assert results[0].preflight_gates[1]["status"] == "passed"
+    assert results[0].preflight_gates[1]["model"] == "gpt-test"
+    assert len(captured_requests) == 1
+    assert captured_requests[0].planner == "deepagents"
+    assert captured_requests[0].runtime_config == {"max_context_files": 4}
+    assert "DeepAgents max context files configured: 4" in results[0].evidence
+    assert "OpenAI model preflight passed" in ";".join(results[0].evidence)
+    saved_summary = json.loads(
+        (output_dir / "public_issue_repair_attempt_summary.json").read_text(encoding="utf-8")
+    )
+    assert saved_summary["deepagents_max_context_files"] == 4
+    assert saved_summary["estimated_model_cost_usd"] == 0.0123
+    report = (output_dir / "public_issue_repair_attempt_report.md").read_text(encoding="utf-8")
+    assert "DeepAgents max context files: `4`" in report
+    assert "Estimated model cost: `$0.012300`" in report
+    assert "1 calls, 1200 tokens, $0.012300" in report
+
+
+def test_execute_public_issue_repairs_blocks_live_budget_before_run(
+    tmp_path: Path,
+) -> None:
+    tasks_dir, readiness_path = _write_ready_public_repair_fixture(tmp_path)
+
+    output_dir = tmp_path / "repair_attempts"
+    results, summary = execute_public_issue_repairs(
+        readiness_path=readiness_path,
+        output_dir=output_dir,
+        tasks_dir=tasks_dir,
+        runtime="deepagents",
+        planner="deepagents",
+        sandbox_mode="local",
+        dry_run=False,
+        model_preflight=_passed_public_repair_model_preflight,
+        max_live_cost_usd=0.01,
+        estimated_cost_per_attempt_usd=0.02,
+    )
+
+    assert summary.attempted_tasks == 0
+    assert summary.blocked_tasks == 1
+    assert results[0].status == "blocked"
+    assert results[0].run_id is None
+    assert results[0].preflight_status == "blocked"
+    assert results[0].preflight_gates[2]["name"] == "budget"
+    assert results[0].preflight_gates[2]["status"] == "blocked"
+    assert results[0].preflight_gates[2]["projected_model_attempts"] == "1"
+    assert results[0].preflight_gates[2]["projected_cost_usd"] == "0.020000"
+    assert "Live cost budget preflight failed" in ";".join(results[0].errors)
+    assert not (output_dir / "public_issue_repair_attempts").exists()
+    report = (output_dir / "public_issue_repair_attempt_report.md").read_text(
+        encoding="utf-8"
+    )
+    assert "blocked (sandbox:skipped; model:passed; budget:blocked)" in report
+
+
+def test_execute_public_issue_repairs_allows_live_budget_after_preflight(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    tasks_dir, readiness_path = _write_ready_public_repair_fixture(tmp_path)
+    captured_requests = []
+
+    class FakeRepairRunner:
+        def __init__(self, *, artifacts_dir: Path) -> None:
+            self.artifacts_dir = artifacts_dir
+
+        def run(self, request):
+            captured_requests.append(request)
+            run_dir = self.artifacts_dir / "runs" / "fake-run"
+            run_dir.mkdir(parents=True)
+            report_path = run_dir / "report.md"
+            trace_path = run_dir / "traces.jsonl"
+            diff_path = run_dir / "final.diff"
+            report_path.write_text("fake report\n", encoding="utf-8")
+            trace_path.write_text("", encoding="utf-8")
+            diff_path.write_text(
+                "diff --git a/src/example.py b/src/example.py\n+return 2\n",
+                encoding="utf-8",
+            )
+            return SimpleNamespace(
+                run_id="fake-run",
+                status="completed",
+                report_path=report_path,
+                trace_path=trace_path,
+                final_diff_path=diff_path,
+                test_result=SimpleNamespace(exit_code=0),
+                model_usage={
+                    "call_count": 2,
+                    "response_count": 8,
+                    "input_tokens": 1000,
+                    "output_tokens": 200,
+                    "total_tokens": 1200,
+                    "estimated_cost_usd": 0.02,
+                },
+            )
+
+    monkeypatch.setattr(
+        "patchsmith.evaluation.issue_corpus.public_issue_repairs.RepairRunner",
+        FakeRepairRunner,
+    )
+
+    results, summary = execute_public_issue_repairs(
+        readiness_path=readiness_path,
+        output_dir=tmp_path / "repair_attempts",
+        tasks_dir=tasks_dir,
+        runtime="deepagents",
+        planner="deepagents",
+        sandbox_mode="local",
+        max_retries=1,
+        dry_run=False,
+        model_preflight=_passed_public_repair_model_preflight,
+        max_live_cost_usd=0.03,
+        estimated_cost_per_attempt_usd=0.01,
+    )
+
+    assert summary.attempted_tasks == 1
+    assert summary.validated_tasks == 1
+    assert summary.estimated_model_cost_usd == 0.02
+    assert results[0].status == "validated"
+    assert results[0].estimated_model_cost_usd == 0.02
+    assert results[0].preflight_status == "passed"
+    assert results[0].preflight_gates[2]["name"] == "budget"
+    assert results[0].preflight_gates[2]["status"] == "passed"
+    assert results[0].preflight_gates[2]["projected_model_attempts"] == "2"
+    assert results[0].preflight_gates[2]["projected_cost_usd"] == "0.020000"
+    assert "Live cost budget preflight passed" in ";".join(results[0].evidence)
+    assert len(captured_requests) == 1
+
+
+def test_execute_public_issue_repairs_flags_actual_live_budget_overrun(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    tasks_dir, readiness_path = _write_ready_public_repair_fixture(tmp_path)
+
+    class FakeRepairRunner:
+        def __init__(self, *, artifacts_dir: Path) -> None:
+            self.artifacts_dir = artifacts_dir
+
+        def run(self, request):
+            run_dir = self.artifacts_dir / "runs" / "fake-run"
+            run_dir.mkdir(parents=True)
+            report_path = run_dir / "report.md"
+            trace_path = run_dir / "traces.jsonl"
+            diff_path = run_dir / "final.diff"
+            report_path.write_text("fake report\n", encoding="utf-8")
+            trace_path.write_text("", encoding="utf-8")
+            diff_path.write_text(
+                "diff --git a/src/example.py b/src/example.py\n+return 2\n",
+                encoding="utf-8",
+            )
+            return SimpleNamespace(
+                run_id="fake-run",
+                status="completed",
+                report_path=report_path,
+                trace_path=trace_path,
+                final_diff_path=diff_path,
+                test_result=SimpleNamespace(exit_code=0),
+                model_usage={
+                    "call_count": 2,
+                    "response_count": 19,
+                    "input_tokens": 404951,
+                    "output_tokens": 2393,
+                    "total_tokens": 407344,
+                    "estimated_cost_usd": 0.314482,
+                },
+            )
+
+    monkeypatch.setattr(
+        "patchsmith.evaluation.issue_corpus.public_issue_repairs.RepairRunner",
+        FakeRepairRunner,
+    )
+
+    results, summary = execute_public_issue_repairs(
+        readiness_path=readiness_path,
+        output_dir=tmp_path / "repair_attempts",
+        tasks_dir=tasks_dir,
+        runtime="deepagents",
+        planner="deepagents",
+        sandbox_mode="local",
+        max_retries=1,
+        dry_run=False,
+        model_preflight=_passed_public_repair_model_preflight,
+        max_live_cost_usd=0.24,
+        estimated_cost_per_attempt_usd=0.11,
+    )
+
+    assert summary.attempted_tasks == 1
+    assert summary.validated_tasks == 0
+    assert summary.failed_tasks == 1
+    assert summary.estimated_model_cost_usd == 0.314482
+    assert results[0].status == "failed"
+    assert results[0].test_exit_code == 0
+    assert results[0].model_total_tokens == 407344
+    assert results[0].estimated_model_cost_usd == 0.314482
+    assert "actual live model cost exceeded configured cap" in ";".join(
+        results[0].warnings
+    )
+    assert "Actual model usage: 2 calls, 407344 tokens, estimated cost $0.314482." in (
+        ";".join(results[0].evidence)
+    )
+
+
+def test_execute_public_issue_repairs_flags_actual_model_usage_cap_overrun(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    tasks_dir, readiness_path = _write_ready_public_repair_fixture(tmp_path)
+    captured_requests = []
+
+    class FakeRepairRunner:
+        def __init__(self, *, artifacts_dir: Path) -> None:
+            self.artifacts_dir = artifacts_dir
+
+        def run(self, request):
+            captured_requests.append(request)
+            run_dir = self.artifacts_dir / "runs" / "fake-run"
+            run_dir.mkdir(parents=True)
+            report_path = run_dir / "report.md"
+            trace_path = run_dir / "traces.jsonl"
+            diff_path = run_dir / "final.diff"
+            report_path.write_text("fake report\n", encoding="utf-8")
+            trace_path.write_text("", encoding="utf-8")
+            diff_path.write_text(
+                "diff --git a/src/example.py b/src/example.py\n+return 2\n",
+                encoding="utf-8",
+            )
+            return SimpleNamespace(
+                run_id="fake-run",
+                status="completed",
+                report_path=report_path,
+                trace_path=trace_path,
+                final_diff_path=diff_path,
+                test_result=SimpleNamespace(exit_code=0),
+                model_usage={
+                    "call_count": 2,
+                    "response_count": 18,
+                    "input_tokens": 386120,
+                    "output_tokens": 2376,
+                    "total_tokens": 388496,
+                    "estimated_cost_usd": 0.29884575,
+                },
+            )
+
+    monkeypatch.setattr(
+        "patchsmith.evaluation.issue_corpus.public_issue_repairs.RepairRunner",
+        FakeRepairRunner,
+    )
+
+    output_dir = tmp_path / "repair_attempts"
+    results, summary = execute_public_issue_repairs(
+        readiness_path=readiness_path,
+        output_dir=output_dir,
+        tasks_dir=tasks_dir,
+        runtime="deepagents",
+        planner="deepagents",
+        sandbox_mode="local",
+        max_retries=1,
+        dry_run=False,
+        model_preflight=_passed_public_repair_model_preflight,
+        max_live_cost_usd=0.45,
+        estimated_cost_per_attempt_usd=0.20,
+        deepagents_max_context_files=4,
+        max_actual_model_responses=12,
+        max_actual_model_tokens=200000,
+        deepagents_subagent_mode="auto",
+    )
+
+    assert summary.attempted_tasks == 1
+    assert summary.validated_tasks == 0
+    assert summary.failed_tasks == 1
+    assert summary.model_response_count == 18
+    assert summary.model_total_tokens == 388496
+    assert summary.max_actual_model_responses == 12
+    assert summary.max_actual_model_tokens == 200000
+    assert results[0].status == "failed"
+    assert results[0].test_exit_code == 0
+    assert "actual model responses exceeded configured cap: 18 > 12" in (
+        ";".join(results[0].warnings)
+    )
+    assert "actual model tokens exceeded configured cap: 388496 > 200000" in (
+        ";".join(results[0].warnings)
+    )
+    assert captured_requests[0].runtime_config == {
+        "max_context_files": 4,
+        "resource_budget": {
+            "max_model_responses": 12,
+            "max_model_tokens": 200000,
+        },
+        "subagent_mode": "auto",
+    }
+    saved_summary = json.loads(
+        (output_dir / "public_issue_repair_attempt_summary.json").read_text(encoding="utf-8")
+    )
+    assert saved_summary["max_actual_model_responses"] == 12
+    assert saved_summary["max_actual_model_tokens"] == 200000
+    report = (output_dir / "public_issue_repair_attempt_report.md").read_text(
+        encoding="utf-8"
+    )
+    assert "Max actual model responses: `12`" in report
+    assert "Max actual model tokens: `200000`" in report
+
+
+def test_execute_public_issue_repairs_filters_by_task_id(tmp_path: Path) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    tasks_dir = tmp_path / "materialized_tasks"
+    for task_id in ["public_task_a", "public_task_b"]:
+        task_dir = tasks_dir / task_id
+        task_dir.mkdir(parents=True)
+        issue_path = task_dir / "issue.md"
+        issue_path.write_text(f"{task_id} issue\n", encoding="utf-8")
+        (task_dir / "task_manifest.json").write_text(
+            json.dumps(
+                {
+                    "task_id": task_id,
+                    "issue_file": str(issue_path),
+                    "suggested_commands": ["PYTHONPATH=src python3 -m patchsmith.cli run --json"],
+                }
+            ),
+            encoding="utf-8",
+        )
+    readiness_records = [
+        {
+            "task_id": task_id,
+            "repository": "owner/repo",
+            "issue_url": f"https://github.com/owner/repo/issues/{index}",
+            "status": "ready",
+            "repo_path": str(repo_dir),
+            "repo_exists": True,
+            "repair_command": "PYTHONPATH=src python3 -m patchsmith.cli run --json",
+            "validation_command": "python3 -m pytest tests/test_bug.py",
+            "reproduction_execution_status": "reproduced",
+            "blockers": [],
+            "warnings": [],
+            "evidence": ["public issue reproduction execution saved failing evidence"],
+            "next_actions": [],
+        }
+        for index, task_id in enumerate(["public_task_a", "public_task_b"], start=1)
+    ]
+    readiness_path = tmp_path / "public_issue_repair_readiness_results.json"
+    readiness_path.write_text(json.dumps(readiness_records), encoding="utf-8")
+
+    results, summary = execute_public_issue_repairs(
+        readiness_path=readiness_path,
+        output_dir=tmp_path / "repair_attempts",
+        tasks_dir=tasks_dir,
+        task_ids=["public_task_b"],
+        repeats=2,
+    )
+
+    assert [result.task_id for result in results] == ["public_task_b", "public_task_b"]
+    assert summary.task_count == 2
+    assert summary.unique_task_count == 1
+
+    cli_output = tmp_path / "cli_repair_attempts"
+    exit_code = main(
+        [
+            "execute-public-issue-repairs",
+            "--readiness",
+            str(readiness_path),
+            "--tasks-dir",
+            str(tasks_dir),
+            "--output",
+            str(cli_output),
+            "--task-id",
+            "public_task_b",
+            "--deepagents-max-context-files",
+            "3",
+            "--max-actual-model-responses",
+            "12",
+            "--max-actual-model-tokens",
+            "200000",
+            "--deepagents-subagents",
+            "auto",
+            "--json",
+        ]
+    )
+
+    assert exit_code == 0
+    cli_results = json.loads(
+        (cli_output / "public_issue_repair_attempt_results.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert [result["task_id"] for result in cli_results] == ["public_task_b"]
+    cli_summary = json.loads(
+        (cli_output / "public_issue_repair_attempt_summary.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert cli_summary["deepagents_max_context_files"] == 3
+    assert cli_summary["max_actual_model_responses"] == 12
+    assert cli_summary["max_actual_model_tokens"] == 200000
+    assert "DeepAgents max context files configured: 3" in cli_results[0]["evidence"]
+
+
+def test_execute_public_issue_repairs_can_stop_after_validated_attempt(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    tasks_dir = tmp_path / "materialized_tasks"
+    task_dir = tasks_dir / "public_task"
+    task_dir.mkdir(parents=True)
+    issue_path = task_dir / "issue.md"
+    issue_path.write_text("bug fixed by first attempt\n", encoding="utf-8")
+    (task_dir / "task_manifest.json").write_text(
+        json.dumps(
+            {
+                "task_id": "public_task",
+                "issue_file": str(issue_path),
+                "suggested_commands": ["PYTHONPATH=src python3 -m patchsmith.cli run --json"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    readiness_path = tmp_path / "public_issue_repair_readiness_results.json"
+    readiness_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "public_task",
+                    "repository": "owner/repo",
+                    "issue_url": "https://github.com/owner/repo/issues/10",
+                    "status": "ready",
+                    "repo_path": str(repo_dir),
+                    "repo_exists": True,
+                    "repair_command": "PYTHONPATH=src python3 -m patchsmith.cli run --json",
+                    "validation_command": "python3 -m pytest tests/test_bug.py",
+                    "reproduction_execution_status": "reproduced",
+                    "blockers": [],
+                    "warnings": [],
+                    "evidence": ["public issue reproduction execution saved failing evidence"],
+                    "next_actions": [],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    captured_requests = []
+
+    class FakeRepairRunner:
+        def __init__(self, *, artifacts_dir: Path) -> None:
+            self.artifacts_dir = artifacts_dir
+
+        def run(self, request):
+            captured_requests.append(request)
+            run_dir = self.artifacts_dir / "runs" / f"fake-run-{len(captured_requests)}"
+            run_dir.mkdir(parents=True)
+            report_path = run_dir / "report.md"
+            trace_path = run_dir / "traces.jsonl"
+            diff_path = run_dir / "final.diff"
+            report_path.write_text("fake report\n", encoding="utf-8")
+            trace_path.write_text("", encoding="utf-8")
+            diff_path.write_text(
+                "diff --git a/src/example.py b/src/example.py\n+return 2\n",
+                encoding="utf-8",
+            )
+            return SimpleNamespace(
+                run_id=f"fake-run-{len(captured_requests)}",
+                status="completed",
+                report_path=report_path,
+                trace_path=trace_path,
+                final_diff_path=diff_path,
+                test_result=SimpleNamespace(exit_code=0),
+            )
+
+    monkeypatch.setattr(
+        "patchsmith.evaluation.issue_corpus.public_issue_repairs.RepairRunner",
+        FakeRepairRunner,
+    )
+
+    results, summary = execute_public_issue_repairs(
+        readiness_path=readiness_path,
+        output_dir=tmp_path / "repair_attempts",
+        tasks_dir=tasks_dir,
+        repeats=3,
+        stop_on_validated=True,
+        dry_run=False,
+        sandbox_preflight=_passed_public_repair_sandbox_preflight,
+    )
+
+    assert len(captured_requests) == 1
+    assert [result.attempt_index for result in results] == [1]
+    assert results[0].attempt_count == 3
+    assert results[0].status == "validated"
+    assert summary.repeat_count == 3
+    assert summary.stop_on_validated is True
+    assert summary.task_count == 1
+    assert summary.attempted_tasks == 1
+    assert summary.validated_tasks == 1
+    assert summary.validated_task_pass_at_n_rate == 1.0
+    report = (tmp_path / "repair_attempts" / "public_issue_repair_attempt_report.md").read_text(
+        encoding="utf-8"
+    )
+    assert "Stop on validated: `True`" in report
 
 
 def test_execute_public_issue_repairs_passes_source_hints_as_context_paths(
@@ -1368,6 +2234,7 @@ def test_execute_public_issue_repairs_passes_source_hints_as_context_paths(
         output_dir=tmp_path / "repair_attempts",
         tasks_dir=tasks_dir,
         dry_run=False,
+        sandbox_preflight=_passed_public_repair_sandbox_preflight,
     )
 
     assert summary.attempted_tasks == 1
@@ -1382,6 +2249,234 @@ def test_execute_public_issue_repairs_passes_source_hints_as_context_paths(
     assert "Read the validation fixture file(s) before choosing a source edit" in (
         captured_requests[0].issue_text
     )
+    assert "Symbol-qualified source hints to inspect before broad module edits" in (
+        captured_requests[0].issue_text
+    )
+    assert "Before editing a different file or function" in captured_requests[0].issue_text
+
+
+def test_execute_public_issue_repairs_marks_high_risk_passing_patch_failed(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    src_dir = repo_dir / "src"
+    tests_dir = repo_dir / "tests"
+    src_dir.mkdir(parents=True)
+    tests_dir.mkdir()
+    (src_dir / "example.py").write_text("def target():\n    return 1\n", encoding="utf-8")
+    (tests_dir / "test_bug.py").write_text(
+        "from src.example import target\n\n\ndef test_bug():\n    assert target() == 2\n",
+        encoding="utf-8",
+    )
+    tasks_dir = tmp_path / "materialized_tasks"
+    task_dir = tasks_dir / "public_task"
+    task_dir.mkdir(parents=True)
+    issue_path = task_dir / "issue.md"
+    issue_path.write_text("# Public bug\n", encoding="utf-8")
+    (task_dir / "task_manifest.json").write_text(
+        json.dumps(
+            {
+                "task_id": "public_task",
+                "issue_file": str(issue_path),
+                "suggested_commands": ["PYTHONPATH=src python3 -m patchsmith.cli run --json"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    readiness_path = tmp_path / "public_issue_repair_readiness_results.json"
+    readiness_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "public_task",
+                    "repository": "owner/repo",
+                    "issue_url": "https://example.test/1",
+                    "status": "ready",
+                    "repo_path": str(repo_dir),
+                    "repo_exists": True,
+                    "repair_command": "PYTHONPATH=src python3 -m patchsmith.cli run --json",
+                    "validation_command": "python3 -m pytest tests/test_bug.py",
+                    "validation_fixture_files": [
+                        {"path": "tests/test_bug.py", "content": "def test_bug(): pass\n"}
+                    ],
+                    "validation_source_hints": ["src/example.py"],
+                    "reproduction_execution_status": "reproduced",
+                    "blockers": [],
+                    "warnings": [],
+                    "evidence": [],
+                    "next_actions": [],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    class FakeRepairRunner:
+        def __init__(self, *, artifacts_dir: Path) -> None:
+            self.artifacts_dir = artifacts_dir
+
+        def run(self, request):
+            run_dir = self.artifacts_dir / "runs" / "fake-run"
+            run_dir.mkdir(parents=True)
+            report_path = run_dir / "report.md"
+            trace_path = run_dir / "traces.jsonl"
+            diff_path = run_dir / "final.diff"
+            report_path.write_text("fake report\n", encoding="utf-8")
+            trace_path.write_text(
+                json.dumps(
+                    {
+                        "node_name": "runtime.patch_quality",
+                        "event_type": "runtime_node",
+                        "payload": {
+                            "quality": {
+                                "severity": "high",
+                                "findings": [{"code": "source_text_recompile"}],
+                            }
+                        },
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            diff_path.write_text(
+                "diff --git a/src/example.py b/src/example.py\n+return 2\n",
+                encoding="utf-8",
+            )
+            return SimpleNamespace(
+                run_id="fake-run",
+                status="completed",
+                report_path=report_path,
+                trace_path=trace_path,
+                final_diff_path=diff_path,
+                test_result=SimpleNamespace(exit_code=0),
+            )
+
+    monkeypatch.setattr(
+        "patchsmith.evaluation.issue_corpus.public_issue_repairs.RepairRunner",
+        FakeRepairRunner,
+    )
+
+    results, summary = execute_public_issue_repairs(
+        readiness_path=readiness_path,
+        output_dir=tmp_path / "repair_attempts",
+        tasks_dir=tasks_dir,
+        dry_run=False,
+        sandbox_preflight=_passed_public_repair_sandbox_preflight,
+    )
+
+    assert summary.attempted_tasks == 1
+    assert summary.validated_tasks == 0
+    assert summary.failed_tasks == 1
+    assert results[0].status == "failed"
+    assert results[0].test_exit_code == 0
+    assert results[0].patch_generated is True
+    assert "repair validation command exited zero" in results[0].evidence
+    assert "repair validation passed but final patch quality is high-risk" in results[
+        0
+    ].warnings
+
+
+def test_execute_public_issue_repairs_marks_diff_quality_warning_failed(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    tasks_dir = tmp_path / "materialized_tasks"
+    task_dir = tasks_dir / "public_task"
+    task_dir.mkdir(parents=True)
+    issue_path = task_dir / "issue.md"
+    issue_path.write_text("# Public doc bug\n", encoding="utf-8")
+    (task_dir / "task_manifest.json").write_text(
+        json.dumps(
+            {
+                "task_id": "public_task",
+                "issue_file": str(issue_path),
+                "suggested_commands": ["PYTHONPATH=src python3 -m patchsmith.cli run --json"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    readiness_path = tmp_path / "public_issue_repair_readiness_results.json"
+    readiness_path.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "public_task",
+                    "repository": "owner/repo",
+                    "issue_url": "https://example.test/1",
+                    "status": "ready",
+                    "repo_path": str(repo_dir),
+                    "repo_exists": True,
+                    "repair_command": "PYTHONPATH=src python3 -m patchsmith.cli run --json",
+                    "validation_command": "python3 -m pytest tests/test_bug.py",
+                    "reproduction_execution_status": "reproduced",
+                    "blockers": [],
+                    "warnings": [],
+                    "evidence": [],
+                    "next_actions": [],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    class FakeRepairRunner:
+        def __init__(self, *, artifacts_dir: Path) -> None:
+            self.artifacts_dir = artifacts_dir
+
+        def run(self, request):
+            run_dir = self.artifacts_dir / "runs" / "fake-run"
+            run_dir.mkdir(parents=True)
+            report_path = run_dir / "report.md"
+            trace_path = run_dir / "traces.jsonl"
+            diff_path = run_dir / "final.diff"
+            report_path.write_text("fake report\n", encoding="utf-8")
+            trace_path.write_text("", encoding="utf-8")
+            diff_path.write_text(
+                "\n".join(
+                    [
+                        "diff --git a/src/requests/exceptions.py b/src/requests/exceptions.py",
+                        "--- a/src/requests/exceptions.py",
+                        "+++ b/src/requests/exceptions.py",
+                        "@@ -130,7 +130,8 @@",
+                        '-    """The server declared chunked encoding but sent an invalid chunk."""',
+                        '+    """This exception is raised when a chunked transfer-encoding response is',
+                        '+    interrupted by a transient connection reset."""',
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            return SimpleNamespace(
+                run_id="fake-run",
+                status="completed",
+                report_path=report_path,
+                trace_path=trace_path,
+                final_diff_path=diff_path,
+                test_result=SimpleNamespace(exit_code=0),
+            )
+
+    monkeypatch.setattr(
+        "patchsmith.evaluation.issue_corpus.public_issue_repairs.RepairRunner",
+        FakeRepairRunner,
+    )
+
+    results, summary = execute_public_issue_repairs(
+        readiness_path=readiness_path,
+        output_dir=tmp_path / "repair_attempts",
+        tasks_dir=tasks_dir,
+        dry_run=False,
+        sandbox_preflight=_passed_public_repair_sandbox_preflight,
+    )
+
+    assert summary.validated_tasks == 0
+    assert summary.failed_tasks == 1
+    assert results[0].status == "failed"
+    assert "repair validation passed but final patch quality is high-risk" in results[
+        0
+    ].warnings
 
 
 def test_execute_public_issue_repairs_executes_local_heuristic_repair(
@@ -1480,6 +2575,9 @@ def test_execute_public_issue_repairs_executes_local_heuristic_repair(
     assert results[0].status == "validated"
     assert results[0].patch_generated
     assert results[0].test_exit_code == 0
+    assert "repair validation command exited zero with acceptable patch quality" in results[
+        0
+    ].evidence
     assert results[0].validation_fixture_paths == ["tests/test_issue_repro.py"]
     assert results[0].report_path is not None
     assert Path(results[0].report_path).exists()

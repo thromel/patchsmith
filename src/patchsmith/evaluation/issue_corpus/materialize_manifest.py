@@ -61,8 +61,8 @@ def issue_corpus_task_manifest(
                 "PYTHONPATH=src python3 -m patchsmith.cli run "
                 f'--repo "{repo_ref}" '
                 f'--issue-file "{issue_path}" '
-                "--runtime langgraph "
-                "--planner fake_model "
+                "--runtime deepagents "
+                "--planner deepagents "
                 "--context-provider native_hybrid "
                 f'--test-command "{test_commands[0]}" '
                 "--json"

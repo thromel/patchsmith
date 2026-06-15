@@ -7,6 +7,7 @@ from typing import Any
 
 from patchsmith.evaluation._helpers import (
     _optional_string,
+    _patch_quality_from_trace,
     _string_list,
 )
 from patchsmith.evaluation.issue_corpus.public_issue_repair_attempt_results import (
@@ -19,6 +20,7 @@ from patchsmith.evaluation.issue_corpus.public_issue_repair_helpers import (
     public_issue_repair_issue_text,
 )
 from patchsmith.evaluation_models import IssueCorpusPublicRepairAttemptResult
+from patchsmith.patch_quality import assess_diff_quality
 from patchsmith.public_issue_fixtures import (
     normalize_public_issue_fixture_files as _normalize_public_issue_fixture_files,
 )
@@ -43,6 +45,19 @@ def execute_public_issue_repair_record(
     max_retries: int,
     dry_run: bool,
     allow_warnings: bool,
+    preflight_errors: list[str] | None = None,
+    preflight_warnings: list[str] | None = None,
+    preflight_evidence: list[str] | None = None,
+    preflight_next_actions: list[str] | None = None,
+    preflight_status: str = "not_applicable",
+    preflight_gates: list[dict[str, str]] | None = None,
+    attempt_index: int = 1,
+    attempt_count: int = 1,
+    deepagents_max_context_files: int | None = None,
+    max_live_cost_usd: float | None = None,
+    max_actual_model_responses: int | None = None,
+    max_actual_model_tokens: int | None = None,
+    deepagents_subagent_mode: str | None = None,
 ) -> IssueCorpusPublicRepairAttemptResult:
     task_id = _optional_string(record.get("task_id"))
     repository = _optional_string(record.get("repository"))
@@ -62,9 +77,17 @@ def execute_public_issue_repair_record(
     errors = _string_list(record.get("blockers"))
     errors.extend(fixture_errors)
     errors.extend(source_hint_errors)
+    errors.extend(preflight_errors or [])
     warnings = _string_list(record.get("warnings"))
+    warnings.extend(preflight_warnings or [])
     evidence = _string_list(record.get("evidence"))
+    evidence.extend(preflight_evidence or [])
+    if deepagents_max_context_files is not None and deepagents_max_context_files > 0:
+        evidence.append(
+            f"DeepAgents max context files configured: {deepagents_max_context_files}"
+        )
     next_actions = _string_list(record.get("next_actions"))
+    next_actions.extend(preflight_next_actions or [])
     run_id: str | None = None
     run_status: str | None = None
     report_path: str | None = None
@@ -72,6 +95,12 @@ def execute_public_issue_repair_record(
     final_diff_path: str | None = None
     test_exit_code: int | None = None
     patch_generated = False
+    model_call_count: int | None = None
+    model_response_count: int | None = None
+    model_input_tokens: int | None = None
+    model_output_tokens: int | None = None
+    model_total_tokens: int | None = None
+    estimated_model_cost_usd: float | None = None
 
     repo_exists = False
     if repo_path_value:
@@ -132,6 +161,10 @@ def execute_public_issue_repair_record(
                 *next_actions,
                 "resolve public repair-attempt blockers before execution",
             ],
+            attempt_index=attempt_index,
+            attempt_count=attempt_count,
+            preflight_status=preflight_status,
+            preflight_gates=preflight_gates,
         )
 
     if dry_run:
@@ -164,6 +197,10 @@ def execute_public_issue_repair_record(
             warnings=warnings,
             evidence=[*evidence, "repair attempt passed dry-run gating"],
             next_actions=[*next_actions, "rerun with --execute to launch PatchSmith repair"],
+            attempt_index=attempt_index,
+            attempt_count=attempt_count,
+            preflight_status=preflight_status,
+            preflight_gates=preflight_gates,
         )
 
     assert runner is not None
@@ -186,6 +223,10 @@ def execute_public_issue_repair_record(
             sandbox_mode=sandbox_mode,
             sandbox_image=sandbox_image,
             max_retries=max_retries,
+            deepagents_max_context_files=deepagents_max_context_files,
+            max_actual_model_responses=max_actual_model_responses,
+            max_actual_model_tokens=max_actual_model_tokens,
+            deepagents_subagent_mode=deepagents_subagent_mode,
         )
     except Exception as error:
         errors.append(f"PatchSmith repair run failed: {error}")
@@ -218,6 +259,10 @@ def execute_public_issue_repair_record(
             warnings=warnings,
             evidence=evidence,
             next_actions=[*next_actions, "inspect the failed PatchSmith run before retrying"],
+            attempt_index=attempt_index,
+            attempt_count=attempt_count,
+            preflight_status=preflight_status,
+            preflight_gates=preflight_gates,
         )
 
     run_id = run_outcome.run_id
@@ -227,12 +272,37 @@ def execute_public_issue_repair_record(
     final_diff_path = run_outcome.final_diff_path
     test_exit_code = run_outcome.test_exit_code
     patch_generated = run_outcome.patch_generated
+    model_call_count = run_outcome.model_call_count
+    model_response_count = run_outcome.model_response_count
+    model_input_tokens = run_outcome.model_input_tokens
+    model_output_tokens = run_outcome.model_output_tokens
+    model_total_tokens = run_outcome.model_total_tokens
+    estimated_model_cost_usd = run_outcome.estimated_model_cost_usd
+    patch_quality = _saved_patch_quality(
+        trace_path=trace_path,
+        final_diff_path=final_diff_path,
+    )
+    patch_quality_warning = bool(patch_quality.get("patch_quality_warning"))
     if patch_generated:
         evidence.append("PatchSmith generated a final diff")
-    if test_exit_code == 0 and patch_generated:
+    if estimated_model_cost_usd is not None:
+        evidence.append(
+            "Actual model usage: "
+            f"{model_call_count or 0} calls, "
+            f"{model_total_tokens or 0} tokens, "
+            f"estimated cost ${estimated_model_cost_usd:.6f}."
+        )
+    if test_exit_code == 0 and patch_generated and not patch_quality_warning:
         status = "validated"
-        evidence.append("repair validation command exited zero")
+        evidence.append("repair validation command exited zero with acceptable patch quality")
         next_actions.append("review final diff and broaden validation before claims")
+    elif test_exit_code == 0 and patch_generated:
+        status = "failed"
+        evidence.append("repair validation command exited zero")
+        warnings.append("repair validation passed but final patch quality is high-risk")
+        next_actions.append(
+            "inspect or retry the high-risk final diff before claiming repair"
+        )
     elif test_exit_code == 0:
         status = "failed"
         warnings.append("repair validation passed but no patch was generated")
@@ -241,6 +311,35 @@ def execute_public_issue_repair_record(
         status = "failed"
         warnings.append(f"repair validation exit code is {test_exit_code}")
         next_actions.append("inspect saved run artifacts before retrying or claiming repair")
+    if (
+        max_live_cost_usd is not None
+        and estimated_model_cost_usd is not None
+        and estimated_model_cost_usd > max_live_cost_usd
+    ):
+        if status == "validated":
+            status = "failed"
+        warnings.append(
+            "actual live model cost exceeded configured cap: "
+            f"${estimated_model_cost_usd:.6f} > ${max_live_cost_usd:.6f}"
+        )
+        next_actions.append(
+            "raise the live cost estimate/cap or reduce retries/context before "
+            "claiming budget-compliant repair"
+        )
+    actual_usage_cap_warnings = _actual_usage_cap_warnings(
+        model_response_count=model_response_count,
+        model_total_tokens=model_total_tokens,
+        max_actual_model_responses=max_actual_model_responses,
+        max_actual_model_tokens=max_actual_model_tokens,
+    )
+    if actual_usage_cap_warnings:
+        if status == "validated":
+            status = "failed"
+        warnings.extend(actual_usage_cap_warnings)
+        next_actions.append(
+            "ensure usage is recorded or reduce retries/context before claiming "
+            "response/token-budget-compliant repair"
+        )
 
     return _attempt_result(
         task_id=task_id,
@@ -267,8 +366,100 @@ def execute_public_issue_repair_record(
         final_diff_path=final_diff_path,
         test_exit_code=test_exit_code,
         patch_generated=patch_generated,
+        model_call_count=model_call_count,
+        model_response_count=model_response_count,
+        model_input_tokens=model_input_tokens,
+        model_output_tokens=model_output_tokens,
+        model_total_tokens=model_total_tokens,
+        estimated_model_cost_usd=estimated_model_cost_usd,
         errors=errors,
         warnings=warnings,
         evidence=evidence,
         next_actions=next_actions,
+        attempt_index=attempt_index,
+        attempt_count=attempt_count,
+        preflight_status=preflight_status,
+        preflight_gates=preflight_gates,
     )
+
+
+def _actual_usage_cap_warnings(
+    *,
+    model_response_count: int | None,
+    model_total_tokens: int | None,
+    max_actual_model_responses: int | None,
+    max_actual_model_tokens: int | None,
+) -> list[str]:
+    warnings: list[str] = []
+    if max_actual_model_responses is not None:
+        if model_response_count is None:
+            warnings.append(
+                "actual model response cap was configured but response count was not recorded"
+            )
+        elif model_response_count > max_actual_model_responses:
+            warnings.append(
+                "actual model responses exceeded configured cap: "
+                f"{model_response_count} > {max_actual_model_responses}"
+            )
+    if max_actual_model_tokens is not None:
+        if model_total_tokens is None:
+            warnings.append(
+                "actual model token cap was configured but total tokens were not recorded"
+            )
+        elif model_total_tokens > max_actual_model_tokens:
+            warnings.append(
+                "actual model tokens exceeded configured cap: "
+                f"{model_total_tokens} > {max_actual_model_tokens}"
+            )
+    return warnings
+
+
+def _saved_patch_quality(
+    *,
+    trace_path: str | None,
+    final_diff_path: str | None,
+) -> dict[str, object]:
+    trace_quality: dict[str, object] = (
+        _patch_quality_from_trace(Path(trace_path))
+        if trace_path and Path(trace_path).is_file()
+        else {"patch_quality_severity": None, "patch_quality_warning": False}
+    )
+    diff_quality = _diff_patch_quality(final_diff_path)
+    if diff_quality is None:
+        return trace_quality
+    trace_severity = trace_quality.get("patch_quality_severity")
+    diff_severity = diff_quality.get("patch_quality_severity")
+    return {
+        "patch_quality_severity": _higher_severity(
+            trace_severity if isinstance(trace_severity, str) else None,
+            diff_severity if isinstance(diff_severity, str) else None,
+        ),
+        "patch_quality_warning": bool(trace_quality.get("patch_quality_warning"))
+        or bool(diff_quality.get("patch_quality_warning")),
+    }
+
+
+def _diff_patch_quality(final_diff_path: str | None) -> dict[str, object] | None:
+    if not final_diff_path:
+        return None
+    path = Path(final_diff_path)
+    if not path.is_file():
+        return None
+    assessment = assess_diff_quality(path.read_text(encoding="utf-8"))
+    if assessment.severity == "low" and not assessment.findings:
+        return None
+    return {
+        "patch_quality_severity": assessment.severity,
+        "patch_quality_warning": assessment.severity == "high",
+    }
+
+
+def _higher_severity(left: str | None, right: str | None) -> str | None:
+    severities = [severity for severity in (left, right) if severity]
+    if not severities:
+        return None
+    return max(severities, key=lambda severity: _severity_rank(severity))
+
+
+def _severity_rank(severity: str) -> int:
+    return {"low": 0, "medium": 1, "high": 2}.get(severity, -1)
