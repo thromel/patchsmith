@@ -6,6 +6,7 @@ from typing import Any
 
 from patchsmith.patching import PatchSafetyError, validate_repo_relative_path
 from patchsmith.planning import RepairPlan
+from patchsmith.text_spans import nearest_source_span
 
 _PREVIEW_CHARS = 160
 
@@ -37,6 +38,10 @@ def repair_plan_diagnostics(
     old_occurrences = before.count(plan.old) if plan.old else 0
     diagnostics["old_found"] = old_occurrences > 0
     diagnostics["old_occurrences"] = old_occurrences
+    if old_occurrences == 0 and plan.old.strip():
+        nearest_span = nearest_source_span(before, plan.old)
+        if nearest_span:
+            diagnostics["nearest_source_excerpt"] = nearest_span.to_diagnostics()
     return diagnostics
 
 

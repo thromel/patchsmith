@@ -21,10 +21,12 @@ def metadata_from_result(
     total_tokens = 0
     model = configured_model
     response_ids: list[str] = []
+    response_count = 0
     saw_usage = False
     for message in messages:
         if type(message).__name__ != "AIMessage":
             continue
+        response_count += 1
         usage = getattr(message, "usage_metadata", None)
         if isinstance(usage, dict):
             saw_usage = True
@@ -41,6 +43,7 @@ def metadata_from_result(
         provider=provider,
         model=model,
         response_id=",".join(response_ids) or None,
+        response_count=response_count or None,
         input_tokens=input_tokens if saw_usage else None,
         output_tokens=output_tokens if saw_usage else None,
         total_tokens=total_tokens if saw_usage else None,

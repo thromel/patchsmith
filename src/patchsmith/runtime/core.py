@@ -5,7 +5,12 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from patchsmith.models import CommandResult, PatchCandidate, RetrievedContext
-from patchsmith.patching import PatchSafetyError, apply_text_replacement
+from patchsmith.patch_effects import (
+    replacement_changes_only_python_imports,
+    text_mentions_import_resolution_failure,
+)
+from patchsmith.patch_quality import PatchQualityAssessment, assess_patch_quality
+from patchsmith.patching import PatchSafetyError, TextEditResult, apply_text_replacement
 from patchsmith.planning import HeuristicRepairPlanner, RepairPlan, RepairPlanner
 from patchsmith.runtime.plan_diagnostics import repair_plan_diagnostics
 
@@ -65,9 +70,8 @@ class AgentlessRuntime:
 class HeuristicRuntime:
     """Deterministic repair baseline for seeded smoke tasks.
 
-    This is not a replacement for the planned LangGraph runtime. It provides a
-    bounded patch-attempt path so the rest of the product loop can be exercised
-    before model calls are introduced.
+    It provides a bounded patch-attempt path so the rest of the product loop can
+    be exercised without live model calls.
     """
 
     def __init__(self, planner: RepairPlanner | None = None) -> None:
@@ -145,12 +149,54 @@ def _apply_plan(
     generation_strategy: str,
     risk_notes: list[str],
     runtime_trace: list[dict[str, Any]],
+    reject_comment_only: bool = False,
+    reject_python_syntax_errors: bool = False,
+    reject_python_unbound_names: bool = False,
+    allow_nearest_match: bool = False,
+    reject_import_only_behavioral_patches: bool = False,
+    emit_patch_effect_trace: bool = False,
 ) -> AgentResult:
+    if reject_import_only_behavioral_patches and _is_import_only_behavioral_patch(
+        task=task,
+        plan=plan,
+    ):
+        raise PatchSafetyError(
+            "replacement changes only Python import statements for a non-import "
+            "behavioral failure"
+        )
     edit = apply_text_replacement(
         repo_path=repo_path,
         relative_path=plan.path,
         old=plan.old,
         new=plan.new,
+        reject_comment_only=reject_comment_only,
+        reject_python_syntax_errors=reject_python_syntax_errors,
+        reject_python_unbound_names=reject_python_unbound_names,
+        allow_nearest_match=allow_nearest_match,
+    )
+    if edit.replacement_strategy != "exact":
+        runtime_trace = [
+            *runtime_trace,
+            {
+                "node": "patch_alignment",
+                "status": "completed",
+                "summary": (
+                    "Applied high-similarity nearest source span because the planned old "
+                    "span was not an exact match."
+                ),
+                "strategy": edit.replacement_strategy,
+                "similarity": edit.replacement_similarity,
+            },
+        ]
+    if emit_patch_effect_trace:
+        runtime_trace = _insert_before_review(
+            runtime_trace,
+            _patch_effect_event(plan=plan, edit=edit),
+        )
+    quality = assess_patch_quality(plan)
+    runtime_trace = _insert_before_review(
+        runtime_trace,
+        _patch_quality_event(quality=quality),
     )
     return AgentResult(
         status="patch_generated",
@@ -165,7 +211,7 @@ def _apply_plan(
                 files_changed=[plan.path],
                 selected=True,
                 status="generated",
-                risk_notes=risk_notes,
+                risk_notes=[*risk_notes, *quality.risk_notes],
             )
         ],
         test_results=[],
@@ -199,6 +245,60 @@ def _no_patch_result(
         test_results=[],
         runtime_trace=runtime_trace,
     )
+
+
+def _is_import_only_behavioral_patch(*, task: AgentTask, plan: RepairPlan) -> bool:
+    if not plan.path.endswith(".py"):
+        return False
+    if not replacement_changes_only_python_imports(old=plan.old, new=plan.new):
+        return False
+    return not text_mentions_import_resolution_failure(_plan_failure_context(task=task, plan=plan))
+
+
+def _patch_effect_event(*, plan: RepairPlan, edit: TextEditResult) -> dict[str, Any]:
+    import_only = plan.path.endswith(".py") and replacement_changes_only_python_imports(
+        old=plan.old,
+        new=plan.new,
+    )
+    effect_kind = "import_only" if import_only else "behavior_change"
+    return {
+        "node": "patch_effect",
+        "status": "completed",
+        "summary": f"Patch effect classified as {effect_kind}.",
+        "path": edit.path,
+        "effect_kind": effect_kind,
+        "import_only": import_only,
+        "replacement_strategy": edit.replacement_strategy,
+        "replacement_similarity": edit.replacement_similarity,
+    }
+
+
+def _patch_quality_event(*, quality: PatchQualityAssessment) -> dict[str, Any]:
+    return {
+        "node": "patch_quality",
+        "status": quality.severity,
+        "summary": f"Patch quality risk classified as {quality.severity}.",
+        "quality": quality.to_dict(),
+    }
+
+
+def _insert_before_review(
+    runtime_trace: list[dict[str, Any]],
+    event: dict[str, Any],
+) -> list[dict[str, Any]]:
+    for index in range(len(runtime_trace) - 1, -1, -1):
+        if runtime_trace[index].get("node") == "review":
+            return [*runtime_trace[:index], event, *runtime_trace[index:]]
+    return [*runtime_trace, event]
+
+
+def _plan_failure_context(*, task: AgentTask, plan: RepairPlan) -> str:
+    parts = [task.issue_text, plan.summary]
+    metadata = plan.metadata or {}
+    failure_localization = metadata.get("failure_localization")
+    if isinstance(failure_localization, dict):
+        parts.extend(str(value) for value in failure_localization.values())
+    return "\n".join(parts)
 
 
 def _runtime_config_int(config: dict[str, object], key: str, default: int) -> int:

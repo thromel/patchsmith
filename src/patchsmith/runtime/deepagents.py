@@ -109,6 +109,12 @@ class DeepAgentsRuntime:
                         "summary": "DeepAgents adapter generated one bounded patch candidate.",
                     },
                 ],
+                reject_comment_only=True,
+                reject_python_syntax_errors=True,
+                reject_python_unbound_names=True,
+                allow_nearest_match=True,
+                reject_import_only_behavioral_patches=True,
+                emit_patch_effect_trace=True,
             )
         except PatchSafetyError as error:
             trace.extend(

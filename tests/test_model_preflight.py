@@ -7,6 +7,8 @@ from patchsmith.cli import main
 from patchsmith.model_config import DEFAULT_OPENAI_MODEL
 from patchsmith.model_preflight import openai_model_preflight, openai_model_preflight_from_env
 
+FAKE_OPENAI_API_KEY = "sk-proj-" + ("a" * 32)
+
 
 def test_openai_model_preflight_reports_available_model() -> None:
     captured: dict[str, object] = {}
@@ -24,13 +26,13 @@ def test_openai_model_preflight_reports_available_model() -> None:
         ).encode("utf-8")
 
     result = openai_model_preflight(
-        api_key="test-key",
+        api_key=FAKE_OPENAI_API_KEY,
         model="gpt-5.4-mini",
         timeout_seconds=12.0,
         opener=opener,
     )
 
-    assert captured["authorization"] == "Bearer test-key"
+    assert captured["authorization"] == f"Bearer {FAKE_OPENAI_API_KEY}"
     assert captured["timeout"] == 12.0
     assert result.status == "available"
     assert result.available is True
@@ -51,7 +53,7 @@ def test_openai_model_preflight_suggests_nearby_models_when_missing() -> None:
         ).encode("utf-8")
 
     result = openai_model_preflight(
-        api_key="test-key",
+        api_key=FAKE_OPENAI_API_KEY,
         model="gpt-5.5-mini",
         opener=opener,
     )
@@ -72,7 +74,7 @@ def test_openai_model_preflight_redacts_http_error_body() -> None:
         )
 
     result = openai_model_preflight(
-        api_key="test-key",
+        api_key=FAKE_OPENAI_API_KEY,
         model="gpt-5.4-mini",
         opener=opener,
     )
@@ -102,6 +104,44 @@ def test_openai_model_preflight_rejects_multiline_api_key() -> None:
 
     assert result.status == "invalid_credentials"
     assert result.available is False
+
+
+def test_openai_model_preflight_rejects_non_openai_key_without_request() -> None:
+    called = False
+
+    def opener(request: urllib.request.Request, timeout: float) -> bytes:
+        nonlocal called
+        called = True
+        return b"{}"
+
+    result = openai_model_preflight(
+        api_key="https://github.com/thromel/patchsmith",
+        model="gpt-5.4-mini",
+        opener=opener,
+    )
+
+    assert called is False
+    assert result.status == "invalid_credentials_format"
+    assert result.available is False
+    assert "does not look like an OpenAI API key" in (result.error or "")
+    assert "https://github.com" not in (result.error or "")
+
+
+def test_openai_model_preflight_accepts_project_key_shape() -> None:
+    captured: dict[str, object] = {}
+
+    def opener(request: urllib.request.Request, timeout: float) -> bytes:
+        captured["authorization"] = request.get_header("Authorization")
+        return json.dumps({"data": [{"id": "gpt-5.4-mini"}]}).encode("utf-8")
+
+    result = openai_model_preflight(
+        api_key=FAKE_OPENAI_API_KEY,
+        model="gpt-5.4-mini",
+        opener=opener,
+    )
+
+    assert captured["authorization"] == f"Bearer {FAKE_OPENAI_API_KEY}"
+    assert result.status == "available"
 
 
 def test_openai_model_preflight_from_env_requires_api_key() -> None:
