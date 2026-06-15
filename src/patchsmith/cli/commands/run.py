@@ -65,7 +65,6 @@ from patchsmith.cli._args import (
 )
 from patchsmith.cli._types import CommandHandler
 from patchsmith.ingest import clone_or_copy_repository, index_repository
-from patchsmith.model_config import DEFAULT_OPENAI_MODEL
 from patchsmith.model_preflight import ModelPreflightResult, openai_model_preflight_from_env
 from patchsmith.models import RepairRunResult, RunRequest
 from patchsmith.workflow import RepairRunner
@@ -146,28 +145,6 @@ def register(subparsers: argparse._SubParsersAction) -> dict[str, CommandHandler
     _add_sandbox_args(run)
     run.add_argument("--json", action="store_true", help="Print machine-readable run summary.")
 
-    model_preflight = subparsers.add_parser(
-        "openai-model-preflight",
-        help="Check whether the configured OpenAI account exposes a model id.",
-    )
-    model_preflight.add_argument(
-        "--model",
-        default=DEFAULT_OPENAI_MODEL,
-        help="Model id to check before running live repair evaluation.",
-    )
-    model_preflight.add_argument(
-        "--endpoint",
-        default="https://api.openai.com/v1/models",
-        help="OpenAI Models API endpoint.",
-    )
-    model_preflight.add_argument(
-        "--timeout-seconds",
-        type=float,
-        default=30.0,
-        help="HTTP timeout for the model availability request.",
-    )
-    model_preflight.add_argument("--json", action="store_true", help="Print JSON result.")
-
     index = subparsers.add_parser(
         "index", help="Clone/copy a repository and print file index JSON."
     )
@@ -188,7 +165,6 @@ def register(subparsers: argparse._SubParsersAction) -> dict[str, CommandHandler
         "agent": _agent_command,
         "chat": _chat_command,
         "run": _run_command,
-        "openai-model-preflight": _openai_model_preflight_command,
         "index": _index_command,
         "retrieve": _retrieve_command,
     }
@@ -949,27 +925,6 @@ def _run_command(args: argparse.Namespace) -> int:
     else:
         _print_run_result(result)
     return 0
-
-
-def _openai_model_preflight_command(args: argparse.Namespace) -> int:
-    result = openai_model_preflight_from_env(
-        model=args.model,
-        endpoint=args.endpoint,
-        timeout_seconds=args.timeout_seconds,
-    )
-    if args.json:
-        print(json.dumps(result.to_dict(), indent=2))
-    else:
-        print(f"Model: {result.model}")
-        print(f"Status: {result.status}")
-        print(f"Available: {result.available}")
-        if result.suggestions:
-            print("Suggestions:")
-            for suggestion in result.suggestions:
-                print(f"  - {suggestion}")
-        if result.error:
-            print(f"Error: {result.error}")
-    return 0 if result.available else 2
 
 
 def _openai_model_preflight_for_config(config: AgentCliConfig) -> ModelPreflightResult:

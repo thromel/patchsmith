@@ -11,10 +11,10 @@ tests.
 
 ## Current Evidence
 
-- Source size: 280 Python files under `src/patchsmith`, about 59.7k lines.
-- Test size: 105 Python files under `tests`, about 34.2k lines.
+- Source size: 281 Python files under `src/patchsmith`, about 59.8k lines.
+- Test size: 106 Python files under `tests`, about 34.3k lines.
 - Largest source files:
-  - `src/patchsmith/cli/commands/run.py`: 1139 lines.
+  - `src/patchsmith/cli/commands/run.py`: 1094 lines.
   - `src/patchsmith/runtime/attempts.py`: 1108 lines.
   - `src/patchsmith/runtime/feedback.py`: 735 lines.
   - `src/patchsmith/session/recommendations.py`: 716 lines.
@@ -31,7 +31,7 @@ tests.
 - Current validation:
   - `uv run ruff check src tests docs README.md`: passed.
   - `uv run mypy src`: passed.
-  - `uv run pytest -q`: 729 passed.
+  - `uv run pytest -q`: 730 passed.
 - Current local smoke:
   - `patchsmith chat` persisted a natural-language memory note and reloaded it
     from `.patchsmith/instructions.md`.
@@ -47,7 +47,7 @@ than the product actually is.
 | root modules | 89 | 18506 | Agent shell compatibility, DeepAgents, workflow, retrieval, patching, models, safety, and mixed helpers are still colocated. |
 | evaluation | 62 | 15132 | Rich benchmark functionality; the complex-suite runner is now thin, but CLI and issue-corpus flows still need simplification. |
 | portfolio | 52 | 9188 | Public status/evidence reporting is separated, but many modules are report-fragment style rather than domain services. |
-| cli | 25 | 5479 | Command surface is split by broad command groups, but `run.py` still owns multiple products. |
+| cli | 26 | 5506 | Command surface is split by broad command groups, with model preflight now isolated; `run.py` still owns agent/chat/run plus index/retrieve. |
 | chat | 27 | 4085 | Command handlers, custom command fallback, command registry, task execution, resume hydration, controller lifecycle, hooks, transcript recording, terminal formatting, and shared replay helpers are split out. |
 | session | 9 | 2612 | Typed store/metrics/gates/reporting are split out behind compatibility exports. |
 | runtime | 6 | 2414 | Runtime execution is compact relative to evaluation/chat, but attempt and feedback modules are large. |
@@ -522,6 +522,11 @@ Progress:
   coverage in `tests/test_deepagents_contract.py` and
   `tests/test_deepagents_invoke.py` pins registry-backed manifest paths,
   allowed reads, and budget-critical read policy.
+- 2026-06-16: The standalone `openai-model-preflight` CLI command moved into
+  `patchsmith.cli.commands.model_preflight`, while the agent runtime keeps its
+  internal model-preflight helper in `run.py`. Focused coverage in
+  `tests/test_cli_model_preflight.py` pins command routing through the dedicated
+  module; `cli/commands/run.py` is now 1094 lines.
 - 2026-06-15: Phase 3 started by moving complex benchmark suite models,
   threshold/config resolution, spec loading, and suite input preflight into
   `patchsmith.evaluation.complex.models` and
