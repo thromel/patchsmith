@@ -15,11 +15,8 @@ from patchsmith.agent_cli import (
     AgentCliConfig,
     config_with_loaded_agent_instructions,
 )
-from patchsmith.agent_commands import (
-    load_custom_command,
-    render_custom_command_prompt,
-)
 from patchsmith.chat.commands import ChatCommandContext
+from patchsmith.chat.custom_commands import handle_custom_command
 from patchsmith.chat.formatting import write_line
 from patchsmith.chat.handlers.execution import handle_preflight_command
 from patchsmith.chat.hooks import run_chat_hooks
@@ -217,6 +214,10 @@ def _handle_slash_command(
 ) -> bool:
     command, argument = parse_slash_command(raw)
     record_chat_event(runtime, "user_command", {"command": command, "argument": argument})
+    context = _chat_command_context(
+        runner_cls=runner_cls,
+        model_preflight_checker=model_preflight_checker,
+    )
     if command in {"exit", "quit"}:
         write_line(output_stream, "Session ended.")
         _end_session(runtime=runtime, reason=command, output_stream=output_stream)
@@ -227,73 +228,19 @@ def _handle_slash_command(
             runtime=runtime,
             argument=argument,
             output_stream=output_stream,
-            context=_chat_command_context(
-                runner_cls=runner_cls,
-                model_preflight_checker=model_preflight_checker,
-            ),
+            context=context,
         )
         return True
-    if _handle_custom_command(
+    if handle_custom_command(
         runtime=runtime,
         command=command,
         argument=argument,
         output_stream=output_stream,
-        runner_cls=runner_cls,
-        model_preflight_checker=model_preflight_checker,
+        context=context,
     ):
         return True
     write_line(output_stream, f"Unknown command: /{command}")
     write_line(output_stream, "Type /help for available commands.")
-    return True
-
-
-def _handle_custom_command(
-    *,
-    runtime: AgentChatRuntime,
-    command: str,
-    argument: str,
-    output_stream: TextIO,
-    runner_cls: type[RepairRunner],
-    model_preflight_checker: ModelPreflightChecker | None,
-) -> bool:
-    custom_command = load_custom_command(runtime.state.config.repo, command)
-    if custom_command is None:
-        return False
-    prompt = render_custom_command_prompt(custom_command, argument)
-    if not run_chat_hooks(
-        runtime=runtime,
-        event="UserPromptExpansion",
-        payload={
-            "command": custom_command.name,
-            "argument": argument,
-            "command_path": str(custom_command.path),
-            "prompt_chars": len(prompt),
-            "matcher_target": custom_command.name,
-        },
-        output_stream=output_stream,
-        blocking=True,
-    ):
-        return True
-    record_chat_event(
-        runtime,
-        "custom_command",
-        {
-            "command": custom_command.name,
-            "argument": argument,
-            "command_path": str(custom_command.path),
-            "prompt_chars": len(prompt),
-        },
-    )
-    write_line(output_stream, f"Running custom command: /{custom_command.name}")
-    run_chat_task(
-        runtime=runtime,
-        task=prompt,
-        output_stream=output_stream,
-        runner_cls=runner_cls,
-        model_preflight_checker=model_preflight_checker,
-        record=record_chat_event,
-        run_hooks=run_chat_hooks,
-    )
     return True
 
 
