@@ -18,6 +18,7 @@ from patchsmith.deepagents_prompts import PATCHSMITH_DEEPAGENTS_REPAIR_INTERFACE
 class DeepAgentsRunInterface:
     repair_interface_manifest: str
     agent_files: dict[str, dict[str, str]]
+    manifest_contents: ManifestContents
     repair_interface_manifest_path: str = PATCHSMITH_DEEPAGENTS_REPAIR_INTERFACE_PATH
 
 
@@ -65,15 +66,17 @@ def build_deepagents_run_interface(
         preferred_target_paths=preferred_target_paths,
         preferred_target_symbols=preferred_target_symbols,
     )
+    mounted_manifest_contents = manifest_contents.with_content(
+        "repair_interface",
+        repair_interface_manifest,
+    )
     agent_files = _agent_files(
         files,
-        manifest_contents=manifest_contents.with_content(
-            "repair_interface",
-            repair_interface_manifest,
-        ),
+        manifest_contents=mounted_manifest_contents,
         subagents_enabled=subagents_enabled,
     )
     return DeepAgentsRunInterface(
         repair_interface_manifest=repair_interface_manifest,
         agent_files=agent_files,
+        manifest_contents=mounted_manifest_contents,
     )

@@ -8,9 +8,12 @@ from langchain_core.messages import AIMessage
 from patchsmith.deepagents_agent import DeepAgentsResourceBudgetExceeded
 from patchsmith.deepagents_config import DeepAgentsPlannerConfig
 from patchsmith.deepagents_invoke import invoke_deepagents_plan
+from patchsmith.deepagents_manifests import ManifestContents
 from patchsmith.deepagents_prompts import (
+    PATCHSMITH_DEEPAGENTS_ACCEPTANCE_RUBRIC_PATH,
     PATCHSMITH_DEEPAGENTS_CONTEXT_BUDGET_PATH,
     PATCHSMITH_DEEPAGENTS_REPAIR_INTERFACE_PATH,
+    PATCHSMITH_DEEPAGENTS_REPO_MAP_PATH,
     PATCHSMITH_DEEPAGENTS_SOURCE_HINTS_PATH,
 )
 
@@ -94,6 +97,55 @@ def test_invoke_deepagents_plan_builds_prompt_and_records_usage() -> None:
     assert PATCHSMITH_DEEPAGENTS_CONTEXT_BUDGET_PATH in prompt
     assert "Preferred patch paths for this constrained run" in prompt
     assert payload["files"]["/src/calc.py"]["encoding"] == "utf-8"
+
+
+def test_invoke_deepagents_plan_uses_manifest_contents_for_prompt_paths() -> None:
+    agent = _FakeAgent(
+        {
+            "messages": [
+                AIMessage(
+                    content="{}",
+                    usage_metadata={
+                        "input_tokens": 100,
+                        "output_tokens": 10,
+                        "total_tokens": 110,
+                    },
+                )
+            ],
+            "structured_response": {"path": "src/calc.py"},
+        }
+    )
+
+    invocation = invoke_deepagents_plan(
+        agent=agent,
+        issue_text="add returns subtraction",
+        virtual_to_repo={"/src/calc.py": "src/calc.py"},
+        agent_files={"/src/calc.py": {"content": "def add(): pass", "encoding": "utf-8"}},
+        config=DeepAgentsPlannerConfig(model="gpt-test"),
+        source_hint_manifest=None,
+        repo_map_manifest=None,
+        repo_instructions_manifest=None,
+        acceptance_rubric_manifest=None,
+        retry_feedback_manifest=None,
+        target_history_manifest=None,
+        context_budget_manifest=None,
+        manifest_contents=ManifestContents.from_enabled_flags(
+            repair_interface=True,
+            repo_map=True,
+            acceptance_rubric=True,
+        ),
+        preferred_target_paths=["src/calc.py"],
+        preferred_target_symbols={},
+        subagents_enabled=False,
+        budget_critical=False,
+    )
+
+    assert invocation.failed is False
+    prompt = agent.invocations[0]["messages"][0]["content"]
+    assert PATCHSMITH_DEEPAGENTS_REPAIR_INTERFACE_PATH in prompt
+    assert PATCHSMITH_DEEPAGENTS_REPO_MAP_PATH in prompt
+    assert PATCHSMITH_DEEPAGENTS_ACCEPTANCE_RUBRIC_PATH in prompt
+    assert PATCHSMITH_DEEPAGENTS_SOURCE_HINTS_PATH not in prompt
 
 
 def test_invoke_deepagents_plan_reports_structured_output_failures() -> None:

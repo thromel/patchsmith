@@ -11,16 +11,9 @@ from patchsmith.deepagents_config import (
     DEEPAGENTS_PROVIDER,
     DeepAgentsPlannerConfig,
 )
+from patchsmith.deepagents_manifests import ManifestContents
 from patchsmith.deepagents_metadata import metadata_from_result
 from patchsmith.deepagents_prompts import (
-    PATCHSMITH_DEEPAGENTS_ACCEPTANCE_RUBRIC_PATH,
-    PATCHSMITH_DEEPAGENTS_CONTEXT_BUDGET_PATH,
-    PATCHSMITH_DEEPAGENTS_REPAIR_INTERFACE_PATH,
-    PATCHSMITH_DEEPAGENTS_REPO_INSTRUCTIONS_PATH,
-    PATCHSMITH_DEEPAGENTS_REPO_MAP_PATH,
-    PATCHSMITH_DEEPAGENTS_RETRY_FEEDBACK_PATH,
-    PATCHSMITH_DEEPAGENTS_SOURCE_HINTS_PATH,
-    PATCHSMITH_DEEPAGENTS_TARGET_HISTORY_PATH,
     deepagents_planner_prompt,
 )
 from patchsmith.deepagents_routing import estimate_resource_budget_cost
@@ -61,6 +54,7 @@ def invoke_deepagents_plan(
     retry_feedback_manifest: str | None,
     target_history_manifest: str | None,
     context_budget_manifest: str | None,
+    manifest_contents: ManifestContents | None = None,
     preferred_target_paths: Iterable[str],
     preferred_target_symbols: Mapping[str, Iterable[str]],
     subagents_enabled: bool,
@@ -68,6 +62,16 @@ def invoke_deepagents_plan(
 ) -> DeepAgentsInvocation:
     prompt_virtual_to_repo = dict(virtual_to_repo)
     prompt_preferred_target_paths = list(preferred_target_paths)
+    manifest_presence = manifest_contents or ManifestContents.from_enabled_flags(
+        repair_interface=True,
+        source_hint=source_hint_manifest is not None,
+        repo_map=repo_map_manifest is not None,
+        repo_instructions=repo_instructions_manifest is not None,
+        acceptance_rubric=acceptance_rubric_manifest is not None,
+        retry_feedback=retry_feedback_manifest is not None,
+        target_history=target_history_manifest is not None,
+        context_budget=context_budget_manifest is not None,
+    )
     try:
         result = agent.invoke(
             {
@@ -78,42 +82,28 @@ def invoke_deepagents_plan(
                             issue_text,
                             prompt_virtual_to_repo,
                             repair_interface_manifest_path=(
-                                PATCHSMITH_DEEPAGENTS_REPAIR_INTERFACE_PATH
+                                manifest_presence.path_if_enabled("repair_interface")
                             ),
                             source_hint_manifest_path=(
-                                PATCHSMITH_DEEPAGENTS_SOURCE_HINTS_PATH
-                                if source_hint_manifest is not None
-                                else None
+                                manifest_presence.path_if_enabled("source_hint")
                             ),
                             repo_map_manifest_path=(
-                                PATCHSMITH_DEEPAGENTS_REPO_MAP_PATH
-                                if repo_map_manifest is not None
-                                else None
+                                manifest_presence.path_if_enabled("repo_map")
                             ),
                             repo_instructions_manifest_path=(
-                                PATCHSMITH_DEEPAGENTS_REPO_INSTRUCTIONS_PATH
-                                if repo_instructions_manifest is not None
-                                else None
+                                manifest_presence.path_if_enabled("repo_instructions")
                             ),
                             acceptance_rubric_manifest_path=(
-                                PATCHSMITH_DEEPAGENTS_ACCEPTANCE_RUBRIC_PATH
-                                if acceptance_rubric_manifest is not None
-                                else None
+                                manifest_presence.path_if_enabled("acceptance_rubric")
                             ),
                             retry_feedback_manifest_path=(
-                                PATCHSMITH_DEEPAGENTS_RETRY_FEEDBACK_PATH
-                                if retry_feedback_manifest is not None
-                                else None
+                                manifest_presence.path_if_enabled("retry_feedback")
                             ),
                             target_history_manifest_path=(
-                                PATCHSMITH_DEEPAGENTS_TARGET_HISTORY_PATH
-                                if target_history_manifest is not None
-                                else None
+                                manifest_presence.path_if_enabled("target_history")
                             ),
                             context_budget_manifest_path=(
-                                PATCHSMITH_DEEPAGENTS_CONTEXT_BUDGET_PATH
-                                if context_budget_manifest is not None
-                                else None
+                                manifest_presence.path_if_enabled("context_budget")
                             ),
                             preferred_target_paths=prompt_preferred_target_paths,
                             preferred_target_symbols=preferred_target_symbols,

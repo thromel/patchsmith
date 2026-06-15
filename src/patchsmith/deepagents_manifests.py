@@ -106,6 +106,32 @@ class ManifestContents:
     def from_mapping(cls, contents: Mapping[str, str | None]) -> ManifestContents:
         return cls(dict(contents))
 
+    @classmethod
+    def from_enabled_flags(
+        cls,
+        *,
+        repair_interface: bool = False,
+        source_hint: bool = False,
+        repo_map: bool = False,
+        repo_instructions: bool = False,
+        acceptance_rubric: bool = False,
+        retry_feedback: bool = False,
+        target_history: bool = False,
+        context_budget: bool = False,
+    ) -> ManifestContents:
+        return cls.from_mapping(
+            {
+                "repair_interface": "enabled" if repair_interface else None,
+                "source_hint": "enabled" if source_hint else None,
+                "repo_map": "enabled" if repo_map else None,
+                "repo_instructions": "enabled" if repo_instructions else None,
+                "acceptance_rubric": "enabled" if acceptance_rubric else None,
+                "retry_feedback": "enabled" if retry_feedback else None,
+                "target_history": "enabled" if target_history else None,
+                "context_budget": "enabled" if context_budget else None,
+            }
+        )
+
     def content(self, key: str) -> str | None:
         return self.contents.get(key)
 
@@ -118,6 +144,27 @@ class ManifestContents:
 
     def to_mapping(self) -> dict[str, str | None]:
         return dict(self.contents)
+
+    def path_if_enabled(self, key: str) -> str | None:
+        return manifest_path(key) if self.is_enabled(key) else None
+
+    def path_list_if_enabled(self, key: str) -> list[str]:
+        path = self.path_if_enabled(key)
+        return [path] if path is not None else []
+
+    def enabled_paths(
+        self,
+        *,
+        include_core: bool = True,
+        include_repair_interface: bool = True,
+    ) -> list[str]:
+        paths = [definition.path for definition in CORE_DEFINITIONS] if include_core else []
+        for definition in MANIFEST_DEFINITIONS:
+            if not include_repair_interface and definition.key == "repair_interface":
+                continue
+            if self.is_enabled(definition.key):
+                paths.append(definition.path)
+        return paths
 
     def specs(self) -> list[ManifestSpec]:
         specs: list[ManifestSpec] = []

@@ -59,6 +59,11 @@ def test_build_deepagents_run_interface_mounts_manifest_and_virtual_files() -> N
     assert files[PATCHSMITH_DEEPAGENTS_REPAIR_INTERFACE_PATH]["content"] == (
         run_interface.repair_interface_manifest
     )
+    assert run_interface.manifest_contents.content("repair_interface") == (
+        run_interface.repair_interface_manifest
+    )
+    assert run_interface.manifest_contents.is_enabled("source_hint")
+    assert run_interface.manifest_contents.is_enabled("acceptance_rubric")
 
 
 def test_build_deepagents_run_interface_omits_absent_optional_manifests() -> None:

@@ -9,18 +9,11 @@ from patchsmith.deepagents_config import (
     deepagents_encrypted_reasoning_enabled,
     deepagents_encrypted_reasoning_mode,
 )
+from patchsmith.deepagents_manifests import ManifestContents
 from patchsmith.deepagents_prompts import (
-    PATCHSMITH_DEEPAGENTS_ACCEPTANCE_RUBRIC_PATH,
-    PATCHSMITH_DEEPAGENTS_CONTEXT_BUDGET_PATH,
     PATCHSMITH_DEEPAGENTS_MEMORY_PATH,
-    PATCHSMITH_DEEPAGENTS_REPAIR_INTERFACE_PATH,
     PATCHSMITH_DEEPAGENTS_REPAIR_SKILL_PATH,
-    PATCHSMITH_DEEPAGENTS_REPO_INSTRUCTIONS_PATH,
-    PATCHSMITH_DEEPAGENTS_REPO_MAP_PATH,
-    PATCHSMITH_DEEPAGENTS_RETRY_FEEDBACK_PATH,
     PATCHSMITH_DEEPAGENTS_SKILL_DIR,
-    PATCHSMITH_DEEPAGENTS_SOURCE_HINTS_PATH,
-    PATCHSMITH_DEEPAGENTS_TARGET_HISTORY_PATH,
 )
 from patchsmith.deepagents_schema import patch_plan_response_schema
 
@@ -60,6 +53,7 @@ def deepagents_planning_contract(
     retry_feedback_manifest: bool = False,
     target_history_manifest: bool = False,
     repair_interface_manifest: bool = False,
+    manifest_contents: ManifestContents | None = None,
     resource_budget: Mapping[str, Any] | None = None,
     patchable_target_paths: Iterable[str] | None = None,
     preferred_target_symbols: Mapping[str, Iterable[str]] | None = None,
@@ -78,43 +72,36 @@ def deepagents_planning_contract(
     memory_paths = [PATCHSMITH_DEEPAGENTS_MEMORY_PATH]
     skill_sources = [PATCHSMITH_DEEPAGENTS_SKILL_DIR]
     skill_paths = [PATCHSMITH_DEEPAGENTS_REPAIR_SKILL_PATH]
-    repair_interface_paths = (
-        [PATCHSMITH_DEEPAGENTS_REPAIR_INTERFACE_PATH] if repair_interface_manifest else []
+    manifest_presence = manifest_contents or ManifestContents.from_enabled_flags(
+        repair_interface=repair_interface_manifest,
+        source_hint=source_hint_manifest,
+        repo_map=repo_map_manifest,
+        repo_instructions=repo_instructions_manifest,
+        acceptance_rubric=acceptance_rubric_manifest,
+        retry_feedback=retry_feedback_manifest,
+        target_history=target_history_manifest,
+        context_budget=context_budget_manifest,
     )
-    context_budget_paths = (
-        [PATCHSMITH_DEEPAGENTS_CONTEXT_BUDGET_PATH] if context_budget_manifest else []
-    )
-    repo_map_paths = [PATCHSMITH_DEEPAGENTS_REPO_MAP_PATH] if repo_map_manifest else []
-    repo_instruction_paths = (
-        [PATCHSMITH_DEEPAGENTS_REPO_INSTRUCTIONS_PATH]
-        if repo_instructions_manifest
-        else []
-    )
-    acceptance_rubric_paths = (
-        [PATCHSMITH_DEEPAGENTS_ACCEPTANCE_RUBRIC_PATH]
-        if acceptance_rubric_manifest
-        else []
-    )
-    source_hint_paths = [PATCHSMITH_DEEPAGENTS_SOURCE_HINTS_PATH] if source_hint_manifest else []
-    retry_feedback_paths = (
-        [PATCHSMITH_DEEPAGENTS_RETRY_FEEDBACK_PATH] if retry_feedback_manifest else []
-    )
-    target_history_paths = (
-        [PATCHSMITH_DEEPAGENTS_TARGET_HISTORY_PATH] if target_history_manifest else []
-    )
+    repair_interface_manifest = manifest_presence.is_enabled("repair_interface")
+    context_budget_manifest = manifest_presence.is_enabled("context_budget")
+    repo_map_manifest = manifest_presence.is_enabled("repo_map")
+    repo_instructions_manifest = manifest_presence.is_enabled("repo_instructions")
+    acceptance_rubric_manifest = manifest_presence.is_enabled("acceptance_rubric")
+    source_hint_manifest = manifest_presence.is_enabled("source_hint")
+    retry_feedback_manifest = manifest_presence.is_enabled("retry_feedback")
+    target_history_manifest = manifest_presence.is_enabled("target_history")
+    repair_interface_path = manifest_presence.path_if_enabled("repair_interface")
+    context_budget_path = manifest_presence.path_if_enabled("context_budget")
+    repo_map_path = manifest_presence.path_if_enabled("repo_map")
+    repo_instructions_path = manifest_presence.path_if_enabled("repo_instructions")
+    acceptance_rubric_path = manifest_presence.path_if_enabled("acceptance_rubric")
+    source_hint_path = manifest_presence.path_if_enabled("source_hint")
+    retry_feedback_path = manifest_presence.path_if_enabled("retry_feedback")
+    target_history_path = manifest_presence.path_if_enabled("target_history")
     allowed_reads = sorted(
         {
             *file_paths,
-            *memory_paths,
-            *skill_paths,
-            *repair_interface_paths,
-            *context_budget_paths,
-            *repo_map_paths,
-            *repo_instruction_paths,
-            *acceptance_rubric_paths,
-            *source_hint_paths,
-            *retry_feedback_paths,
-            *target_history_paths,
+            *manifest_presence.enabled_paths(include_core=True),
         }
     )
     subagent_names = {
@@ -158,60 +145,30 @@ def deepagents_planning_contract(
         "memory_paths": memory_paths,
         "skill_sources": skill_sources,
         "skill_paths": skill_paths,
-        "repair_interface_manifest_path": (
-            PATCHSMITH_DEEPAGENTS_REPAIR_INTERFACE_PATH
-            if repair_interface_manifest
-            else None
-        ),
-        "context_budget_manifest_path": (
-            PATCHSMITH_DEEPAGENTS_CONTEXT_BUDGET_PATH if context_budget_manifest else None
-        ),
+        "repair_interface_manifest_path": repair_interface_path,
+        "context_budget_manifest_path": context_budget_path,
         "context_budget": (
             _context_budget_contract_metadata(context_budget_metadata)
             if context_budget_manifest
             else None
         ),
         "resource_budget": _resource_budget_contract_metadata(resource_budget),
-        "repo_map_manifest_path": (
-            PATCHSMITH_DEEPAGENTS_REPO_MAP_PATH if repo_map_manifest else None
-        ),
-        "repo_instructions_manifest_path": (
-            PATCHSMITH_DEEPAGENTS_REPO_INSTRUCTIONS_PATH
-            if repo_instructions_manifest
-            else None
-        ),
+        "repo_map_manifest_path": repo_map_path,
+        "repo_instructions_manifest_path": repo_instructions_path,
         "repository_instructions": {
             "type": "scoped_repo_instructions",
-            "manifest_path": (
-                PATCHSMITH_DEEPAGENTS_REPO_INSTRUCTIONS_PATH
-                if repo_instructions_manifest
-                else None
-            ),
+            "manifest_path": repo_instructions_path,
             "required": repo_instructions_manifest and not budget_critical,
         },
-        "acceptance_rubric_manifest_path": (
-            PATCHSMITH_DEEPAGENTS_ACCEPTANCE_RUBRIC_PATH
-            if acceptance_rubric_manifest
-            else None
-        ),
+        "acceptance_rubric_manifest_path": acceptance_rubric_path,
         "contextual_verifier": {
             "type": "acceptance_rubric",
-            "manifest_path": (
-                PATCHSMITH_DEEPAGENTS_ACCEPTANCE_RUBRIC_PATH
-                if acceptance_rubric_manifest
-                else None
-            ),
+            "manifest_path": acceptance_rubric_path,
             "required": acceptance_rubric_manifest,
         },
-        "source_hint_manifest_path": (
-            PATCHSMITH_DEEPAGENTS_SOURCE_HINTS_PATH if source_hint_manifest else None
-        ),
-        "retry_feedback_manifest_path": (
-            PATCHSMITH_DEEPAGENTS_RETRY_FEEDBACK_PATH if retry_feedback_manifest else None
-        ),
-        "target_history_manifest_path": (
-            PATCHSMITH_DEEPAGENTS_TARGET_HISTORY_PATH if target_history_manifest else None
-        ),
+        "source_hint_manifest_path": source_hint_path,
+        "retry_feedback_manifest_path": retry_feedback_path,
+        "target_history_manifest_path": target_history_path,
         "virtual_file_count": len(file_paths),
         "virtual_file_paths": file_paths,
         "filesystem_policy": {
