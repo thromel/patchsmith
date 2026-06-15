@@ -8,17 +8,17 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from patchsmith.deepagents_manifests import (
+    STABLE_TIMESTAMP,
+    add_virtual_files,
+    core_virtual_files,
+    manifest_enabled_keys,
+    manifest_specs_from_contents,
+    required_read_paths,
+)
 from patchsmith.deepagents_prompts import (
     PATCHSMITH_DEEPAGENTS_ACCEPTANCE_RUBRIC_PATH,
-    PATCHSMITH_DEEPAGENTS_CONTEXT_BUDGET_PATH,
-    PATCHSMITH_DEEPAGENTS_MEMORY_PATH,
-    PATCHSMITH_DEEPAGENTS_REPAIR_INTERFACE_PATH,
-    PATCHSMITH_DEEPAGENTS_REPAIR_SKILL_PATH,
     PATCHSMITH_DEEPAGENTS_REPO_INSTRUCTIONS_PATH,
-    PATCHSMITH_DEEPAGENTS_REPO_MAP_PATH,
-    PATCHSMITH_DEEPAGENTS_RETRY_FEEDBACK_PATH,
-    PATCHSMITH_DEEPAGENTS_SOURCE_HINTS_PATH,
-    PATCHSMITH_DEEPAGENTS_TARGET_HISTORY_PATH,
     deepagents_agents_md,
     deepagents_repair_skill_md,
 )
@@ -94,78 +94,31 @@ def agent_files(
     target_history_manifest: str | None = None,
     subagents_enabled: bool = True,
 ) -> dict[str, dict[str, str]]:
-    agent_file_map = {
-        **files,
-        PATCHSMITH_DEEPAGENTS_MEMORY_PATH: {
-            "content": deepagents_agents_md(subagents_enabled=subagents_enabled),
-            "encoding": "utf-8",
-            "created_at": stable_timestamp(),
-            "modified_at": stable_timestamp(),
-        },
-        PATCHSMITH_DEEPAGENTS_REPAIR_SKILL_PATH: {
-            "content": deepagents_repair_skill_md(subagents_enabled=subagents_enabled),
-            "encoding": "utf-8",
-            "created_at": stable_timestamp(),
-            "modified_at": stable_timestamp(),
-        },
-    }
-    if repair_interface_manifest and repair_interface_manifest.strip():
-        agent_file_map[PATCHSMITH_DEEPAGENTS_REPAIR_INTERFACE_PATH] = {
-            "content": repair_interface_manifest,
-            "encoding": "utf-8",
-            "created_at": stable_timestamp(),
-            "modified_at": stable_timestamp(),
-        }
-    if acceptance_rubric_manifest and acceptance_rubric_manifest.strip():
-        agent_file_map[PATCHSMITH_DEEPAGENTS_ACCEPTANCE_RUBRIC_PATH] = {
-            "content": acceptance_rubric_manifest,
-            "encoding": "utf-8",
-            "created_at": stable_timestamp(),
-            "modified_at": stable_timestamp(),
-        }
-    if repo_map_manifest and repo_map_manifest.strip():
-        agent_file_map[PATCHSMITH_DEEPAGENTS_REPO_MAP_PATH] = {
-            "content": repo_map_manifest,
-            "encoding": "utf-8",
-            "created_at": stable_timestamp(),
-            "modified_at": stable_timestamp(),
-        }
-    if repo_instructions_manifest and repo_instructions_manifest.strip():
-        agent_file_map[PATCHSMITH_DEEPAGENTS_REPO_INSTRUCTIONS_PATH] = {
-            "content": repo_instructions_manifest,
-            "encoding": "utf-8",
-            "created_at": stable_timestamp(),
-            "modified_at": stable_timestamp(),
-        }
-    if context_budget_manifest and context_budget_manifest.strip():
-        agent_file_map[PATCHSMITH_DEEPAGENTS_CONTEXT_BUDGET_PATH] = {
-            "content": context_budget_manifest,
-            "encoding": "utf-8",
-            "created_at": stable_timestamp(),
-            "modified_at": stable_timestamp(),
-        }
-    if source_hint_manifest and source_hint_manifest.strip():
-        agent_file_map[PATCHSMITH_DEEPAGENTS_SOURCE_HINTS_PATH] = {
-            "content": source_hint_manifest,
-            "encoding": "utf-8",
-            "created_at": stable_timestamp(),
-            "modified_at": stable_timestamp(),
-        }
-    if retry_feedback_manifest and retry_feedback_manifest.strip():
-        agent_file_map[PATCHSMITH_DEEPAGENTS_RETRY_FEEDBACK_PATH] = {
-            "content": retry_feedback_manifest,
-            "encoding": "utf-8",
-            "created_at": stable_timestamp(),
-            "modified_at": stable_timestamp(),
-        }
-    if target_history_manifest and target_history_manifest.strip():
-        agent_file_map[PATCHSMITH_DEEPAGENTS_TARGET_HISTORY_PATH] = {
-            "content": target_history_manifest,
-            "encoding": "utf-8",
-            "created_at": stable_timestamp(),
-            "modified_at": stable_timestamp(),
-        }
-    return agent_file_map
+    core_files = core_virtual_files(
+        subagents_enabled=subagents_enabled,
+        memory_content=lambda enabled: deepagents_agents_md(
+            subagents_enabled=enabled,
+        ),
+        repair_skill_content=lambda enabled: deepagents_repair_skill_md(
+            subagents_enabled=enabled,
+        ),
+    )
+    manifest_files = [
+        spec.to_virtual_file()
+        for spec in manifest_specs_from_contents(
+            {
+                "repair_interface": repair_interface_manifest,
+                "source_hint": source_hint_manifest,
+                "repo_map": repo_map_manifest,
+                "repo_instructions": repo_instructions_manifest,
+                "acceptance_rubric": acceptance_rubric_manifest,
+                "retry_feedback": retry_feedback_manifest,
+                "target_history": target_history_manifest,
+                "context_budget": context_budget_manifest,
+            }
+        )
+    ]
+    return add_virtual_files(files, [*core_files, *manifest_files])
 
 
 def repair_interface_manifest(
@@ -193,28 +146,18 @@ def repair_interface_manifest(
     budget_response_limit = _resource_budget_response_limit(resource_budget)
     budget_critical = budget_response_limit is not None and budget_response_limit <= 6
     preferred_paths = _ordered_unique_paths(preferred_target_paths or [])
-    required_reads = []
-    if not budget_critical:
-        required_reads.extend(
-            [
-                PATCHSMITH_DEEPAGENTS_MEMORY_PATH,
-                PATCHSMITH_DEEPAGENTS_REPAIR_SKILL_PATH,
-            ]
-        )
-    if source_hint_manifest and not budget_critical:
-        required_reads.append(PATCHSMITH_DEEPAGENTS_SOURCE_HINTS_PATH)
-    if repo_map_manifest:
-        required_reads.append(PATCHSMITH_DEEPAGENTS_REPO_MAP_PATH)
-    if repo_instructions_manifest and not budget_critical:
-        required_reads.append(PATCHSMITH_DEEPAGENTS_REPO_INSTRUCTIONS_PATH)
-    if acceptance_rubric_manifest:
-        required_reads.append(PATCHSMITH_DEEPAGENTS_ACCEPTANCE_RUBRIC_PATH)
-    if retry_feedback_manifest:
-        required_reads.append(PATCHSMITH_DEEPAGENTS_RETRY_FEEDBACK_PATH)
-    if target_history_manifest:
-        required_reads.append(PATCHSMITH_DEEPAGENTS_TARGET_HISTORY_PATH)
-    if context_budget_manifest:
-        required_reads.append(PATCHSMITH_DEEPAGENTS_CONTEXT_BUDGET_PATH)
+    required_reads = required_read_paths(
+        manifest_enabled_keys(
+            source_hint_manifest=source_hint_manifest,
+            repo_map_manifest=repo_map_manifest,
+            repo_instructions_manifest=repo_instructions_manifest,
+            acceptance_rubric_manifest=acceptance_rubric_manifest,
+            retry_feedback_manifest=retry_feedback_manifest,
+            target_history_manifest=target_history_manifest,
+            context_budget_manifest=context_budget_manifest,
+        ),
+        budget_critical=budget_critical,
+    )
 
     lines = [
         "# PatchSmith Repair Interface",
@@ -1214,7 +1157,7 @@ def path_modified_at(path: Path) -> str:
 
 
 def stable_timestamp() -> str:
-    return "1970-01-01T00:00:00+00:00"
+    return STABLE_TIMESTAMP
 
 
 def _context_symbols(context: RetrievedContext) -> list[str]:
