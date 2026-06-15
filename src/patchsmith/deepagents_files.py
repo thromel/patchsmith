@@ -14,6 +14,7 @@ from patchsmith.deepagents_context_utils import (
     clean_context_excerpt,
 )
 from patchsmith.deepagents_manifests import (
+    ManifestContents,
     add_virtual_files,
     core_virtual_files,
     manifest_specs_from_contents,
@@ -73,6 +74,7 @@ def agent_files(
     source_hint_manifest: str | None = None,
     retry_feedback_manifest: str | None = None,
     target_history_manifest: str | None = None,
+    manifest_contents: ManifestContents | None = None,
     subagents_enabled: bool = True,
 ) -> dict[str, dict[str, str]]:
     core_files = core_virtual_files(
@@ -84,20 +86,21 @@ def agent_files(
             subagents_enabled=enabled,
         ),
     )
+    contents = manifest_contents or ManifestContents.from_mapping(
+        {
+            "repair_interface": repair_interface_manifest,
+            "source_hint": source_hint_manifest,
+            "repo_map": repo_map_manifest,
+            "repo_instructions": repo_instructions_manifest,
+            "acceptance_rubric": acceptance_rubric_manifest,
+            "retry_feedback": retry_feedback_manifest,
+            "target_history": target_history_manifest,
+            "context_budget": context_budget_manifest,
+        }
+    )
     manifest_files = [
         spec.to_virtual_file()
-        for spec in manifest_specs_from_contents(
-            {
-                "repair_interface": repair_interface_manifest,
-                "source_hint": source_hint_manifest,
-                "repo_map": repo_map_manifest,
-                "repo_instructions": repo_instructions_manifest,
-                "acceptance_rubric": acceptance_rubric_manifest,
-                "retry_feedback": retry_feedback_manifest,
-                "target_history": target_history_manifest,
-                "context_budget": context_budget_manifest,
-            }
-        )
+        for spec in manifest_specs_from_contents(contents)
     ]
     return add_virtual_files(files, [*core_files, *manifest_files])
 

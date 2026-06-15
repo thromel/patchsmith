@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import pytest
 
+from patchsmith.deepagents_files import agent_files
 from patchsmith.deepagents_manifests import (
     STABLE_TIMESTAMP,
+    ManifestContents,
     VirtualFile,
     add_virtual_files,
     manifest_enabled_keys,
@@ -72,6 +74,44 @@ def test_manifest_specs_use_registry_order_and_skip_blank_content() -> None:
     assert specs[0].to_virtual_file().kind == "manifest"
 
 
+def test_manifest_contents_drive_specs_and_required_reads_from_registry() -> None:
+    contents = ManifestContents.from_mapping(
+        {
+            "repair_interface": "interface",
+            "source_hint": "   ",
+            "repo_map": "map",
+            "acceptance_rubric": "rubric",
+            "unknown_manifest": "ignored",
+        }
+    )
+
+    assert contents.to_mapping() == {
+        "repair_interface": "interface",
+        "source_hint": "   ",
+        "repo_map": "map",
+        "acceptance_rubric": "rubric",
+    }
+    assert [(spec.key, spec.content) for spec in contents.specs()] == [
+        ("repair_interface", "interface"),
+        ("repo_map", "map"),
+        ("acceptance_rubric", "rubric"),
+    ]
+    assert manifest_specs_from_contents(contents) == contents.specs()
+    assert contents.enabled_keys(include_repair_interface=False) == [
+        "memory",
+        "repair_skill",
+        "repo_map",
+        "acceptance_rubric",
+    ]
+    assert contents.required_read_paths(budget_critical=True) == [
+        PATCHSMITH_DEEPAGENTS_REPO_MAP_PATH,
+        PATCHSMITH_DEEPAGENTS_ACCEPTANCE_RUBRIC_PATH,
+    ]
+    assert contents.with_content("context_budget", "budget").is_enabled(
+        "context_budget"
+    )
+
+
 def test_add_virtual_files_preserves_existing_files_and_mounts_manifest_specs() -> None:
     base_files = {
         "/src/calc.py": {
@@ -93,6 +133,29 @@ def test_add_virtual_files_preserves_existing_files_and_mounts_manifest_specs() 
         "created_at": STABLE_TIMESTAMP,
         "modified_at": STABLE_TIMESTAMP,
     }
+
+
+def test_agent_files_mount_manifest_contents_bundle() -> None:
+    files = agent_files(
+        {"/src/calc.py": {"content": "def add(): pass\n", "encoding": "utf-8"}},
+        manifest_contents=ManifestContents.from_mapping(
+            {
+                "repair_interface": "interface",
+                "repo_map": "map",
+                "context_budget": "budget",
+            }
+        ),
+        subagents_enabled=False,
+    )
+
+    assert files["/src/calc.py"]["content"] == "def add(): pass\n"
+    assert files[PATCHSMITH_DEEPAGENTS_MEMORY_PATH]["content"].startswith(
+        "# PatchSmith DeepAgents Repair Contract"
+    )
+    assert files[PATCHSMITH_DEEPAGENTS_REPAIR_INTERFACE_PATH]["content"] == "interface"
+    assert files[PATCHSMITH_DEEPAGENTS_REPO_MAP_PATH]["content"] == "map"
+    assert files[PATCHSMITH_DEEPAGENTS_CONTEXT_BUDGET_PATH]["content"] == "budget"
+    assert PATCHSMITH_DEEPAGENTS_SOURCE_HINTS_PATH not in files
 
 
 def test_required_read_paths_respect_budget_critical_policy() -> None:

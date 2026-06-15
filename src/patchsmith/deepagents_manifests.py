@@ -83,6 +83,80 @@ class ManifestSpec:
         )
 
 
+@dataclass(frozen=True)
+class ManifestContents:
+    contents: Mapping[str, str | None]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "contents",
+            {
+                key: value
+                for key, value in self.contents.items()
+                if key in _MANIFEST_KEYS
+            },
+        )
+
+    @classmethod
+    def empty(cls) -> ManifestContents:
+        return cls({})
+
+    @classmethod
+    def from_mapping(cls, contents: Mapping[str, str | None]) -> ManifestContents:
+        return cls(dict(contents))
+
+    def content(self, key: str) -> str | None:
+        return self.contents.get(key)
+
+    def is_enabled(self, key: str) -> bool:
+        content = self.content(key)
+        return content is not None and bool(content.strip())
+
+    def with_content(self, key: str, content: str | None) -> ManifestContents:
+        return ManifestContents.from_mapping({**self.contents, key: content})
+
+    def to_mapping(self) -> dict[str, str | None]:
+        return dict(self.contents)
+
+    def specs(self) -> list[ManifestSpec]:
+        specs: list[ManifestSpec] = []
+        for definition in MANIFEST_DEFINITIONS:
+            spec = definition.to_spec(self.content(definition.key))
+            if spec is not None:
+                specs.append(spec)
+        return specs
+
+    def enabled_keys(
+        self,
+        *,
+        include_core: bool = True,
+        include_repair_interface: bool = True,
+    ) -> list[str]:
+        enabled = [definition.key for definition in CORE_DEFINITIONS] if include_core else []
+        for definition in MANIFEST_DEFINITIONS:
+            if not include_repair_interface and definition.key == "repair_interface":
+                continue
+            if self.is_enabled(definition.key):
+                enabled.append(definition.key)
+        return enabled
+
+    def required_read_paths(
+        self,
+        *,
+        budget_critical: bool,
+        include_core: bool = True,
+        include_repair_interface: bool = False,
+    ) -> list[str]:
+        return required_read_paths(
+            self.enabled_keys(
+                include_core=include_core,
+                include_repair_interface=include_repair_interface,
+            ),
+            budget_critical=budget_critical,
+        )
+
+
 CORE_DEFINITIONS: tuple[ManifestDefinition, ...] = (
     ManifestDefinition(
         key="memory",
@@ -153,6 +227,7 @@ MANIFEST_DEFINITIONS: tuple[ManifestDefinition, ...] = (
     ),
 )
 
+_MANIFEST_KEYS = {definition.key for definition in MANIFEST_DEFINITIONS}
 _DEFINITIONS_BY_KEY = {
     definition.key: definition
     for definition in (*CORE_DEFINITIONS, *MANIFEST_DEFINITIONS)
@@ -160,14 +235,11 @@ _DEFINITIONS_BY_KEY = {
 
 
 def manifest_specs_from_contents(
-    contents: Mapping[str, str | None],
+    contents: Mapping[str, str | None] | ManifestContents,
 ) -> list[ManifestSpec]:
-    specs: list[ManifestSpec] = []
-    for definition in MANIFEST_DEFINITIONS:
-        spec = definition.to_spec(contents.get(definition.key))
-        if spec is not None:
-            specs.append(spec)
-    return specs
+    if isinstance(contents, ManifestContents):
+        return contents.specs()
+    return ManifestContents.from_mapping(contents).specs()
 
 
 def core_virtual_files(

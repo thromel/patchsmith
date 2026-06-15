@@ -6,6 +6,7 @@ from collections.abc import Iterable, Mapping
 from typing import Any
 
 from patchsmith.deepagents_manifests import (
+    ManifestContents,
     manifest_enabled_keys,
     required_read_paths,
 )
@@ -30,6 +31,7 @@ def repair_interface_manifest(
     repo_map_manifest: bool = False,
     repo_instructions_manifest: bool = False,
     acceptance_rubric_manifest: bool = False,
+    manifest_contents: ManifestContents | None = None,
     context_mode: str = "full",
     context_window_lines: int = 0,
     preferred_target_paths: Iterable[str] | None = None,
@@ -40,18 +42,23 @@ def repair_interface_manifest(
     budget_response_limit = _resource_budget_response_limit(resource_budget)
     budget_critical = budget_response_limit is not None and budget_response_limit <= 6
     preferred_paths = _ordered_unique_paths(preferred_target_paths or [])
+    enabled_manifests = _enabled_manifests_from_contents_or_flags(
+        manifest_contents=manifest_contents,
+        source_hint_manifest=source_hint_manifest,
+        repo_map_manifest=repo_map_manifest,
+        repo_instructions_manifest=repo_instructions_manifest,
+        acceptance_rubric_manifest=acceptance_rubric_manifest,
+        retry_feedback_manifest=retry_feedback_manifest,
+        target_history_manifest=target_history_manifest,
+        context_budget_manifest=context_budget_manifest,
+    )
     required_reads = required_read_paths(
-        manifest_enabled_keys(
-            source_hint_manifest=source_hint_manifest,
-            repo_map_manifest=repo_map_manifest,
-            repo_instructions_manifest=repo_instructions_manifest,
-            acceptance_rubric_manifest=acceptance_rubric_manifest,
-            retry_feedback_manifest=retry_feedback_manifest,
-            target_history_manifest=target_history_manifest,
-            context_budget_manifest=context_budget_manifest,
-        ),
+        enabled_manifests,
         budget_critical=budget_critical,
     )
+    target_history_enabled = "target_history" in enabled_manifests
+    acceptance_rubric_enabled = "acceptance_rubric" in enabled_manifests
+    repo_instructions_enabled = "repo_instructions" in enabled_manifests
 
     lines = [
         "# PatchSmith Repair Interface",
@@ -118,7 +125,7 @@ def repair_interface_manifest(
         lines.append(f"- `{repo_path}` via `{virtual_path}`")
 
     if preferred_paths:
-        if target_history_manifest:
+        if target_history_enabled:
             preferred_guidance = (
                 "Choose one of these mounted paths unless a historical target has "
                 "fresh old-span evidence for a distinct control point."
@@ -155,7 +162,7 @@ def repair_interface_manifest(
                 ]
             )
 
-    if acceptance_rubric_manifest:
+    if acceptance_rubric_enabled:
         lines.extend(
             [
                 "",
@@ -167,7 +174,7 @@ def repair_interface_manifest(
             ]
         )
 
-    if repo_instructions_manifest:
+    if repo_instructions_enabled:
         lines.extend(
             [
                 "",
@@ -195,6 +202,33 @@ def repair_interface_manifest(
         ]
     )
     return "\n".join(lines).rstrip()
+
+
+def _enabled_manifests_from_contents_or_flags(
+    *,
+    manifest_contents: ManifestContents | None,
+    source_hint_manifest: bool,
+    repo_map_manifest: bool,
+    repo_instructions_manifest: bool,
+    acceptance_rubric_manifest: bool,
+    retry_feedback_manifest: bool,
+    target_history_manifest: bool,
+    context_budget_manifest: bool,
+) -> list[str]:
+    if manifest_contents is not None:
+        return manifest_contents.enabled_keys(
+            include_core=True,
+            include_repair_interface=False,
+        )
+    return manifest_enabled_keys(
+        source_hint_manifest=source_hint_manifest,
+        repo_map_manifest=repo_map_manifest,
+        repo_instructions_manifest=repo_instructions_manifest,
+        acceptance_rubric_manifest=acceptance_rubric_manifest,
+        retry_feedback_manifest=retry_feedback_manifest,
+        target_history_manifest=target_history_manifest,
+        context_budget_manifest=context_budget_manifest,
+    )
 
 
 def _resource_budget_lines(resource_budget: Mapping[str, Any] | None) -> list[str]:

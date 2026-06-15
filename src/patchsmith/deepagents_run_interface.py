@@ -10,6 +10,7 @@ from patchsmith.deepagents_files import (
     _agent_files,
     _repair_interface_manifest,
 )
+from patchsmith.deepagents_manifests import ManifestContents
 from patchsmith.deepagents_prompts import PATCHSMITH_DEEPAGENTS_REPAIR_INTERFACE_PATH
 
 
@@ -40,6 +41,17 @@ def build_deepagents_run_interface(
     preferred_target_paths: Iterable[str],
     preferred_target_symbols: Mapping[str, Iterable[str]],
 ) -> DeepAgentsRunInterface:
+    manifest_contents = ManifestContents.from_mapping(
+        {
+            "source_hint": source_hint_manifest,
+            "repo_map": repo_map_manifest,
+            "repo_instructions": repo_instructions_manifest,
+            "acceptance_rubric": acceptance_rubric_manifest,
+            "retry_feedback": retry_feedback_manifest,
+            "target_history": target_history_manifest,
+            "context_budget": context_budget_manifest,
+        }
+    )
     repair_interface_manifest = _repair_interface_manifest(
         virtual_to_repo=virtual_to_repo,
         files=files,
@@ -47,13 +59,7 @@ def build_deepagents_run_interface(
         subagents_enabled=subagents_enabled,
         subagent_routing_reasons=subagent_routing_reasons,
         resource_budget=resource_budget,
-        source_hint_manifest=source_hint_manifest is not None,
-        retry_feedback_manifest=retry_feedback_manifest is not None,
-        target_history_manifest=target_history_manifest is not None,
-        context_budget_manifest=context_budget_manifest is not None,
-        repo_map_manifest=repo_map_manifest is not None,
-        repo_instructions_manifest=repo_instructions_manifest is not None,
-        acceptance_rubric_manifest=acceptance_rubric_manifest is not None,
+        manifest_contents=manifest_contents,
         context_mode=context_mode,
         context_window_lines=context_window_lines,
         preferred_target_paths=preferred_target_paths,
@@ -61,14 +67,10 @@ def build_deepagents_run_interface(
     )
     agent_files = _agent_files(
         files,
-        repair_interface_manifest=repair_interface_manifest,
-        acceptance_rubric_manifest=acceptance_rubric_manifest,
-        context_budget_manifest=context_budget_manifest,
-        repo_map_manifest=repo_map_manifest,
-        repo_instructions_manifest=repo_instructions_manifest,
-        source_hint_manifest=source_hint_manifest,
-        retry_feedback_manifest=retry_feedback_manifest,
-        target_history_manifest=target_history_manifest,
+        manifest_contents=manifest_contents.with_content(
+            "repair_interface",
+            repair_interface_manifest,
+        ),
         subagents_enabled=subagents_enabled,
     )
     return DeepAgentsRunInterface(
