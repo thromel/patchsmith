@@ -11,7 +11,7 @@ tests.
 
 ## Current Evidence
 
-- Source size: 265 Python files under `src/patchsmith`, about 59.4k lines.
+- Source size: 266 Python files under `src/patchsmith`, about 59.4k lines.
 - Test size: 92 Python files under `tests`, about 32.8k lines.
 - Largest source files:
   - `src/patchsmith/deepagents_files.py`: 1328 lines.
@@ -22,7 +22,7 @@ tests.
   - `src/patchsmith/evaluation/issue_corpus/public_issue_repairs.py`: 637 lines.
   - `src/patchsmith/evaluation/complex/summary.py`: 631 lines.
 - Largest tests:
-  - `tests/test_agent_chat.py`: 3641 lines.
+  - `tests/test_agent_chat.py`: 3661 lines.
   - `tests/evaluation/test_runners.py`: 2608 lines.
   - `tests/evaluation/test_issue_corpus_public_issues.py`: 2586 lines.
   - `tests/test_deepagents_planner.py`: 2398 lines.
@@ -43,11 +43,11 @@ than the product actually is.
 
 | Area | Files | Lines | Read |
 | --- | ---: | ---: | --- |
-| root modules | 80 | 18520 | Agent shell, DeepAgents, workflow, retrieval, patching, models, safety, and mixed helpers are still colocated. |
+| root modules | 80 | 18122 | Agent shell compatibility, DeepAgents, workflow, retrieval, patching, models, safety, and mixed helpers are still colocated. |
 | evaluation | 62 | 15132 | Rich benchmark functionality; the complex-suite runner is now thin, but CLI and issue-corpus flows still need simplification. |
 | portfolio | 52 | 9188 | Public status/evidence reporting is separated, but many modules are report-fragment style rather than domain services. |
 | cli | 25 | 5479 | Command surface is split by broad command groups, but `run.py` still owns multiple products. |
-| chat | 21 | 3704 | Command handlers, task execution, resume hydration, and shared replay helpers are split out; the controller still owns the REPL loop. |
+| chat | 22 | 4107 | Command handlers, task execution, resume hydration, controller lifecycle, and shared replay helpers are split out. |
 | session | 9 | 2612 | Typed store/metrics/gates/reporting are split out behind compatibility exports. |
 | runtime | 6 | 2414 | Runtime execution is compact relative to evaluation/chat, but attempt and feedback modules are large. |
 | observability | 10 | 2321 | HTML/report rendering is reasonably isolated. |
@@ -56,7 +56,7 @@ Top internal coupling hotspots by number of imported PatchSmith areas:
 
 | Module | Internal areas imported | Risk |
 | --- | ---: | --- |
-| `agent_chat.py` | 9 | Chat shell is now mostly REPL/session glue, but still bridges command dispatch, custom commands, hooks, and workflow callbacks. |
+| `chat/controller.py` | 9 | Chat controller now owns REPL/session glue, command dispatch, custom commands, hooks, and workflow callbacks inside the chat package. |
 | `cli/commands/run.py` | 14 | One CLI module owns `agent`, `chat`, legacy `run`, offline session actions, model preflight, indexing, and retrieval. |
 | `deepagents_planner.py` | 12 | Planner owns or coordinates nearly every DeepAgents concern. |
 | `workflow.py` | 12 | Main repair workflow imports analysis, planning, reporting, runtime, sandbox, tracing, and restore paths. |
@@ -398,6 +398,11 @@ Progress:
   `tests/chat/test_session_resume.py`. `agent_chat.py` is now 403 lines and 12
   top-level definitions; the controller no longer owns replaying transcript
   rows into runtime state.
+- 2026-06-16: The chat session controller moved into
+  `patchsmith.chat.controller`, while `patchsmith.agent_chat` remains a
+  five-line compatibility wrapper for existing imports. Focused chat regression
+  coverage still imports the compatibility path; apply/check monkeypatches now
+  target the controller module that owns command context construction.
 - 2026-06-15: Phase 1 typed-transcript slice added `patchsmith.session.events`
   and `patchsmith.session.store`. Existing transcript writes and
   `agent_session.transcript_rows` now use the store compatibility layer, with

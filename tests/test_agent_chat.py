@@ -83,12 +83,20 @@ def test_chat_session_runs_preflight_task_apply_and_writes_transcript(
             applied=False,
         )
 
-    import patchsmith.agent_chat as agent_chat
     import patchsmith.agent_cli as agent_cli
+    import patchsmith.chat.controller as chat_controller
 
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-    monkeypatch.setattr(agent_chat, "apply_agent_run_diff", fake_apply_agent_run_diff)
-    monkeypatch.setattr(agent_chat, "check_agent_run_diff", fake_check_agent_run_diff)
+    monkeypatch.setattr(
+        chat_controller,
+        "apply_agent_run_diff",
+        fake_apply_agent_run_diff,
+    )
+    monkeypatch.setattr(
+        chat_controller,
+        "check_agent_run_diff",
+        fake_check_agent_run_diff,
+    )
     monkeypatch.setattr(agent_cli, "apply_agent_run_diff", fake_apply_agent_run_diff)
     monkeypatch.setattr(
         agent_cli,
@@ -953,12 +961,20 @@ def test_chat_session_metrics_report_process_rates(
             applied=False,
         )
 
-    import patchsmith.agent_chat as agent_chat
     import patchsmith.agent_cli as agent_cli
+    import patchsmith.chat.controller as chat_controller
 
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-    monkeypatch.setattr(agent_chat, "apply_agent_run_diff", fake_apply_agent_run_diff)
-    monkeypatch.setattr(agent_chat, "check_agent_run_diff", fake_check_agent_run_diff)
+    monkeypatch.setattr(
+        chat_controller,
+        "apply_agent_run_diff",
+        fake_apply_agent_run_diff,
+    )
+    monkeypatch.setattr(
+        chat_controller,
+        "check_agent_run_diff",
+        fake_check_agent_run_diff,
+    )
     monkeypatch.setattr(agent_cli, "apply_agent_run_diff", fake_apply_agent_run_diff)
     monkeypatch.setattr(
         agent_cli,
@@ -2276,9 +2292,9 @@ def test_chat_session_apply_requires_review_and_ready_check(
     ) -> AgentApplyResult:
         raise AssertionError("guarded apply should not call git apply")
 
-    import patchsmith.agent_chat as agent_chat
+    import patchsmith.chat.controller as chat_controller
 
-    monkeypatch.setattr(agent_chat, "apply_agent_run_diff", fail_apply)
+    monkeypatch.setattr(chat_controller, "apply_agent_run_diff", fail_apply)
 
     output = io.StringIO()
     assert (
@@ -2622,11 +2638,15 @@ def test_chat_session_preapply_hook_can_block_apply(
             applied=False,
         )
 
-    import patchsmith.agent_chat as agent_chat
+    import patchsmith.chat.controller as chat_controller
 
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-    monkeypatch.setattr(agent_chat, "apply_agent_run_diff", fail_apply)
-    monkeypatch.setattr(agent_chat, "check_agent_run_diff", fake_check_agent_run_diff)
+    monkeypatch.setattr(chat_controller, "apply_agent_run_diff", fail_apply)
+    monkeypatch.setattr(
+        chat_controller,
+        "check_agent_run_diff",
+        fake_check_agent_run_diff,
+    )
     output = io.StringIO()
     assert (
         run_chat_session(
