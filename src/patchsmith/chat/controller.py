@@ -22,22 +22,9 @@ from patchsmith.agent_commands import (
 from patchsmith.agent_hooks import (
     run_agent_hooks,
 )
-from patchsmith.chat.commands import ChatCommandContext, build_command_registry
-from patchsmith.chat.handlers.checkpoints import checkpoint_commands
-from patchsmith.chat.handlers.context import context_commands
-from patchsmith.chat.handlers.diff_apply import diff_apply_commands
-from patchsmith.chat.handlers.execution import (
-    execution_commands,
-    handle_preflight_command,
-)
-from patchsmith.chat.handlers.memory import memory_instruction_commands
-from patchsmith.chat.handlers.model_budget import model_budget_commands
-from patchsmith.chat.handlers.permissions import permission_commands
-from patchsmith.chat.handlers.project import project_commands
-from patchsmith.chat.handlers.session_evidence import session_evidence_commands
-from patchsmith.chat.handlers.session_plan import plan_feedback_commands
-from patchsmith.chat.handlers.session_state import session_state_commands
-from patchsmith.chat.handlers.system import system_commands
+from patchsmith.chat.commands import ChatCommandContext
+from patchsmith.chat.handlers.execution import handle_preflight_command
+from patchsmith.chat.registry import chat_command_registry
 from patchsmith.chat.routing import parse_slash_command, route_natural_command
 from patchsmith.chat.session_payloads import (
     config_payload,
@@ -49,22 +36,7 @@ from patchsmith.chat.task_runner import ModelPreflightChecker, run_chat_task
 from patchsmith.session.store import append_transcript_event
 from patchsmith.workflow import RepairRunner
 
-_REGISTERED_CHAT_COMMANDS = build_command_registry(
-    (
-        *system_commands(),
-        *memory_instruction_commands(),
-        *context_commands(),
-        *model_budget_commands(),
-        *permission_commands(),
-        *plan_feedback_commands(),
-        *project_commands(),
-        *session_evidence_commands(),
-        *diff_apply_commands(),
-        *execution_commands(),
-        *checkpoint_commands(),
-        *session_state_commands(),
-    )
-)
+_REGISTERED_CHAT_COMMANDS = chat_command_registry()
 
 
 def run_chat_session(
