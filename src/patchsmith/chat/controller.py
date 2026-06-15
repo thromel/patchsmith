@@ -19,12 +19,10 @@ from patchsmith.agent_commands import (
     load_custom_command,
     render_custom_command_prompt,
 )
-from patchsmith.agent_hooks import (
-    run_agent_hooks,
-)
 from patchsmith.chat.commands import ChatCommandContext
 from patchsmith.chat.formatting import write_line
 from patchsmith.chat.handlers.execution import handle_preflight_command
+from patchsmith.chat.hooks import run_chat_hooks
 from patchsmith.chat.registry import chat_command_registry
 from patchsmith.chat.routing import parse_slash_command, route_natural_command
 from patchsmith.chat.session_payloads import (
@@ -34,7 +32,7 @@ from patchsmith.chat.session_payloads import (
 from patchsmith.chat.session_resume import runtime_from_transcript
 from patchsmith.chat.state import AgentChatRuntime, AgentChatState
 from patchsmith.chat.task_runner import ModelPreflightChecker, run_chat_task
-from patchsmith.session.store import append_transcript_event
+from patchsmith.chat.transcript import record_chat_event
 from patchsmith.workflow import RepairRunner
 
 _REGISTERED_CHAT_COMMANDS = chat_command_registry()
@@ -60,7 +58,7 @@ def run_chat_session(
             write_line(output_stream, f"Cannot resume missing session: {state.session_id}")
             write_line(output_stream, f"Expected transcript: {state.transcript_path}")
             return 2
-        _record(
+        record_chat_event(
             runtime,
             "session_resume",
             {
@@ -72,14 +70,14 @@ def run_chat_session(
         banner = "PatchSmith Chat (resumed)"
     else:
         runtime = AgentChatRuntime(state=state)
-        _record(runtime, "session_start", {"config": config_payload(state.config)})
+        record_chat_event(runtime, "session_start", {"config": config_payload(state.config)})
         banner = "PatchSmith Chat"
 
     write_line(output_stream, banner)
     write_line(output_stream, f"Session: {state.session_id}")
     write_line(output_stream, f"Transcript: {state.transcript_path}")
     write_line(output_stream, "Type /help for commands, /exit to quit.")
-    if not _run_chat_hooks(
+    if not run_chat_hooks(
         runtime=runtime,
         event="SessionStart",
         payload={
@@ -89,7 +87,7 @@ def run_chat_session(
         output_stream=output_stream,
         blocking=True,
     ):
-        _record(runtime, "session_end", {"reason": "session_start_hook_blocked"})
+        record_chat_event(runtime, "session_end", {"reason": "session_start_hook_blocked"})
         return 2
 
     if initial_prompt.strip():
@@ -99,8 +97,8 @@ def run_chat_session(
             output_stream=output_stream,
             runner_cls=runner_cls,
             model_preflight_checker=model_preflight_checker,
-            record=_record,
-            run_hooks=_run_chat_hooks,
+            record=record_chat_event,
+            run_hooks=run_chat_hooks,
         )
 
     while True:
@@ -124,7 +122,7 @@ def run_chat_session(
             continue
         routed_command = route_natural_command(raw)
         if routed_command is not None:
-            _record(
+            record_chat_event(
                 runtime,
                 "natural_command",
                 {"raw": raw, "routed_command": routed_command},
@@ -141,7 +139,7 @@ def run_chat_session(
             continue
         if runtime.chat_mode == "plan":
             runtime.pending_planned_task = raw
-            _record(runtime, "plan_mode_task", {"task": raw, "pending": True})
+            record_chat_event(runtime, "plan_mode_task", {"task": raw, "pending": True})
             write_line(
                 output_stream,
                 "Plan mode: running preflight only. Say 'go ahead' or use /run to execute.",
@@ -150,7 +148,7 @@ def run_chat_session(
                 runtime=runtime,
                 argument=raw,
                 output_stream=output_stream,
-                context=ChatCommandContext(record=_record),
+                context=ChatCommandContext(record=record_chat_event),
             )
             write_line(output_stream, f"Pending planned task: {raw}")
             continue
@@ -160,8 +158,8 @@ def run_chat_session(
             output_stream=output_stream,
             runner_cls=runner_cls,
             model_preflight_checker=model_preflight_checker,
-            record=_record,
-            run_hooks=_run_chat_hooks,
+            record=record_chat_event,
+            run_hooks=run_chat_hooks,
         )
 
 
@@ -195,13 +193,13 @@ def _chat_command_context(
             output_stream=output_stream,
             runner_cls=runner_cls,
             model_preflight_checker=model_preflight_checker,
-            record=_record,
-            run_hooks=_run_chat_hooks,
+            record=record_chat_event,
+            run_hooks=run_chat_hooks,
         )
 
     return ChatCommandContext(
-        record=_record,
-        run_hooks=_run_chat_hooks,
+        record=record_chat_event,
+        run_hooks=run_chat_hooks,
         apply_agent_run_diff=apply_agent_run_diff,
         check_agent_run_diff=check_agent_run_diff,
         reverse_agent_run_diff=reverse_agent_run_diff,
@@ -218,7 +216,7 @@ def _handle_slash_command(
     model_preflight_checker: ModelPreflightChecker | None,
 ) -> bool:
     command, argument = parse_slash_command(raw)
-    _record(runtime, "user_command", {"command": command, "argument": argument})
+    record_chat_event(runtime, "user_command", {"command": command, "argument": argument})
     if command in {"exit", "quit"}:
         write_line(output_stream, "Session ended.")
         _end_session(runtime=runtime, reason=command, output_stream=output_stream)
@@ -262,7 +260,7 @@ def _handle_custom_command(
     if custom_command is None:
         return False
     prompt = render_custom_command_prompt(custom_command, argument)
-    if not _run_chat_hooks(
+    if not run_chat_hooks(
         runtime=runtime,
         event="UserPromptExpansion",
         payload={
@@ -276,7 +274,7 @@ def _handle_custom_command(
         blocking=True,
     ):
         return True
-    _record(
+    record_chat_event(
         runtime,
         "custom_command",
         {
@@ -293,8 +291,8 @@ def _handle_custom_command(
         output_stream=output_stream,
         runner_cls=runner_cls,
         model_preflight_checker=model_preflight_checker,
-        record=_record,
-        run_hooks=_run_chat_hooks,
+        record=record_chat_event,
+        run_hooks=run_chat_hooks,
     )
     return True
 
@@ -315,49 +313,13 @@ def _end_session(
     reason: str,
     output_stream: TextIO,
 ) -> None:
-    _record(runtime, "session_end", {"reason": reason})
-    _run_chat_hooks(
+    record_chat_event(runtime, "session_end", {"reason": reason})
+    run_chat_hooks(
         runtime=runtime,
         event="SessionEnd",
         payload={"reason": reason},
         output_stream=output_stream,
         blocking=False,
-    )
-
-
-def _run_chat_hooks(
-    *,
-    runtime: AgentChatRuntime,
-    event: str,
-    payload: dict[str, object],
-    output_stream: TextIO,
-    blocking: bool,
-) -> bool:
-    hook_payload = {
-        "session_id": runtime.state.session_id,
-        "transcript_path": str(runtime.state.transcript_path),
-        **payload,
-    }
-    result = run_agent_hooks(
-        repo=runtime.state.config.repo,
-        event=event,
-        payload=hook_payload,
-    )
-    if result.runs:
-        _record(runtime, "hook_result", result.to_dict())
-    if result.blocked:
-        reason = result.block_reason or f"{event} blocked by hook"
-        write_line(output_stream, f"Hook blocked {event}: {reason}")
-        return not blocking
-    return True
-
-
-def _record(runtime: AgentChatRuntime, event: str, payload: dict[str, object]) -> None:
-    append_transcript_event(
-        runtime.state.transcript_path,
-        session_id=runtime.state.session_id,
-        event=event,
-        payload=payload,
     )
 
 
