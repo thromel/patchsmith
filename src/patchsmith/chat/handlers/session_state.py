@@ -6,6 +6,7 @@ from patchsmith.agent_plan import plan_items_payload
 from patchsmith.agent_session import session_usage_payload
 from patchsmith.chat.commands import ChatCommand, ChatCommandContext
 from patchsmith.chat.handlers.model_budget import budget_label, model_label
+from patchsmith.chat.session_payloads import last_run_value, optional_text
 from patchsmith.chat.state import AgentChatRuntime
 
 
@@ -71,14 +72,14 @@ def handle_status_command(
     if runtime.compaction_summary is not None:
         compacted = runtime.compaction_summary.get("compacted_task_count")
         _write_line(output_stream, f"Last compaction: {compacted} task(s)")
-    last_run_id = _last_run_value(runtime, "run_id")
+    last_run_id = last_run_value(runtime, "run_id")
     if last_run_id is None:
         _write_line(output_stream, "Last run: none")
         return
     _write_line(output_stream, f"Last run: {last_run_id}")
-    _write_line(output_stream, f"Last status: {_last_run_value(runtime, 'status')}")
-    _write_line(output_stream, f"Last report: {_last_run_value(runtime, 'report_path')}")
-    _write_line(output_stream, f"Last diff: {_last_run_value(runtime, 'final_diff_path')}")
+    _write_line(output_stream, f"Last status: {last_run_value(runtime, 'status')}")
+    _write_line(output_stream, f"Last report: {last_run_value(runtime, 'report_path')}")
+    _write_line(output_stream, f"Last diff: {last_run_value(runtime, 'final_diff_path')}")
     if runtime.last_apply is not None:
         _write_line(output_stream, f"Last apply: {runtime.last_apply.status}")
     if runtime.last_rewind is not None:
@@ -168,7 +169,7 @@ def handle_clear_command(
         "cleared_history_count": len(runtime.history or []),
         "cleared_plan_count": len(runtime.plan_items or []),
         "cleared_feedback_count": len(runtime.feedback_items or []),
-        "cleared_last_run_id": _last_run_value(runtime, "run_id"),
+        "cleared_last_run_id": last_run_value(runtime, "run_id"),
         "cleared_last_apply": runtime.last_apply.status if runtime.last_apply else None,
         "cleared_last_rewind": runtime.last_rewind.status if runtime.last_rewind else None,
     }
@@ -230,35 +231,11 @@ def _compaction_payload(
             "max_model_responses": runtime.state.config.max_model_responses,
             "max_model_tokens": runtime.state.config.max_model_tokens,
         },
-        "last_run_id": _last_run_value(runtime, "run_id"),
-        "last_status": _last_run_value(runtime, "status"),
-        "last_report_path": _optional_text(_last_run_value(runtime, "report_path")),
-        "last_diff_path": _optional_text(_last_run_value(runtime, "final_diff_path")),
+        "last_run_id": last_run_value(runtime, "run_id"),
+        "last_status": last_run_value(runtime, "status"),
+        "last_report_path": optional_text(last_run_value(runtime, "report_path")),
+        "last_diff_path": optional_text(last_run_value(runtime, "final_diff_path")),
     }
-
-
-def _last_run_value(runtime: AgentChatRuntime, key: str) -> object | None:
-    if runtime.last_run is not None:
-        value = getattr(runtime.last_run, _result_attribute_for_payload_key(key), None)
-        if value is not None:
-            return value
-    if runtime.last_run_payload is None:
-        return None
-    return runtime.last_run_payload.get(key)
-
-
-def _result_attribute_for_payload_key(key: str) -> str:
-    if key == "final_diff_path":
-        return "final_diff_path"
-    if key == "report_path":
-        return "report_path"
-    if key == "trace_path":
-        return "trace_path"
-    return key
-
-
-def _optional_text(value: object) -> str | None:
-    return None if value is None else str(value)
 
 
 def _write_line(output_stream: TextIO, message: str) -> None:

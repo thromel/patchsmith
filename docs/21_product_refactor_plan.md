@@ -11,13 +11,13 @@ tests.
 
 ## Current Evidence
 
-- Source size: 259 Python files under `src/patchsmith`, about 59.3k lines.
-- Test size: 88 Python files under `tests`, about 31.8k lines.
+- Source size: 261 Python files under `src/patchsmith`, about 59.3k lines.
+- Test size: 89 Python files under `tests`, about 32.0k lines.
 - Largest source files:
-  - `src/patchsmith/agent_chat.py`: 1490 lines.
   - `src/patchsmith/deepagents_files.py`: 1328 lines.
   - `src/patchsmith/cli/commands/run.py`: 1139 lines.
   - `src/patchsmith/runtime/attempts.py`: 1108 lines.
+  - `src/patchsmith/agent_chat.py`: 950 lines.
   - `src/patchsmith/runtime/feedback.py`: 735 lines.
   - `src/patchsmith/session/recommendations.py`: 716 lines.
 - Largest tests:
@@ -29,7 +29,7 @@ tests.
 - Current validation:
   - `uv run ruff check src tests docs README.md`: passed.
   - `uv run mypy src`: passed.
-  - `uv run pytest -q`: 669 passed.
+  - `uv run pytest -q`: 673 passed.
 - Current local smoke:
   - `patchsmith chat` persisted a natural-language memory note and reloaded it
     from `.patchsmith/instructions.md`.
@@ -63,10 +63,10 @@ Definition-count hotspots:
 
 | Module | Definitions | Read |
 | --- | ---: | --- |
-| `agent_chat.py` | 55 | Needs controller extraction after command handlers stabilize. |
 | `deepagents_files.py` | 46 | Needs virtual-file and manifest registry. |
 | `evaluation/complex/trace_readers.py` | 32 | Newly extracted pure trace readers; keep adding fixture coverage here. |
 | `evaluation/complex/followups.py` | 31 | Newly extracted follow-up candidate policy for budget, verifier, retry, and quality reruns. |
+| `agent_chat.py` | 27 | Command handlers are mostly registered modules; controller extraction is now the next chat boundary. |
 | `evaluation/complex/summary.py` | 24 | Newly extracted summary aggregation and resource-budget accounting. |
 | `evaluation/complex/spec.py` | 18 | Newly extracted suite spec/config parsing; now consumes the threshold registry for resolution and validation. |
 | `evaluation/complex/extract.py` | 16 | Newly extracted saved-attempt result parsing and failure classification. |
@@ -365,6 +365,13 @@ Progress:
   `patchsmith.chat.handlers.session_state`, with direct coverage in
   `tests/chat/test_session_state_commands.py`; `agent_chat.py` is now
   1490 lines.
+- 2026-06-16: The `/checkpoint`, `/checkpoints`, and `/restore` command family
+  moved into `patchsmith.chat.handlers.checkpoints`. Shared config and
+  checkpoint replay payload helpers moved into
+  `patchsmith.chat.session_payloads`, so checkpoint restore and transcript
+  resume use the same decoders. Focused tests live under
+  `tests/chat/test_checkpoint_commands.py`; `agent_chat.py` is now 950 lines
+  and 27 top-level definitions.
 - 2026-06-15: Phase 1 typed-transcript slice added `patchsmith.session.events`
   and `patchsmith.session.store`. Existing transcript writes and
   `agent_session.transcript_rows` now use the store compatibility layer, with

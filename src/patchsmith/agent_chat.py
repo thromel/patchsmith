@@ -41,6 +41,7 @@ from patchsmith.agent_session import (
     transcript_rows,
 )
 from patchsmith.chat.commands import ChatCommandContext, build_command_registry
+from patchsmith.chat.handlers.checkpoints import checkpoint_commands
 from patchsmith.chat.handlers.context import context_commands
 from patchsmith.chat.handlers.diff_apply import diff_apply_commands
 from patchsmith.chat.handlers.execution import execution_commands
@@ -55,6 +56,20 @@ from patchsmith.chat.handlers.session_plan import (
 )
 from patchsmith.chat.handlers.session_state import session_state_commands
 from patchsmith.chat.routing import parse_slash_command, route_natural_command
+from patchsmith.chat.session_payloads import (
+    apply_config_update,
+    apply_result_from_payload,
+    apply_result_from_state,
+    chat_mode_from_payload,
+    config_from_payload,
+    config_payload,
+    context_paths_from_payload,
+    dict_or_none,
+    feedback_items_from_update,
+    last_run_value,
+    optional_text,
+    string_list_from_payload,
+)
 from patchsmith.chat.state import AgentChatRuntime, AgentChatState
 from patchsmith.model_preflight import ModelPreflightResult
 from patchsmith.models import CommandResult
@@ -75,6 +90,7 @@ _REGISTERED_CHAT_COMMANDS = build_command_registry(
         *session_evidence_commands(),
         *diff_apply_commands(),
         *execution_commands(),
+        *checkpoint_commands(),
         *session_state_commands(),
     )
 )
@@ -104,15 +120,15 @@ def run_chat_session(
             runtime,
             "session_resume",
             {
-                "config": _config_payload(runtime.state.config),
+                "config": config_payload(runtime.state.config),
                 "history_count": len(runtime.history or []),
-                "last_run_id": _last_run_value(runtime, "run_id"),
+                "last_run_id": last_run_value(runtime, "run_id"),
             },
         )
         banner = "PatchSmith Chat (resumed)"
     else:
         runtime = AgentChatRuntime(state=state)
-        _record(runtime, "session_start", {"config": _config_payload(state.config)})
+        _record(runtime, "session_start", {"config": config_payload(state.config)})
         banner = "PatchSmith Chat"
 
     _write_line(output_stream, banner)
@@ -124,7 +140,7 @@ def run_chat_session(
         event="SessionStart",
         payload={
             "resume": resume,
-            "config": _config_payload(runtime.state.config),
+            "config": config_payload(runtime.state.config),
         },
         output_stream=output_stream,
         blocking=True,
@@ -272,15 +288,6 @@ def _handle_slash_command(
                 model_preflight_checker=model_preflight_checker,
             ),
         )
-        return True
-    if command == "checkpoint":
-        _handle_checkpoint(runtime=runtime, label=argument, output_stream=output_stream)
-        return True
-    if command == "checkpoints":
-        _handle_checkpoints(runtime=runtime, output_stream=output_stream)
-        return True
-    if command == "restore":
-        _handle_restore(runtime=runtime, selector=argument, output_stream=output_stream)
         return True
     if command == "doctor":
         _handle_doctor(runtime=runtime, output_stream=output_stream)
@@ -486,188 +493,6 @@ def _handle_custom_command(
     return True
 
 
-def _handle_checkpoint(
-    *,
-    runtime: AgentChatRuntime,
-    label: str,
-    output_stream: TextIO,
-) -> None:
-    payload = _checkpoint_payload(runtime=runtime, label=label)
-    _record(runtime, "session_checkpoint", payload)
-    label_text = f" ({payload['label']})" if payload["label"] else ""
-    _write_line(output_stream, f"Checkpoint saved: {payload['checkpoint_id']}{label_text}")
-
-
-def _handle_checkpoints(
-    *,
-    runtime: AgentChatRuntime,
-    output_stream: TextIO,
-) -> None:
-    checkpoints = _checkpoint_payloads(runtime.state.transcript_path)
-    _record(runtime, "session_checkpoint_list", {"count": len(checkpoints)})
-    _write_line(output_stream, _format_checkpoints(checkpoints))
-
-
-def _handle_restore(
-    *,
-    runtime: AgentChatRuntime,
-    selector: str,
-    output_stream: TextIO,
-) -> None:
-    value = selector.strip()
-    if not value:
-        _write_line(output_stream, "Usage: /restore <checkpoint-id-or-label>")
-        return
-    checkpoint = _find_checkpoint(runtime.state.transcript_path, value)
-    if checkpoint is None:
-        _write_line(output_stream, f"Checkpoint not found: {value}")
-        return
-    state = checkpoint.get("state")
-    if not isinstance(state, dict):
-        _write_line(output_stream, f"Checkpoint has no restorable state: {value}")
-        return
-    _restore_checkpoint_state(runtime=runtime, state=state)
-    payload = {
-        "checkpoint_id": checkpoint.get("checkpoint_id"),
-        "label": checkpoint.get("label"),
-        "state": state,
-    }
-    _record(runtime, "session_restore", payload)
-    label_text = f" ({checkpoint['label']})" if checkpoint.get("label") else ""
-    _write_line(output_stream, f"Restored checkpoint: {checkpoint['checkpoint_id']}{label_text}")
-
-
-def _checkpoint_payload(
-    *,
-    runtime: AgentChatRuntime,
-    label: str,
-) -> dict[str, object]:
-    state = _checkpoint_state_payload(runtime)
-    checkpoint_label = label.strip() or None
-    return {
-        "checkpoint_id": f"ckpt-{uuid4().hex[:8]}",
-        "label": checkpoint_label,
-        "history_count": len(runtime.history or []),
-        "plan_count": len(runtime.plan_items or []),
-        "last_run_id": _last_run_value(runtime, "run_id"),
-        "state": state,
-    }
-
-
-def _checkpoint_state_payload(runtime: AgentChatRuntime) -> dict[str, object]:
-    return {
-        "config": _config_payload(runtime.state.config),
-        "chat_mode": runtime.chat_mode,
-        "pending_planned_task": runtime.pending_planned_task,
-        "history": list(runtime.history or []),
-        "plan_items": plan_items_payload(runtime.plan_items or []),
-        "feedback_items": list(runtime.feedback_items or []),
-        "last_run_payload": runtime.last_run_payload,
-        "last_apply": (
-            runtime.last_apply.to_dict() if runtime.last_apply is not None else None
-        ),
-        "last_rewind": (
-            runtime.last_rewind.to_dict() if runtime.last_rewind is not None else None
-        ),
-        "compaction_summary": runtime.compaction_summary,
-    }
-
-
-def _checkpoint_payloads(transcript_path: Path) -> list[dict[str, object]]:
-    checkpoints: list[dict[str, object]] = []
-    for row in transcript_rows(transcript_path):
-        if row.get("event") != "session_checkpoint":
-            continue
-        payload = row.get("payload")
-        if not isinstance(payload, dict):
-            continue
-        checkpoint = dict(payload)
-        timestamp = row.get("timestamp")
-        if isinstance(timestamp, str):
-            checkpoint["timestamp"] = timestamp
-        checkpoints.append(checkpoint)
-    return checkpoints
-
-
-def _find_checkpoint(transcript_path: Path, selector: str) -> dict[str, object] | None:
-    for checkpoint in reversed(_checkpoint_payloads(transcript_path)):
-        checkpoint_id = checkpoint.get("checkpoint_id")
-        label = checkpoint.get("label")
-        if checkpoint_id == selector or label == selector:
-            return checkpoint
-    return None
-
-
-def _format_checkpoints(checkpoints: list[dict[str, object]]) -> str:
-    if not checkpoints:
-        return "No checkpoints found."
-    lines = [
-        "Checkpoints:",
-        "ID | Label | Tasks | Plan | Last run | Saved",
-        "--- | --- | ---: | ---: | --- | ---",
-    ]
-    for checkpoint in checkpoints:
-        lines.append(
-            " | ".join(
-                [
-                    _checkpoint_text(checkpoint.get("checkpoint_id")),
-                    _checkpoint_text(checkpoint.get("label")),
-                    _checkpoint_text(checkpoint.get("history_count")),
-                    _checkpoint_text(checkpoint.get("plan_count")),
-                    _checkpoint_text(checkpoint.get("last_run_id")),
-                    _checkpoint_text(checkpoint.get("timestamp")),
-                ]
-            )
-        )
-    return "\n".join(lines)
-
-
-def _restore_checkpoint_state(
-    *,
-    runtime: AgentChatRuntime,
-    state: dict[str, object],
-) -> None:
-    config_payload = state.get("config")
-    config = runtime.state.config
-    if isinstance(config_payload, dict):
-        config = _config_from_payload(config_payload, config)
-    runtime.state = dataclass_replace(runtime.state, config=config)
-    runtime.chat_mode = _chat_mode_from_payload(state.get("chat_mode"))
-    runtime.pending_planned_task = _optional_text(state.get("pending_planned_task"))
-    runtime.last_run = None
-    runtime.history = _string_list_from_payload(state.get("history"))
-    runtime.plan_items = plan_items_from_payload(state.get("plan_items"))
-    runtime.feedback_items = _string_list_from_payload(state.get("feedback_items"))
-    runtime.last_run_payload = _dict_or_none(state.get("last_run_payload"))
-    runtime.last_apply = _apply_result_from_state(state.get("last_apply"))
-    runtime.last_rewind = _apply_result_from_state(state.get("last_rewind"))
-    runtime.compaction_summary = _dict_or_none(state.get("compaction_summary"))
-
-
-def _apply_result_from_state(value: object) -> AgentApplyResult | None:
-    if not isinstance(value, dict):
-        return None
-    return _apply_result_from_payload(value)
-
-
-def _dict_or_none(value: object) -> dict[str, object] | None:
-    return dict(value) if isinstance(value, dict) else None
-
-
-def _chat_mode_from_payload(value: object) -> str:
-    return value if value in {"act", "plan"} else "act"
-
-
-def _string_list_from_payload(value: object) -> list[str]:
-    if not isinstance(value, list):
-        return []
-    return [item for item in value if isinstance(item, str)]
-
-
-def _checkpoint_text(value: object) -> str:
-    return "n/a" if value is None else str(value)
-
-
 def _handle_task(
     *,
     runtime: AgentChatRuntime,
@@ -698,7 +523,7 @@ def _handle_task(
             "task": task,
             "plan_items": plan_payload,
             "feedback_items": feedback_payload,
-            "config": _config_payload(runtime.state.config),
+            "config": config_payload(runtime.state.config),
             "matcher_target": task,
         },
         output_stream=output_stream,
@@ -1005,40 +830,6 @@ def _record(runtime: AgentChatRuntime, event: str, payload: dict[str, object]) -
     )
 
 
-def _config_payload(config: AgentCliConfig) -> dict[str, object]:
-    return {
-        "repo": config.repo,
-        "commit": config.commit,
-        "branch": config.branch,
-        "issue_url": config.issue_url,
-        "test_command": config.test_command,
-        "context_provider": config.context_provider,
-        "context_paths": list(config.context_paths),
-        "top_k": config.top_k,
-        "artifacts_dir": config.artifacts_dir,
-        "sandbox_mode": config.sandbox_mode,
-        "sandbox_image": config.sandbox_image,
-        "apply": config.apply,
-        "allow_dirty_apply": config.allow_dirty_apply,
-        "max_retries": config.max_retries,
-        "deepagents_max_context_files": config.deepagents_max_context_files,
-        "deepagents_subagents": config.deepagents_subagents,
-        "deepagents_model": config.deepagents_model,
-        "max_model_responses": config.max_model_responses,
-        "max_model_tokens": config.max_model_tokens,
-        "agent_profile": config.agent_profile,
-        "agent_profile_path": config.agent_profile_path,
-        "agent_profile_description": config.agent_profile_description,
-        "agent_profile_instructions": config.agent_profile_instructions,
-        "agent_profile_instruction_chars": len(config.agent_profile_instructions or ""),
-        "load_agent_instructions": config.load_agent_instructions,
-        "instruction_paths": list(config.instruction_paths),
-        "agent_instruction_files": list(config.agent_instruction_files),
-        "agent_instructions": config.agent_instructions,
-        "agent_instruction_chars": len(config.agent_instructions or ""),
-    }
-
-
 def _runtime_from_transcript(
     *,
     state: AgentChatState,
@@ -1064,23 +855,23 @@ def _runtime_from_transcript(
         if event == "session_start":
             config_payload = payload.get("config")
             if isinstance(config_payload, dict):
-                config = _config_from_payload(config_payload, config)
+                config = config_from_payload(config_payload, config)
         elif event == "context_update":
-            context_paths = _context_paths_from_payload(payload)
+            context_paths = context_paths_from_payload(payload)
             if context_paths is not None:
                 config = dataclass_replace(config, context_paths=context_paths)
         elif event == "config_update":
-            config = _apply_config_update(config, payload)
+            config = apply_config_update(config, payload)
         elif event == "chat_mode_update":
-            chat_mode = _chat_mode_from_payload(payload.get("mode"))
+            chat_mode = chat_mode_from_payload(payload.get("mode"))
         elif event == "plan_mode_task":
-            pending_planned_task = _optional_text(payload.get("task"))
+            pending_planned_task = optional_text(payload.get("task"))
         elif event in {"plan_mode_approval", "plan_mode_cancel"}:
             pending_planned_task = None
         elif event == "plan_update":
             plan_items = plan_items_from_payload(payload.get("items"))
         elif event == "feedback_update":
-            feedback_items = _feedback_items_from_update(
+            feedback_items = feedback_items_from_update(
                 current=feedback_items,
                 payload=payload,
             )
@@ -1092,9 +883,9 @@ def _runtime_from_transcript(
         elif event == "run_result":
             last_run_payload = dict(payload)
         elif event == "apply_result":
-            last_apply = _apply_result_from_payload(payload)
+            last_apply = apply_result_from_payload(payload)
         elif event == "rewind_result":
-            last_rewind = _apply_result_from_payload(payload)
+            last_rewind = apply_result_from_payload(payload)
         elif event == "session_compact":
             history = []
             compaction_summary = dict(payload)
@@ -1112,22 +903,22 @@ def _runtime_from_transcript(
             if isinstance(state_payload, dict):
                 config_payload = state_payload.get("config")
                 if isinstance(config_payload, dict):
-                    config = _config_from_payload(config_payload, config)
-                history = _string_list_from_payload(state_payload.get("history"))
+                    config = config_from_payload(config_payload, config)
+                history = string_list_from_payload(state_payload.get("history"))
                 plan_items = plan_items_from_payload(state_payload.get("plan_items"))
-                feedback_items = _string_list_from_payload(
+                feedback_items = string_list_from_payload(
                     state_payload.get("feedback_items")
                 )
-                last_run_payload = _dict_or_none(state_payload.get("last_run_payload"))
-                last_apply = _apply_result_from_state(state_payload.get("last_apply"))
-                last_rewind = _apply_result_from_state(
+                last_run_payload = dict_or_none(state_payload.get("last_run_payload"))
+                last_apply = apply_result_from_state(state_payload.get("last_apply"))
+                last_rewind = apply_result_from_state(
                     state_payload.get("last_rewind")
                 )
-                chat_mode = _chat_mode_from_payload(state_payload.get("chat_mode"))
-                pending_planned_task = _optional_text(
+                chat_mode = chat_mode_from_payload(state_payload.get("chat_mode"))
+                pending_planned_task = optional_text(
                     state_payload.get("pending_planned_task")
                 )
-                compaction_summary = _dict_or_none(
+                compaction_summary = dict_or_none(
                     state_payload.get("compaction_summary")
                 )
     return AgentChatRuntime(
@@ -1142,337 +933,6 @@ def _runtime_from_transcript(
         plan_items=plan_items,
         feedback_items=feedback_items,
     )
-
-
-def _config_from_payload(
-    payload: dict[str, object],
-    fallback: AgentCliConfig,
-) -> AgentCliConfig:
-    return AgentCliConfig(
-        repo=_payload_str(payload, "repo", fallback.repo),
-        commit=_payload_optional_str(payload, "commit", fallback.commit),
-        branch=_payload_optional_str(payload, "branch", fallback.branch),
-        issue_url=_payload_optional_str(payload, "issue_url", fallback.issue_url),
-        test_command=_payload_optional_str(
-            payload,
-            "test_command",
-            fallback.test_command,
-        ),
-        context_provider=_payload_str(
-            payload,
-            "context_provider",
-            fallback.context_provider,
-        ),
-        context_paths=_context_paths_from_payload(payload) or fallback.context_paths,
-        top_k=_payload_int(payload, "top_k", fallback.top_k),
-        artifacts_dir=_payload_str(payload, "artifacts_dir", fallback.artifacts_dir),
-        sandbox_mode=_payload_str(payload, "sandbox_mode", fallback.sandbox_mode),
-        sandbox_image=_payload_str(payload, "sandbox_image", fallback.sandbox_image),
-        apply=_payload_bool(payload, "apply", fallback.apply),
-        allow_dirty_apply=_payload_bool(
-            payload,
-            "allow_dirty_apply",
-            fallback.allow_dirty_apply,
-        ),
-        max_retries=_payload_int(payload, "max_retries", fallback.max_retries),
-        deepagents_max_context_files=_payload_int(
-            payload,
-            "deepagents_max_context_files",
-            fallback.deepagents_max_context_files,
-        ),
-        deepagents_subagents=_payload_str(
-            payload,
-            "deepagents_subagents",
-            fallback.deepagents_subagents,
-        ),
-        deepagents_model=_payload_optional_str(
-            payload,
-            "deepagents_model",
-            fallback.deepagents_model,
-        ),
-        max_model_responses=_payload_int(
-            payload,
-            "max_model_responses",
-            fallback.max_model_responses,
-        ),
-        max_model_tokens=_payload_int(
-            payload,
-            "max_model_tokens",
-            fallback.max_model_tokens,
-        ),
-        agent_profile=_payload_optional_str(
-            payload,
-            "agent_profile",
-            fallback.agent_profile,
-        ),
-        agent_profile_path=_payload_optional_str(
-            payload,
-            "agent_profile_path",
-            fallback.agent_profile_path,
-        ),
-        agent_profile_description=_payload_optional_str(
-            payload,
-            "agent_profile_description",
-            fallback.agent_profile_description,
-        ),
-        agent_profile_instructions=_payload_optional_str(
-            payload,
-            "agent_profile_instructions",
-            fallback.agent_profile_instructions,
-        ),
-        load_agent_instructions=_payload_bool(
-            payload,
-            "load_agent_instructions",
-            fallback.load_agent_instructions,
-        ),
-        instruction_paths=_tuple_str_field(
-            payload,
-            "instruction_paths",
-            fallback.instruction_paths,
-        ),
-        agent_instruction_files=_tuple_str_field(
-            payload,
-            "agent_instruction_files",
-            fallback.agent_instruction_files,
-        ),
-        agent_instructions=_payload_optional_str(
-            payload,
-            "agent_instructions",
-            fallback.agent_instructions,
-        ),
-    )
-
-
-def _apply_config_update(
-    config: AgentCliConfig,
-    payload: dict[str, object],
-) -> AgentCliConfig:
-    field = payload.get("field")
-    if field == "deepagents_model":
-        value = payload.get("value")
-        return dataclass_replace(
-            config,
-            deepagents_model=value if isinstance(value, str) else None,
-        )
-    if field == "resource_budget":
-        return dataclass_replace(
-            config,
-            max_model_responses=_payload_int(
-                payload,
-                "max_model_responses",
-                config.max_model_responses,
-            ),
-            max_model_tokens=_payload_int(
-                payload,
-                "max_model_tokens",
-                config.max_model_tokens,
-            ),
-        )
-    if field == "permissions":
-        apply_after_run = _payload_bool(payload, "apply", config.apply)
-        return dataclass_replace(
-            config,
-            apply=apply_after_run,
-            allow_dirty_apply=(
-                _payload_bool(
-                    payload,
-                    "allow_dirty_apply",
-                    config.allow_dirty_apply,
-                )
-                if apply_after_run
-                else False
-            ),
-        )
-    if field == "agent_profile":
-        return dataclass_replace(
-            config,
-            agent_profile=_payload_optional_str(
-                payload,
-                "agent_profile",
-                config.agent_profile,
-            ),
-            agent_profile_path=_payload_optional_str(
-                payload,
-                "agent_profile_path",
-                config.agent_profile_path,
-            ),
-            agent_profile_description=_payload_optional_str(
-                payload,
-                "agent_profile_description",
-                config.agent_profile_description,
-            ),
-            agent_profile_instructions=_payload_optional_str(
-                payload,
-                "agent_profile_instructions",
-                config.agent_profile_instructions,
-            ),
-            deepagents_model=_payload_optional_str(
-                payload,
-                "deepagents_model",
-                config.deepagents_model,
-            ),
-            deepagents_subagents=_payload_str(
-                payload,
-                "deepagents_subagents",
-                config.deepagents_subagents,
-            ),
-            deepagents_max_context_files=_payload_int(
-                payload,
-                "deepagents_max_context_files",
-                config.deepagents_max_context_files,
-            ),
-            max_model_responses=_payload_int(
-                payload,
-                "max_model_responses",
-                config.max_model_responses,
-            ),
-            max_model_tokens=_payload_int(
-                payload,
-                "max_model_tokens",
-                config.max_model_tokens,
-            ),
-            top_k=_payload_int(payload, "top_k", config.top_k),
-            test_command=_payload_optional_str(
-                payload,
-                "test_command",
-                config.test_command,
-            ),
-            context_paths=_context_paths_from_payload(payload) or config.context_paths,
-        )
-    if field == "project_instructions":
-        return dataclass_replace(
-            config,
-            load_agent_instructions=_payload_bool(
-                payload,
-                "load_agent_instructions",
-                config.load_agent_instructions,
-            ),
-            instruction_paths=_tuple_str_field(
-                payload,
-                "instruction_paths",
-                config.instruction_paths,
-            ),
-            agent_instruction_files=_tuple_str_field(
-                payload,
-                "agent_instruction_files",
-                config.agent_instruction_files,
-            ),
-            agent_instructions=_payload_optional_str(
-                payload,
-                "agent_instructions",
-                config.agent_instructions,
-            ),
-        )
-    return config
-
-
-def _context_paths_from_payload(payload: dict[str, object]) -> tuple[str, ...] | None:
-    value = payload.get("context_paths")
-    if not isinstance(value, list):
-        return None
-    return tuple(item for item in value if isinstance(item, str))
-
-
-def _feedback_items_from_update(
-    *,
-    current: list[str],
-    payload: dict[str, object],
-) -> list[str]:
-    action = payload.get("action")
-    if action == "clear":
-        return []
-    items = payload.get("items")
-    if isinstance(items, list):
-        return [item for item in items if isinstance(item, str)]
-    item = payload.get("item")
-    if action == "add" and isinstance(item, str):
-        return [*current, item]
-    return current
-
-
-def _tuple_str_field(
-    payload: dict[str, object],
-    key: str,
-    fallback: tuple[str, ...],
-) -> tuple[str, ...]:
-    value = payload.get(key)
-    if not isinstance(value, list):
-        return fallback
-    return tuple(item for item in value if isinstance(item, str))
-
-
-def _apply_result_from_payload(payload: dict[str, object]) -> AgentApplyResult | None:
-    status = payload.get("status")
-    repo_path = payload.get("repo_path")
-    diff_path = payload.get("diff_path")
-    message = payload.get("message")
-    if not isinstance(status, str):
-        return None
-    if not isinstance(repo_path, str):
-        return None
-    if not isinstance(diff_path, str):
-        return None
-    if not isinstance(message, str):
-        return None
-    return AgentApplyResult(
-        status=status,
-        repo_path=repo_path,
-        diff_path=diff_path,
-        message=message,
-        applied=payload.get("applied") is True,
-    )
-
-
-def _payload_str(payload: dict[str, object], key: str, fallback: str) -> str:
-    value = payload.get(key)
-    return value if isinstance(value, str) else fallback
-
-
-def _payload_optional_str(
-    payload: dict[str, object],
-    key: str,
-    fallback: str | None,
-) -> str | None:
-    value = payload.get(key)
-    if value is None:
-        return None if key in payload else fallback
-    return value if isinstance(value, str) else fallback
-
-
-def _payload_int(payload: dict[str, object], key: str, fallback: int) -> int:
-    value = payload.get(key)
-    if isinstance(value, bool):
-        return fallback
-    return value if isinstance(value, int) else fallback
-
-
-def _payload_bool(payload: dict[str, object], key: str, fallback: bool) -> bool:
-    value = payload.get(key)
-    return value if isinstance(value, bool) else fallback
-
-
-def _optional_text(value: object) -> str | None:
-    return None if value is None else str(value)
-
-
-def _last_run_value(runtime: AgentChatRuntime, key: str) -> object | None:
-    if runtime.last_run is not None:
-        value = getattr(runtime.last_run, _result_attribute_for_payload_key(key), None)
-        if value is not None:
-            return value
-    if runtime.last_run_payload is None:
-        return None
-    return runtime.last_run_payload.get(key)
-
-
-def _result_attribute_for_payload_key(key: str) -> str:
-    if key == "final_diff_path":
-        return "final_diff_path"
-    if key == "report_path":
-        return "report_path"
-    if key == "trace_path":
-        return "trace_path"
-    return key
 
 
 def _write_line(output_stream: TextIO, message: str) -> None:
