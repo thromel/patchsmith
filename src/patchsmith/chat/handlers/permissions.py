@@ -6,6 +6,7 @@ from typing import TextIO
 from patchsmith.agent_cli import AgentCliConfig
 from patchsmith.agent_permissions import format_permissions, permission_state
 from patchsmith.chat.commands import ChatCommand, ChatCommandContext
+from patchsmith.chat.formatting import write_line
 from patchsmith.chat.state import AgentChatRuntime
 
 
@@ -35,7 +36,7 @@ def handle_permissions_command(
             "permission_view",
             permission_state(runtime.state.config).to_dict(),
         )
-        _write_line(output_stream, format_permissions(runtime.state.config))
+        write_line(output_stream, format_permissions(runtime.state.config))
         return
     if action == "apply":
         next_value = _parse_apply_permission(value, output_stream)
@@ -46,7 +47,7 @@ def handle_permissions_command(
             apply_after_run=next_value,
             context=context,
         )
-        _write_line(output_stream, format_permissions(runtime.state.config))
+        write_line(output_stream, format_permissions(runtime.state.config))
         return
     if action == "dirty":
         next_value = _parse_dirty_permission(
@@ -61,9 +62,9 @@ def handle_permissions_command(
             allow_dirty_apply=next_value,
             context=context,
         )
-        _write_line(output_stream, format_permissions(runtime.state.config))
+        write_line(output_stream, format_permissions(runtime.state.config))
         return
-    _write_line(
+    write_line(
         output_stream,
         "Usage: /permissions [show|apply auto|apply manual|dirty allow|dirty deny]",
     )
@@ -74,7 +75,7 @@ def _parse_apply_permission(raw: str, output_stream: TextIO) -> bool | None:
         return True
     if raw in {"manual", "off", "false"}:
         return False
-    _write_line(output_stream, "Usage: /permissions apply [auto|manual]")
+    write_line(output_stream, "Usage: /permissions apply [auto|manual]")
     return None
 
 
@@ -88,13 +89,13 @@ def _parse_dirty_permission(
         return False
     if raw in {"allow", "allowed", "on", "true"}:
         if not config.apply:
-            _write_line(
+            write_line(
                 output_stream,
                 "Enable auto apply before allowing dirty apply: /permissions apply auto",
             )
             return None
         return True
-    _write_line(output_stream, "Usage: /permissions dirty [allow|deny]")
+    write_line(output_stream, "Usage: /permissions dirty [allow|deny]")
     return None
 
 
@@ -135,8 +136,3 @@ def _permission_update_payload(config: AgentCliConfig) -> dict[str, object]:
         "apply": config.apply,
         "allow_dirty_apply": config.allow_dirty_apply,
     }
-
-
-def _write_line(output_stream: TextIO, message: str) -> None:
-    output_stream.write(f"{message}\n")
-    output_stream.flush()

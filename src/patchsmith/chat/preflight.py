@@ -7,6 +7,7 @@ from patchsmith.agent_cli import (
     agent_preflight_payload,
     validate_agent_cli_config,
 )
+from patchsmith.chat.formatting import write_line
 
 
 def preflight_payload(
@@ -36,12 +37,7 @@ def print_checks(checks: object, output_stream: TextIO) -> None:
         return
     for check in checks:
         if isinstance(check, dict):
-            _write_line(
+            write_line(
                 output_stream,
                 f"- {check['name']}: {check['status']} - {check['message']}",
             )
-
-
-def _write_line(output_stream: TextIO, message: str) -> None:
-    output_stream.write(f"{message}\n")
-    output_stream.flush()

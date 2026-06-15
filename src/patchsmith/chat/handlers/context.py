@@ -4,6 +4,7 @@ from dataclasses import replace as dataclass_replace
 from typing import TextIO
 
 from patchsmith.chat.commands import ChatCommand, ChatCommandContext
+from patchsmith.chat.formatting import write_line
 from patchsmith.chat.state import AgentChatRuntime
 
 
@@ -32,7 +33,7 @@ def handle_context_command(
         return
     if action == "add":
         if not context_path:
-            _write_line(output_stream, "Usage: /context add <repo-relative-path[#symbol]>")
+            write_line(output_stream, "Usage: /context add <repo-relative-path[#symbol]>")
             return
         _add_context_path(
             runtime=runtime,
@@ -43,7 +44,7 @@ def handle_context_command(
         return
     if action in {"remove", "rm"}:
         if not context_path:
-            _write_line(output_stream, "Usage: /context remove <repo-relative-path[#symbol]>")
+            write_line(output_stream, "Usage: /context remove <repo-relative-path[#symbol]>")
             return
         _remove_context_path(
             runtime=runtime,
@@ -54,10 +55,10 @@ def handle_context_command(
         return
     if action == "clear":
         _set_context_paths(runtime=runtime, context_paths=())
-        _write_line(output_stream, "Context hints cleared.")
+        write_line(output_stream, "Context hints cleared.")
         context.record(runtime, "context_update", {"action": "clear", "context_paths": []})
         return
-    _write_line(output_stream, "Usage: /context [show|add|remove|clear] [path]")
+    write_line(output_stream, "Usage: /context [show|add|remove|clear] [path]")
 
 
 def _add_context_path(
@@ -69,11 +70,11 @@ def _add_context_path(
 ) -> None:
     context_paths = runtime.state.config.context_paths
     if context_path in context_paths:
-        _write_line(output_stream, f"Context already includes: {context_path}")
+        write_line(output_stream, f"Context already includes: {context_path}")
         return
     updated = (*context_paths, context_path)
     _set_context_paths(runtime=runtime, context_paths=updated)
-    _write_line(output_stream, f"Added context: {context_path}")
+    write_line(output_stream, f"Added context: {context_path}")
     context.record(
         runtime,
         "context_update",
@@ -90,11 +91,11 @@ def _remove_context_path(
 ) -> None:
     context_paths = runtime.state.config.context_paths
     if context_path not in context_paths:
-        _write_line(output_stream, f"Context hint not found: {context_path}")
+        write_line(output_stream, f"Context hint not found: {context_path}")
         return
     updated = tuple(path for path in context_paths if path != context_path)
     _set_context_paths(runtime=runtime, context_paths=updated)
-    _write_line(output_stream, f"Removed context: {context_path}")
+    write_line(output_stream, f"Removed context: {context_path}")
     context.record(
         runtime,
         "context_update",
@@ -121,13 +122,8 @@ def _set_context_paths(
 def _print_context(*, runtime: AgentChatRuntime, output_stream: TextIO) -> None:
     context_paths = runtime.state.config.context_paths
     if not context_paths:
-        _write_line(output_stream, "No forced context hints.")
+        write_line(output_stream, "No forced context hints.")
         return
-    _write_line(output_stream, "Forced context hints:")
+    write_line(output_stream, "Forced context hints:")
     for index, context_path in enumerate(context_paths, start=1):
-        _write_line(output_stream, f"{index}. {context_path}")
-
-
-def _write_line(output_stream: TextIO, message: str) -> None:
-    output_stream.write(f"{message}\n")
-    output_stream.flush()
+        write_line(output_stream, f"{index}. {context_path}")

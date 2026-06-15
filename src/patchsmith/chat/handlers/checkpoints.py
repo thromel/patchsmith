@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from patchsmith.agent_session import transcript_rows
 from patchsmith.chat.commands import ChatCommand, ChatCommandContext
+from patchsmith.chat.formatting import write_line
 from patchsmith.chat.session_payloads import (
     checkpoint_state_payload,
     last_run_value,
@@ -44,7 +45,7 @@ def handle_checkpoint_command(
     payload = _checkpoint_payload(runtime=runtime, label=argument)
     context.record(runtime, "session_checkpoint", payload)
     label_text = f" ({payload['label']})" if payload["label"] else ""
-    _write_line(output_stream, f"Checkpoint saved: {payload['checkpoint_id']}{label_text}")
+    write_line(output_stream, f"Checkpoint saved: {payload['checkpoint_id']}{label_text}")
 
 
 def handle_checkpoints_command(
@@ -56,7 +57,7 @@ def handle_checkpoints_command(
 ) -> None:
     checkpoints = _checkpoint_payloads(runtime.state.transcript_path)
     context.record(runtime, "session_checkpoint_list", {"count": len(checkpoints)})
-    _write_line(output_stream, _format_checkpoints(checkpoints))
+    write_line(output_stream, _format_checkpoints(checkpoints))
 
 
 def handle_restore_command(
@@ -68,15 +69,15 @@ def handle_restore_command(
 ) -> None:
     value = argument.strip()
     if not value:
-        _write_line(output_stream, "Usage: /restore <checkpoint-id-or-label>")
+        write_line(output_stream, "Usage: /restore <checkpoint-id-or-label>")
         return
     checkpoint = _find_checkpoint(runtime.state.transcript_path, value)
     if checkpoint is None:
-        _write_line(output_stream, f"Checkpoint not found: {value}")
+        write_line(output_stream, f"Checkpoint not found: {value}")
         return
     state = checkpoint.get("state")
     if not isinstance(state, dict):
-        _write_line(output_stream, f"Checkpoint has no restorable state: {value}")
+        write_line(output_stream, f"Checkpoint has no restorable state: {value}")
         return
     restore_checkpoint_state(runtime=runtime, state=state)
     payload = {
@@ -86,7 +87,7 @@ def handle_restore_command(
     }
     context.record(runtime, "session_restore", payload)
     label_text = f" ({checkpoint['label']})" if checkpoint.get("label") else ""
-    _write_line(output_stream, f"Restored checkpoint: {checkpoint['checkpoint_id']}{label_text}")
+    write_line(output_stream, f"Restored checkpoint: {checkpoint['checkpoint_id']}{label_text}")
 
 
 def _checkpoint_payload(
@@ -157,8 +158,3 @@ def _format_checkpoints(checkpoints: list[dict[str, object]]) -> str:
 
 def _checkpoint_text(value: object) -> str:
     return "n/a" if value is None else str(value)
-
-
-def _write_line(output_stream: TextIO, message: str) -> None:
-    output_stream.write(f"{message}\n")
-    output_stream.flush()

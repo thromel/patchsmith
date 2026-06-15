@@ -11,6 +11,7 @@ from patchsmith.agent_instructions import (
     load_agent_instruction_bundle,
 )
 from patchsmith.chat.commands import ChatCommand, ChatCommandContext
+from patchsmith.chat.formatting import write_line
 from patchsmith.chat.state import AgentChatRuntime
 
 
@@ -100,7 +101,7 @@ def _handle_instruction_surface(
             },
         )
         formatter = format_agent_memory if surface == "memory" else format_agent_instructions
-        _write_line(output_stream, formatter(bundle))
+        write_line(output_stream, formatter(bundle))
         return
     if surface == "memory" and action.startswith("add "):
         _handle_memory_add(
@@ -121,8 +122,8 @@ def _handle_instruction_surface(
         )
         runtime.state = dataclass_replace(runtime.state, config=updated_config)
         context.record(runtime, "config_update", instruction_update_payload(updated_config))
-        _write_line(output_stream, f"Project {label} reloaded.")
-        _write_line(
+        write_line(output_stream, f"Project {label} reloaded.")
+        write_line(
             output_stream,
             f"Loaded instruction files: {len(updated_config.agent_instruction_files)}",
         )
@@ -136,12 +137,12 @@ def _handle_instruction_surface(
         )
         runtime.state = dataclass_replace(runtime.state, config=updated_config)
         context.record(runtime, "config_update", instruction_update_payload(updated_config))
-        _write_line(output_stream, f"Project {label} disabled for later runs.")
+        write_line(output_stream, f"Project {label} disabled for later runs.")
         return
     usage = f"Usage: {command} [show|reload|clear]"
     if surface == "memory":
         usage = f"Usage: {command} [show|reload|clear|add <note>]"
-    _write_line(output_stream, usage)
+    write_line(output_stream, usage)
 
 
 def _handle_memory_add(
@@ -152,12 +153,12 @@ def _handle_memory_add(
     context: ChatCommandContext,
 ) -> None:
     if not note:
-        _write_line(output_stream, "Usage: /memory add <note>")
+        write_line(output_stream, "Usage: /memory add <note>")
         return
     try:
         update = append_agent_memory_note(runtime.state.config.repo, note)
     except ValueError as exc:
-        _write_line(output_stream, f"Project memory update failed: {exc}")
+        write_line(output_stream, f"Project memory update failed: {exc}")
         context.record(
             runtime,
             "memory_update",
@@ -180,12 +181,7 @@ def _handle_memory_add(
     context.record(runtime, "memory_update", payload)
     context.record(runtime, "config_update", instruction_update_payload(updated_config))
     if update.already_present:
-        _write_line(output_stream, f"Project memory already had note: {update.note}")
+        write_line(output_stream, f"Project memory already had note: {update.note}")
     else:
-        _write_line(output_stream, f"Project memory added: {update.note}")
-    _write_line(output_stream, f"Memory file: {update.repo_relative_path}")
-
-
-def _write_line(output_stream: TextIO, message: str) -> None:
-    output_stream.write(f"{message}\n")
-    output_stream.flush()
+        write_line(output_stream, f"Project memory added: {update.note}")
+    write_line(output_stream, f"Memory file: {update.repo_relative_path}")

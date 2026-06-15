@@ -5,6 +5,7 @@ from typing import TextIO
 from patchsmith.agent_plan import plan_items_payload
 from patchsmith.agent_session import session_usage_payload
 from patchsmith.chat.commands import ChatCommand, ChatCommandContext
+from patchsmith.chat.formatting import write_line
 from patchsmith.chat.handlers.model_budget import budget_label, model_label
 from patchsmith.chat.session_payloads import last_run_value, optional_text
 from patchsmith.chat.state import AgentChatRuntime
@@ -41,49 +42,49 @@ def handle_status_command(
     context: ChatCommandContext,
 ) -> None:
     config = runtime.state.config
-    _write_line(output_stream, f"Session: {runtime.state.session_id}")
-    _write_line(output_stream, f"Chat mode: {runtime.chat_mode}")
+    write_line(output_stream, f"Session: {runtime.state.session_id}")
+    write_line(output_stream, f"Chat mode: {runtime.chat_mode}")
     if runtime.pending_planned_task:
-        _write_line(output_stream, f"Pending planned task: {runtime.pending_planned_task}")
+        write_line(output_stream, f"Pending planned task: {runtime.pending_planned_task}")
     else:
-        _write_line(output_stream, "Pending planned task: none")
-    _write_line(output_stream, f"Repo: {config.repo}")
-    _write_line(output_stream, f"Context provider: {config.context_provider}")
-    _write_line(output_stream, f"Model override: {model_label(config)}")
-    _write_line(output_stream, f"Agent profile: {config.agent_profile or 'none'}")
-    _write_line(
+        write_line(output_stream, "Pending planned task: none")
+    write_line(output_stream, f"Repo: {config.repo}")
+    write_line(output_stream, f"Context provider: {config.context_provider}")
+    write_line(output_stream, f"Model override: {model_label(config)}")
+    write_line(output_stream, f"Agent profile: {config.agent_profile or 'none'}")
+    write_line(
         output_stream,
         f"Project instructions: {len(config.agent_instruction_files)} file(s)",
     )
-    _write_line(output_stream, f"Session plan items: {len(runtime.plan_items or [])}")
-    _write_line(output_stream, f"Session feedback items: {len(runtime.feedback_items or [])}")
-    _write_line(output_stream, f"Budget: {budget_label(config)}")
+    write_line(output_stream, f"Session plan items: {len(runtime.plan_items or [])}")
+    write_line(output_stream, f"Session feedback items: {len(runtime.feedback_items or [])}")
+    write_line(output_stream, f"Budget: {budget_label(config)}")
     if config.context_paths:
-        _write_line(output_stream, f"Context hints: {', '.join(config.context_paths)}")
+        write_line(output_stream, f"Context hints: {', '.join(config.context_paths)}")
     else:
-        _write_line(output_stream, "Context hints: none")
-    _write_line(output_stream, f"Top K: {config.top_k}")
-    _write_line(output_stream, f"Apply by default: {str(config.apply).lower()}")
-    _write_line(
+        write_line(output_stream, "Context hints: none")
+    write_line(output_stream, f"Top K: {config.top_k}")
+    write_line(output_stream, f"Apply by default: {str(config.apply).lower()}")
+    write_line(
         output_stream,
         f"Dirty apply allowed: {str(config.allow_dirty_apply).lower()}",
     )
-    _write_line(output_stream, f"Transcript: {runtime.state.transcript_path}")
+    write_line(output_stream, f"Transcript: {runtime.state.transcript_path}")
     if runtime.compaction_summary is not None:
         compacted = runtime.compaction_summary.get("compacted_task_count")
-        _write_line(output_stream, f"Last compaction: {compacted} task(s)")
+        write_line(output_stream, f"Last compaction: {compacted} task(s)")
     last_run_id = last_run_value(runtime, "run_id")
     if last_run_id is None:
-        _write_line(output_stream, "Last run: none")
+        write_line(output_stream, "Last run: none")
         return
-    _write_line(output_stream, f"Last run: {last_run_id}")
-    _write_line(output_stream, f"Last status: {last_run_value(runtime, 'status')}")
-    _write_line(output_stream, f"Last report: {last_run_value(runtime, 'report_path')}")
-    _write_line(output_stream, f"Last diff: {last_run_value(runtime, 'final_diff_path')}")
+    write_line(output_stream, f"Last run: {last_run_id}")
+    write_line(output_stream, f"Last status: {last_run_value(runtime, 'status')}")
+    write_line(output_stream, f"Last report: {last_run_value(runtime, 'report_path')}")
+    write_line(output_stream, f"Last diff: {last_run_value(runtime, 'final_diff_path')}")
     if runtime.last_apply is not None:
-        _write_line(output_stream, f"Last apply: {runtime.last_apply.status}")
+        write_line(output_stream, f"Last apply: {runtime.last_apply.status}")
     if runtime.last_rewind is not None:
-        _write_line(output_stream, f"Last rewind: {runtime.last_rewind.status}")
+        write_line(output_stream, f"Last rewind: {runtime.last_rewind.status}")
 
 
 def handle_history_command(
@@ -96,13 +97,13 @@ def handle_history_command(
     if not runtime.history:
         if runtime.compaction_summary is not None:
             compacted = runtime.compaction_summary.get("compacted_task_count")
-            _write_line(output_stream, "No tasks since last compaction.")
-            _write_line(output_stream, f"Last compaction summarized {compacted} task(s).")
+            write_line(output_stream, "No tasks since last compaction.")
+            write_line(output_stream, f"Last compaction summarized {compacted} task(s).")
             return
-        _write_line(output_stream, "No tasks in this session yet.")
+        write_line(output_stream, "No tasks in this session yet.")
         return
     for index, task in enumerate(runtime.history, start=1):
-        _write_line(output_stream, f"{index}. {task}")
+        write_line(output_stream, f"{index}. {task}")
 
 
 def handle_mode_command(
@@ -114,7 +115,7 @@ def handle_mode_command(
 ) -> None:
     value = argument.strip().lower()
     if not value:
-        _write_line(output_stream, f"Chat mode: {runtime.chat_mode}")
+        write_line(output_stream, f"Chat mode: {runtime.chat_mode}")
         return
     aliases = {
         "act": "act",
@@ -125,17 +126,17 @@ def handle_mode_command(
     }
     mode = aliases.get(value)
     if mode is None:
-        _write_line(output_stream, "Usage: /mode [act|plan]")
+        write_line(output_stream, "Usage: /mode [act|plan]")
         return
     runtime.chat_mode = mode
     context.record(runtime, "chat_mode_update", {"mode": mode})
     if mode == "plan":
-        _write_line(
+        write_line(
             output_stream,
             "Chat mode: plan. Plain text runs /preflight; use /run <task> to execute.",
         )
         return
-    _write_line(output_stream, "Chat mode: act. Plain text runs the repair loop.")
+    write_line(output_stream, "Chat mode: act. Plain text runs the repair loop.")
 
 
 def handle_cancel_command(
@@ -147,15 +148,15 @@ def handle_cancel_command(
 ) -> None:
     value = argument.strip().lower()
     if value not in {"", "plan", "planned", "planned task", "task"}:
-        _write_line(output_stream, "Usage: /cancel [plan]")
+        write_line(output_stream, "Usage: /cancel [plan]")
         return
     task = runtime.pending_planned_task
     if task is None:
-        _write_line(output_stream, "No pending planned task.")
+        write_line(output_stream, "No pending planned task.")
         return
     runtime.pending_planned_task = None
     context.record(runtime, "plan_mode_cancel", {"task": task})
-    _write_line(output_stream, f"Cancelled planned task: {task}")
+    write_line(output_stream, f"Cancelled planned task: {task}")
 
 
 def handle_clear_command(
@@ -175,7 +176,7 @@ def handle_clear_command(
     }
     _clear_runtime_state(runtime)
     context.record(runtime, "session_clear", payload)
-    _write_line(output_stream, "Session state cleared. Transcript retained.")
+    write_line(output_stream, "Session state cleared. Transcript retained.")
 
 
 def handle_compact_command(
@@ -190,11 +191,11 @@ def handle_compact_command(
     runtime.last_task = None
     runtime.history = []
     context.record(runtime, "session_compact", payload)
-    _write_line(
+    write_line(
         output_stream,
         f"Session compacted. Summarized {payload['compacted_task_count']} task(s).",
     )
-    _write_line(output_stream, "Last run artifact pointers were preserved.")
+    write_line(output_stream, "Last run artifact pointers were preserved.")
 
 
 def _clear_runtime_state(runtime: AgentChatRuntime) -> None:
@@ -236,8 +237,3 @@ def _compaction_payload(
         "last_report_path": optional_text(last_run_value(runtime, "report_path")),
         "last_diff_path": optional_text(last_run_value(runtime, "final_diff_path")),
     }
-
-
-def _write_line(output_stream: TextIO, message: str) -> None:
-    output_stream.write(f"{message}\n")
-    output_stream.flush()

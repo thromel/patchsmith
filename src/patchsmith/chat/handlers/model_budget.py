@@ -5,6 +5,7 @@ from typing import TextIO
 
 from patchsmith.agent_cli import AgentCliConfig
 from patchsmith.chat.commands import ChatCommand, ChatCommandContext
+from patchsmith.chat.formatting import write_line
 from patchsmith.chat.state import AgentChatRuntime
 
 
@@ -32,14 +33,14 @@ def handle_model_command(
 ) -> None:
     value = argument.strip()
     if not value:
-        _write_line(output_stream, f"Model override: {model_label(runtime.state.config)}")
+        write_line(output_stream, f"Model override: {model_label(runtime.state.config)}")
         return
     if value.lower() == "clear":
         _set_model_override(runtime=runtime, model=None, context=context)
-        _write_line(output_stream, "Model override cleared.")
+        write_line(output_stream, "Model override cleared.")
         return
     _set_model_override(runtime=runtime, model=value, context=context)
-    _write_line(output_stream, f"Model override: {value}")
+    write_line(output_stream, f"Model override: {value}")
 
 
 def handle_budget_command(
@@ -51,7 +52,7 @@ def handle_budget_command(
 ) -> None:
     parts = argument.split()
     if not parts:
-        _write_line(output_stream, f"Budget: {budget_label(runtime.state.config)}")
+        write_line(output_stream, f"Budget: {budget_label(runtime.state.config)}")
         return
     action = parts[0].lower()
     config = runtime.state.config
@@ -62,7 +63,7 @@ def handle_budget_command(
             max_model_tokens=-1,
             context=context,
         )
-        _write_line(output_stream, f"Budget: {budget_label(runtime.state.config)}")
+        write_line(output_stream, f"Budget: {budget_label(runtime.state.config)}")
         return
     if action == "responses" and len(parts) == 2:
         responses = _parse_budget_value(parts[1], "responses", output_stream)
@@ -74,7 +75,7 @@ def handle_budget_command(
             max_model_tokens=config.max_model_tokens,
             context=context,
         )
-        _write_line(output_stream, f"Budget: {budget_label(runtime.state.config)}")
+        write_line(output_stream, f"Budget: {budget_label(runtime.state.config)}")
         return
     if action == "tokens" and len(parts) == 2:
         tokens = _parse_budget_value(parts[1], "tokens", output_stream)
@@ -86,7 +87,7 @@ def handle_budget_command(
             max_model_tokens=tokens,
             context=context,
         )
-        _write_line(output_stream, f"Budget: {budget_label(runtime.state.config)}")
+        write_line(output_stream, f"Budget: {budget_label(runtime.state.config)}")
         return
     if action == "set" and len(parts) == 3:
         responses = _parse_budget_value(parts[1], "responses", output_stream)
@@ -99,9 +100,9 @@ def handle_budget_command(
             max_model_tokens=tokens,
             context=context,
         )
-        _write_line(output_stream, f"Budget: {budget_label(runtime.state.config)}")
+        write_line(output_stream, f"Budget: {budget_label(runtime.state.config)}")
         return
-    _write_line(
+    write_line(
         output_stream,
         "Usage: /budget [responses <n>|tokens <n>|set <responses> <tokens>|clear]",
     )
@@ -137,10 +138,10 @@ def _parse_budget_value(
     try:
         value = int(raw)
     except ValueError:
-        _write_line(output_stream, f"{label} must be an integer.")
+        write_line(output_stream, f"{label} must be an integer.")
         return None
     if value < -1:
-        _write_line(output_stream, f"{label} must be -1 or non-negative.")
+        write_line(output_stream, f"{label} must be -1 or non-negative.")
         return None
     return value
 
@@ -171,8 +172,3 @@ def _set_budget(
 
 def _budget_value_label(value: int) -> str:
     return "unlimited" if value < 0 else str(value)
-
-
-def _write_line(output_stream: TextIO, message: str) -> None:
-    output_stream.write(f"{message}\n")
-    output_stream.flush()

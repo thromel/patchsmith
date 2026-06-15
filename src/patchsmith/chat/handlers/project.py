@@ -15,6 +15,7 @@ from patchsmith.agent_profiles import (
 )
 from patchsmith.agent_session import format_session_summaries, list_session_summaries
 from patchsmith.chat.commands import ChatCommand, ChatCommandContext
+from patchsmith.chat.formatting import write_line
 from patchsmith.chat.state import AgentChatRuntime
 
 
@@ -66,7 +67,7 @@ def handle_sessions_command(
             "artifacts_dir": runtime.state.config.artifacts_dir,
         },
     )
-    _write_line(output_stream, format_session_summaries(summaries))
+    write_line(output_stream, format_session_summaries(summaries))
 
 
 def handle_commands_command(
@@ -86,7 +87,7 @@ def handle_commands_command(
             "command_root": ".patchsmith/commands",
         },
     )
-    _write_line(output_stream, format_custom_commands(commands))
+    write_line(output_stream, format_custom_commands(commands))
 
 
 def handle_hooks_command(
@@ -106,7 +107,7 @@ def handle_hooks_command(
             "hook_config": ".patchsmith/hooks.json",
         },
     )
-    _write_line(output_stream, format_agent_hooks(hooks))
+    write_line(output_stream, format_agent_hooks(hooks))
 
 
 def handle_agent_profiles_command(
@@ -126,7 +127,7 @@ def handle_agent_profiles_command(
             "profile_root": ".patchsmith/agents",
         },
     )
-    _write_line(output_stream, format_agent_profiles(profiles))
+    write_line(output_stream, format_agent_profiles(profiles))
 
 
 def handle_agent_profile_command(
@@ -142,17 +143,17 @@ def handle_agent_profile_command(
         return
     if action == "clear":
         _set_agent_profile(runtime=runtime, profile=None, context=context)
-        _write_line(output_stream, "Agent profile cleared.")
+        write_line(output_stream, "Agent profile cleared.")
         return
     profile = load_agent_profile(runtime.state.config.repo, action)
     if profile is None:
-        _write_line(output_stream, f"Agent profile not found: {action}")
-        _write_line(output_stream, "Use /agents to list project profiles.")
+        write_line(output_stream, f"Agent profile not found: {action}")
+        write_line(output_stream, "Use /agents to list project profiles.")
         return
     _set_agent_profile(runtime=runtime, profile=profile, context=context)
-    _write_line(output_stream, f"Agent profile: /{profile.name}")
+    write_line(output_stream, f"Agent profile: /{profile.name}")
     if profile.description:
-        _write_line(output_stream, f"Description: {profile.description}")
+        write_line(output_stream, f"Description: {profile.description}")
 
 
 def _print_agent_profile(
@@ -162,13 +163,13 @@ def _print_agent_profile(
 ) -> None:
     config = runtime.state.config
     if not config.agent_profile:
-        _write_line(output_stream, "Agent profile: none")
+        write_line(output_stream, "Agent profile: none")
         return
-    _write_line(output_stream, f"Agent profile: /{config.agent_profile}")
+    write_line(output_stream, f"Agent profile: /{config.agent_profile}")
     if config.agent_profile_description:
-        _write_line(output_stream, f"Description: {config.agent_profile_description}")
+        write_line(output_stream, f"Description: {config.agent_profile_description}")
     if config.agent_profile_path:
-        _write_line(output_stream, f"Source: {config.agent_profile_path}")
+        write_line(output_stream, f"Source: {config.agent_profile_path}")
 
 
 def _set_agent_profile(
@@ -245,8 +246,3 @@ def _merged_context_paths(
     added: tuple[str, ...],
 ) -> tuple[str, ...]:
     return tuple(dict.fromkeys((*existing, *added)))
-
-
-def _write_line(output_stream: TextIO, message: str) -> None:
-    output_stream.write(f"{message}\n")
-    output_stream.flush()

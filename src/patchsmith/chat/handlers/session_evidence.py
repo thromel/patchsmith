@@ -21,6 +21,7 @@ from patchsmith.agent_session import (
     session_usage_payload,
 )
 from patchsmith.chat.commands import ChatCommand, ChatCommandContext
+from patchsmith.chat.formatting import write_line
 from patchsmith.chat.state import AgentChatRuntime
 
 
@@ -67,19 +68,19 @@ def handle_cost_command(
 ) -> None:
     payload = session_usage_payload(runtime.state.transcript_path)
     context.record(runtime, "session_usage", payload)
-    _write_line(output_stream, "Session usage:")
-    _write_line(output_stream, f"Tasks: {payload['task_count']}")
-    _write_line(output_stream, f"Runs: {payload['run_count']}")
-    _write_line(output_stream, f"Validated runs: {payload['validated_run_count']}")
-    _write_line(output_stream, f"Run errors: {payload['run_error_count']}")
-    _write_line(output_stream, f"Model calls: {payload['model_call_count']}")
-    _write_line(output_stream, f"Model responses: {payload['model_response_count']}")
-    _write_line(output_stream, f"Model tokens: {payload['model_total_tokens']}")
+    write_line(output_stream, "Session usage:")
+    write_line(output_stream, f"Tasks: {payload['task_count']}")
+    write_line(output_stream, f"Runs: {payload['run_count']}")
+    write_line(output_stream, f"Validated runs: {payload['validated_run_count']}")
+    write_line(output_stream, f"Run errors: {payload['run_error_count']}")
+    write_line(output_stream, f"Model calls: {payload['model_call_count']}")
+    write_line(output_stream, f"Model responses: {payload['model_response_count']}")
+    write_line(output_stream, f"Model tokens: {payload['model_total_tokens']}")
     cost = payload["estimated_cost_usd"]
     if isinstance(cost, int | float):
-        _write_line(output_stream, f"Estimated cost: ${cost:.6f}")
+        write_line(output_stream, f"Estimated cost: ${cost:.6f}")
     else:
-        _write_line(output_stream, "Estimated cost: n/a")
+        write_line(output_stream, "Estimated cost: n/a")
 
 
 def handle_metrics_command(
@@ -91,7 +92,7 @@ def handle_metrics_command(
 ) -> None:
     metrics = session_metrics(runtime.state.transcript_path)
     context.record(runtime, "session_metrics", metrics.to_dict())
-    _write_line(output_stream, format_session_metrics(metrics))
+    write_line(output_stream, format_session_metrics(metrics))
 
 
 def handle_timeline_command(
@@ -114,7 +115,7 @@ def handle_timeline_command(
             "entries": [entry.to_dict() for entry in entries],
         },
     )
-    _write_line(output_stream, format_session_timeline(entries))
+    write_line(output_stream, format_session_timeline(entries))
 
 
 def handle_next_command(
@@ -126,7 +127,7 @@ def handle_next_command(
 ) -> None:
     recommendation = session_recommendation(runtime.state.transcript_path)
     context.record(runtime, "session_next", recommendation.to_dict())
-    _write_line(output_stream, format_session_recommendation(recommendation))
+    write_line(output_stream, format_session_recommendation(recommendation))
 
 
 def handle_gate_command(
@@ -138,8 +139,8 @@ def handle_gate_command(
 ) -> None:
     config, error = _chat_gate_config(argument)
     if error:
-        _write_line(output_stream, error)
-        _write_line(
+        write_line(output_stream, error)
+        write_line(
             output_stream,
             "Usage: /gate [validated|clean|reviewed|applied|cost <usd>]",
         )
@@ -154,7 +155,7 @@ def handle_gate_command(
             "gate": result.to_dict(),
         },
     )
-    _write_line(output_stream, format_session_gate(result))
+    write_line(output_stream, format_session_gate(result))
 
 
 def handle_run_evidence_command(
@@ -165,11 +166,11 @@ def handle_run_evidence_command(
     context: ChatCommandContext,
 ) -> None:
     if runtime.last_run_payload is None:
-        _write_line(output_stream, "No run evidence is available.")
+        write_line(output_stream, "No run evidence is available.")
         return
     evidence = summarize_agent_run_evidence(runtime.last_run_payload)
     context.record(runtime, "run_evidence", evidence.to_dict())
-    _write_line(output_stream, format_agent_run_evidence(evidence))
+    write_line(output_stream, format_agent_run_evidence(evidence))
 
 
 def handle_export_command(
@@ -192,7 +193,7 @@ def handle_export_command(
             "transcript_path": str(export.transcript_path),
         },
     )
-    _write_line(output_stream, f"Exported session report: {export.report_path}")
+    write_line(output_stream, f"Exported session report: {export.report_path}")
 
 
 def _parse_timeline_limit(argument: str, output_stream: TextIO) -> int | None:
@@ -202,10 +203,10 @@ def _parse_timeline_limit(argument: str, output_stream: TextIO) -> int | None:
     try:
         limit = int(value)
     except ValueError:
-        _write_line(output_stream, "Usage: /timeline [1-100]")
+        write_line(output_stream, "Usage: /timeline [1-100]")
         return None
     if limit < 1 or limit > 100:
-        _write_line(output_stream, "timeline limit must be between 1 and 100.")
+        write_line(output_stream, "timeline limit must be between 1 and 100.")
         return None
     return limit
 
@@ -251,8 +252,3 @@ def _chat_gate_config(argument: str) -> tuple[AgentSessionGateConfig, str | None
             max_run_errors=0,
         ), None
     return AgentSessionGateConfig(), f"Unknown gate profile: {argument.strip()}"
-
-
-def _write_line(output_stream: TextIO, message: str) -> None:
-    output_stream.write(f"{message}\n")
-    output_stream.flush()

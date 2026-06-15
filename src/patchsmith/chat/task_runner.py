@@ -12,6 +12,7 @@ from patchsmith.agent_cli import (
 )
 from patchsmith.agent_plan import agent_plan_context, plan_items_payload
 from patchsmith.chat.commands import ChatEventRecorder, ChatHookRunner
+from patchsmith.chat.formatting import write_line
 from patchsmith.chat.handlers.session_plan import agent_feedback_context
 from patchsmith.chat.preflight import preflight_payload
 from patchsmith.chat.session_payloads import config_payload
@@ -80,7 +81,7 @@ def run_chat_task(
         task=issue_text,
     )
     if preflight_error:
-        _write_line(output_stream, preflight_error)
+        write_line(output_stream, preflight_error)
         record(
             runtime,
             "run_preflight_error",
@@ -95,7 +96,7 @@ def run_chat_task(
             "preflight": run_preflight,
         },
     )
-    _write_line(output_stream, f"Run preflight: {run_preflight['status']}")
+    write_line(output_stream, f"Run preflight: {run_preflight['status']}")
     if model_preflight_checker is not None and not _run_model_preflight(
         runtime=runtime,
         output_stream=output_stream,
@@ -103,7 +104,7 @@ def run_chat_task(
         record=record,
     ):
         return
-    _write_line(output_stream, "Running PatchSmith agent...")
+    write_line(output_stream, "Running PatchSmith agent...")
     try:
         chat_run = run_agent_once(
             config=_chat_run_config(runtime.state.config),
@@ -112,7 +113,7 @@ def run_chat_task(
         )
     except Exception as exc:
         message = str(exc)
-        _write_line(output_stream, message)
+        write_line(output_stream, message)
         record(
             runtime,
             "run_error",
@@ -146,7 +147,7 @@ def run_chat_task(
             ),
         }
         record(runtime, "apply_auto_deferred", deferred_payload)
-        _write_line(
+        write_line(
             output_stream,
             "Auto apply deferred: run /diff review, /apply check, then /apply.",
         )
@@ -185,15 +186,15 @@ def _run_model_preflight(
     payload = result.to_dict()
     record(runtime, "model_preflight", payload)
     if result.available:
-        _write_line(output_stream, f"Model preflight: {result.status} ({result.model})")
+        write_line(output_stream, f"Model preflight: {result.status} ({result.model})")
         return True
-    _write_line(output_stream, f"Model preflight: {result.status} ({result.model})")
+    write_line(output_stream, f"Model preflight: {result.status} ({result.model})")
     if result.suggestions:
-        _write_line(output_stream, "Model suggestions: " + ", ".join(result.suggestions))
+        write_line(output_stream, "Model suggestions: " + ", ".join(result.suggestions))
     if result.error:
-        _write_line(output_stream, f"Model preflight blocked: {result.error}")
+        write_line(output_stream, f"Model preflight blocked: {result.error}")
     else:
-        _write_line(output_stream, "Model preflight blocked: requested model is unavailable.")
+        write_line(output_stream, "Model preflight blocked: requested model is unavailable.")
     return False
 
 
@@ -219,20 +220,15 @@ def _task_with_session_context(*, runtime: AgentChatRuntime, task: str) -> str:
 
 def _print_run_summary(*, chat_run: AgentCliRun, output_stream: TextIO) -> None:
     result = chat_run.result
-    _write_line(output_stream, f"Run ID: {result.run_id}")
-    _write_line(output_stream, f"Status: {result.status}")
-    _write_line(output_stream, f"Report: {result.report_path}")
-    _write_line(output_stream, f"Trace: {result.trace_path}")
-    _write_line(output_stream, f"Diff: {result.final_diff_path}")
+    write_line(output_stream, f"Run ID: {result.run_id}")
+    write_line(output_stream, f"Status: {result.status}")
+    write_line(output_stream, f"Report: {result.report_path}")
+    write_line(output_stream, f"Trace: {result.trace_path}")
+    write_line(output_stream, f"Diff: {result.final_diff_path}")
     if result.test_result:
-        _write_line(output_stream, f"Test exit code: {result.test_result.exit_code}")
+        write_line(output_stream, f"Test exit code: {result.test_result.exit_code}")
     if chat_run.apply_result is not None:
-        _write_line(
+        write_line(
             output_stream,
             f"Apply: {chat_run.apply_result.status} - {chat_run.apply_result.message}",
         )
-
-
-def _write_line(output_stream: TextIO, message: str) -> None:
-    output_stream.write(f"{message}\n")
-    output_stream.flush()

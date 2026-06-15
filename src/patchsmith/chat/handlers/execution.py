@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import TextIO
 
 from patchsmith.chat.commands import ChatCommand, ChatCommandContext
+from patchsmith.chat.formatting import write_line
 from patchsmith.chat.preflight import preflight_payload, print_checks
 from patchsmith.chat.state import AgentChatRuntime
 from patchsmith.models import CommandResult
@@ -38,18 +39,18 @@ def handle_preflight_command(
     context: ChatCommandContext,
 ) -> None:
     if not argument:
-        _write_line(output_stream, "Usage: /preflight <task>")
+        write_line(output_stream, "Usage: /preflight <task>")
         return
     payload, error = preflight_payload(
         config=runtime.state.config,
         task=argument,
     )
     if error:
-        _write_line(output_stream, error)
+        write_line(output_stream, error)
         context.record(runtime, "preflight_error", {"message": error})
         return
     context.record(runtime, "preflight", payload)
-    _write_line(output_stream, f"Preflight: {payload['status']}")
+    write_line(output_stream, f"Preflight: {payload['status']}")
     print_checks(payload["checks"], output_stream)
 
 
@@ -62,8 +63,8 @@ def handle_verify_command(
 ) -> None:
     command = argument.strip() or runtime.state.config.test_command
     if not command:
-        _write_line(output_stream, "Usage: /verify <allowed-test-command>")
-        _write_line(output_stream, "No test command is configured for this session.")
+        write_line(output_stream, "Usage: /verify <allowed-test-command>")
+        write_line(output_stream, "No test command is configured for this session.")
         return
     sandbox = create_sandbox_runner(
         mode=runtime.state.config.sandbox_mode,
@@ -81,15 +82,15 @@ def handle_verify_command(
         "status": _verify_status(result),
     }
     context.record(runtime, "verify_result", payload)
-    _write_line(output_stream, f"Verify: {payload['status']}")
-    _write_line(output_stream, f"Command: {result.command}")
+    write_line(output_stream, f"Verify: {payload['status']}")
+    write_line(output_stream, f"Command: {result.command}")
     exit_code = result.exit_code if result.exit_code is not None else "n/a"
-    _write_line(output_stream, f"Exit code: {exit_code}")
-    _write_line(output_stream, f"Duration: {result.duration_ms} ms")
+    write_line(output_stream, f"Exit code: {exit_code}")
+    write_line(output_stream, f"Duration: {result.duration_ms} ms")
     if not result.policy_decision.allowed:
-        _write_line(output_stream, f"Policy: blocked - {result.policy_decision.reason}")
+        write_line(output_stream, f"Policy: blocked - {result.policy_decision.reason}")
     if result.timed_out:
-        _write_line(output_stream, "Timed out: true")
+        write_line(output_stream, "Timed out: true")
     _print_verify_output("stdout", result.stdout, output_stream)
     _print_verify_output("stderr", result.stderr, output_stream)
 
@@ -102,13 +103,13 @@ def handle_run_command(
     context: ChatCommandContext,
 ) -> None:
     if not argument and runtime.pending_planned_task is None:
-        _write_line(output_stream, "No pending planned task. Usage: /run <task>")
+        write_line(output_stream, "No pending planned task. Usage: /run <task>")
         return
     task = argument or runtime.pending_planned_task or ""
     if not argument:
         context.record(runtime, "plan_mode_approval", {"task": task})
         runtime.pending_planned_task = None
-        _write_line(output_stream, f"Approved planned task: {task}")
+        write_line(output_stream, f"Approved planned task: {task}")
     if context.run_task is None:
         raise RuntimeError("run task handler is not configured")
     context.run_task(
@@ -132,7 +133,7 @@ def _print_verify_output(label: str, text: str, output_stream: TextIO) -> None:
     value = text.strip()
     if not value:
         return
-    _write_line(output_stream, f"{label}: {_truncate_line(value)}")
+    write_line(output_stream, f"{label}: {_truncate_line(value)}")
 
 
 def _truncate_line(text: str, limit: int = 240) -> str:
@@ -140,8 +141,3 @@ def _truncate_line(text: str, limit: int = 240) -> str:
     if len(single_line) <= limit:
         return single_line
     return single_line[: limit - 3].rstrip() + "..."
-
-
-def _write_line(output_stream: TextIO, message: str) -> None:
-    output_stream.write(f"{message}\n")
-    output_stream.flush()

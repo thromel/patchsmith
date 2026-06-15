@@ -21,6 +21,7 @@ from patchsmith.agent_diff import (
 )
 from patchsmith.agent_session import transcript_rows
 from patchsmith.chat.commands import ChatCommand, ChatCommandContext
+from patchsmith.chat.formatting import write_line
 from patchsmith.chat.state import AgentChatRuntime
 
 
@@ -64,18 +65,18 @@ def handle_diff_command(
 ) -> None:
     diff_path = last_diff_path(runtime)
     if diff_path is None:
-        _write_line(output_stream, "No run is available.")
+        write_line(output_stream, "No run is available.")
         return
     action, _, rest = argument.partition(" ")
     action = action.strip().lower()
     if action in {"", "path"}:
         context.record(runtime, "diff_view", {"mode": "path", "diff_path": str(diff_path)})
-        _write_line(output_stream, f"Diff: {diff_path}")
+        write_line(output_stream, f"Diff: {diff_path}")
         return
     if action == "stat":
         diff = summarize_agent_diff(diff_path, max_lines=0)
         context.record(runtime, "diff_view", {"mode": "stat", **diff.to_dict()})
-        _write_line(output_stream, format_agent_diff_stat(diff))
+        write_line(output_stream, format_agent_diff_stat(diff))
         return
     if action in {"show", "preview"}:
         max_lines = _parse_diff_preview_limit(rest.strip(), output_stream)
@@ -91,14 +92,14 @@ def handle_diff_command(
                 **diff.to_dict(),
             },
         )
-        _write_line(output_stream, format_agent_diff_preview(diff))
+        write_line(output_stream, format_agent_diff_preview(diff))
         return
     if action == "review":
         review = review_agent_diff(diff_path)
         context.record(runtime, "diff_review", review.to_dict())
-        _write_line(output_stream, format_agent_diff_review(review))
+        write_line(output_stream, format_agent_diff_review(review))
         return
-    _write_line(output_stream, "Usage: /diff [path|stat|show [1-300]|review]")
+    write_line(output_stream, "Usage: /diff [path|stat|show [1-300]|review]")
 
 
 def handle_apply_command(
@@ -110,18 +111,18 @@ def handle_apply_command(
 ) -> None:
     action = argument.strip().lower()
     if action not in {"", "check", "dry-run", "dryrun"}:
-        _write_line(output_stream, "Usage: /apply [check]")
+        write_line(output_stream, "Usage: /apply [check]")
         return
     diff_path = last_diff_path(runtime)
     if diff_path is None:
-        _write_line(output_stream, "No run is available to apply.")
+        write_line(output_stream, "No run is available to apply.")
         return
     dry_run = action in {"check", "dry-run", "dryrun"}
     if not dry_run:
         guard = apply_guard(runtime=runtime, diff_path=diff_path)
         if guard is not None:
             context.record(runtime, "apply_blocked", guard)
-            _write_line(output_stream, f"Apply blocked: {guard['message']}")
+            write_line(output_stream, f"Apply blocked: {guard['message']}")
             return
     if not _run_hooks(
         context,
@@ -144,7 +145,7 @@ def handle_apply_command(
             diff_path=diff_path,
             allow_dirty=runtime.state.config.allow_dirty_apply,
         )
-        _write_line(
+        write_line(
             output_stream,
             f"Apply check: {check_result.status} - {check_result.message}",
         )
@@ -156,7 +157,7 @@ def handle_apply_command(
         allow_dirty=runtime.state.config.allow_dirty_apply,
     )
     runtime.last_apply = apply_result
-    _write_line(output_stream, f"Apply: {apply_result.status} - {apply_result.message}")
+    write_line(output_stream, f"Apply: {apply_result.status} - {apply_result.message}")
     context.record(runtime, "apply_result", apply_result.to_dict())
     _run_hooks(
         context,
@@ -180,11 +181,11 @@ def handle_approve_command(
 ) -> None:
     action, _, reason = argument.strip().partition(" ")
     if action.lower() != "apply" or not reason.strip():
-        _write_line(output_stream, "Usage: /approve apply <reason>")
+        write_line(output_stream, "Usage: /approve apply <reason>")
         return
     diff_path = last_diff_path(runtime)
     if diff_path is None:
-        _write_line(output_stream, "No run is available to approve.")
+        write_line(output_stream, "No run is available to approve.")
         return
     approval, error = apply_approval_payload(
         runtime=runtime,
@@ -192,10 +193,10 @@ def handle_approve_command(
         reason=reason.strip(),
     )
     if error is not None:
-        _write_line(output_stream, error)
+        write_line(output_stream, error)
         return
     context.record(runtime, "apply_approval", approval)
-    _write_line(
+    write_line(
         output_stream,
         f"Apply approved: {approval['risk_level']} - {approval['reason']}",
     )
@@ -210,11 +211,11 @@ def handle_reject_command(
 ) -> None:
     action, _, reason = argument.strip().partition(" ")
     if action.lower() != "apply" or not reason.strip():
-        _write_line(output_stream, "Usage: /reject apply <reason>")
+        write_line(output_stream, "Usage: /reject apply <reason>")
         return
     diff_path = last_diff_path(runtime)
     if diff_path is None:
-        _write_line(output_stream, "No run is available to reject.")
+        write_line(output_stream, "No run is available to reject.")
         return
     rejection, error = apply_decision_payload(
         runtime=runtime,
@@ -223,10 +224,10 @@ def handle_reject_command(
         reason=reason.strip(),
     )
     if error is not None:
-        _write_line(output_stream, error.replace("approve", "reject"))
+        write_line(output_stream, error.replace("approve", "reject"))
         return
     context.record(runtime, "apply_rejection", rejection)
-    _write_line(
+    write_line(
         output_stream,
         f"Apply rejected: {rejection['risk_level']} - {rejection['reason']}",
     )
@@ -240,11 +241,11 @@ def handle_rewind_command(
     context: ChatCommandContext,
 ) -> None:
     if argument.strip():
-        _write_line(output_stream, "Usage: /rewind")
+        write_line(output_stream, "Usage: /rewind")
         return
     diff_path = last_diff_path(runtime)
     if diff_path is None:
-        _write_line(output_stream, "No run is available to rewind.")
+        write_line(output_stream, "No run is available to rewind.")
         return
     if not _run_hooks(
         context,
@@ -264,7 +265,7 @@ def handle_rewind_command(
         diff_path=diff_path,
     )
     runtime.last_rewind = rewind_result
-    _write_line(
+    write_line(
         output_stream,
         f"Rewind: {rewind_result.status} - {rewind_result.message}",
     )
@@ -419,10 +420,10 @@ def _parse_diff_preview_limit(raw: str, output_stream: TextIO) -> int | None:
     try:
         value = int(raw)
     except ValueError:
-        _write_line(output_stream, "Usage: /diff show [1-300]")
+        write_line(output_stream, "Usage: /diff show [1-300]")
         return None
     if value < 1 or value > 300:
-        _write_line(output_stream, "diff preview line limit must be between 1 and 300.")
+        write_line(output_stream, "diff preview line limit must be between 1 and 300.")
         return None
     return value
 
@@ -500,8 +501,3 @@ def _check_agent_run_diff(context: ChatCommandContext):
 
 def _reverse_agent_run_diff(context: ChatCommandContext):
     return context.reverse_agent_run_diff or default_reverse_agent_run_diff
-
-
-def _write_line(output_stream: TextIO, message: str) -> None:
-    output_stream.write(f"{message}\n")
-    output_stream.flush()

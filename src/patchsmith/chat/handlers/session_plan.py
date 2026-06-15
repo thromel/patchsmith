@@ -10,6 +10,7 @@ from patchsmith.agent_plan import (
     update_plan_item_status,
 )
 from patchsmith.chat.commands import ChatCommand, ChatCommandContext
+from patchsmith.chat.formatting import write_line
 from patchsmith.chat.state import AgentChatRuntime
 
 
@@ -40,7 +41,7 @@ def handle_plan_command(
     action = action.strip().lower()
     value = rest.strip()
     if action in {"", "show"}:
-        _write_line(output_stream, format_agent_plan(runtime.plan_items or []))
+        write_line(output_stream, format_agent_plan(runtime.plan_items or []))
         context.record(
             runtime,
             "plan_view",
@@ -50,18 +51,18 @@ def handle_plan_command(
     if action in {"set", "reset"}:
         items = parse_plan_items(value)
         if not items:
-            _write_line(output_stream, "Usage: /plan set <task>; <task>; ...")
+            write_line(output_stream, "Usage: /plan set <task>; <task>; ...")
             return
         _set_plan_items(runtime=runtime, items=items, action=action, context=context)
-        _write_line(output_stream, format_agent_plan(items))
+        write_line(output_stream, format_agent_plan(items))
         return
     if action == "add":
         if not value:
-            _write_line(output_stream, "Usage: /plan add <task>")
+            write_line(output_stream, "Usage: /plan add <task>")
             return
         items = [*(runtime.plan_items or []), AgentPlanItem(text=value)]
         _set_plan_items(runtime=runtime, items=items, action="add", context=context)
-        _write_line(output_stream, format_agent_plan(items))
+        write_line(output_stream, format_agent_plan(items))
         return
     if action in {"start", "done", "block", "skip", "pending"}:
         status = _plan_status_for_action(action)
@@ -76,9 +77,9 @@ def handle_plan_command(
         return
     if action == "clear":
         _set_plan_items(runtime=runtime, items=[], action="clear", context=context)
-        _write_line(output_stream, "Session plan cleared.")
+        write_line(output_stream, "Session plan cleared.")
         return
-    _write_line(
+    write_line(
         output_stream,
         "Usage: /plan [show|set|add|start|done|block|skip|pending|clear] ...",
     )
@@ -95,7 +96,7 @@ def handle_feedback_command(
     action = action.strip().lower()
     value = rest.strip()
     if action in {"", "show", "list"}:
-        _write_line(output_stream, format_feedback(runtime.feedback_items or []))
+        write_line(output_stream, format_feedback(runtime.feedback_items or []))
         context.record(
             runtime,
             "feedback_view",
@@ -104,18 +105,18 @@ def handle_feedback_command(
         return
     if action == "add":
         if not value:
-            _write_line(output_stream, "Usage: /feedback add <guidance for next run>")
+            write_line(output_stream, "Usage: /feedback add <guidance for next run>")
             return
         _add_feedback_item(runtime=runtime, item=value, context=context)
-        _write_line(output_stream, f"Added feedback: {value}")
+        write_line(output_stream, f"Added feedback: {value}")
         return
     if action == "clear":
         runtime.feedback_items = []
         context.record(runtime, "feedback_update", {"action": "clear", "items": []})
-        _write_line(output_stream, "Session feedback cleared.")
+        write_line(output_stream, "Session feedback cleared.")
         return
     _add_feedback_item(runtime=runtime, item=argument.strip(), context=context)
-    _write_line(output_stream, f"Added feedback: {argument.strip()}")
+    write_line(output_stream, f"Added feedback: {argument.strip()}")
 
 
 def format_feedback(items: list[str]) -> str:
@@ -157,7 +158,7 @@ def _update_plan_status(
     try:
         index = int(raw_index)
     except ValueError:
-        _write_line(output_stream, f"Usage: /plan {action} <index>")
+        write_line(output_stream, f"Usage: /plan {action} <index>")
         return
     try:
         items = update_plan_item_status(
@@ -166,7 +167,7 @@ def _update_plan_status(
             status=status,
         )
     except IndexError:
-        _write_line(output_stream, f"Plan item not found: {index}")
+        write_line(output_stream, f"Plan item not found: {index}")
         return
     _set_plan_items(
         runtime=runtime,
@@ -175,7 +176,7 @@ def _update_plan_status(
         index=index,
         context=context,
     )
-    _write_line(output_stream, format_agent_plan(items))
+    write_line(output_stream, format_agent_plan(items))
 
 
 def _set_plan_items(
@@ -211,8 +212,3 @@ def _add_feedback_item(
         "feedback_update",
         {"action": "add", "item": item, "items": feedback_items},
     )
-
-
-def _write_line(output_stream: TextIO, message: str) -> None:
-    output_stream.write(f"{message}\n")
-    output_stream.flush()
