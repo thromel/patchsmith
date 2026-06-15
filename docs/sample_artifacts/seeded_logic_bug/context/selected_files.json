@@ -1,0 +1,14 @@
+[
+  {
+    "path": "src/simple_calc.py",
+    "rank": 1,
+    "role": "source",
+    "reason": "implementation contains add() returning left - right"
+  },
+  {
+    "path": "tests/test_simple_calc.py",
+    "rank": 2,
+    "role": "test",
+    "reason": "focused assertion expects add(2, 3) == 5"
+  }
+]

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 
 from patchsmith.cli import _build_parser_and_handlers, build_parser, main
@@ -8,7 +11,9 @@ from patchsmith.portfolio.quality_gate import DEFAULT_QUALITY_GATE_TIMEOUT_SECON
 pytestmark = pytest.mark.unit
 
 EXPECTED_COMMANDS = {
+    "demo",
     "run",
+    "inspect",
     "openai-model-preflight",
     "index",
     "retrieve",
@@ -98,6 +103,46 @@ def test_unknown_command_is_rejected() -> None:
     parser = build_parser()
     with pytest.raises(SystemExit):
         parser.parse_args(["no-such-command"])
+
+
+def test_demo_command_runs_seeded_logic_bug_and_inspect_reads_artifacts(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    artifacts = tmp_path / "artifacts"
+
+    exit_code = main(
+        [
+            "demo",
+            "seeded-logic-bug",
+            "--artifacts-dir",
+            str(artifacts),
+            "--json",
+        ]
+    )
+    payload = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 0
+    assert payload["demo"] == "seeded-logic-bug"
+    assert payload["repair_verdict"] == "patch_validated"
+    assert payload["claim_boundary"] == "focused_validation_only"
+    assert payload["changed_files"] == ["src/simple_calc.py"]
+    run_dir = Path(payload["run_dir"])
+    assert (run_dir / "report.md").is_file()
+    assert (run_dir / "final.diff").is_file()
+    assert (run_dir / "traces.jsonl").is_file()
+    assert (run_dir / "metadata.json").is_file()
+    assert (run_dir / "artifact_index.md").is_file()
+    assert (run_dir / "context" / "selected_files.json").is_file()
+
+    inspect_exit_code = main(["inspect", str(run_dir), "--json"])
+    inspect_payload = json.loads(capsys.readouterr().out)
+
+    assert inspect_exit_code == 0
+    assert inspect_payload["run_id"] == payload["run_id"]
+    assert inspect_payload["repair_verdict"] == "patch_validated"
+    assert inspect_payload["validation"] == "exit_code=0"
+    assert inspect_payload["claim_boundary"] == "focused_validation_only"
 
 
 def test_quality_gate_cli_defaults_use_production_timeout() -> None:

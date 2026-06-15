@@ -1,6 +1,8 @@
 {
   "project": "PatchSmith Research",
   "generated_files": [
+    "CHANGELOG.md",
+    "LICENSE",
     "README.md",
     "adr/0001-use-langgraph-as-primary-runtime.md",
     "adr/0002-use-docker-sandbox-for-execution.md",
@@ -27,6 +29,33 @@
     "docs/16_ctxhelm_integration_plan.md",
     "docs/17_sprint_plans.md",
     "docs/18_delivery_process.md",
+    "docs/artifact_gallery.md",
+    "docs/benchmark_manifest_schema.md",
+    "docs/comparison_matrix.md",
+    "docs/failure_taxonomy.md",
+    "docs/runtime_fairness_checks.md",
+    "docs/sample_artifacts/empty_diff_blocked/README.md",
+    "docs/sample_artifacts/empty_diff_blocked/final.diff",
+    "docs/sample_artifacts/empty_diff_blocked/logs/stderr.txt",
+    "docs/sample_artifacts/empty_diff_blocked/logs/stdout.txt",
+    "docs/sample_artifacts/empty_diff_blocked/metadata.json",
+    "docs/sample_artifacts/empty_diff_blocked/report.md",
+    "docs/sample_artifacts/empty_diff_blocked/traces.sample.jsonl",
+    "docs/sample_artifacts/failed_validation/README.md",
+    "docs/sample_artifacts/failed_validation/final.diff",
+    "docs/sample_artifacts/failed_validation/logs/stderr.txt",
+    "docs/sample_artifacts/failed_validation/logs/stdout.txt",
+    "docs/sample_artifacts/failed_validation/metadata.json",
+    "docs/sample_artifacts/failed_validation/report.md",
+    "docs/sample_artifacts/failed_validation/traces.sample.jsonl",
+    "docs/sample_artifacts/seeded_logic_bug/README.md",
+    "docs/sample_artifacts/seeded_logic_bug/context/selected_files.json",
+    "docs/sample_artifacts/seeded_logic_bug/final.diff",
+    "docs/sample_artifacts/seeded_logic_bug/logs/stderr.txt",
+    "docs/sample_artifacts/seeded_logic_bug/logs/stdout.txt",
+    "docs/sample_artifacts/seeded_logic_bug/metadata.json",
+    "docs/sample_artifacts/seeded_logic_bug/report.md",
+    "docs/sample_artifacts/seeded_logic_bug/traces.sample.jsonl",
     "docs/checklists/demo_readiness_checklist.md",
     "docs/checklists/mvp_definition_of_done.md",
     "docs/checklists/security_review_checklist.md",
@@ -43,7 +72,7 @@
     "templates/failure_analysis_template.md",
     "templates/run_report_template.md"
   ],
-  "file_count": 41,
+  "file_count": 70,
   "recommended_first_read": [
     "README.md",
     "docs/00_project_charter.md",
@@ -53,6 +82,7 @@
     "docs/09_roadmap.md",
     "docs/16_ctxhelm_integration_plan.md",
     "docs/17_sprint_plans.md",
-    "docs/18_delivery_process.md"
+    "docs/18_delivery_process.md",
+    "docs/artifact_gallery.md"
   ]
 }

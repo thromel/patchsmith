@@ -1,0 +1,16 @@
+{
+  "schema_version": "patchsmith.demo.v1",
+  "demo": "failed-validation",
+  "claim_boundary": "focused_validation_only",
+  "run": {
+    "run_id": "sample-failed-validation",
+    "status": "completed",
+    "runtime": "example",
+    "planner": "example",
+    "test_exit_code": 1,
+    "repair_verdict": "patch_failed_tests",
+    "repair_failure_category": "test_failure_after_patch",
+    "repair_patch_generated": true,
+    "repair_tests_passed": false
+  }
+}

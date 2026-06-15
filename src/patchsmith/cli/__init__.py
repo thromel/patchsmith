@@ -5,9 +5,9 @@ from __future__ import annotations
 import argparse
 
 from patchsmith.cli._types import CommandHandler
-from patchsmith.cli.commands import evals, issue_corpus, observability, portfolio, run
+from patchsmith.cli.commands import demo, evals, issue_corpus, observability, portfolio, run
 
-_COMMAND_MODULES = (run, evals, issue_corpus, observability, portfolio)
+_COMMAND_MODULES = (run, demo, evals, issue_corpus, observability, portfolio)
 
 
 def _build_parser_and_handlers() -> tuple[argparse.ArgumentParser, dict[str, CommandHandler]]:

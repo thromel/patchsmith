@@ -60,6 +60,16 @@ or the issue was never reproducible in the first place.
 PatchSmith keeps those pieces separate. It is meant for comparing repair systems
 without hiding setup failures, weak validation, or lucky patches.
 
+## What PatchSmith Is Not
+
+- It is not an autonomous GitHub issue fixer.
+- It is not a hosted repair service.
+- It is not proof that a focused test pass equals upstream acceptance.
+- It is not a leaderboard claim against SWE-agent, OpenHands, or coding models.
+- It is not a replacement for human review.
+
+The model gets to propose. PatchSmith owns the mutation.
+
 ## How It Works
 
 ```text
@@ -108,6 +118,22 @@ Run the test suite:
 ```bash
 PYTHONPATH=src python -m pytest -q
 ```
+
+Run the canonical five-minute demo:
+
+```bash
+patchsmith demo seeded-logic-bug
+```
+
+Then inspect the generated run directory:
+
+```bash
+patchsmith inspect artifacts/demo/seeded_logic_bug/runs/<run_id>
+```
+
+The demo writes `report.md`, `final.diff`, `traces.jsonl`, validation logs,
+`metadata.json`, and `context/selected_files.json`. A static preview lives in
+[`docs/sample_artifacts/seeded_logic_bug/`](docs/sample_artifacts/seeded_logic_bug/).
 
 Run a deterministic repair on a seeded bug:
 
@@ -334,6 +360,7 @@ templates/                  report and ADR templates
 PYTHONPATH=src python -m pytest -q
 PYTHONPATH=src python -m patchsmith.cli quality-gate --json
 PYTHONPATH=src python -m patchsmith.cli project-status --json
+PYTHONPATH=src python -m patchsmith.cli demo seeded-logic-bug
 PYTHONPATH=src python -m patchsmith.cli demo-readiness --json
 ```
 
@@ -347,7 +374,18 @@ PYTHONPATH=src python -m patchsmith.cli demo-readiness --json
   validation strength.
 - Keep the runtime adapters small enough to read and test.
 
+## Public Evidence Docs
+
+- [Artifact gallery](docs/artifact_gallery.md): committed success, blocked, and
+  failed-validation samples.
+- [Failure taxonomy](docs/failure_taxonomy.md): outcome labels for repair runs.
+- [Benchmark manifest schema](docs/benchmark_manifest_schema.md): task-level
+  fields needed for reproducible repair rows.
+- [Runtime fairness checks](docs/runtime_fairness_checks.md): invariants for
+  comparing planners without changing harness privileges.
+- [Comparison matrix](docs/comparison_matrix.md): PatchSmith's boundary versus
+  adjacent repair-agent systems.
+
 ## License
 
-No license file is included yet. Treat the code as source-available until a
-license is added.
+MIT. See [LICENSE](LICENSE).

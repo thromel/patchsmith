@@ -1,0 +1,31 @@
+{
+  "schema_version": "patchsmith.demo.v1",
+  "demo": "seeded-logic-bug",
+  "task_id": "task_001_logic_bug",
+  "claim_boundary": "focused_validation_only",
+  "run": {
+    "run_id": "sample-seeded-logic-bug",
+    "status": "completed",
+    "runtime": "heuristic",
+    "planner": "heuristic",
+    "context_provider": "native_hybrid",
+    "test_exit_code": 0,
+    "retrieved_files": [
+      "src/simple_calc.py",
+      "tests/test_simple_calc.py"
+    ],
+    "repair_verdict": "patch_validated",
+    "repair_patch_generated": true,
+    "repair_tests_passed": true,
+    "model_call_count": 0,
+    "estimated_cost_usd": null
+  },
+  "artifacts": {
+    "report": "report.md",
+    "diff": "final.diff",
+    "trace": "traces.sample.jsonl",
+    "stdout": "logs/stdout.txt",
+    "stderr": "logs/stderr.txt",
+    "selected_context": "context/selected_files.json"
+  }
+}

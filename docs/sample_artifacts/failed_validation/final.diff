@@ -1,0 +1,9 @@
+--- a/src/simple_calc.py
++++ b/src/simple_calc.py
+@@ -1,5 +1,5 @@
+ def add(left: int, right: int) -> int:
+-    return left - right
++    return left * right
+
+
+ def subtract(left: int, right: int) -> int:
