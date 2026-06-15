@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from dataclasses import replace as dataclass_replace
 from pathlib import Path
 from typing import Any
 
@@ -16,7 +15,6 @@ from patchsmith.agent_chat import run_chat_session
 from patchsmith.agent_cli import (
     AgentCliConfig,
     agent_preflight_payload,
-    config_with_loaded_agent_instructions,
     run_agent_once,
     run_result_payload,
     validate_agent_cli_config,
@@ -37,11 +35,9 @@ from patchsmith.agent_instructions import (
     load_agent_instruction_bundle,
 )
 from patchsmith.agent_profiles import (
-    AgentProfile,
     agent_profiles_payload,
     format_agent_profiles,
     list_agent_profiles,
-    load_agent_profile,
 )
 from patchsmith.agent_session import (
     AgentSessionGateConfig,
@@ -62,6 +58,14 @@ from patchsmith.cli._args import (
     _load_issue_text,
 )
 from patchsmith.cli._types import CommandHandler
+from patchsmith.cli.agent_args import (
+    add_agent_options,
+    add_agent_prompt_arg,
+    add_agent_session_options,
+    agent_config_from_args,
+    load_agent_initial_prompt,
+    load_agent_issue_text,
+)
 from patchsmith.model_preflight import ModelPreflightResult, openai_model_preflight_from_env
 from patchsmith.models import RepairRunResult, RunRequest
 from patchsmith.workflow import RepairRunner
@@ -72,8 +76,8 @@ def register(subparsers: argparse._SubParsersAction) -> dict[str, CommandHandler
         "agent",
         help="Run PatchSmith as a terminal-first coding agent for the current repo.",
     )
-    _add_agent_prompt_arg(agent)
-    _add_agent_options(agent)
+    add_agent_prompt_arg(agent)
+    add_agent_options(agent)
     agent.add_argument(
         "--preflight",
         action="store_true",
@@ -84,16 +88,16 @@ def register(subparsers: argparse._SubParsersAction) -> dict[str, CommandHandler
         action="store_true",
         help="Start an interactive PatchSmith chat session.",
     )
-    _add_agent_session_options(agent)
+    add_agent_session_options(agent)
     agent.add_argument("--json", action="store_true", help="Print machine-readable run summary.")
 
     chat = subparsers.add_parser(
         "chat",
         help="Start an interactive PatchSmith coding-agent session.",
     )
-    _add_agent_prompt_arg(chat)
-    _add_agent_options(chat)
-    _add_agent_session_options(chat)
+    add_agent_prompt_arg(chat)
+    add_agent_options(chat)
+    add_agent_session_options(chat)
     chat.add_argument(
         "--json",
         action="store_true",
@@ -147,223 +151,6 @@ def register(subparsers: argparse._SubParsersAction) -> dict[str, CommandHandler
         "chat": _chat_command,
         "run": _run_command,
     }
-
-
-def _add_agent_prompt_arg(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument(
-        "prompt",
-        nargs="?",
-        help="Task or issue text. If omitted, pass --issue-file or enter it in chat.",
-    )
-
-
-def _add_agent_options(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument(
-        "--repo",
-        default=".",
-        help="Local path or public Git repository URL. Defaults to the current directory.",
-    )
-    parser.add_argument("--commit", help="Optional commit hash to check out.")
-    parser.add_argument("--branch", help="Optional branch to check out.")
-    parser.add_argument("--issue-file", help="Path to a file containing task text.")
-    parser.add_argument("--issue-url", help="Optional source issue URL for the run report.")
-    parser.add_argument("--test-command", help="Allowed test command to run in the sandbox.")
-    parser.add_argument(
-        "--context-provider",
-        choices=["native", "native_hybrid", "native_graph", "ctxhelm_cli", "auto"],
-        default="native_hybrid",
-        help="Context broker to use before agent execution.",
-    )
-    parser.add_argument(
-        "--context-path",
-        action="append",
-        default=[],
-        help=(
-            "Repo-relative file to force into the repair context. Repeat for multiple "
-            "files; an optional #symbol suffix is accepted for traceability."
-        ),
-    )
-    parser.add_argument(
-        "--agent-profile",
-        help="Project agent profile from .patchsmith/agents to apply before running.",
-    )
-    parser.add_argument(
-        "--instruction-path",
-        action="append",
-        default=[],
-        help=(
-            "Extra repo-relative project instruction file to load. Repeat for "
-            "multiple files."
-        ),
-    )
-    parser.add_argument(
-        "--no-agent-instructions",
-        action="store_true",
-        help="Disable automatic AGENTS.md/CLAUDE.md-style project instruction loading.",
-    )
-    parser.add_argument("--top-k", type=int, default=5, help="Number of files to retrieve.")
-    parser.add_argument("--artifacts-dir", default="artifacts", help="Artifact output directory.")
-    _add_sandbox_args(parser)
-    parser.add_argument(
-        "--apply",
-        action="store_true",
-        help="Apply the generated diff back to the local target repo after the run.",
-    )
-    parser.add_argument(
-        "--allow-dirty-apply",
-        action="store_true",
-        help="Allow --apply when the target repo has uncommitted changes.",
-    )
-    parser.add_argument(
-        "--max-retries",
-        type=int,
-        default=1,
-        help="Maximum extra DeepAgents feedback retries after the first attempt.",
-    )
-    parser.add_argument(
-        "--deepagents-max-context-files",
-        type=int,
-        default=0,
-        help=(
-            "Cap mounted repository files for native DeepAgents. Use 0 to keep the "
-            "default full retrieved context."
-        ),
-    )
-    parser.add_argument(
-        "--deepagents-subagents",
-        choices=["full", "auto", "inline"],
-        default="auto",
-        help="Native DeepAgents subagent routing mode.",
-    )
-    parser.add_argument(
-        "--deepagents-model",
-        help="DeepAgents/OpenAI-compatible model override for this agent session.",
-    )
-    parser.add_argument(
-        "--skip-model-preflight",
-        action="store_true",
-        help=(
-            "Skip the live OpenAI model availability check before an actual agent run."
-        ),
-    )
-    parser.add_argument(
-        "--max-model-responses",
-        type=int,
-        default=12,
-        help="Maximum DeepAgents model responses allowed for this run. Use -1 to disable.",
-    )
-    parser.add_argument(
-        "--max-model-tokens",
-        type=int,
-        default=200000,
-        help="Maximum DeepAgents model tokens allowed for this run. Use -1 to disable.",
-    )
-
-
-def _add_agent_session_options(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument(
-        "--resume",
-        metavar="SESSION_ID",
-        help="Resume an existing PatchSmith chat transcript by session id.",
-    )
-    parser.add_argument(
-        "--list-sessions",
-        action="store_true",
-        help="List saved PatchSmith chat sessions under --artifacts-dir and exit.",
-    )
-    parser.add_argument(
-        "--list-commands",
-        action="store_true",
-        help="List project custom slash commands under .patchsmith/commands and exit.",
-    )
-    parser.add_argument(
-        "--list-hooks",
-        action="store_true",
-        help="List project lifecycle hooks under .patchsmith/hooks.json and exit.",
-    )
-    parser.add_argument(
-        "--list-agents",
-        action="store_true",
-        help="List project agent profiles under .patchsmith/agents and exit.",
-    )
-    parser.add_argument(
-        "--list-instructions",
-        action="store_true",
-        help="List project instruction files that PatchSmith would load and exit.",
-    )
-    parser.add_argument(
-        "--script",
-        help="Read chat input from a command script file instead of stdin.",
-    )
-    parser.add_argument(
-        "--session-metrics",
-        metavar="SESSION_ID",
-        help="Print saved transcript metrics for a PatchSmith chat session and exit.",
-    )
-    parser.add_argument(
-        "--session-gate",
-        metavar="SESSION_ID",
-        help="Evaluate saved transcript metrics against process/cost thresholds and exit.",
-    )
-    parser.add_argument(
-        "--session-next",
-        metavar="SESSION_ID",
-        help="Print the deterministic next recommendation for a saved chat session.",
-    )
-    parser.add_argument(
-        "--export-session",
-        metavar="SESSION_ID",
-        help="Export a saved PatchSmith chat transcript as Markdown and exit.",
-    )
-    parser.add_argument(
-        "--export-path",
-        help="Output path for --export-session. Defaults beside the transcript.",
-    )
-    parser.add_argument(
-        "--require-validated-run",
-        action="store_true",
-        help="Fail --session-gate unless the saved session has at least one validated run.",
-    )
-    parser.add_argument(
-        "--require-diff-review",
-        action="store_true",
-        help="Fail --session-gate unless the saved session has a diff risk review.",
-    )
-    parser.add_argument(
-        "--require-ready-apply-check",
-        action="store_true",
-        help="Fail --session-gate unless the saved session has a ready apply check.",
-    )
-    parser.add_argument(
-        "--min-validation-rate",
-        type=float,
-        help="Fail --session-gate below this validation rate, from 0.0 to 1.0.",
-    )
-    parser.add_argument(
-        "--min-preflight-to-run-rate",
-        type=float,
-        help="Fail --session-gate below this preflight-to-run rate, from 0.0 to 1.0.",
-    )
-    parser.add_argument(
-        "--min-apply-success-rate",
-        type=float,
-        help="Fail --session-gate below this apply success rate, from 0.0 to 1.0.",
-    )
-    parser.add_argument(
-        "--max-cost-per-validated-run-usd",
-        type=float,
-        help="Fail --session-gate above this cost per validated run.",
-    )
-    parser.add_argument(
-        "--max-run-errors",
-        type=int,
-        help="Fail --session-gate above this run-error count.",
-    )
-    parser.add_argument(
-        "--max-high-risk-diff-reviews",
-        type=int,
-        help="Fail --session-gate above this high-risk diff review count.",
-    )
 
 
 def _agent_command(args: argparse.Namespace) -> int:
@@ -440,7 +227,7 @@ def _agent_command(args: argparse.Namespace) -> int:
             return _print_saved_session_next(args)
         if args.export_session:
             return _export_saved_session(args)
-        config, profile_error = _agent_config_from_args(args)
+        config, profile_error = agent_config_from_args(args)
         if profile_error:
             print(profile_error, file=sys.stderr)
             return 2
@@ -448,16 +235,16 @@ def _agent_command(args: argparse.Namespace) -> int:
         if error:
             print(error, file=sys.stderr)
             return 2
-        initial_prompt = _load_agent_initial_prompt(args)
+        initial_prompt = load_agent_initial_prompt(args)
         return _run_chat_from_args(args=args, config=config, initial_prompt=initial_prompt)
-    issue_text = _load_agent_issue_text(args)
+    issue_text = load_agent_issue_text(args)
     if not issue_text:
         print(
             "patchsmith agent requires a prompt, --issue-file, or piped stdin.",
             file=sys.stderr,
         )
         return 2
-    config, profile_error = _agent_config_from_args(args)
+    config, profile_error = agent_config_from_args(args)
     if profile_error:
         print(profile_error, file=sys.stderr)
         return 2
@@ -557,7 +344,7 @@ def _chat_command(args: argparse.Namespace) -> int:
     if args.export_path:
         print("--export-path requires --export-session.", file=sys.stderr)
         return 2
-    config, profile_error = _agent_config_from_args(args)
+    config, profile_error = agent_config_from_args(args)
     if profile_error:
         print(profile_error, file=sys.stderr)
         return 2
@@ -568,7 +355,7 @@ def _chat_command(args: argparse.Namespace) -> int:
     return _run_chat_from_args(
         args=args,
         config=config,
-        initial_prompt=_load_agent_initial_prompt(args),
+        initial_prompt=load_agent_initial_prompt(args),
     )
 
 
@@ -921,94 +708,6 @@ def _format_model_preflight_block(result: ModelPreflightResult) -> str:
     else:
         lines.append("requested model is unavailable for the configured provider.")
     return "\n".join(lines)
-
-
-def _load_agent_issue_text(args: argparse.Namespace) -> str:
-    if args.issue_file:
-        return Path(args.issue_file).read_text(encoding="utf-8").strip()
-    if args.prompt:
-        return args.prompt.strip()
-    if not sys.stdin.isatty():
-        return sys.stdin.read().strip()
-    return ""
-
-
-def _load_agent_initial_prompt(args: argparse.Namespace) -> str:
-    if args.issue_file:
-        return Path(args.issue_file).read_text(encoding="utf-8").strip()
-    if args.prompt:
-        return args.prompt.strip()
-    return ""
-
-
-def _agent_config_from_args(args: argparse.Namespace) -> tuple[AgentCliConfig, str | None]:
-    config = AgentCliConfig(
-        repo=args.repo,
-        commit=args.commit,
-        branch=args.branch,
-        issue_url=args.issue_url,
-        test_command=args.test_command,
-        context_provider=args.context_provider,
-        context_paths=tuple(args.context_path or ()),
-        top_k=args.top_k,
-        artifacts_dir=args.artifacts_dir,
-        sandbox_mode=args.sandbox_mode,
-        sandbox_image=args.sandbox_image,
-        apply=args.apply,
-        allow_dirty_apply=args.allow_dirty_apply,
-        max_retries=args.max_retries,
-        deepagents_max_context_files=args.deepagents_max_context_files,
-        deepagents_subagents=args.deepagents_subagents,
-        deepagents_model=args.deepagents_model,
-        max_model_responses=args.max_model_responses,
-        max_model_tokens=args.max_model_tokens,
-        load_agent_instructions=not args.no_agent_instructions,
-        instruction_paths=tuple(args.instruction_path or ()),
-    )
-    profile_name = getattr(args, "agent_profile", None)
-    if not profile_name:
-        return config_with_loaded_agent_instructions(config), None
-    profile = load_agent_profile(args.repo, profile_name)
-    if profile is None:
-        return config, f"agent profile not found: {profile_name}"
-    return config_with_loaded_agent_instructions(
-        _config_with_agent_profile(config, profile)
-    ), None
-
-
-def _config_with_agent_profile(
-    config: AgentCliConfig,
-    profile: AgentProfile,
-) -> AgentCliConfig:
-    return dataclass_replace(
-        config,
-        agent_profile=profile.name,
-        agent_profile_path=str(profile.path),
-        agent_profile_description=profile.description,
-        agent_profile_instructions=profile.instructions,
-        deepagents_model=profile.model or config.deepagents_model,
-        deepagents_subagents=profile.subagents or config.deepagents_subagents,
-        deepagents_max_context_files=(
-            profile.max_context_files
-            if profile.max_context_files is not None
-            else config.deepagents_max_context_files
-        ),
-        max_model_responses=(
-            profile.max_model_responses
-            if profile.max_model_responses is not None
-            else config.max_model_responses
-        ),
-        max_model_tokens=(
-            profile.max_model_tokens
-            if profile.max_model_tokens is not None
-            else config.max_model_tokens
-        ),
-        top_k=profile.top_k if profile.top_k is not None else config.top_k,
-        test_command=profile.test_command or config.test_command,
-        context_paths=tuple(
-            dict.fromkeys((*config.context_paths, *profile.context_paths))
-        ),
-    )
 
 
 def _print_agent_preflight(payload: dict[str, Any]) -> None:
