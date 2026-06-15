@@ -175,7 +175,7 @@ class AgentRuntime(Protocol):
         ...
 ```
 
-### LangGraph MVP graph
+### DeepAgents MVP graph
 
 ```text
 triage_node
@@ -210,6 +210,29 @@ triage_node
 - produce repair plan,
 - identify files to inspect or edit,
 - estimate risk.
+
+DeepAgents planning receives a PatchSmith-owned virtual filesystem. Besides
+retrieved repository files, PatchSmith injects durable repair instructions and,
+when reviewed reproduction evidence names source hints, a
+`/.patchsmith/source-hints.md` manifest. The manifest lists prioritized
+repository paths, symbol-qualified targets, and focused excerpts so the agent
+inspects the controlling runtime mechanism before broad source edits.
+
+On feedback retries, PatchSmith also injects `/.patchsmith/retry-feedback.md`.
+That manifest is generated after the failed patch is reverted and contains the
+previous status, structured failure-localization cues, sandbox signal, patch
+diagnostics, and failed diff. The retry agent can inspect it as a compact
+post-failure brief instead of rediscovering the failure from a long issue prompt.
+PatchSmith saves the same brief under the run's `feedback/` artifacts so
+benchmark reports and human reviewers can inspect the exact context given to the
+retry attempt.
+
+The native DeepAgents `PatchPlan` schema requires two pre-patch localization
+fields in addition to the bounded text replacement: `failure_mechanism` and
+`target_rationale`. PatchSmith stores them as `failure_localization` metadata on
+the plan trace. This makes the agent state the controlling mechanism before the
+safety gate applies a diff, and it gives retry/debug reports a concrete claim to
+compare against sandbox failures.
 
 #### Edit node
 
@@ -376,7 +399,7 @@ Outputs:
 ```yaml
 experiment_name: retrieval_ablation_v1
 dataset: seeded_bugs_v1
-runtime: langgraph
+runtime: deepagents
 model: default_strong
 retrieval_strategy: code_context_graph
 max_iterations: 3
@@ -434,7 +457,7 @@ Configuration should be file-based and reproducible.
 Example:
 
 ```yaml
-runtime: langgraph
+runtime: deepagents
 retrieval:
   strategy: hybrid_v0
   max_files: 8
@@ -454,7 +477,7 @@ patch_search:
 1. Run model-free repo clone and indexing.
 2. Implement sandbox command runner.
 3. Implement basic retrieval.
-4. Implement LangGraph repair graph with mock model.
+4. Implement DeepAgents repair graph with mock model.
 5. Connect real model calls.
 6. Add diff report.
 7. Add evaluation runner.

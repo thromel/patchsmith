@@ -2,7 +2,7 @@
 
 ## Agent runtime
 
-The orchestration implementation used to execute the repair workflow. Examples include LangGraph, DeepAgents, OpenAI Agents SDK, Agentless baseline, or tree-search runtime.
+The orchestration implementation used to execute the repair workflow. PatchSmith's production agent runtime is DeepAgents; agentless and heuristic modes are evaluation controls.
 
 ## Agentless baseline
 
@@ -18,11 +18,7 @@ The process of selecting and formatting retrieved repository context for model i
 
 ## DeepAgents runtime
 
-An experimental DeepAgents-backed runtime behind PatchSmith's bounded planner/edit contract. It supports offline adapter evidence and native live-model planning; current saved live evidence uses `deepagents_openai_chat` on `gpt-5.4-mini`.
-
-## OpenAI Agents runtime
-
-An experimental runtime adapter for the OpenAI Agents SDK scaffold. Current local evidence uses dependency-gated offline compatibility mode behind PatchSmith's bounded planner/edit contract; live OpenAI Agents package/model execution is a separate calibration step.
+An experimental runtime adapter for the DeepAgents scaffold. Current local evidence uses dependency-gated offline compatibility mode behind PatchSmith's bounded planner/edit contract; live DeepAgents package/model execution is a separate calibration step.
 
 ## Evaluation harness
 

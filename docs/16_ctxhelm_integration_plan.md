@@ -14,7 +14,7 @@ This integration is intentionally scoped: `ctxhelm` helps PatchSmith decide what
 
 A coding-agent portfolio project becomes stronger if it can compare two kinds of intelligence:
 
-1. **Agent intelligence**: how LangGraph, DeepAgents, OpenAI Agents SDK, and Agentless scaffolds plan, edit, test, and recover.
+1. **Agent intelligence**: how DeepAgents plans, edits, reviews, tests, and recovers compared with deterministic controls.
 2. **Context intelligence**: how target files, symbols, related tests, graph neighbors, co-change hints, and context packs are selected before the agent edits anything.
 
 `ctxhelm` is a strong fit for the second category because it is local-first, read-only, agent-native, and exposed through both CLI and MCP surfaces.
@@ -29,7 +29,7 @@ GitHub issue
   -> ctxhelm indexes safe repo metadata
   -> ctxhelm prepares task-conditioned context plan
   -> PatchSmith normalizes plan into its internal ContextBundle
-  -> LangGraph/DeepAgents runtime consumes ContextBundle
+  -> DeepAgents runtime consumes ContextBundle
   -> PatchSmith edits, tests, evaluates, traces, and reports
 ```
 
@@ -243,7 +243,7 @@ Add these lanes to retrieval and end-to-end evals:
 The ctxhelm integration is acceptable when:
 
 - a seeded bug run can use ctxhelm to produce target files and related tests,
-- the LangGraph runtime can consume the normalized `ContextBundle`,
+- the DeepAgents runtime can consume the normalized `ContextBundle`,
 - at least one sandboxed test command suggestion is policy-checked before execution,
 - trace events show ctxhelm calls and outputs without source leakage,
 - evaluation can compare `native_keyword` vs `ctxhelm_cli`,
@@ -266,7 +266,7 @@ The ctxhelm integration is acceptable when:
 
 ### Step 3: Runtime integration
 
-- Add a LangGraph node: `context_broker_node`.
+- Add a DeepAgents node: `context_broker_node`.
 - Convert `ContextBundle` into agent-readable context.
 - Store `ContextBrokerInvocation` rows.
 

@@ -1,4 +1,4 @@
-# ADR 0003: Put Frameworks Behind Runtime Adapters
+# ADR 0003: Keep DeepAgents Behind the Runtime Boundary
 
 ## Status
 
@@ -6,13 +6,13 @@ Accepted
 
 ## Context
 
-PatchSmith Research should include industry-relevant frameworks and research-oriented scaffolds. Candidate runtimes include LangGraph, DeepAgents, OpenAI Agents SDK, Agentless baseline, and tree-search mode.
+PatchSmith Research now standardizes on DeepAgents as the only production agent framework. Deterministic and agentless baselines remain useful for evaluation, but they are controls rather than competing agent frameworks.
 
 Without an adapter boundary, the project can become tightly coupled to one framework and difficult to evaluate or change.
 
 ## Decision
 
-Define a common `AgentRuntime` interface and implement each framework as an adapter.
+Keep the common `AgentRuntime` interface and implement DeepAgents behind that boundary.
 
 ```python
 class AgentRuntime:
@@ -22,32 +22,29 @@ class AgentRuntime:
 
 Supported runtime implementations:
 
-- `LangGraphRuntime`,
 - `DeepAgentsRuntime`,
-- `OpenAIAgentsRuntime`,
-- `AgentlessRuntime`,
-- `TreeSearchRuntime`.
+- `HeuristicRuntime`,
+- `AgentlessRuntime`.
 
 ## Consequences
 
 ### Positive
 
-- Enables fair scaffold comparison.
-- Reduces lock-in.
+- Keeps DeepAgents isolated from domain models.
+- Preserves fair baseline comparison.
 - Keeps domain models clean.
+- Lets PatchSmith expose harness-owned artifacts, such as `/.patchsmith/AGENTS.md`,
+  repair skills, and `/.patchsmith/source-hints.md`, without leaking framework
+  objects into storage or evaluation code.
 - Allows experiments without rewriting core systems.
 
 ### Negative
 
 - Requires careful interface design.
-- Some framework-specific features may not map cleanly.
+- Some DeepAgents-specific features may not map cleanly.
 - Adapter layer adds upfront complexity.
 
 ## Alternatives considered
-
-### Single-framework architecture
-
-Rejected because scaffold comparison is a core research goal.
 
 ### Framework-free architecture
 

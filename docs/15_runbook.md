@@ -40,13 +40,13 @@ PYTHONPATH=src python3 -m patchsmith.cli run \
   --json
 ```
 
-Expected future LangGraph command:
+Expected future DeepAgents command:
 
 ```bash
 patchsmith run \
   --repo https://github.com/example/repo \
   --issue-file examples/issues/issue_001.md \
-  --runtime langgraph \
+  --runtime deepagents \
   --retrieval hybrid_v0 \
   --test-command "python -m pytest"
 ```
@@ -103,30 +103,30 @@ PYTHONPATH=src python3 -m patchsmith.cli eval-repair \
   --json
 ```
 
-LangGraph orchestration evaluation with the current deterministic planner:
+DeepAgents orchestration evaluation with the current deterministic planner:
 
 ```bash
 PYTHONPATH=src python3 -m patchsmith.cli eval-repair \
   --dataset evals/tasks/seeded_bugs_v1 \
-  --runtime langgraph \
+  --runtime deepagents \
   --context-provider native_hybrid \
-  --output artifacts/experiments/langgraph_repair_eval_v1 \
+  --output artifacts/experiments/deepagents_repair_eval_v1 \
   --json
 ```
 
-LangGraph evaluation through the offline model-planner contract:
+DeepAgents evaluation through the offline model-planner contract:
 
 ```bash
 PYTHONPATH=src python3 -m patchsmith.cli eval-repair \
   --dataset evals/tasks/seeded_bugs_v1 \
-  --runtime langgraph \
+  --runtime deepagents \
   --planner fake_model \
   --context-provider native_hybrid \
-  --output artifacts/experiments/langgraph_model_repair_eval_v1 \
+  --output artifacts/experiments/deepagents_model_repair_eval_v1 \
   --json
 ```
 
-`fake_model` is an offline JSON model double. It exercises prompt construction, model-output parsing, retrieved-path validation, LangGraph patch application, reports, and eval metrics without live credentials.
+`fake_model` is an offline JSON model double. It exercises prompt construction, model-output parsing, retrieved-path validation, DeepAgents patch application, reports, and eval metrics without live credentials.
 
 Public issue corpus validation:
 
@@ -363,33 +363,42 @@ PYTHONPATH=src python3 -m patchsmith.cli eval-scaffold \
   --dataset evals/tasks/seeded_bugs_v1 \
   --variant agentless \
   --variant heuristic \
-  --variant langgraph \
-  --variant langgraph_fake_model \
   --variant deepagents \
-  --variant openai_agents \
   --context-provider native_hybrid \
   --output artifacts/experiments/scaffold_comparison_v1 \
   --json
 ```
 
 The scaffold report includes patch/test rates, latency, trace event counts, runtime node counts, failed trace events, retry events, and a 0-5 debug score.
-The `deepagents` and `openai_agents` variants currently use PatchSmith's dependency-gated adapters in offline compatibility mode unless their optional extras are installed.
+The `deepagents` variant uses PatchSmith's dependency-gated DeepAgents adapter unless the native live planner is selected separately.
 
-OpenAI Agents SDK adapter smoke:
+Complex public-issue benchmark summary:
 
 ```bash
-python -m pip install -e ".[dev,openai-agents]"
-
-PYTHONPATH=src python3 -m patchsmith.cli eval-repair \
-  --dataset evals/tasks/seeded_bugs_v1 \
-  --runtime openai_agents \
-  --planner heuristic \
-  --context-provider native_hybrid \
-  --output artifacts/experiments/openai_agents_adapter_smoke_v1 \
+PYTHONPATH=src python3 -m patchsmith.cli eval-complex \
+  --attempt-dir artifacts/experiments/public_issue_corpus_v1 \
+  --benchmark public_issue_smoke_v1_latest_all \
+  --output artifacts/experiments/complex_deepagents_public_issue_smoke_v1_latest_all \
   --json
 ```
 
-This proves the `openai-agents` import boundary and PatchSmith adapter contract when the extra is installed. It does not prove live OpenAI Agents model quality unless credentials, model config, and non-offline provider metadata are present.
+This reads completed public-issue repair-attempt artifacts and summarizes validation rate, patch-generation rate, trace complexity, retry-feedback artifact coverage, DeepAgents trajectory score, model provider, tokens, and estimated cost. It does not execute tests or call a model.
+
+DeepAgents adapter smoke:
+
+```bash
+python -m pip install -e ".[dev,deepagents]"
+
+PYTHONPATH=src python3 -m patchsmith.cli eval-repair \
+  --dataset evals/tasks/seeded_bugs_v1 \
+  --runtime deepagents \
+  --planner heuristic \
+  --context-provider native_hybrid \
+  --output artifacts/experiments/deepagents_adapter_smoke_v1 \
+  --json
+```
+
+This proves the `deepagents` import boundary and PatchSmith adapter contract when the extra is installed. It does not prove live DeepAgents model quality unless credentials, model config, and non-offline provider metadata are present.
 
 Patch-search evaluation:
 
@@ -525,7 +534,7 @@ PYTHONPATH=src python3 -m patchsmith.cli environment-readiness \
   --json
 ```
 
-The environment-readiness report consolidates saved Docker smoke evidence with host Docker hints, current OpenAI credential/package readiness, optional DeepAgents/OpenAI Agents package importability, saved adapter evidence, and remediation commands. It does not execute Docker smoke or call live model providers.
+The environment-readiness report consolidates saved Docker smoke evidence with host Docker hints, current OpenAI credential/package readiness, optional DeepAgents package importability, saved adapter evidence, and remediation commands. It does not execute Docker smoke or call live model providers.
 
 Evidence refresh:
 
@@ -538,7 +547,28 @@ PYTHONPATH=src python3 -m patchsmith.cli refresh-evidence \
   --json
 ```
 
-The evidence refresh command regenerates the lightweight review/status reports in dependency order: artifact index, failure report, demo readiness, live-calibration readiness and plan, environment readiness, demo script/media, final evaluation, launch blockers, MVP progress, delivery audit, project status, and release hygiene. It skips the full quality gate and Docker smoke by default; pass `--include-quality-gate` only when the refresh should also run compile, pytest, and package build, and pass `--include-docker-smoke` when the Docker sandbox evidence should be refreshed before launch/status reports.
+The evidence refresh command regenerates the lightweight review/status reports in dependency order: artifact index, failure report, demo readiness, live-calibration readiness and plan, environment readiness, demo script/media, final evaluation, launch blockers, MVP progress, delivery audit, project status, and release hygiene. It skips the full quality gate, Docker smoke, and complex suite aggregation by default; pass `--include-quality-gate` only when the refresh should also run compile, pytest, and package build, pass `--include-docker-smoke` when the Docker sandbox evidence should be refreshed before launch/status reports, and pass `--complex-suite-spec evals/issue_corpora/public_issue_smoke_v1/complex_suite.template.json` when the live-agent suite gate should be regenerated from existing artifacts without new model calls. Add `min_target_alignment_rate` to the suite gate when the report should enforce that final patches stayed inside paths localized by explicit target candidates or by DeepAgents' structured failure-localization rationale for the selected patch plan. Use `max_selected_*_per_validated_task` cost/token/response caps to bound aggregate retained-attempt spend, `max_attempted_*_per_validated_task` caps to catch expensive exploratory attempts, and `max_*_task_*` caps to catch single-task cost, token, or response-count outliers even when the suite average passes. The complex summary also includes context-efficiency proxies for selected attempts: virtual files, virtual files per validated task, tokens per virtual file, responses per virtual file, and selected context-target recall/precision when saved traces include both localized targets and mounted source paths. It reports repo-instructions manifest tasks and read-first rate when DeepAgents mounted scoped AGENTS.md-style repository guidance for selected paths. Use `min_repo_instructions_manifest_rate` and `min_repo_instructions_read_first_rate` when a context-policy lane must prove those scoped instructions were mounted and read before source edits. Use `max_selected_virtual_files_per_validated_task`, `max_selected_tokens_per_virtual_file`, and `max_selected_responses_per_virtual_file` to cap context-efficiency proxies. Use `min_selected_context_target_recall` to catch missing localized target context and `min_selected_context_target_precision` to catch over-broad mounted source context. Use `min_acceptance_rubric_manifest_rate` and `min_acceptance_rubric_read_first_rate` when a verifier lane must prove the task-local acceptance rubric was mounted and read before final output. Use `min_acceptance_rubric_alignment_rate` when the lane must also prove deterministic rubric alignment: read-first verifier coverage, mounted patch target, target-aligned localization, generated patch, and no patch-quality warning.
+Use `min_selected_progress_score` when a suite must prove selected attempts reached a minimum partial-progress stage even if a task is not cleanly validated; the score separates reproduced input, patch generation, target-aligned patches, quality-warning test passes, and clean validation.
+Complex summaries also include `failure_class_counts` and `selected_failure_class_counts`. These deterministic artifact labels separate clean validation from quality-risk passes, preflight blocks, missing reproduction, no-patch attempts, target-misaligned patches, runtime/tool failures, retry exhaustion, and validation failures; they are triage labels, not human root-cause annotations.
+They also include `harness_layer_counts` and
+`selected_harness_layer_counts`, which collapse the same evidence into the
+implicated harness layer: budget, model, sandbox, preflight, reproduction,
+planning, context, patch quality, retry, runtime, validation, or orchestration.
+Use those counts when deciding whether a failed live lane needs a context-policy
+edit, retry-policy edit, sandbox/readiness fix, or validation-harness repair.
+The equivalent `refresh-evidence` flags are `--complex-suite-min-acceptance-rubric-manifest-rate`, `--complex-suite-min-acceptance-rubric-read-first-rate`, and `--complex-suite-min-acceptance-rubric-alignment-rate`.
+Trajectory summaries keep the legacy agent trajectory score stable and report contextual-verifier coverage as a separate rate, so older score thresholds do not move when verifier instrumentation is added. Use `min_contextual_verifier_rate`, `--min-contextual-verifier-rate`, or `--complex-suite-min-contextual-verifier-rate` when a suite must prove verifier coverage from saved traces. Use `evals/issue_corpora/public_issue_smoke_v1/complex_suite_verifier.template.json` for the next rubric-enabled live lane; keep `complex_suite.template.json` as the historical pre-rubric baseline.
+
+Before citing a complex suite, run the spec preflight:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli eval-complex-suite \
+  --suite-spec evals/issue_corpora/public_issue_smoke_v1/complex_suite.template.json \
+  --validate-only \
+  --json
+```
+
+This follows the same engineering lesson behind current coding-agent systems: [SWE-agent](https://arxiv.org/abs/2405.15793) treats the agent-computer interface as a first-class design object, [Agentless](https://arxiv.org/abs/2407.01489) separates localization/repair/validation so claims stay auditable, and [OpenHands](https://arxiv.org/abs/2407.16741) emphasizes sandboxed execution plus benchmark integration. PatchSmith's suite spec preflight applies that pattern to benchmark evidence by checking the declared interface before aggregating saved traces.
 
 Live calibration readiness:
 
@@ -676,7 +706,7 @@ PYTHONPATH=src python3 -m patchsmith.cli run \
   --repo evals/tasks/seeded_bugs_v1/task_001_logic_bug/repo \
   --issue-file evals/tasks/seeded_bugs_v1/task_001_logic_bug/issue.md \
   --test-command "python3 -m pytest" \
-  --runtime langgraph \
+  --runtime deepagents \
   --planner openai \
   --max-retries 1 \
   --context-provider native_hybrid \
@@ -694,6 +724,84 @@ export PATCHSMITH_OPENAI_OUTPUT_COST_PER_1M=...
 Without those rates, PatchSmith still records provider, response ID, and usage token counts when the provider returns them, but the estimated cost remains `n/a`.
 
 `--max-retries` controls extra graph-level planning/edit retries after the first attempt. The runtime trace records retry decisions under `runtime.retry`; sandbox test execution still happens afterward in the workflow layer.
+
+Optional DeepAgents context-budget experiments:
+
+```bash
+export PATCHSMITH_DEEPAGENTS_SUBAGENTS=auto
+export PATCHSMITH_DEEPAGENTS_CONTEXT_MODE=span
+export PATCHSMITH_DEEPAGENTS_CONTEXT_WINDOW_LINES=80
+PYTHONPATH=src python -m patchsmith.cli execute-public-issue-repairs \
+  --deepagents-max-context-files 2 ...
+```
+
+The default `0` preserves the full retrieved context. Positive values cap the
+repository files mounted into the DeepAgents virtual filesystem while keeping
+reviewed source hints, validation fixtures, and strong target-localization
+signals such as symbol-qualified control points first. Treat this as an
+experiment knob: validate token usage, validation status, target alignment, and
+cost before adopting a capped configuration in a suite.
+`PATCHSMITH_DEEPAGENTS_CONTEXT_MODE=span` is an additional opt-in compression
+mode that keeps mounted repository paths stable while narrowing each source file
+to a focused line window around matched symbols, runtime-cache cues, or reviewed
+source hints. Use it only in saved calibration lanes until it proves lower
+tokens without reducing validation or target alignment. Complex benchmark
+reports expose DeepAgents virtual-file count, context-cap usage,
+repair-interface manifest coverage, acceptance-rubric manifest coverage,
+read-first rates, token, and cost metrics.
+Public issue repair summaries expose actual model calls, tokens, and estimated
+cost. Post-run live-cost, response-count, and token-count cap overages are
+treated as failed claims rather than validated repairs.
+Use `--max-actual-model-responses` and `--max-actual-model-tokens` when a live
+benchmark lane needs hard claim limits for DeepAgents' internal call volume.
+PatchSmith mounts those limits into `/.patchsmith/repair-interface.md` as a
+resource budget. For native DeepAgents runs, the response cap also installs an
+active model-callback tripwire that blocks the next model response once the cap
+is exhausted; token caps are evaluated from recorded provider usage after each
+response and remain strict post-run claim gates. `--deepagents-subagents auto`
+makes budgeted first attempts prefer compact inline localization/review while
+keeping feedback retries eligible for subagents. When the remaining response
+budget is six or fewer, the repair interface enters budget-critical mode: it
+stops requiring generic memory/skill reads, includes a compact Fast Patch Packet
+for the first preferred source/symbol, and asks the model to return a structured
+patch as soon as the controlling branch is identifiable.
+Feedback retries write `feedback/retry_feedback_attempt_*_to_*.md` and emit
+`retry_failure_class` in the `feedback_retry` trace payload. Use that field to
+check whether the next attempt was guided by validation failure, safety-gate
+rejection, patch-quality risk, repeated-target failure, or missing validation
+instead of a blind retry. Complex benchmark summaries aggregate those payloads
+as `retry_failure_class_counts` next to `retry_label_counts`.
+Complex reports also include `process_quality_label_counts`,
+`process_quality_flag_counts`, and `process_risky_validated_tasks`. Treat these
+as trace-derived process diagnostics: a run can pass validation while still
+being flagged for missing verification, blind retry behavior, repeated failed
+event churn, or editing after successful verification. Use
+`min_process_quality_score` and `max_process_risky_validated_tasks` in suite
+specs, or the matching `--min-process-quality-score` /
+`--max-process-risky-validated-tasks` CLI flags, when a benchmark lane should
+fail on likely lucky-pass process risk.
+`PATCHSMITH_DEEPAGENTS_SUBAGENTS=auto` is a separate efficiency experiment:
+it keeps subagents for retries, reviewed source hints, validation fixtures, and
+multi-context repairs, but disables them for simple single-control-point runs.
+`inline` disables subagents globally and should be used only when reproducing
+that ablation. Compare any non-default mode against `full` with the same task,
+model, sandbox, and suite gates before using it in a benchmark claim.
+Native DeepAgents runs also mount `/.patchsmith/repair-interface.md`, a compact
+run interface that lists required reads, mounted source paths, subagent routing,
+and the bounded output contract. They also mount
+`/.patchsmith/acceptance-rubric.md`, a task-local verifier checklist generated
+from issue evidence, mounted files, preferred target paths/symbols, validation
+fixtures, and unsafe-patch exclusions. When the target repository has
+AGENTS.md-style files at the root or ancestors of mounted context paths,
+PatchSmith mounts a capped `/.patchsmith/repo-instructions.md` manifest. Treat
+that file as scoped constraints for the current mounted paths, not as broad
+repository context. Check
+`repair_interface_manifest_path`, `repair_interface_manifest_read_first`,
+`acceptance_rubric_manifest_path`, and
+`acceptance_rubric_manifest_read_first`, plus
+`repo_instructions_manifest_path` and
+`repo_instructions_manifest_read_first`, in saved DeepAgents contract metadata
+before comparing traces from different experiment slices.
 
 ## Common failures
 

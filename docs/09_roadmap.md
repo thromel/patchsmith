@@ -48,7 +48,7 @@ Run one issue through one end-to-end repair attempt.
 - repository clone,
 - basic file index,
 - keyword retrieval,
-- LangGraph repair graph,
+- DeepAgents repair graph,
 - file read/search tools,
 - patch application,
 - Docker test runner,
@@ -132,9 +132,9 @@ Compare agent scaffolds without rewriting the system.
 
 - `AgentRuntime` interface,
 - Agentless runtime,
-- LangGraph runtime cleanup,
-- DeepAgents runtime adapter,
-- optional OpenAI Agents SDK adapter,
+- DeepAgents runtime cleanup,
+- deterministic baseline controls,
+- scaffold comparison report,
 - scaffold comparison report.
 
 ### Exit criteria
@@ -195,8 +195,10 @@ Add high-signal research features selectively.
 - episodic memory,
 - gated skill registry,
 - DSPy optimization,
-- tree-search mode,
+- DeepAgents trajectory analysis,
 - generated distinguishing tests.
+- structured retry labels and agent-computer-interface improvements from
+  `docs/19_agent_rnd_benchmark_plan.md`.
 
 ### Exit criteria
 

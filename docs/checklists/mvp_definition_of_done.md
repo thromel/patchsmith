@@ -9,7 +9,7 @@ The MVP is complete when all items below are satisfied.
 - [ ] System records commit hash.
 - [ ] System builds basic file index.
 - [ ] System retrieves candidate files.
-- [ ] LangGraph repair loop runs.
+- [ ] DeepAgents repair loop runs.
 - [ ] Agent can read files through bounded tool.
 - [ ] Agent can apply patch through controlled tool.
 - [ ] Tests run in Docker sandbox.

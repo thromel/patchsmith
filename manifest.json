@@ -4,7 +4,6 @@
     "CHANGELOG.md",
     "LICENSE",
     "README.md",
-    "adr/0001-use-langgraph-as-primary-runtime.md",
     "adr/0002-use-docker-sandbox-for-execution.md",
     "adr/0003-frameworks-behind-runtime-adapters.md",
     "adr/0004-use-code-context-graph-for-retrieval.md",
@@ -29,6 +28,7 @@
     "docs/16_ctxhelm_integration_plan.md",
     "docs/17_sprint_plans.md",
     "docs/18_delivery_process.md",
+    "docs/19_agent_rnd_benchmark_plan.md",
     "docs/artifact_gallery.md",
     "docs/benchmark_manifest_schema.md",
     "docs/comparison_matrix.md",
@@ -83,6 +83,7 @@
     "docs/16_ctxhelm_integration_plan.md",
     "docs/17_sprint_plans.md",
     "docs/18_delivery_process.md",
+    "docs/19_agent_rnd_benchmark_plan.md",
     "docs/artifact_gallery.md"
   ]
 }

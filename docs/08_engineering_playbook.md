@@ -86,7 +86,7 @@ For a solo portfolio project, this can be simplified:
 Use clear commit prefixes:
 
 ```text
-feat: add LangGraph MVP repair loop
+feat: add DeepAgents MVP repair loop
 fix: handle sandbox command timeout
 exp: run retrieval ablation v1
 docs: add safety threat model
@@ -157,7 +157,7 @@ Example:
 
 | Milestone | User-visible outcome | Engineering artifact | Evaluation artifact |
 |---|---|---|---|
-| MVP Agent | issue-to-diff report | LangGraph runtime | 5 seeded bug runs |
+| MVP Agent | issue-to-diff report | DeepAgents runtime | 5 seeded bug runs |
 | Advanced retrieval | retrieved context view | Code Context Graph | retrieval ablation |
 | Patch search | candidate comparison | patch selector | success@k report |
 

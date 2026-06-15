@@ -12,7 +12,7 @@ PatchSmith Research is both a working engineering project and a portfolio artifa
 
 Use this description:
 
-> PatchSmith Research is an AI software-maintenance agent and evaluation lab that converts GitHub issues into tested patch diffs. It uses LangGraph-based orchestration, codebase retrieval, sandboxed execution, patch candidate search, and SWE-bench-style evaluation to study what makes coding agents reliable.
+> PatchSmith Research is an AI software-maintenance agent and evaluation lab that converts GitHub issues into tested patch diffs. It uses DeepAgents-based orchestration, codebase retrieval, sandboxed execution, patch candidate search, and SWE-bench-style evaluation to study what makes coding agents reliable.
 
 ## Public repository requirements
 
@@ -116,7 +116,7 @@ PYTHONPATH=src python3 -m patchsmith.cli live-calibration \
   --json
 ```
 
-Current live calibration readiness output is `calibrated`: saved artifacts include native DeepAgents `deepagents_openai_chat` runs with token and cost metadata, including a 10-task seeded eval on `gpt-5.4-mini`. The originally requested `gpt-5.5-mini` model was not exposed by the configured OpenAI account, so release claims must name the actual tested model. OpenAI Agents SDK still has package-backed adapter smoke evidence only; this proves optional-package import compatibility, not live OpenAI Agents model quality.
+Current live calibration readiness output is `calibrated`: saved artifacts include native DeepAgents `deepagents_openai_chat` runs with token and cost metadata, including a 10-task seeded eval on `gpt-5.4-mini`. The originally requested `gpt-5.5-mini` model was not exposed by the configured OpenAI account, so release claims must name the actual tested model. Package-backed DeepAgents smoke evidence proves the optional-package import boundary; live quality claims must cite the native live-provider artifacts.
 
 Generate the live calibration execution plan:
 
@@ -191,7 +191,7 @@ PYTHONPATH=src python3 -m patchsmith.cli refresh-evidence \
   --json
 ```
 
-Current evidence-refresh output records the review-artifact regeneration order, per-step status, duration, output paths, and skipped quality-gate status. Use it after code/doc changes to refresh portfolio evidence without accidentally running Docker or live-provider work.
+Current evidence-refresh output records the review-artifact regeneration order, per-step status, duration, output paths, and skipped heavyweight gates. Use it after code/doc changes to refresh portfolio evidence without accidentally running Docker or live-provider work. Pass `--complex-suite-spec evals/issue_corpora/public_issue_smoke_v1/complex_suite.template.json` when saved public-issue repair attempts should be re-aggregated into `complex_benchmark_suite_report.md` and `complex_benchmark_suite_gate.json`; this reads existing artifacts only and does not call a model provider.
 
 Run the executable quality gate:
 
@@ -539,9 +539,9 @@ Focus:
 ## Resume bullets
 
 ```text
-Built PatchSmith Research, an AI software-maintenance agent that converts GitHub issues into tested patch diffs using LangGraph orchestration, hybrid code retrieval, opt-in Docker sandboxing, and evaluation-driven development.
+Built PatchSmith Research, an AI software-maintenance agent that converts GitHub issues into tested patch diffs using DeepAgents orchestration, hybrid code retrieval, opt-in Docker sandboxing, and evaluation-driven development.
 
-Implemented a research harness comparing Agentless, LangGraph, DeepAgents, OpenAI Agents SDK, and patch-search scaffolds across success rate, retrieval hit rate, cost, latency, and failure modes.
+Implemented a research harness comparing DeepAgents against agentless and deterministic controls across success rate, retrieval hit rate, cost, latency, and failure modes.
 
 Designed a Code Context Graph combining files, symbols, imports, tests, stack traces, and retrieval signals to improve fault-localization analysis over simple embeddings.
 

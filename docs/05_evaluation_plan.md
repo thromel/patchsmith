@@ -190,6 +190,14 @@ Initial target:
 | Wall-clock latency | Total run duration |
 | Sandbox latency | Time spent executing commands |
 | Cost per successful patch | Total cost divided by successful tasks |
+| Attempted cost per validated task | Total model cost across evaluated attempts divided by validated tasks |
+| Selected cost per validated task | Model cost for the retained best attempt per task divided by validated tasks |
+| Attempted tokens per validated task | Total model tokens across evaluated attempts divided by validated tasks |
+| Selected tokens per validated task | Model tokens for the retained best attempt per task divided by validated tasks |
+| Max attempted task cost | Highest model cost observed for any attempted task |
+| Max selected task cost | Highest model cost among retained selected attempts |
+| Max attempted task tokens | Highest model token count observed for any attempted task |
+| Max selected task tokens | Highest model token count among retained selected attempts |
 
 ### Safety metrics
 
@@ -228,10 +236,8 @@ Secondary metrics:
 Compare:
 
 - Agentless,
-- LangGraph,
-- DeepAgents,
-- OpenAI Agents SDK,
-- tree-search mode.
+- Heuristic baseline,
+- DeepAgents.
 
 Primary metric:
 
@@ -331,7 +337,7 @@ Required:
 
 - at least 10 seeded tasks,
 - baseline runtime implemented,
-- LangGraph runtime implemented,
+- DeepAgents runtime implemented,
 - retrieval metrics implemented.
 
 ### Gate 3: Portfolio readiness
@@ -356,5 +362,5 @@ Required:
 | Experiment | Dataset | Runtime | Retrieval | Candidate count | Success | Avg cost | Avg latency | Notes |
 |---|---|---|---|---:|---:|---:|---:|---|
 | baseline_v0 | seeded_bugs_v1 | agentless | keyword | 1 | TBD | TBD | TBD | First baseline |
-| langgraph_v0 | seeded_bugs_v1 | langgraph | hybrid_v0 | 1 | TBD | TBD | TBD | MVP runtime |
-| patch_search_v0 | seeded_bugs_v1 | langgraph | hybrid_v0 | 3 | TBD | TBD | TBD | Research mode |
+| deepagents_v0 | seeded_bugs_v1 | deepagents | hybrid_v0 | 1 | TBD | TBD | TBD | MVP runtime |
+| patch_search_v0 | seeded_bugs_v1 | deepagents | hybrid_v0 | 3 | TBD | TBD | TBD | Research mode |

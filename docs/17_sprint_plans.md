@@ -198,7 +198,7 @@ In scope:
 - file read/search tools,
 - structured edit or unified diff application,
 - deterministic fake runtime for tests,
-- minimal model-backed LangGraph runtime behind `AgentRuntime`,
+- minimal model-backed DeepAgents runtime behind `AgentRuntime`,
 - patch candidate artifact,
 - retry limit,
 - final review node.
@@ -219,23 +219,23 @@ Acceptance criteria:
 
 Current status:
 
-Started. A deterministic `heuristic` runtime and a LangGraph orchestration runtime now run behind the `AgentRuntime` boundary, apply safe text replacements inside the run workspace, emit patch candidate metadata, export unified diffs, and pass the 10-task seeded smoke suite through `eval-repair`. LangGraph now has planner selection with `heuristic`, `fake_model`, and `openai`; `fake_model` exercises the prompt/JSON model-backed planner seam offline, validates retrieved repo-relative paths, and produces a 10-task seeded evaluation artifact. `openai` is credential-gated through the OpenAI Responses API and records token/cost metadata when available. The LangGraph trace now includes `triage`, `plan`, `edit`, `analyze`, `retry`, and `review`; sandbox `test`, post-test `analyze`, and `report` events remain in the workflow layer. Run reports now include a `Repair Analysis` section and a dynamic final verdict such as `patch_validated`. Richer model-driven test-failure analysis is still pending.
+Started. A deterministic `heuristic` runtime and a DeepAgents orchestration runtime now run behind the `AgentRuntime` boundary, apply safe text replacements inside the run workspace, emit patch candidate metadata, export unified diffs, and pass the 10-task seeded smoke suite through `eval-repair`. DeepAgents now has planner selection with `heuristic`, `fake_model`, and `openai`; `fake_model` exercises the prompt/JSON model-backed planner seam offline, validates retrieved repo-relative paths, and produces a 10-task seeded evaluation artifact. `openai` is credential-gated through the OpenAI Responses API and records token/cost metadata when available. The DeepAgents trace now includes `triage`, `plan`, `edit`, `analyze`, `retry`, and `review`; sandbox `test`, post-test `analyze`, and `report` events remain in the workflow layer. Run reports now include a `Repair Analysis` section and a dynamic final verdict such as `patch_validated`. Richer model-driven test-failure analysis is still pending.
 
 Latest verification command:
 
 ```bash
 PYTHONPATH=src python3 -m patchsmith.cli eval-repair \
   --dataset evals/tasks/seeded_bugs_v1 \
-  --runtime langgraph \
+  --runtime deepagents \
   --planner fake_model \
   --context-provider native_hybrid \
-  --output artifacts/experiments/langgraph_model_repair_eval_v1 \
+  --output artifacts/experiments/deepagents_model_repair_eval_v1 \
   --json
 ```
 
 Latest evidence:
 
-- `artifacts/experiments/langgraph_model_repair_eval_v1/repair_report.md`,
+- `artifacts/experiments/deepagents_model_repair_eval_v1/repair_report.md`,
 - attempted tasks: 10,
 - completed tasks: 10,
 - patch generated rate: 1.00,
@@ -559,7 +559,7 @@ Compare at least two agent scaffolds under the same task and model conditions.
 In scope:
 
 - Agentless baseline,
-- LangGraph runtime,
+- DeepAgents runtime,
 - runtime config,
 - comparable traces,
 - scaffold comparison report.
@@ -576,7 +576,7 @@ Acceptance criteria:
 
 Current status:
 
-Started. `eval-scaffold` now compares multiple repair scaffolds under the same dataset, context provider, sandbox, and repair-evaluation metrics. The comparison includes `agentless`, `heuristic`, `langgraph`, `langgraph_fake_model`, the dependency-gated `deepagents` adapter, and the dependency-gated `openai_agents` adapter in offline compatibility mode; each scaffold also keeps its own nested repair report and run artifacts.
+Started. `eval-scaffold` now compares DeepAgents against agentless and deterministic controls under the same dataset, context provider, sandbox, and repair-evaluation metrics; each scaffold also keeps its own nested repair report and run artifacts.
 
 Latest verification command:
 
@@ -585,10 +585,7 @@ PYTHONPATH=src python3 -m patchsmith.cli eval-scaffold \
   --dataset evals/tasks/seeded_bugs_v1 \
   --variant agentless \
   --variant heuristic \
-  --variant langgraph \
-  --variant langgraph_fake_model \
   --variant deepagents \
-  --variant openai_agents \
   --context-provider native_hybrid \
   --output artifacts/experiments/scaffold_comparison_v1 \
   --json
@@ -599,10 +596,7 @@ Latest evidence:
 - `artifacts/experiments/scaffold_comparison_v1/scaffold_report.md`,
 - `agentless`: patch generated 0.00, targeted tests passed 0.00, average latency 496ms, average trace events 9.0, runtime nodes 0.0, debug score 4.0,
 - `heuristic`: patch generated 1.00, targeted tests passed 1.00, average latency 469ms, average trace events 12.0, runtime nodes 3.0, debug score 5.0,
-- `langgraph`: patch generated 1.00, targeted tests passed 1.00, average latency 512ms, average trace events 15.0, runtime nodes 6.0, retries 1.0, debug score 5.0,
-- `langgraph_fake_model`: patch generated 1.00, targeted tests passed 1.00, average latency 482ms, average trace events 15.0, runtime nodes 6.0, retries 1.0, debug score 5.0, model provider `offline_fake_model`, cost $0.00,
-- `deepagents`: patch generated 1.00, targeted tests passed 1.00, average latency 465ms, average trace events 15.0, runtime nodes 6.0, retries 0.0, debug score 5.0; current evidence uses offline adapter compatibility mode, not live DeepAgents package/model execution.
-- `openai_agents`: patch generated 1.00, targeted tests passed 1.00, average latency 466ms, average trace events 16.0, runtime nodes 7.0, retries 0.0, debug score 5.0; current evidence uses offline adapter compatibility mode, not live OpenAI Agents package/model execution.
+- `deepagents`: patch generated 1.00, targeted tests passed 1.00, average latency 465ms, average trace events 15.0, runtime nodes 6.0, retries 0.0, debug score 5.0; live-provider quality is tracked in separate calibration artifacts.
 
 ### Sprint 8: Multi-Candidate Patch Search
 
@@ -748,7 +742,7 @@ Acceptance criteria:
 
 Current status:
 
-Started. The README now surfaces current seeded-suite metrics, limitations, scaffold comparison, artifact dashboard generation, failure report generation, demo readiness generation, live calibration readiness generation, demo script generation, demo media generation, final evaluation generation, executable quality-gate generation, consolidated project-status generation, evidence-refresh orchestration, launch-blocker remediation commands, public issue reproduction planning, public issue failure-signal discovery, public issue reproduction-spec validation, public issue reproduction execution gating, public issue repair-readiness gating, public issue repair-attempt gating, and release hygiene generation. The failure-analysis surface is generated from saved traces through `inspect-failures`, the launch review surface is generated through `demo-readiness`, the live-provider readiness surface is generated through `live-calibration`, the timed recording script is generated through `demo-script`, demo media is generated through `demo-media`, the portfolio-facing evaluation narrative is generated through `final-evaluation`, the executable verification surface is generated through `quality-gate`, the status briefing surface is generated through `project-status`, the public reproduction handoff surface is generated through `plan-public-issue-reproductions`, the failure-signal discovery surface is generated through `discover-public-issue-failure-signals`, the reproduction-spec validation surface is generated through `validate-public-issue-reproduction-specs`, the reproduction execution surface is generated through `execute-public-issue-reproductions`, the public repair handoff surface is generated through `check-public-issue-repair-readiness`, the repair-attempt surface is generated through `execute-public-issue-repairs`, the review refresh surface is generated through `refresh-evidence`, the blocker backlog is generated through `launch-blockers`, and release checks are generated through `release-hygiene`. Current public issue reproduction planning is warning-class because all three materialized public issue tasks have candidate commands but still need manual failing-signal specs; the planner now emits `public_issue_reproduction_specs_template.json`, accepts a reviewed reproduction-spec overlay, supports non-claiming failure-signal discovery, validates reviewed specs before execution, and the corpus includes `evals/issue_corpora/public_issue_smoke_v1/reproduction_specs.template.json` as the source-controlled authoring template. Current public issue reproduction execution is gated and blocks those tasks until the expected failing signals are encoded; dry-run is the default and `--execute` is required to save stdout/stderr reproduction logs. Current public issue repair readiness is warning-class: all three materialized public issue tasks have runnable validation and saved PatchSmith commands, but all three lack saved failing reproduction evidence. Current readiness is `ready`: seeded-suite evidence is coherent and live DeepAgents provider metadata is saved. Current live calibration readiness is `calibrated`: native DeepAgents has saved `deepagents_openai_chat` runs with token and cost metadata on `gpt-5.4-mini`, while OpenAI Agents SDK remains adapter/package evidence only. Current release hygiene is blocked until implementation changes are committed or intentionally removed. CI workflow coverage, a Mermaid architecture diagram, SVG/PNG demo media, an executable quality-gate report, consolidated project-status report, evidence-refresh orchestration, and dependency-chain launch remediation now exist. The remaining Sprint 10 work is public-issue reproduction evidence plus release hygiene cleanup.
+Started. The README now surfaces current seeded-suite metrics, limitations, scaffold comparison, artifact dashboard generation, failure report generation, demo readiness generation, live calibration readiness generation, demo script generation, demo media generation, final evaluation generation, executable quality-gate generation, consolidated project-status generation, evidence-refresh orchestration, launch-blocker remediation commands, public issue reproduction planning, public issue failure-signal discovery, public issue reproduction-spec validation, public issue reproduction execution gating, public issue repair-readiness gating, public issue repair-attempt gating, and release hygiene generation. The failure-analysis surface is generated from saved traces through `inspect-failures`, the launch review surface is generated through `demo-readiness`, the live-provider readiness surface is generated through `live-calibration`, the timed recording script is generated through `demo-script`, demo media is generated through `demo-media`, the portfolio-facing evaluation narrative is generated through `final-evaluation`, the executable verification surface is generated through `quality-gate`, the status briefing surface is generated through `project-status`, the public reproduction handoff surface is generated through `plan-public-issue-reproductions`, the failure-signal discovery surface is generated through `discover-public-issue-failure-signals`, the reproduction-spec validation surface is generated through `validate-public-issue-reproduction-specs`, the reproduction execution surface is generated through `execute-public-issue-reproductions`, the public repair handoff surface is generated through `check-public-issue-repair-readiness`, the repair-attempt surface is generated through `execute-public-issue-repairs`, the review refresh surface is generated through `refresh-evidence`, the blocker backlog is generated through `launch-blockers`, and release checks are generated through `release-hygiene`. Current public issue reproduction planning is warning-class because all three materialized public issue tasks have candidate commands but still need manual failing-signal specs; the planner now emits `public_issue_reproduction_specs_template.json`, accepts a reviewed reproduction-spec overlay, supports non-claiming failure-signal discovery, validates reviewed specs before execution, and the corpus includes `evals/issue_corpora/public_issue_smoke_v1/reproduction_specs.template.json` as the source-controlled authoring template. Current public issue reproduction execution is gated and blocks those tasks until the expected failing signals are encoded; dry-run is the default and `--execute` is required to save stdout/stderr reproduction logs. Current public issue repair readiness is warning-class: all three materialized public issue tasks have runnable validation and saved PatchSmith commands, but all three lack saved failing reproduction evidence. Current readiness is `ready`: seeded-suite evidence is coherent and live DeepAgents provider metadata is saved. Current live calibration readiness is `calibrated`: native DeepAgents has saved `deepagents_openai_chat` runs with token and cost metadata on `gpt-5.4-mini`; package-backed smoke evidence covers the import boundary. Current release hygiene is blocked until implementation changes are committed or intentionally removed. CI workflow coverage, a Mermaid architecture diagram, SVG/PNG demo media, an executable quality-gate report, consolidated project-status report, evidence-refresh orchestration, and dependency-chain launch remediation now exist. The remaining Sprint 10 work is public-issue reproduction evidence plus release hygiene cleanup.
 
 Latest verification command:
 
@@ -922,8 +916,6 @@ Latest evidence:
 - saved live-provider runs: 0,
 - DeepAgents package-backed runs: 10,
 - DeepAgents compatibility-mode runs: 30,
-- OpenAI Agents package-backed runs: 10,
-- OpenAI Agents compatibility-mode runs: 20,
 - demo script sections: 6,
 - demo script target duration: 3m 10s,
 - demo media: SVG and PNG generated from saved evidence,

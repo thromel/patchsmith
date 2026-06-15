@@ -84,7 +84,7 @@ The demo should show:
 - repository clone at a fixed commit,
 - repo indexing and file search,
 - hybrid retrieval,
-- LangGraph-based repair loop,
+- DeepAgents-based repair loop,
 - Docker-based sandbox execution,
 - patch diff generation,
 - run trace and logs,
@@ -93,8 +93,6 @@ The demo should show:
 
 ### In scope after v1
 
-- DeepAgents runtime adapter,
-- OpenAI Agents SDK runtime adapter,
 - Agentless baseline,
 - Code Context Graph retrieval,
 - multi-candidate patch search,
@@ -128,13 +126,13 @@ The demo should show:
 
 - The system accepts an issue and repository.
 - The system retrieves relevant files.
-- The LangGraph runtime produces a patch attempt.
+- The DeepAgents runtime produces a patch attempt.
 - The sandbox runs tests and captures results.
 - The system returns a final report with a diff and trace.
 
 ### Research success
 
-- At least three agent scaffolds can be compared on the same task set.
+- DeepAgents can be compared against deterministic and agentless baselines on the same task set.
 - At least three retrieval strategies can be compared.
 - At least one patch-search ablation is completed.
 - Results include correctness, cost, latency, and failure-mode analysis.

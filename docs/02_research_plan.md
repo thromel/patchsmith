@@ -23,6 +23,10 @@ This project is an applied research engineering system. It does not need to clai
 
 ## Research questions
 
+See `docs/19_agent_rnd_benchmark_plan.md` for the current DeepAgents and
+coding-agent R&D plan that maps SoTA agent patterns to PatchSmith experiments,
+cost gates, and kill criteria.
+
 ### RQ1: Retrieval quality
 
 Does Code Context Graph retrieval improve fault localization and patch success compared with embeddings-only and keyword-only retrieval?
@@ -47,10 +51,8 @@ How do different agent scaffolds compare on software repair tasks?
 Scaffolds:
 
 - Agentless baseline,
-- LangGraph single repair loop,
-- DeepAgents multi-agent scaffold,
-- OpenAI Agents SDK runtime,
-- tree-search research mode.
+- Heuristic seeded-task baseline,
+- DeepAgents runtime.
 
 Hypothesis:
 
@@ -193,9 +195,8 @@ Start with these baselines:
 1. Keyword-only retrieval plus single patch prompt.
 2. Embedding retrieval plus single patch prompt.
 3. Agentless localization-repair-validation pipeline.
-4. LangGraph repair loop.
-5. DeepAgents multi-agent runtime.
-6. Multi-candidate patch-search mode.
+4. DeepAgents repair loop.
+5. Multi-candidate patch-search mode.
 
 ## Reporting format
 

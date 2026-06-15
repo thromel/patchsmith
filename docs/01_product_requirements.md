@@ -133,9 +133,9 @@ Acceptance criteria:
 - Retrieval output includes ranks, scores, and method labels.
 - Retrieved context can be inspected in the run report.
 
-### F5. LangGraph repair loop
+### F5. DeepAgents repair loop
 
-The system must implement the MVP repair loop with LangGraph:
+The system must implement the MVP repair loop with DeepAgents:
 
 ```text
 triage -> retrieve -> plan -> edit -> test -> analyze -> finalize
@@ -195,11 +195,9 @@ Build a graph representation of code files, symbols, imports, tests, stack trace
 
 ### AF2. Runtime adapters
 
-Support multiple agent scaffolds through a common interface:
+Support the production DeepAgents runtime and deterministic evaluation controls through a common interface:
 
-- LangGraph runtime,
 - DeepAgents runtime,
-- OpenAI Agents SDK runtime,
 - Agentless baseline,
 - mini-SWE-agent-inspired baseline.
 

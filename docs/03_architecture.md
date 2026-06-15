@@ -26,8 +26,7 @@ flowchart TD
     broker --> ctxhelm["ctxhelm CLI adapter"]
     workflow --> runtime["Agent runtime boundary"]
     runtime --> agentless["Agentless baseline"]
-    runtime --> langgraph["LangGraph runtime"]
-    runtime --> deepagents["DeepAgents adapter"]
+    runtime --> deepagents["DeepAgents runtime"]
     runtime --> patchsearch["Patch-search mode"]
     workflow --> sandbox["Command policy and sandbox"]
     sandbox --> tests["Targeted tests"]
@@ -61,7 +60,7 @@ flowchart TD
                            v
           +----------------+----------------+
           | Agent Runtime Layer             |
-          | LangGraph, DeepAgents, baselines|
+          | DeepAgents runtime and baselines |
           +-----+------------+--------------+
                 |            |
                 v            v
@@ -167,11 +166,9 @@ class AgentRuntime:
 
 Supported runtimes:
 
-- `LangGraphRuntime`: primary production workflow,
-- `DeepAgentsRuntime`: dependency-gated DeepAgents scaffold adapter plus native DeepAgents planner path with state-backed file reads, a skills-backed PatchSmith repair contract, read-only virtual filesystem permissions, patch-review subagent support, structured patch output, and explicit sandbox-feedback retries,
-- `OpenAIAgentsRuntime`: dependency-gated OpenAI Agents SDK scaffold adapter,
-- `AgentlessRuntime`: baseline localization-repair-validation runtime,
-- `TreeSearchRuntime`: research mode for test-time exploration.
+- `DeepAgentsRuntime`: primary production workflow, with native planning, state-backed file reads, a skills-backed PatchSmith repair contract, a generated source-hint manifest for reviewed reproduction targets, read-only virtual filesystem permissions, patch-review subagent support, structured patch output, and explicit sandbox-feedback retries,
+- `HeuristicRuntime`: deterministic seeded-task repair baseline,
+- `AgentlessRuntime`: baseline localization-repair-validation runtime.
 
 ### Retrieval layer
 
@@ -336,13 +333,13 @@ Frameworks must not leak into the domain layer.
 Good:
 
 ```text
-AgentRuntime interface -> LangGraph implementation
+AgentRuntime interface -> DeepAgents implementation
 ```
 
 Bad:
 
 ```text
-LangGraph-specific state objects passed through the entire backend
+DeepAgents-specific state objects passed through the entire backend
 ```
 
 ## Deployment architecture for MVP
@@ -362,7 +359,7 @@ Public demo can initially be simulated with pre-recorded runs to avoid unsafe ar
 
 ## Key architecture decisions
 
-- Use LangGraph as primary runtime.
+- Use DeepAgents as primary runtime.
 - Use Docker sandbox for execution.
 - Keep frameworks behind runtime adapters.
 - Use Code Context Graph for advanced retrieval.

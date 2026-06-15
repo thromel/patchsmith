@@ -32,7 +32,7 @@ ctxhelm will improve early-stage PatchSmith performance by producing better targ
 - same repository snapshot,
 - same issue text,
 - same model configuration,
-- same LangGraph repair loop,
+- same DeepAgents repair loop,
 - same sandbox configuration,
 - same maximum iterations,
 - same test timeout,
