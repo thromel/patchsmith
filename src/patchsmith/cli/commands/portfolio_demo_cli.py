@@ -276,10 +276,6 @@ def _final_evaluation_command(args: argparse.Namespace) -> int:
                     "deepagents_compatibility_run_count": (
                         report.deepagents_compatibility_run_count
                     ),
-                    "openai_agents_package_run_count": (report.openai_agents_package_run_count),
-                    "openai_agents_compatibility_run_count": (
-                        report.openai_agents_compatibility_run_count
-                    ),
                     "decision_count": len(report.decisions),
                     "limitation_count": len(report.limitations),
                     "report_path": str(Path(args.output)),

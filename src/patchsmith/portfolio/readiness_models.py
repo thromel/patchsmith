@@ -66,8 +66,6 @@ class LiveCalibrationReport:
     saved_live_provider_count: int
     deepagents_package_run_count: int
     deepagents_compatibility_run_count: int
-    openai_agents_package_run_count: int
-    openai_agents_compatibility_run_count: int
     model_providers: dict[str, int]
     checks: list[LiveCalibrationCheck]
     smoke_commands: list[str]
@@ -80,8 +78,6 @@ class LiveCalibrationReport:
             "saved_live_provider_count": self.saved_live_provider_count,
             "deepagents_package_run_count": self.deepagents_package_run_count,
             "deepagents_compatibility_run_count": self.deepagents_compatibility_run_count,
-            "openai_agents_package_run_count": self.openai_agents_package_run_count,
-            "openai_agents_compatibility_run_count": (self.openai_agents_compatibility_run_count),
             "model_providers": self.model_providers,
             "checks": [check.to_dict() for check in self.checks],
             "smoke_commands": self.smoke_commands,

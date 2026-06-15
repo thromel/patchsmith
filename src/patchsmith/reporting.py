@@ -135,7 +135,8 @@ def render_run_report(
     else:
         lines.extend(["No test command was supplied or detected.", ""])
 
-    model_usage = _model_usage_from_trace(trace_events)
+    model_usage = model_usage_from_trace(trace_events)
+    patch_quality = _latest_patch_quality_from_trace(trace_events)
     lines.extend(
         [
             "## Final Diff",
@@ -147,6 +148,7 @@ def render_run_report(
             "## Cost and Latency",
             "",
             f"- Model calls: `{model_usage['call_count']}`",
+            f"- Model responses: `{model_usage['response_count'] or 'n/a'}`",
             f"- Model provider: `{model_usage['model_provider'] or 'none'}`",
             f"- Input tokens: `{model_usage['input_tokens'] or 'n/a'}`",
             f"- Output tokens: `{model_usage['output_tokens'] or 'n/a'}`",
@@ -178,6 +180,17 @@ def render_run_report(
                 if repair_analysis
                 else "- Next action: Inspect trace events."
             ),
+            "",
+            "## Patch Quality",
+            "",
+            f"- Risk: `{patch_quality.get('severity', 'not_available')}`",
+            f"- Score: `{patch_quality.get('score', 'n/a')}`",
+            *[
+                "- Finding: "
+                f"`{finding.get('severity', 'unknown')}` "
+                f"`{finding.get('code', 'unknown')}` - {finding.get('message', '')}"
+                for finding in _patch_quality_findings(patch_quality)
+            ],
             "",
             "## Trace Summary",
             "",
@@ -214,12 +227,13 @@ def _truncate(value: str, max_chars: int = 6000) -> str:
     return value[:max_chars] + "\n...[truncated]"
 
 
-def _model_usage_from_trace(trace_events: list[TraceEvent]) -> dict[str, Any]:
+def model_usage_from_trace(trace_events: list[TraceEvent]) -> dict[str, Any]:
     providers: list[str] = []
     input_tokens: list[int] = []
     output_tokens: list[int] = []
     total_tokens: list[int] = []
     estimated_costs: list[float] = []
+    response_counts: list[int] = []
     call_count = 0
 
     for event in trace_events:
@@ -237,15 +251,45 @@ def _model_usage_from_trace(trace_events: list[TraceEvent]) -> dict[str, Any]:
         _append_int(output_tokens, model_call.get("output_tokens"))
         _append_int(total_tokens, model_call.get("total_tokens"))
         _append_float(estimated_costs, model_call.get("estimated_cost_usd"))
+        _append_int(response_counts, _model_response_count(model_call))
 
     return {
         "call_count": call_count,
+        "response_count": sum(response_counts) if response_counts else None,
         "model_provider": ",".join(providers) if providers else None,
         "input_tokens": sum(input_tokens) if input_tokens else None,
         "output_tokens": sum(output_tokens) if output_tokens else None,
         "total_tokens": sum(total_tokens) if total_tokens else None,
         "estimated_cost_usd": sum(estimated_costs) if estimated_costs else None,
     }
+
+
+def _model_response_count(model_call: dict[str, Any]) -> int | None:
+    explicit = model_call.get("response_count")
+    if isinstance(explicit, bool):
+        return None
+    if isinstance(explicit, int) and explicit > 0:
+        return explicit
+    response_id = model_call.get("response_id")
+    if not isinstance(response_id, str):
+        return None
+    ids = [part for part in (part.strip() for part in response_id.split(",")) if part]
+    return len(ids) or None
+
+
+def _latest_patch_quality_from_trace(trace_events: list[TraceEvent]) -> dict[str, Any]:
+    for event in reversed(trace_events):
+        quality = event.payload.get("quality")
+        if isinstance(quality, dict):
+            return quality
+    return {}
+
+
+def _patch_quality_findings(quality: dict[str, Any]) -> list[dict[str, Any]]:
+    findings = quality.get("findings")
+    if not isinstance(findings, list):
+        return []
+    return [finding for finding in findings if isinstance(finding, dict)]
 
 
 def _append_int(values: list[int], value: object) -> None:

@@ -51,8 +51,6 @@ class ProjectStatusReport:
     saved_live_provider_count: int
     deepagents_package_run_count: int
     deepagents_compatibility_run_count: int
-    openai_agents_package_run_count: int
-    openai_agents_compatibility_run_count: int
     experiment_count: int
     run_count: int
     metric_count: int
@@ -84,8 +82,6 @@ class ProjectStatusReport:
             "saved_live_provider_count": self.saved_live_provider_count,
             "deepagents_package_run_count": self.deepagents_package_run_count,
             "deepagents_compatibility_run_count": self.deepagents_compatibility_run_count,
-            "openai_agents_package_run_count": self.openai_agents_package_run_count,
-            "openai_agents_compatibility_run_count": self.openai_agents_compatibility_run_count,
             "experiment_count": self.experiment_count,
             "run_count": self.run_count,
             "metric_count": self.metric_count,
@@ -125,6 +121,7 @@ class EvidenceRefreshReport:
     skipped_count: int
     quality_gate_refreshed: bool
     docker_smoke_refreshed: bool
+    complex_suite_refreshed: bool
     steps: list[EvidenceRefreshStep]
 
     def to_dict(self) -> dict[str, Any]:
@@ -139,6 +136,7 @@ class EvidenceRefreshReport:
             "skipped_count": self.skipped_count,
             "quality_gate_refreshed": self.quality_gate_refreshed,
             "docker_smoke_refreshed": self.docker_smoke_refreshed,
+            "complex_suite_refreshed": self.complex_suite_refreshed,
             "steps": [step.to_dict() for step in self.steps],
         }
 

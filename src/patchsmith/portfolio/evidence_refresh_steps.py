@@ -5,6 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from patchsmith.artifacts import write_json
+from patchsmith.evaluation import (
+    ComplexBenchmarkSuiteThresholds,
+    summarize_complex_benchmark_suite,
+    validate_complex_benchmark_suite_inputs,
+)
 from patchsmith.observability import (
     write_artifact_index,
     write_failure_report,
@@ -42,6 +48,11 @@ class EvidenceRefreshConfig:
     docker_smoke_skip_run: bool
     docker_smoke_image: str
     docker_binary: str
+    include_complex_suite: bool
+    complex_suite_attempt_dirs: tuple[Path, ...]
+    complex_suite_output_dir: Path | None
+    complex_suite_benchmark: str
+    complex_suite_thresholds: ComplexBenchmarkSuiteThresholds
 
     @property
     def experiments_dir(self) -> Path:
@@ -53,6 +64,52 @@ class EvidenceRefreshConfig:
     def output_paths(self, *relative_paths: str) -> list[str]:
         return [str(self.experiment_path(path)) for path in relative_paths]
 
+    def complex_suite_output_path(self) -> Path:
+        return self.complex_suite_output_dir or self.experiment_path(
+            "complex_benchmark_suite"
+        )
+
+    def complex_suite_output_paths(self, *filenames: str) -> list[str]:
+        output_dir = self.complex_suite_output_path()
+        return [str(output_dir / filename) for filename in filenames]
+
+
+@dataclass(frozen=True)
+class ComplexSuiteEvidenceRefreshResult:
+    complex_suite_status: str
+    attempt_dir_count: int
+    task_count: int
+    unique_task_count: int
+    validated_tasks: int
+    live_provider_tasks: int
+    validation_rate: float
+    avg_progress_score: float
+    selected_avg_progress_score: float
+    partial_progress_tasks: int
+    failure_class_counts: dict[str, int]
+    selected_failure_class_counts: dict[str, int]
+    harness_layer_counts: dict[str, int]
+    selected_harness_layer_counts: dict[str, int]
+    retry_failure_class_counts: dict[str, int]
+    process_quality_label_counts: dict[str, int]
+    process_quality_flag_counts: dict[str, int]
+    selected_cost_per_validated_task_usd: float | None
+    selected_tokens_per_validated_task: float | None
+    selected_virtual_files_per_validated_task: float | None
+    selected_tokens_per_virtual_file: float | None
+    selected_responses_per_virtual_file: float | None
+    selected_context_target_recall: float | None
+    selected_context_target_precision: float | None
+    repo_instructions_manifest_rate: float
+    repo_instructions_read_first_rate: float
+    acceptance_rubric_manifest_rate: float
+    acceptance_rubric_read_first_rate: float
+    acceptance_rubric_alignment_rate: float
+    avg_agent_trajectory_score: float
+    contextual_verifier_rate: float
+    target_alignment_rate: float
+    output_dir: str
+
 
 def build_evidence_refresh_steps(config: EvidenceRefreshConfig) -> list[EvidenceRefreshStep]:
     return [
@@ -61,6 +118,7 @@ def build_evidence_refresh_steps(config: EvidenceRefreshConfig) -> list[Evidence
             project_root=config.project_root,
             experiments_dir=config.experiments_dir,
         ),
+        _complex_suite_step(config),
         *_review_evidence_refresh_steps(config),
     ]
 
@@ -287,6 +345,127 @@ def _docker_smoke_step(config: EvidenceRefreshConfig) -> EvidenceRefreshStep:
             "Skipped by request. Run `docker-smoke` or pass "
             "`--include-docker-smoke` to refresh Docker sandbox evidence."
         ),
+    )
+
+
+def _complex_suite_step(config: EvidenceRefreshConfig) -> EvidenceRefreshStep:
+    artifact_paths = config.complex_suite_output_paths(
+        "complex_benchmark_results.json",
+        "complex_benchmark_summary.json",
+        "complex_benchmark_selected_results.json",
+        "complex_benchmark_report.md",
+        "complex_benchmark_attempt_summaries.json",
+        "complex_benchmark_suite_report.md",
+        "complex_benchmark_suite_gate.json",
+    )
+    if not config.include_complex_suite:
+        return EvidenceRefreshStep(
+            name="Complex benchmark suite",
+            status="skipped",
+            duration_ms=0,
+            artifact_paths=artifact_paths,
+            summary=(
+                "Skipped by request. Pass `--include-complex-suite` with one or more "
+                "`--complex-suite-attempt-dir` values to aggregate saved live-agent evidence."
+            ),
+        )
+    if not config.complex_suite_attempt_dirs:
+        return EvidenceRefreshStep(
+            name="Complex benchmark suite",
+            status="failed",
+            duration_ms=0,
+            artifact_paths=artifact_paths,
+            summary=(
+                "Complex benchmark suite was requested but no saved attempt "
+                "directories were provided."
+            ),
+            error="missing --complex-suite-attempt-dir",
+        )
+    return _run_evidence_refresh_step(
+        name="Complex benchmark suite",
+        artifact_paths=artifact_paths,
+        action=lambda: _write_complex_suite_refresh(config),
+    )
+
+
+def _write_complex_suite_refresh(
+    config: EvidenceRefreshConfig,
+) -> ComplexSuiteEvidenceRefreshResult:
+    output_dir = config.complex_suite_output_path()
+    preflight = validate_complex_benchmark_suite_inputs(
+        attempt_dirs=list(config.complex_suite_attempt_dirs),
+        output_dir=output_dir,
+        benchmark=config.complex_suite_benchmark,
+        gate_threshold_count=config.complex_suite_thresholds.count,
+    )
+    if preflight.status != "passed":
+        raise RuntimeError(
+            "complex benchmark suite preflight failed: "
+            + "; ".join(preflight.errors)
+        )
+    _results, summary, _attempt_summaries, _followup_candidates = (
+        summarize_complex_benchmark_suite(
+            attempt_dirs=list(config.complex_suite_attempt_dirs),
+            output_dir=output_dir,
+            benchmark=config.complex_suite_benchmark,
+        )
+    )
+    gate = config.complex_suite_thresholds.gate(summary)
+    write_json(
+        output_dir / "complex_benchmark_suite_gate.json",
+        gate.to_dict(),
+        trailing_newline=True,
+    )
+    if gate.status != "passed":
+        raise RuntimeError(
+            "complex benchmark suite gate failed: " + "; ".join(gate.failures)
+        )
+    return ComplexSuiteEvidenceRefreshResult(
+        complex_suite_status=gate.status,
+        attempt_dir_count=len(config.complex_suite_attempt_dirs),
+        task_count=summary.task_count,
+        unique_task_count=summary.unique_task_count,
+        validated_tasks=summary.validated_tasks,
+        live_provider_tasks=summary.live_provider_tasks,
+        validation_rate=summary.validation_rate,
+        avg_progress_score=summary.avg_progress_score,
+        selected_avg_progress_score=summary.selected_avg_progress_score,
+        partial_progress_tasks=summary.partial_progress_tasks,
+        failure_class_counts=summary.failure_class_counts,
+        selected_failure_class_counts=summary.selected_failure_class_counts,
+        harness_layer_counts=summary.harness_layer_counts,
+        selected_harness_layer_counts=summary.selected_harness_layer_counts,
+        retry_failure_class_counts=summary.retry_failure_class_counts,
+        process_quality_label_counts=summary.process_quality_label_counts,
+        process_quality_flag_counts=summary.process_quality_flag_counts,
+        selected_cost_per_validated_task_usd=(
+            summary.selected_cost_per_validated_task_usd
+        ),
+        selected_tokens_per_validated_task=summary.selected_tokens_per_validated_task,
+        selected_virtual_files_per_validated_task=(
+            summary.selected_virtual_files_per_validated_task
+        ),
+        selected_tokens_per_virtual_file=summary.selected_tokens_per_virtual_file,
+        selected_responses_per_virtual_file=summary.selected_responses_per_virtual_file,
+        selected_context_target_recall=summary.selected_context_target_recall,
+        selected_context_target_precision=summary.selected_context_target_precision,
+        repo_instructions_manifest_rate=(
+            summary.repo_instructions_manifest_tasks / summary.task_count
+            if summary.task_count
+            else 0.0
+        ),
+        repo_instructions_read_first_rate=summary.repo_instructions_read_first_rate,
+        acceptance_rubric_manifest_rate=(
+            summary.acceptance_rubric_manifest_tasks / summary.task_count
+            if summary.task_count
+            else 0.0
+        ),
+        acceptance_rubric_read_first_rate=summary.acceptance_rubric_read_first_rate,
+        acceptance_rubric_alignment_rate=summary.acceptance_rubric_alignment_rate,
+        avg_agent_trajectory_score=summary.avg_agent_trajectory_score,
+        contextual_verifier_rate=summary.contextual_verifier_rate,
+        target_alignment_rate=summary.target_alignment_rate,
+        output_dir=str(output_dir),
     )
 
 

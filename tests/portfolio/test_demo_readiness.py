@@ -48,7 +48,7 @@ def test_demo_readiness_report_summarizes_launch_evidence(
         json.dumps(
             [
                 {
-                    "scaffold": "langgraph_fake_model",
+                    "scaffold": "deepagents",
                     "attempted_tasks": 10,
                     "completed_tasks": 10,
                     "patch_generated_rate": 1.0,
@@ -187,19 +187,16 @@ def test_demo_readiness_report_summarizes_launch_evidence(
         output_path=calibration_output,
         json_output_path=calibration_json_output,
         environment={},
-        package_availability={"openai": True, "deepagents": False, "agents": False},
+        package_availability={"openai": True, "deepagents": False},
     )
     assert calibration.calibration_status == "not_configured"
     assert calibration.saved_live_provider_count == 0
     assert calibration.deepagents_package_run_count == 0
-    assert calibration.openai_agents_package_run_count == 0
     calibration_statuses = {check.name: check.status for check in calibration.checks}
     assert calibration_statuses["OpenAI SDK"] == "passed"
     assert calibration_statuses["OpenAI Credentials"] == "missing"
     assert calibration_statuses["DeepAgents Package"] == "warning"
     assert calibration_statuses["Saved DeepAgents Package Evidence"] == "warning"
-    assert calibration_statuses["OpenAI Agents Package"] == "warning"
-    assert calibration_statuses["Saved OpenAI Agents Package Evidence"] == "warning"
     assert calibration_statuses["Saved Live Provider Evidence"] == "missing"
     calibration_text = calibration_output.read_text(encoding="utf-8")
     assert "# PatchSmith Live Calibration Readiness" in calibration_text
@@ -223,7 +220,6 @@ def test_demo_readiness_report_summarizes_launch_evidence(
     cli_calibration_payload = json.loads(capsys.readouterr().out)
     assert cli_calibration_payload["calibration_status"] == "not_configured"
     assert cli_calibration_payload["deepagents_package_run_count"] == 0
-    assert cli_calibration_payload["openai_agents_package_run_count"] == 0
     assert cli_calibration_output.exists()
 
     calibration_plan_output = tmp_path / "live_calibration_plan.md"
@@ -233,38 +229,37 @@ def test_demo_readiness_report_summarizes_launch_evidence(
         output_path=calibration_plan_output,
         json_output_path=calibration_plan_json_output,
         environment={},
-        package_availability={"openai": True, "deepagents": False, "agents": False},
+        package_availability={"openai": True, "deepagents": False},
     )
     assert calibration_plan.plan_status == "blocked"
     assert calibration_plan.credentials_configured is False
-    assert len(calibration_plan.runs) == 6
+    assert len(calibration_plan.runs) == 3
     assert calibration_plan.runs[0].status == "blocked"
     assert calibration_plan.runs[0].requires_credentials
-    assert "--planner openai" in calibration_plan.runs[0].command
+    assert "--planner deepagents" in calibration_plan.runs[0].command
     assert calibration_plan.runs[1].status == "blocked"
-    assert calibration_plan.runs[2].name == "DeepAgents native single-task smoke"
-    assert calibration_plan.runs[2].status == "blocked"
-    assert "--planner deepagents" in calibration_plan.runs[2].command
+    assert calibration_plan.runs[2].name == "DeepAgents package-backed adapter refresh"
+    assert calibration_plan.runs[2].status == "setup_required"
+    assert "--planner heuristic" in calibration_plan.runs[2].command
     plan_text = calibration_plan_output.read_text(encoding="utf-8")
     assert "# PatchSmith Live Calibration Plan" in plan_text
     assert "does not prove live model execution" in plan_text
     plan_payload = json.loads(calibration_plan_json_output.read_text(encoding="utf-8"))
     assert plan_payload["plan_status"] == "blocked"
-    assert plan_payload["run_count"] == 6
+    assert plan_payload["run_count"] == 3
     assert plan_payload["ready_runs"] == 0
-    assert plan_payload["blocked_runs"] == 4
+    assert plan_payload["blocked_runs"] == 2
 
     ready_plan = write_live_calibration_plan_report(
         artifacts_dir=artifacts_dir,
         output_path=tmp_path / "ready_live_calibration_plan.md",
         environment={"OPENAI_API_KEY": "test-key"},
-        package_availability={"openai": True, "deepagents": True, "agents": True},
+        package_availability={"openai": True, "deepagents": True},
     )
     assert ready_plan.plan_status == "ready_to_run"
     assert ready_plan.runs[0].status == "ready"
     assert ready_plan.runs[1].status == "waiting_for_smoke"
     assert ready_plan.runs[2].status == "ready"
-    assert ready_plan.runs[3].status == "waiting_for_smoke"
 
     cli_calibration_plan_output = tmp_path / "cli_live_calibration_plan.md"
     cli_calibration_plan_json_output = tmp_path / "cli_live_calibration_plan.json"
@@ -282,7 +277,7 @@ def test_demo_readiness_report_summarizes_launch_evidence(
     )
     assert exit_code == 0
     cli_calibration_plan_payload = json.loads(capsys.readouterr().out)
-    assert cli_calibration_plan_payload["run_count"] == 6
+    assert cli_calibration_plan_payload["run_count"] == 3
     assert cli_calibration_plan_payload["plan_status"] in {"blocked", "ready_to_run"}
     assert cli_calibration_plan_output.exists()
 
@@ -389,7 +384,6 @@ def test_demo_readiness_report_summarizes_launch_evidence(
     final_payload = json.loads(final_json_output.read_text(encoding="utf-8"))
     assert final_payload["metric_count"] == 3
     assert final_payload["deepagents_package_run_count"] == 0
-    assert final_payload["openai_agents_package_run_count"] == 0
 
     cli_final_output = tmp_path / "cli_final_evaluation.md"
     exit_code = main(
@@ -407,7 +401,6 @@ def test_demo_readiness_report_summarizes_launch_evidence(
     assert cli_final_payload["readiness_status"] == "ready_with_caveats"
     assert cli_final_payload["metric_count"] == 3
     assert cli_final_payload["deepagents_package_run_count"] == 0
-    assert cli_final_payload["openai_agents_package_run_count"] == 0
     assert cli_final_payload["decision_count"] >= 5
     assert cli_final_output.exists()
 

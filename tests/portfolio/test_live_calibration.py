@@ -64,82 +64,22 @@ def test_live_calibration_report_counts_saved_deepagents_package_runs(tmp_path: 
         + "\n",
         encoding="utf-8",
     )
-    openai_agents_package_trace = (
-        artifacts_dir
-        / "experiments"
-        / "openai_agents_package_smoke_v1"
-        / "run_artifacts"
-        / "runs"
-        / "openai-agents-package-run"
-        / "traces.jsonl"
-    )
-    openai_agents_package_trace.parent.mkdir(parents=True)
-    openai_agents_package_trace.write_text(
-        json.dumps(
-            {
-                "run_id": "openai-agents-package-run",
-                "event_type": "runtime_node",
-                "status": "package_available",
-                "payload": {
-                    "runtime": "openai_agents",
-                    "framework": "openai_agents",
-                    "node": "harness",
-                    "status": "package_available",
-                },
-            }
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    openai_agents_compatibility_trace = (
-        artifacts_dir
-        / "experiments"
-        / "openai_agents_compatibility_v1"
-        / "run_artifacts"
-        / "runs"
-        / "openai-agents-compatibility-run"
-        / "traces.jsonl"
-    )
-    openai_agents_compatibility_trace.parent.mkdir(parents=True)
-    openai_agents_compatibility_trace.write_text(
-        json.dumps(
-            {
-                "run_id": "openai-agents-compatibility-run",
-                "event_type": "runtime_node",
-                "status": "compatibility_mode",
-                "payload": {
-                    "runtime": "openai_agents",
-                    "framework": "openai_agents",
-                    "node": "harness",
-                    "status": "compatibility_mode",
-                },
-            }
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-
     report = write_live_calibration_report(
         artifacts_dir=artifacts_dir,
         output_path=tmp_path / "calibration.md",
         json_output_path=tmp_path / "calibration.json",
         environment={},
-        package_availability={"openai": True, "deepagents": False, "agents": False},
+        package_availability={"openai": True, "deepagents": False},
     )
 
     assert report.deepagents_package_run_count == 1
     assert report.deepagents_compatibility_run_count == 1
-    assert report.openai_agents_package_run_count == 1
-    assert report.openai_agents_compatibility_run_count == 1
     statuses = {check.name: check.status for check in report.checks}
     assert statuses["Saved DeepAgents Package Evidence"] == "passed"
-    assert statuses["Saved OpenAI Agents Package Evidence"] == "passed"
     rendered = (tmp_path / "calibration.md").read_text(encoding="utf-8")
     assert "DeepAgents package-backed runs: `1`" in rendered
-    assert "OpenAI Agents package-backed runs: `1`" in rendered
     payload = json.loads((tmp_path / "calibration.json").read_text(encoding="utf-8"))
     assert payload["deepagents_package_run_count"] == 1
-    assert payload["openai_agents_package_run_count"] == 1
 
     final = write_final_evaluation_report(
         artifacts_dir=artifacts_dir,
@@ -147,14 +87,9 @@ def test_live_calibration_report_counts_saved_deepagents_package_runs(tmp_path: 
         json_output_path=tmp_path / "final.json",
     )
     assert final.deepagents_package_run_count == 1
-    assert final.openai_agents_package_run_count == 1
     assert any("package-backed" in decision for decision in final.decisions)
     assert any(
         "live DeepAgents model execution remains uncalibrated" in item for item in final.limitations
-    )
-    assert any(
-        "live OpenAI Agents model execution remains uncalibrated" in item
-        for item in final.limitations
     )
 
 
@@ -197,7 +132,7 @@ def test_live_calibration_report_separates_deepagents_package_and_live_claims(
         artifacts_dir=artifacts_dir,
         output_path=tmp_path / "calibration.md",
         environment={"OPENAI_API_KEY": "test-key"},
-        package_availability={"openai": True, "deepagents": True, "agents": False},
+        package_availability={"openai": True, "deepagents": True},
     )
 
     checks = {check.name: check for check in report.checks}
@@ -231,7 +166,7 @@ def test_live_calibration_plan_includes_native_deepagents_live_runs(
         output_path=tmp_path / "live_plan.md",
         json_output_path=tmp_path / "live_plan.json",
         environment={"OPENAI_API_KEY": "test-key"},
-        package_availability={"openai": True, "deepagents": True, "agents": False},
+        package_availability={"openai": True, "deepagents": True},
     )
 
     runs = {run.name: run for run in plan.runs}
@@ -250,5 +185,5 @@ def test_live_calibration_plan_includes_native_deepagents_live_runs(
     rendered = (tmp_path / "live_plan.md").read_text(encoding="utf-8")
     assert "DeepAgents native single-task smoke" in rendered
     payload = json.loads((tmp_path / "live_plan.json").read_text(encoding="utf-8"))
-    assert payload["run_count"] == 6
-    assert payload["ready_runs"] == 3
+    assert payload["run_count"] == 3
+    assert payload["ready_runs"] == 2

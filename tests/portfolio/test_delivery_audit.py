@@ -72,7 +72,6 @@ def test_delivery_audit_maps_objective_to_current_evidence(
                 "calibration_status": "not_configured",
                 "saved_live_provider_count": 0,
                 "deepagents_package_run_count": 10,
-                "openai_agents_package_run_count": 10,
             }
         ),
         encoding="utf-8",

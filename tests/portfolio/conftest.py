@@ -36,9 +36,9 @@ def _write_progress_artifact_fixture(artifacts_dir: Path) -> None:
         json.dumps(
             [
                 {
-                    "scaffold": "langgraph_fake_model",
-                    "runtime": "langgraph",
-                    "planner": "fake_model",
+                    "scaffold": "deepagents",
+                    "runtime": "deepagents",
+                    "planner": "heuristic",
                     "attempted_tasks": 10,
                     "completed_tasks": 10,
                     "patch_generated_rate": 1.0,

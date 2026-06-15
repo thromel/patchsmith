@@ -72,8 +72,6 @@ def test_project_status_report_summarizes_saved_evidence(
             "saved_live_provider_count": 0,
             "deepagents_package_run_count": 10,
             "deepagents_compatibility_run_count": 30,
-            "openai_agents_package_run_count": 10,
-            "openai_agents_compatibility_run_count": 20,
             "model_providers": {"offline_fake_model": 23},
         },
         "public_issue_corpus_v1/public_issue_repair_readiness_summary.json": {

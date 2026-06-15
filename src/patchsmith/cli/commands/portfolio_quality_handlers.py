@@ -99,6 +99,78 @@ def _refresh_evidence_command(args: argparse.Namespace) -> int:
         docker_smoke_skip_run=args.docker_smoke_skip_run,
         docker_smoke_image=args.docker_smoke_image,
         docker_binary=args.docker_binary,
+        include_complex_suite=args.include_complex_suite,
+        complex_suite_spec_path=(
+            Path(args.complex_suite_spec) if args.complex_suite_spec else None
+        ),
+        complex_suite_attempt_dirs=tuple(
+            Path(path) for path in args.complex_suite_attempt_dir
+        ),
+        complex_suite_output_dir=(
+            Path(args.complex_suite_output_dir)
+            if args.complex_suite_output_dir
+            else None
+        ),
+        complex_suite_benchmark=args.complex_suite_benchmark,
+        complex_suite_min_validation_rate=args.complex_suite_min_validation_rate,
+        complex_suite_min_live_provider_tasks=(
+            args.complex_suite_min_live_provider_tasks
+        ),
+        complex_suite_min_unique_tasks=args.complex_suite_min_unique_tasks,
+        complex_suite_max_selected_cost_per_validated_task_usd=(
+            args.complex_suite_max_selected_cost_per_validated_task_usd
+        ),
+        complex_suite_max_selected_tokens_per_validated_task=(
+            args.complex_suite_max_selected_tokens_per_validated_task
+        ),
+        complex_suite_max_selected_virtual_files_per_validated_task=(
+            args.complex_suite_max_selected_virtual_files_per_validated_task
+        ),
+        complex_suite_max_selected_tokens_per_virtual_file=(
+            args.complex_suite_max_selected_tokens_per_virtual_file
+        ),
+        complex_suite_max_selected_responses_per_virtual_file=(
+            args.complex_suite_max_selected_responses_per_virtual_file
+        ),
+        complex_suite_min_selected_progress_score=(
+            args.complex_suite_min_selected_progress_score
+        ),
+        complex_suite_min_selected_context_target_recall=(
+            args.complex_suite_min_selected_context_target_recall
+        ),
+        complex_suite_min_selected_context_target_precision=(
+            args.complex_suite_min_selected_context_target_precision
+        ),
+        complex_suite_min_repo_instructions_manifest_rate=(
+            args.complex_suite_min_repo_instructions_manifest_rate
+        ),
+        complex_suite_min_repo_instructions_read_first_rate=(
+            args.complex_suite_min_repo_instructions_read_first_rate
+        ),
+        complex_suite_min_acceptance_rubric_manifest_rate=(
+            args.complex_suite_min_acceptance_rubric_manifest_rate
+        ),
+        complex_suite_min_acceptance_rubric_read_first_rate=(
+            args.complex_suite_min_acceptance_rubric_read_first_rate
+        ),
+        complex_suite_min_acceptance_rubric_alignment_rate=(
+            args.complex_suite_min_acceptance_rubric_alignment_rate
+        ),
+        complex_suite_min_agent_trajectory_score=(
+            args.complex_suite_min_agent_trajectory_score
+        ),
+        complex_suite_min_contextual_verifier_rate=(
+            args.complex_suite_min_contextual_verifier_rate
+        ),
+        complex_suite_min_process_quality_score=(
+            args.complex_suite_min_process_quality_score
+        ),
+        complex_suite_max_process_risky_validated_tasks=(
+            args.complex_suite_max_process_risky_validated_tasks
+        ),
+        complex_suite_min_target_alignment_rate=(
+            args.complex_suite_min_target_alignment_rate
+        ),
     )
     if args.json:
         print_json_payload(
@@ -118,7 +190,8 @@ def _refresh_evidence_command(args: argparse.Namespace) -> int:
             f"Passed: {report.passed_count} "
             f"Failed: {report.failed_count} "
             f"Skipped: {report.skipped_count} "
-            f"Docker: {str(report.docker_smoke_refreshed).lower()}"
+            f"Docker: {str(report.docker_smoke_refreshed).lower()} "
+            f"Complex suite: {str(report.complex_suite_refreshed).lower()}"
         )
     return 0
 

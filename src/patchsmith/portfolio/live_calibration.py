@@ -10,7 +10,6 @@ from patchsmith.model_config import DEFAULT_OPENAI_MODEL
 from patchsmith.portfolio._helpers import (
     _discover_deepagents_adapter_modes,
     _discover_model_providers,
-    _discover_openai_agents_adapter_modes,
     _live_providers,
     _package_available,
     _utc_now,
@@ -48,11 +47,9 @@ def build_live_calibration_report(
     model_providers = _discover_model_providers(artifacts_dir)
     live_providers = _live_providers(model_providers)
     deepagents_modes = _discover_deepagents_adapter_modes(artifacts_dir)
-    openai_agents_modes = _discover_openai_agents_adapter_modes(artifacts_dir)
     checks = live_calibration_checks(
         model_providers=model_providers,
         deepagents_modes=deepagents_modes,
-        openai_agents_modes=openai_agents_modes,
         environment=environment,
         package_availability=package_availability,
     )
@@ -63,8 +60,6 @@ def build_live_calibration_report(
         saved_live_provider_count=sum(model_providers[provider] for provider in live_providers),
         deepagents_package_run_count=deepagents_modes.get("package_available", 0),
         deepagents_compatibility_run_count=deepagents_modes.get("compatibility_mode", 0),
-        openai_agents_package_run_count=openai_agents_modes.get("package_available", 0),
-        openai_agents_compatibility_run_count=openai_agents_modes.get("compatibility_mode", 0),
         model_providers=model_providers,
         checks=checks,
         smoke_commands=live_calibration_commands(),
@@ -115,7 +110,6 @@ def build_live_calibration_plan_report(
         openai_sdk_available=openai_sdk_available,
         credentials_configured=credentials_configured,
         deepagents_available=_package_available("deepagents", package_availability),
-        openai_agents_available=_package_available("agents", package_availability),
         saved_live_provider_count=readiness.saved_live_provider_count,
     )
     return LiveCalibrationPlanReport(

@@ -92,7 +92,7 @@ def register_portfolio_calibration_commands(subparsers: argparse._SubParsersActi
     )
     docker_smoke.add_argument(
         "--runtime",
-        choices=["heuristic", "langgraph", "deepagents", "openai_agents"],
+        choices=["heuristic", "deepagents"],
         default="heuristic",
         help="Runtime to use for the smoke repair.",
     )

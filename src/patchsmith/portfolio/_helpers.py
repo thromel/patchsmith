@@ -36,10 +36,6 @@ def _discover_deepagents_adapter_modes(artifacts_dir: Path) -> dict[str, int]:
     return _discover_adapter_modes(artifacts_dir, framework="deepagents")
 
 
-def _discover_openai_agents_adapter_modes(artifacts_dir: Path) -> dict[str, int]:
-    return _discover_adapter_modes(artifacts_dir, framework="openai_agents")
-
-
 def _discover_adapter_modes(artifacts_dir: Path, *, framework: str) -> dict[str, int]:
     modes: dict[str, set[str]] = {
         "package_available": set(),
@@ -169,9 +165,7 @@ def _demo_commands() -> list[str]:
         (
             "PYTHONPATH=src python3 -m patchsmith.cli eval-scaffold "
             "--dataset evals/tasks/seeded_bugs_v1 "
-            "--variant agentless --variant heuristic --variant langgraph "
-            "--variant langgraph_fake_model --variant deepagents "
-            "--variant openai_agents "
+            "--variant agentless --variant heuristic --variant deepagents "
             "--context-provider native_hybrid "
             "--output artifacts/experiments/scaffold_comparison_v1 --json"
         ),

@@ -40,12 +40,10 @@ def demo_script_sections(readiness: DemoReadinessReport) -> list[DemoScriptSecti
             on_screen="Open scaffold comparison and explain the lanes.",
             artifact="artifacts/experiments/scaffold_comparison_v1/scaffold_report.md",
             narration=(
-                "The scaffold comparison keeps Agentless, heuristic, LangGraph, "
-                "LangGraph fake-model, DeepAgents, and OpenAI Agents SDK adapters "
+                "The scaffold comparison keeps Agentless, heuristic, and DeepAgents "
                 "under the same seeded task set and context provider. The important "
-                "interview story is that quality, latency, trace complexity, and "
-                "debuggability are measured together instead of treated as separate "
-                "anecdotes."
+                "interview story is that quality, latency, trace complexity, "
+                "debuggability, and agent trajectory evidence are measured together."
             ),
         ),
         DemoScriptSection(

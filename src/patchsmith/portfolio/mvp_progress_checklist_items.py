@@ -62,10 +62,10 @@ def mvp_core_flow_items(evidence: MvpProgressEvidence) -> list[MvpProgressItem]:
         ),
         mvp_item(
             "Core flow",
-            "LangGraph repair loop runs.",
-            "passed" if evidence.has_langgraph else "missing",
-            f"LangGraph metric lanes {'exist' if evidence.has_langgraph else 'are missing'}.",
-            "Run `eval-repair --runtime langgraph` if missing.",
+            "DeepAgents repair loop runs.",
+            "passed" if evidence.has_deepagents else "missing",
+            f"DeepAgents metric lanes {'exist' if evidence.has_deepagents else 'are missing'}.",
+            "Run `eval-repair --runtime deepagents` if missing.",
         ),
         mvp_item(
             "Core flow",

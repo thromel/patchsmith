@@ -24,8 +24,6 @@ def live_calibration_payload(
         "saved_live_provider_count": report.saved_live_provider_count,
         "deepagents_package_run_count": report.deepagents_package_run_count,
         "deepagents_compatibility_run_count": report.deepagents_compatibility_run_count,
-        "openai_agents_package_run_count": report.openai_agents_package_run_count,
-        "openai_agents_compatibility_run_count": report.openai_agents_compatibility_run_count,
         "model_providers": report.model_providers,
         **_report_paths(output, json_output_path),
     }
@@ -236,6 +234,7 @@ def evidence_refresh_payload(
         "skipped_count": report.skipped_count,
         "quality_gate_refreshed": report.quality_gate_refreshed,
         "docker_smoke_refreshed": report.docker_smoke_refreshed,
+        "complex_suite_refreshed": report.complex_suite_refreshed,
         **_report_paths(output, json_output_path),
     }
 

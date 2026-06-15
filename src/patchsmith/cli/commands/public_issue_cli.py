@@ -263,8 +263,8 @@ def register_public_issue_commands(
     )
     public_repair_attempt_parser.add_argument(
         "--runtime",
-        choices=["agentless", "heuristic", "langgraph", "deepagents", "openai_agents"],
-        default="langgraph",
+        choices=["agentless", "heuristic", "deepagents"],
+        default="deepagents",
         help="Runtime used for executed repair attempts.",
     )
     public_repair_attempt_parser.add_argument(
@@ -297,15 +297,95 @@ def register_public_issue_commands(
         help="Maximum repair-readiness records to process. Use 0 for all records.",
     )
     public_repair_attempt_parser.add_argument(
+        "--task-id",
+        action="append",
+        dest="task_ids",
+        default=None,
+        help=(
+            "Limit repair attempts to a materialized public issue task ID. "
+            "Can be passed multiple times."
+        ),
+    )
+    public_repair_attempt_parser.add_argument(
         "--max-retries",
         type=int,
         default=0,
         help="Maximum extra DeepAgents feedback retries after the first public repair attempt.",
     )
     public_repair_attempt_parser.add_argument(
+        "--deepagents-max-context-files",
+        type=int,
+        default=0,
+        help=(
+            "Cap mounted repository files for native DeepAgents repair attempts. "
+            "Use 0 to keep the default full retrieved context."
+        ),
+    )
+    public_repair_attempt_parser.add_argument(
+        "--deepagents-subagents",
+        choices=["full", "auto", "inline"],
+        default=None,
+        help=(
+            "Override native DeepAgents subagent routing for this repair run. "
+            "Use auto or inline for cost calibration lanes."
+        ),
+    )
+    public_repair_attempt_parser.add_argument(
+        "--repeats",
+        type=int,
+        default=1,
+        help="Independent repair attempts per selected task for pass@N repeatability checks.",
+    )
+    public_repair_attempt_parser.add_argument(
+        "--stop-on-validated",
+        action="store_true",
+        help=(
+            "Stop remaining repeats for a task after the first strict validated "
+            "attempt. Use fixed repeats when measuring stability."
+        ),
+    )
+    public_repair_attempt_parser.add_argument(
         "--allow-warnings",
         action="store_true",
         help="Allow warning-class readiness only when reproduction evidence is already proven.",
+    )
+    public_repair_attempt_parser.add_argument(
+        "--max-live-cost-usd",
+        type=float,
+        default=None,
+        help=(
+            "Optional live-model cost cap for this command. When set with a live "
+            "planner, PatchSmith blocks before launching repairs if projected cost "
+            "would exceed the cap and marks post-run actual overages in saved "
+            "attempt artifacts."
+        ),
+    )
+    public_repair_attempt_parser.add_argument(
+        "--estimated-cost-per-attempt-usd",
+        type=float,
+        default=None,
+        help=(
+            "Estimated cost for one model attempt used with --max-live-cost-usd. "
+            "The projection multiplies this by selected tasks, repeats, and retries."
+        ),
+    )
+    public_repair_attempt_parser.add_argument(
+        "--max-actual-model-responses",
+        type=int,
+        default=None,
+        help=(
+            "Optional post-run cap on recorded model responses. Passing repairs "
+            "that exceed the cap, or do not record response count, are saved as failed."
+        ),
+    )
+    public_repair_attempt_parser.add_argument(
+        "--max-actual-model-tokens",
+        type=int,
+        default=None,
+        help=(
+            "Optional post-run cap on recorded total model tokens. Passing repairs "
+            "that exceed the cap, or do not record token usage, are saved as failed."
+        ),
     )
     public_repair_attempt_parser.add_argument(
         "--execute",

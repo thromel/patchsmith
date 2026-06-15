@@ -37,8 +37,6 @@ class FinalEvaluationReport:
     model_providers: dict[str, int]
     deepagents_package_run_count: int
     deepagents_compatibility_run_count: int
-    openai_agents_package_run_count: int
-    openai_agents_compatibility_run_count: int
     metrics: list[FinalEvaluationMetric]
     decisions: list[str]
     limitations: list[str]
@@ -57,8 +55,6 @@ class FinalEvaluationReport:
             "model_providers": self.model_providers,
             "deepagents_package_run_count": self.deepagents_package_run_count,
             "deepagents_compatibility_run_count": self.deepagents_compatibility_run_count,
-            "openai_agents_package_run_count": self.openai_agents_package_run_count,
-            "openai_agents_compatibility_run_count": (self.openai_agents_compatibility_run_count),
             "metrics": [metric.to_dict() for metric in self.metrics],
             "decisions": self.decisions,
             "limitations": self.limitations,

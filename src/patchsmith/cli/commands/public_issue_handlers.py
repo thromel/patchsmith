@@ -153,6 +153,20 @@ def _check_public_issue_repair_readiness_command(args: argparse.Namespace) -> in
 def _execute_public_issue_repairs_command(args: argparse.Namespace) -> int:
     tasks_dir = Path(args.tasks_dir) if args.tasks_dir else None
     max_tasks = None if args.max_tasks == 0 else args.max_tasks
+    if args.deepagents_max_context_files < 0:
+        raise ValueError("--deepagents-max-context-files must be non-negative")
+    if (
+        args.max_actual_model_responses is not None
+        and args.max_actual_model_responses < 0
+    ):
+        raise ValueError("--max-actual-model-responses must be non-negative")
+    if args.max_actual_model_tokens is not None and args.max_actual_model_tokens < 0:
+        raise ValueError("--max-actual-model-tokens must be non-negative")
+    deepagents_max_context_files = (
+        args.deepagents_max_context_files
+        if args.deepagents_max_context_files > 0
+        else None
+    )
     results, summary = execute_public_issue_repairs(
         readiness_path=Path(args.readiness),
         output_dir=Path(args.output),
@@ -164,8 +178,17 @@ def _execute_public_issue_repairs_command(args: argparse.Namespace) -> int:
         sandbox_image=args.sandbox_image,
         max_retries=args.max_retries,
         max_tasks=max_tasks,
+        task_ids=args.task_ids,
+        repeats=max(1, args.repeats),
+        stop_on_validated=args.stop_on_validated,
         dry_run=not args.execute,
         allow_warnings=args.allow_warnings,
+        max_live_cost_usd=args.max_live_cost_usd,
+        estimated_cost_per_attempt_usd=args.estimated_cost_per_attempt_usd,
+        deepagents_max_context_files=deepagents_max_context_files,
+        max_actual_model_responses=args.max_actual_model_responses,
+        max_actual_model_tokens=args.max_actual_model_tokens,
+        deepagents_subagent_mode=args.deepagents_subagents,
     )
     _emit_summary(
         args=args,
@@ -174,7 +197,8 @@ def _execute_public_issue_repairs_command(args: argparse.Namespace) -> int:
         summary=summary,
         text=(
             f"dry_run={summary.dry_run_tasks} attempted={summary.attempted_tasks} "
-            f"validated={summary.validated_tasks} blocked={summary.blocked_tasks}"
+            f"validated={summary.validated_tasks} blocked={summary.blocked_tasks} "
+            f"pass_at_n={summary.validated_task_pass_at_n_rate:.3f}"
         ),
     )
     return 0

@@ -38,8 +38,7 @@ def _live_calibration_command(args: argparse.Namespace) -> int:
         print(
             f"Status: {report.calibration_status} "
             f"Saved live-provider runs: {report.saved_live_provider_count} "
-            f"DeepAgents package runs: {report.deepagents_package_run_count} "
-            f"OpenAI Agents package runs: {report.openai_agents_package_run_count}"
+            f"DeepAgents package runs: {report.deepagents_package_run_count}"
         )
     return 0
 

@@ -141,6 +141,150 @@ def register_portfolio_quality_commands(subparsers: argparse._SubParsersAction) 
         default="docker",
         help="Docker CLI binary used when Docker smoke is included.",
     )
+    refresh_evidence.add_argument(
+        "--include-complex-suite",
+        action="store_true",
+        help="Aggregate saved complex benchmark attempt directories during refresh.",
+    )
+    refresh_evidence.add_argument(
+        "--complex-suite-spec",
+        help=(
+            "JSON suite spec containing benchmark, attempt_dirs, optional output_dir, "
+            "and gate thresholds. Supplying this enables complex-suite refresh."
+        ),
+    )
+    refresh_evidence.add_argument(
+        "--complex-suite-attempt-dir",
+        action="append",
+        default=[],
+        help=(
+            "Saved public-issue repair attempt directory to aggregate. "
+            "Repeat for each task/attempt directory."
+        ),
+    )
+    refresh_evidence.add_argument(
+        "--complex-suite-output-dir",
+        help=(
+            "Output directory for complex suite artifacts. Defaults to "
+            "artifacts/experiments/complex_benchmark_suite."
+        ),
+    )
+    refresh_evidence.add_argument(
+        "--complex-suite-benchmark",
+        default="public_issue_repair_attempts",
+        help="Benchmark label to write into the complex suite report.",
+    )
+    refresh_evidence.add_argument(
+        "--complex-suite-min-validation-rate",
+        type=float,
+        help="Fail the complex suite gate when validation rate is below this value.",
+    )
+    refresh_evidence.add_argument(
+        "--complex-suite-min-live-provider-tasks",
+        type=int,
+        help="Fail the complex suite gate when live-provider task count is below this value.",
+    )
+    refresh_evidence.add_argument(
+        "--complex-suite-min-unique-tasks",
+        type=int,
+        help="Fail the complex suite gate when unique task count is below this value.",
+    )
+    refresh_evidence.add_argument(
+        "--complex-suite-max-selected-cost-per-validated-task-usd",
+        type=float,
+        help="Fail the complex suite gate above this selected cost per validated task.",
+    )
+    refresh_evidence.add_argument(
+        "--complex-suite-max-selected-tokens-per-validated-task",
+        type=float,
+        help="Fail the complex suite gate above this selected token count per validated task.",
+    )
+    refresh_evidence.add_argument(
+        "--complex-suite-max-selected-virtual-files-per-validated-task",
+        type=float,
+        help=(
+            "Fail the complex suite gate above this selected DeepAgents virtual "
+            "file count per validated task."
+        ),
+    )
+    refresh_evidence.add_argument(
+        "--complex-suite-max-selected-tokens-per-virtual-file",
+        type=float,
+        help="Fail the complex suite gate above this selected token count per virtual file.",
+    )
+    refresh_evidence.add_argument(
+        "--complex-suite-max-selected-responses-per-virtual-file",
+        type=float,
+        help=(
+            "Fail the complex suite gate above this selected response count per "
+            "virtual file."
+        ),
+    )
+    refresh_evidence.add_argument(
+        "--complex-suite-min-selected-progress-score",
+        type=float,
+        help="Fail the complex suite gate below this selected-attempt progress score.",
+    )
+    refresh_evidence.add_argument(
+        "--complex-suite-min-selected-context-target-recall",
+        type=float,
+        help="Fail the complex suite gate below this selected context-target recall.",
+    )
+    refresh_evidence.add_argument(
+        "--complex-suite-min-selected-context-target-precision",
+        type=float,
+        help="Fail the complex suite gate below this selected context-target precision.",
+    )
+    refresh_evidence.add_argument(
+        "--complex-suite-min-repo-instructions-manifest-rate",
+        type=float,
+        help="Fail the complex suite gate below this repo-instructions manifest rate.",
+    )
+    refresh_evidence.add_argument(
+        "--complex-suite-min-repo-instructions-read-first-rate",
+        type=float,
+        help="Fail the complex suite gate below this repo-instructions read-first rate.",
+    )
+    refresh_evidence.add_argument(
+        "--complex-suite-min-acceptance-rubric-manifest-rate",
+        type=float,
+        help="Fail the complex suite gate below this acceptance-rubric manifest rate.",
+    )
+    refresh_evidence.add_argument(
+        "--complex-suite-min-acceptance-rubric-read-first-rate",
+        type=float,
+        help="Fail the complex suite gate below this acceptance-rubric read-first rate.",
+    )
+    refresh_evidence.add_argument(
+        "--complex-suite-min-acceptance-rubric-alignment-rate",
+        type=float,
+        help="Fail the complex suite gate below this acceptance-rubric alignment rate.",
+    )
+    refresh_evidence.add_argument(
+        "--complex-suite-min-agent-trajectory-score",
+        type=float,
+        help="Fail the complex suite gate when average agent trajectory is below this value.",
+    )
+    refresh_evidence.add_argument(
+        "--complex-suite-min-contextual-verifier-rate",
+        type=float,
+        help="Fail the complex suite gate below this contextual-verifier rate.",
+    )
+    refresh_evidence.add_argument(
+        "--complex-suite-min-process-quality-score",
+        type=float,
+        help="Fail the complex suite gate below this average process-quality score.",
+    )
+    refresh_evidence.add_argument(
+        "--complex-suite-max-process-risky-validated-tasks",
+        type=int,
+        help="Fail when more than this many validated tasks are process-risky.",
+    )
+    refresh_evidence.add_argument(
+        "--complex-suite-min-target-alignment-rate",
+        type=float,
+        help="Fail the complex suite gate when target-aligned patch rate is below this value.",
+    )
     refresh_evidence.add_argument("--json", action="store_true", help="Print JSON summary.")
 
 

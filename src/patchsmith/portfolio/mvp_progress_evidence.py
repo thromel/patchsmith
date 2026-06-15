@@ -34,7 +34,7 @@ class MvpProgressEvidence:
     has_retrieval: bool
     has_repair: bool
     has_patch_search: bool
-    has_langgraph: bool
+    has_deepagents: bool
     has_docker_runner: bool
     docker_smoke_count: int
     latest_docker_smoke_status: str | None
@@ -77,7 +77,7 @@ def build_mvp_progress_evidence(
         has_retrieval="retrieval" in metric_kinds,
         has_repair=any(kind in metric_kinds for kind in ("repair", "scaffold")),
         has_patch_search="patch_search" in metric_kinds,
-        has_langgraph=any("langgraph" in lane for lane in metric_lanes),
+        has_deepagents=any("deepagents" in lane for lane in metric_lanes),
         has_docker_runner=has_docker_runner,
         docker_smoke_count=_docker_sandbox_success_count(artifacts_dir),
         latest_docker_smoke_status=_latest_docker_smoke_status(artifacts_dir),

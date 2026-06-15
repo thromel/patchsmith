@@ -36,7 +36,7 @@ def test_mvp_progress_report_scores_checklist_from_evidence(
     assert item_statuses["Live LLM calibration has been run."] == "warning"
     assert item_statuses["Real-world task breadth is proven."] == "warning"
     assert item_statuses["Agent can read files through bounded tool."] == "passed"
-    assert item_statuses["LangGraph repair loop runs."] == "passed"
+    assert item_statuses["DeepAgents repair loop runs."] == "passed"
     rendered = output_path.read_text(encoding="utf-8")
     assert "# PatchSmith MVP Progress Report" in rendered
     assert "Evidence-weighted completion" in rendered

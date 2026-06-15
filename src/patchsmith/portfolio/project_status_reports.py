@@ -28,8 +28,6 @@ def render_project_status_report(report: ProjectStatusReport) -> str:
         f"- Saved live-provider runs: `{report.saved_live_provider_count}`",
         f"- DeepAgents package-backed runs: `{report.deepagents_package_run_count}`",
         f"- DeepAgents compatibility-mode runs: `{report.deepagents_compatibility_run_count}`",
-        f"- OpenAI Agents package-backed runs: `{report.openai_agents_package_run_count}`",
-        f"- OpenAI Agents compatibility-mode runs: `{report.openai_agents_compatibility_run_count}`",
         f"- Indexed experiments: `{report.experiment_count}`",
         f"- Indexed runs: `{report.run_count}`",
         f"- Metric rows: `{report.metric_count}`",

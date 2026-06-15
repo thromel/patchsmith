@@ -15,14 +15,12 @@ def live_calibration_checks(
     *,
     model_providers: dict[str, int],
     deepagents_modes: dict[str, int],
-    openai_agents_modes: dict[str, int],
     environment: dict[str, str],
     package_availability: dict[str, bool] | None,
 ) -> list[LiveCalibrationCheck]:
     live_providers = _live_providers(model_providers)
     openai_sdk_available = _package_available("openai", package_availability)
     deepagents_available = _package_available("deepagents", package_availability)
-    openai_agents_available = _package_available("agents", package_availability)
     openai_key_present = bool(environment.get("OPENAI_API_KEY"))
     model_name = environment.get("PATCHSMITH_OPENAI_MODEL", "").strip()
     input_rate = environment.get("PATCHSMITH_OPENAI_INPUT_COST_PER_1M", "").strip()
@@ -43,9 +41,6 @@ def live_calibration_checks(
             if deepagents_live_runs
             else "Use package-backed traces for adapter-import claims; still avoid live-model claims."
         )
-    openai_agents_package_runs = openai_agents_modes.get("package_available", 0)
-    openai_agents_compatibility_runs = openai_agents_modes.get("compatibility_mode", 0)
-
     return [
         LiveCalibrationCheck(
             name="OpenAI SDK",
@@ -145,63 +140,6 @@ def live_calibration_checks(
                 else f"0 package-backed runs; {deepagents_compatibility_runs} compatibility-mode run(s)."
             ),
             next_action=deepagents_package_next_action,
-        ),
-        LiveCalibrationCheck(
-            name="OpenAI Agents Package",
-            status="passed" if openai_agents_available else "warning",
-            evidence=(
-                "`agents` package is importable."
-                if openai_agents_available
-                else (
-                    "`agents` package is not importable in the current shell; "
-                    "use saved trace evidence for package-backed adapter claims."
-                    if openai_agents_package_runs
-                    else (
-                        "`agents` package is not importable; adapter evidence remains "
-                        "compatibility-mode only."
-                    )
-                )
-            ),
-            next_action=(
-                (
-                    "Run the OpenAI Agents adapter under the installed package before "
-                    "making package-backed claims."
-                )
-                if openai_agents_available
-                else (
-                    "Install the optional `openai-agents` extra in the active environment for "
-                    "new package-backed runs."
-                    if openai_agents_package_runs
-                    else (
-                        "Install the optional `openai-agents` extra before claiming real "
-                        "package execution."
-                    )
-                )
-            ),
-        ),
-        LiveCalibrationCheck(
-            name="Saved OpenAI Agents Package Evidence",
-            status="passed" if openai_agents_package_runs else "warning",
-            evidence=(
-                f"{openai_agents_package_runs} package-backed run(s); "
-                f"{openai_agents_compatibility_runs} compatibility-mode run(s)."
-                if openai_agents_package_runs
-                else (
-                    f"0 package-backed runs; "
-                    f"{openai_agents_compatibility_runs} compatibility-mode run(s)."
-                )
-            ),
-            next_action=(
-                (
-                    "Use package-backed traces for adapter-import claims; still avoid "
-                    "live-model claims."
-                )
-                if openai_agents_package_runs
-                else (
-                    "Run the OpenAI Agents adapter with the optional extra installed and "
-                    "save traces."
-                )
-            ),
         ),
         LiveCalibrationCheck(
             name="Saved Live Provider Evidence",

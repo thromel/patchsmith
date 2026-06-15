@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
 
 from patchsmith.artifacts import format_cost as _format_cost
@@ -22,6 +23,7 @@ def render_repair_eval_report(
     input_tokens = summary.input_tokens if summary.input_tokens is not None else "n/a"
     output_tokens = summary.output_tokens if summary.output_tokens is not None else "n/a"
     total_tokens = summary.total_tokens if summary.total_tokens is not None else "n/a"
+    response_count = summary.response_count if summary.response_count is not None else "n/a"
     lines = [
         "# Repair Evaluation Report",
         "",
@@ -32,19 +34,22 @@ def render_repair_eval_report(
         f"- Attempted tasks: `{summary.attempted_tasks}`",
         f"- Completed tasks: `{summary.completed_tasks}`",
         f"- Model provider: `{summary.model_provider or 'none'}`",
+        f"- Model responses: `{response_count}`",
         f"- Input tokens: `{input_tokens}`",
         f"- Output tokens: `{output_tokens}`",
         f"- Total tokens: `{total_tokens}`",
         f"- Estimated model cost: `{_format_cost(summary.estimated_cost_usd)}`",
+        f"- Retry label counts: `{_format_label_counts(summary.retry_label_counts)}`",
         "",
         "## Summary",
         "",
         (
             "| Runtime | Planner | Context | Patch Generated | Targeted Tests Passed | "
             "Avg Latency ms | Avg Trace Events | Avg Runtime Nodes | Failed Trace Events | "
-            "Avg Retries | Debug Score | Input Tokens | Output Tokens | Est Cost |"
+            "Avg Retries | Retry Labels | Quality Warnings | Debug Score | Agent Trajectory | "
+            "Contextual Verifier | Responses | Input Tokens | Output Tokens | Est Cost |"
         ),
-        "|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "|---|---|---|---:|---:|---:|---:|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|",
         "| "
         f"{summary.runtime} | "
         f"{summary.planner} | "
@@ -56,7 +61,12 @@ def render_repair_eval_report(
         f"{summary.avg_runtime_nodes:.1f} | "
         f"{summary.failed_trace_event_count} | "
         f"{summary.avg_retry_events:.1f} | "
+        f"{_format_label_counts(summary.retry_label_counts)} | "
+        f"{summary.patch_quality_warning_rate:.2f} | "
         f"{summary.avg_debuggability_score:.1f} | "
+        f"{summary.avg_agent_trajectory_score:.2f} | "
+        f"{summary.contextual_verifier_rate:.2f} | "
+        f"{summary.response_count if summary.response_count is not None else ''} | "
         f"{summary.input_tokens if summary.input_tokens is not None else ''} | "
         f"{summary.output_tokens if summary.output_tokens is not None else ''} | "
         f"{_format_cost(summary.estimated_cost_usd)} |",
@@ -66,9 +76,10 @@ def render_repair_eval_report(
         (
             "| Task | Planner | Model Provider | Status | Patch Generated | Tests Passed | "
             "Exit Code | Trace Events | Runtime Nodes | Failed Trace Events | Retries | "
-            "Debug Score | Tokens | Est Cost | Retrieved Files | Report | Error |"
+            "Retry Labels | Quality | Debug Score | Agent Trajectory | Verifier | Responses/Tokens | Est Cost | "
+            "Retrieved Files | Report | Error |"
         ),
-        "|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|---|",
+        "|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---|---|---:|---:|---:|---:|---|---|---|",
     ]
     for result in results:
         lines.append(
@@ -84,8 +95,12 @@ def render_repair_eval_report(
             f"{result.runtime_node_count} | "
             f"{result.failed_trace_event_count} | "
             f"{result.retry_event_count} | "
+            f"{','.join(result.retry_labels) or ''} | "
+            f"{result.patch_quality_severity or ''} | "
             f"{result.debuggability_score:.1f} | "
-            f"{result.total_tokens if result.total_tokens is not None else ''} | "
+            f"{result.agent_trajectory_score:.2f} | "
+            f"{int(result.contextual_verifier)} | "
+            f"{_format_response_and_tokens(result.response_count, result.total_tokens)} | "
             f"{_format_cost(result.estimated_cost_usd)} | "
             f"{', '.join(result.retrieved_files) or 'none'} | "
             f"{result.report_path or ''} | "
@@ -110,6 +125,15 @@ def render_repair_eval_report(
                 "- Debug score is a 0-5 trace-completeness heuristic: trace, context, "
                 "runtime-node, test, and repair-outcome visibility."
             ),
+            (
+                "- Agent trajectory score is a 0-1 trace-derived checklist for todo "
+                "planning, constrained file access, specialist review, guardrails, "
+                "structured output, retry feedback, and patch diagnostics."
+            ),
+            (
+                "- Contextual verifier rate reports whether traces include a task-local "
+                "acceptance-rubric verifier contract."
+            ),
             "",
         ]
     )
@@ -133,20 +157,41 @@ def render_repair_eval_report(
                     "`deepagents` extra and live model provider are configured."
                 ),
             )
-    if summary.runtime == "openai_agents":
-        lines.insert(
-            -1,
-            (
-                "- The `openai_agents` runtime row is dependency-gated adapter evidence; "
-                "local runs use offline compatibility mode unless the optional "
-                "`openai-agents` extra and live model provider are configured."
-            ),
-        )
     return "\n".join(lines)
 
 
 def _is_live_model_provider(provider: str | None) -> bool:
     return bool(provider and not provider.startswith("offline_"))
+
+
+def _merge_label_counts(counts: Iterable[dict[str, int]]) -> dict[str, int]:
+    merged: dict[str, int] = {}
+    for item in counts:
+        for label, count in item.items():
+            merged[label] = merged.get(label, 0) + count
+    return dict(sorted(merged.items()))
+
+
+def _format_label_counts(counts: dict[str, int]) -> str:
+    if not counts:
+        return "none"
+    return ", ".join(f"{label}={count}" for label, count in sorted(counts.items()))
+
+
+def _format_response_and_tokens(
+    response_count: int | None,
+    total_tokens: int | None,
+) -> str:
+    if response_count is None:
+        return str(total_tokens) if total_tokens is not None else ""
+    if total_tokens is None:
+        return f"{response_count} responses"
+    return f"{response_count} responses / {total_tokens}"
+
+
+def _sum_optional_int(values: Iterable[int | None]) -> int | None:
+    numbers = [value for value in values if value is not None]
+    return sum(numbers) if numbers else None
 
 
 def render_scaffold_comparison_report(
@@ -160,15 +205,18 @@ def render_scaffold_comparison_report(
         f"- Dataset: `{dataset_dir}`",
         f"- Scaffold count: `{len(results)}`",
         f"- Model cost: `{_format_cost(_sum_optional_float(result.estimated_cost_usd for result in results))}`",
+        f"- Model responses: `{_sum_optional_int(result.response_count for result in results) or 'n/a'}`",
+        f"- Retry label counts: `{_format_label_counts(_merge_label_counts(result.retry_label_counts for result in results))}`",
         "",
         "## Summary",
         "",
         (
             "| Scaffold | Runtime | Planner | Context | Completed | Patch Generated | "
             "Targeted Tests Passed | Avg Latency ms | Avg Trace Events | Avg Runtime Nodes | "
-            "Failed Trace Events | Avg Retries | Debug Score | Model Provider | Tokens | Est Cost | Repair Report |"
+            "Failed Trace Events | Avg Retries | Retry Labels | Debug Score | Agent Trajectory | "
+            "Contextual Verifier | Model Provider | Responses | Tokens | Est Cost | Repair Report |"
         ),
-        "|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---:|---:|---|",
+        "|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|---:|---:|---|---:|---:|---|---|",
     ]
     for result in results:
         lines.append(
@@ -185,8 +233,12 @@ def render_scaffold_comparison_report(
             f"{result.avg_runtime_nodes:.1f} | "
             f"{result.failed_trace_event_count} | "
             f"{result.avg_retry_events:.1f} | "
+            f"{_format_label_counts(result.retry_label_counts)} | "
             f"{result.avg_debuggability_score:.1f} | "
+            f"{result.avg_agent_trajectory_score:.2f} | "
+            f"{result.contextual_verifier_rate:.2f} | "
             f"{result.model_provider or ''} | "
+            f"{result.response_count if result.response_count is not None else ''} | "
             f"{result.total_tokens if result.total_tokens is not None else ''} | "
             f"{_format_cost(result.estimated_cost_usd)} | "
             f"{result.repair_report_path} |"
@@ -214,6 +266,12 @@ def render_scaffold_comparison_report(
                 "- Debug score is a 0-5 trace-completeness heuristic: trace, context, "
                 "runtime-node, test, and repair-outcome visibility."
             ),
+            (
+                "- Agent trajectory score is a 0-1 trace-derived checklist for "
+                "DeepAgents-style planning, file access boundaries, review, guardrails, "
+                "structured output, retry feedback, and patch diagnostics."
+            ),
+            "- Contextual verifier rate reports task-local acceptance-rubric coverage.",
             "- Compare repair report traces before making a default-runtime decision.",
             "",
         ]
@@ -224,15 +282,6 @@ def render_scaffold_comparison_report(
             (
                 "- The `deepagents` row is dependency-gated adapter evidence; local "
                 "runs use offline compatibility mode unless the optional `deepagents` "
-                "extra and live model provider are configured."
-            ),
-        )
-    if any(result.scaffold == "openai_agents" for result in results):
-        lines.insert(
-            -1,
-            (
-                "- The `openai_agents` row is dependency-gated adapter evidence; local "
-                "runs use offline compatibility mode unless the optional `openai-agents` "
                 "extra and live model provider are configured."
             ),
         )

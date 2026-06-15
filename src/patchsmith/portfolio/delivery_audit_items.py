@@ -220,7 +220,6 @@ def _delivery_audit_items(
             evidence_keys=[
                 "saved_live_provider_count",
                 "deepagents_package_run_count",
-                "openai_agents_package_run_count",
             ],
             source="artifacts/experiments/calibration_readiness.json",
             missing_action="Configure credentials and run the required live-provider smoke.",

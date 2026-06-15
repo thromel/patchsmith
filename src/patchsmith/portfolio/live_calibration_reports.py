@@ -19,11 +19,6 @@ def render_live_calibration_report(report: LiveCalibrationReport) -> str:
         f"- Saved live-provider runs: `{report.saved_live_provider_count}`",
         f"- DeepAgents package-backed runs: `{report.deepagents_package_run_count}`",
         f"- DeepAgents compatibility-mode runs: `{report.deepagents_compatibility_run_count}`",
-        f"- OpenAI Agents package-backed runs: `{report.openai_agents_package_run_count}`",
-        (
-            "- OpenAI Agents compatibility-mode runs: "
-            f"`{report.openai_agents_compatibility_run_count}`"
-        ),
         f"- Model providers: `{_provider_summary(report.model_providers)}`",
         "",
         "## Checks",

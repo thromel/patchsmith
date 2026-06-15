@@ -8,7 +8,6 @@ from patchsmith.artifacts import write_json, write_markdown
 from patchsmith.observability import build_artifact_index
 from patchsmith.portfolio._helpers import (
     _discover_deepagents_adapter_modes,
-    _discover_openai_agents_adapter_modes,
     _markdown_cell,
     _utc_now,
 )
@@ -38,7 +37,6 @@ def build_final_evaluation_report(
     )
     metrics = [final_evaluation_metric(metric) for metric in index.metrics]
     deepagents_modes = _discover_deepagents_adapter_modes(Path(index.artifacts_dir))
-    openai_agents_modes = _discover_openai_agents_adapter_modes(Path(index.artifacts_dir))
     return FinalEvaluationReport(
         artifacts_dir=index.artifacts_dir,
         generated_at=_utc_now(),
@@ -51,13 +49,9 @@ def build_final_evaluation_report(
         model_providers=readiness.model_providers,
         deepagents_package_run_count=deepagents_modes.get("package_available", 0),
         deepagents_compatibility_run_count=deepagents_modes.get("compatibility_mode", 0),
-        openai_agents_package_run_count=openai_agents_modes.get("package_available", 0),
-        openai_agents_compatibility_run_count=openai_agents_modes.get("compatibility_mode", 0),
         metrics=metrics,
-        decisions=final_evaluation_decisions(
-            readiness, metrics, deepagents_modes, openai_agents_modes
-        ),
-        limitations=final_evaluation_limitations(readiness, deepagents_modes, openai_agents_modes),
+        decisions=final_evaluation_decisions(readiness, metrics, deepagents_modes),
+        limitations=final_evaluation_limitations(readiness, deepagents_modes),
         review_artifacts=final_review_artifacts(),
     )
 
@@ -93,11 +87,6 @@ def render_final_evaluation_report(report: FinalEvaluationReport) -> str:
         f"- Runs requiring attention: `{report.runs_requiring_attention}`",
         f"- DeepAgents package-backed runs: `{report.deepagents_package_run_count}`",
         f"- DeepAgents compatibility-mode runs: `{report.deepagents_compatibility_run_count}`",
-        f"- OpenAI Agents package-backed runs: `{report.openai_agents_package_run_count}`",
-        (
-            "- OpenAI Agents compatibility-mode runs: "
-            f"`{report.openai_agents_compatibility_run_count}`"
-        ),
         "",
         "## Executive Conclusion",
         "",

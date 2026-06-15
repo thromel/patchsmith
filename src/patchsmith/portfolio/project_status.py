@@ -184,9 +184,7 @@ def build_project_status_report(
             status="recorded" if calibration else "missing",
             evidence=(
                 f"{_payload_int(calibration, 'deepagents_package_run_count')} DeepAgents package-backed, "
-                f"{_payload_int(calibration, 'deepagents_compatibility_run_count')} DeepAgents compatibility, "
-                f"{_payload_int(calibration, 'openai_agents_package_run_count')} OpenAI Agents package-backed, "
-                f"{_payload_int(calibration, 'openai_agents_compatibility_run_count')} OpenAI Agents compatibility."
+                f"{_payload_int(calibration, 'deepagents_compatibility_run_count')} DeepAgents compatibility."
             ),
             source=sources["calibration"],
         ),
@@ -237,12 +235,6 @@ def build_project_status_report(
         deepagents_package_run_count=_payload_int(calibration, "deepagents_package_run_count"),
         deepagents_compatibility_run_count=_payload_int(
             calibration, "deepagents_compatibility_run_count"
-        ),
-        openai_agents_package_run_count=_payload_int(
-            calibration, "openai_agents_package_run_count"
-        ),
-        openai_agents_compatibility_run_count=_payload_int(
-            calibration, "openai_agents_compatibility_run_count"
         ),
         experiment_count=experiment_count,
         run_count=run_count,

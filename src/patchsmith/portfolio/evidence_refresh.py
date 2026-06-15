@@ -6,6 +6,10 @@ from collections import Counter
 from pathlib import Path
 
 from patchsmith.artifacts import write_json, write_markdown
+from patchsmith.evaluation import (
+    load_complex_benchmark_suite_spec,
+    resolve_complex_benchmark_suite_config,
+)
 from patchsmith.portfolio._helpers import _utc_now
 from patchsmith.portfolio.evidence_refresh_steps import (
     EvidenceRefreshConfig,
@@ -32,9 +36,99 @@ def build_evidence_refresh_report(
     docker_smoke_skip_run: bool = False,
     docker_smoke_image: str = "patchsmith-seeded-smoke:py312",
     docker_binary: str = "docker",
+    include_complex_suite: bool = False,
+    complex_suite_spec_path: Path | None = None,
+    complex_suite_attempt_dirs: tuple[Path, ...] | None = None,
+    complex_suite_output_dir: Path | None = None,
+    complex_suite_benchmark: str = "public_issue_repair_attempts",
+    complex_suite_min_validation_rate: float | None = None,
+    complex_suite_min_live_provider_tasks: int | None = None,
+    complex_suite_min_unique_tasks: int | None = None,
+    complex_suite_max_selected_cost_per_validated_task_usd: float | None = None,
+    complex_suite_max_selected_tokens_per_validated_task: float | None = None,
+    complex_suite_max_selected_virtual_files_per_validated_task: float | None = None,
+    complex_suite_max_selected_tokens_per_virtual_file: float | None = None,
+    complex_suite_max_selected_responses_per_virtual_file: float | None = None,
+    complex_suite_min_selected_progress_score: float | None = None,
+    complex_suite_min_selected_context_target_recall: float | None = None,
+    complex_suite_min_selected_context_target_precision: float | None = None,
+    complex_suite_min_repo_instructions_manifest_rate: float | None = None,
+    complex_suite_min_repo_instructions_read_first_rate: float | None = None,
+    complex_suite_min_acceptance_rubric_manifest_rate: float | None = None,
+    complex_suite_min_acceptance_rubric_read_first_rate: float | None = None,
+    complex_suite_min_acceptance_rubric_alignment_rate: float | None = None,
+    complex_suite_min_agent_trajectory_score: float | None = None,
+    complex_suite_min_contextual_verifier_rate: float | None = None,
+    complex_suite_min_process_quality_score: float | None = None,
+    complex_suite_max_process_risky_validated_tasks: int | None = None,
+    complex_suite_min_target_alignment_rate: float | None = None,
 ) -> EvidenceRefreshReport:
     project_root = project_root.resolve()
     artifacts_dir = artifacts_dir.resolve()
+    complex_suite_spec = (
+        load_complex_benchmark_suite_spec(complex_suite_spec_path)
+        if complex_suite_spec_path is not None
+        else None
+    )
+    complex_suite_config = resolve_complex_benchmark_suite_config(
+        suite_spec=complex_suite_spec,
+        attempt_dirs=complex_suite_attempt_dirs,
+        output_dir=complex_suite_output_dir,
+        benchmark=(
+            None
+            if complex_suite_spec is not None
+            and complex_suite_benchmark == "public_issue_repair_attempts"
+            else complex_suite_benchmark
+        ),
+        min_validation_rate=complex_suite_min_validation_rate,
+        min_live_provider_tasks=complex_suite_min_live_provider_tasks,
+        min_unique_tasks=complex_suite_min_unique_tasks,
+        max_selected_cost_per_validated_task_usd=(
+            complex_suite_max_selected_cost_per_validated_task_usd
+        ),
+        max_selected_tokens_per_validated_task=(
+            complex_suite_max_selected_tokens_per_validated_task
+        ),
+        max_selected_virtual_files_per_validated_task=(
+            complex_suite_max_selected_virtual_files_per_validated_task
+        ),
+        max_selected_tokens_per_virtual_file=(
+            complex_suite_max_selected_tokens_per_virtual_file
+        ),
+        max_selected_responses_per_virtual_file=(
+            complex_suite_max_selected_responses_per_virtual_file
+        ),
+        min_selected_progress_score=complex_suite_min_selected_progress_score,
+        min_selected_context_target_recall=(
+            complex_suite_min_selected_context_target_recall
+        ),
+        min_selected_context_target_precision=(
+            complex_suite_min_selected_context_target_precision
+        ),
+        min_repo_instructions_manifest_rate=(
+            complex_suite_min_repo_instructions_manifest_rate
+        ),
+        min_repo_instructions_read_first_rate=(
+            complex_suite_min_repo_instructions_read_first_rate
+        ),
+        min_acceptance_rubric_manifest_rate=(
+            complex_suite_min_acceptance_rubric_manifest_rate
+        ),
+        min_acceptance_rubric_read_first_rate=(
+            complex_suite_min_acceptance_rubric_read_first_rate
+        ),
+        min_acceptance_rubric_alignment_rate=(
+            complex_suite_min_acceptance_rubric_alignment_rate
+        ),
+        min_agent_trajectory_score=complex_suite_min_agent_trajectory_score,
+        min_contextual_verifier_rate=complex_suite_min_contextual_verifier_rate,
+        min_process_quality_score=complex_suite_min_process_quality_score,
+        max_process_risky_validated_tasks=(
+            complex_suite_max_process_risky_validated_tasks
+        ),
+        min_target_alignment_rate=complex_suite_min_target_alignment_rate,
+        default_output_dir=artifacts_dir / "experiments" / "complex_benchmark_suite",
+    )
     steps = build_evidence_refresh_steps(
         EvidenceRefreshConfig(
             project_root=project_root,
@@ -46,6 +140,11 @@ def build_evidence_refresh_report(
             docker_smoke_skip_run=docker_smoke_skip_run,
             docker_smoke_image=docker_smoke_image,
             docker_binary=docker_binary,
+            include_complex_suite=include_complex_suite or complex_suite_spec is not None,
+            complex_suite_attempt_dirs=complex_suite_config.attempt_dirs,
+            complex_suite_output_dir=complex_suite_config.output_dir,
+            complex_suite_benchmark=complex_suite_config.benchmark,
+            complex_suite_thresholds=complex_suite_config.thresholds,
         )
     )
     status_counts = Counter(step.status for step in steps)
@@ -60,6 +159,7 @@ def build_evidence_refresh_report(
         skipped_count=status_counts.get("skipped", 0),
         quality_gate_refreshed=include_quality_gate,
         docker_smoke_refreshed=include_docker_smoke,
+        complex_suite_refreshed=include_complex_suite or complex_suite_spec is not None,
         steps=steps,
     )
 
@@ -77,6 +177,32 @@ def write_evidence_refresh_report(
     docker_smoke_skip_run: bool = False,
     docker_smoke_image: str = "patchsmith-seeded-smoke:py312",
     docker_binary: str = "docker",
+    include_complex_suite: bool = False,
+    complex_suite_spec_path: Path | None = None,
+    complex_suite_attempt_dirs: tuple[Path, ...] | None = None,
+    complex_suite_output_dir: Path | None = None,
+    complex_suite_benchmark: str = "public_issue_repair_attempts",
+    complex_suite_min_validation_rate: float | None = None,
+    complex_suite_min_live_provider_tasks: int | None = None,
+    complex_suite_min_unique_tasks: int | None = None,
+    complex_suite_max_selected_cost_per_validated_task_usd: float | None = None,
+    complex_suite_max_selected_tokens_per_validated_task: float | None = None,
+    complex_suite_max_selected_virtual_files_per_validated_task: float | None = None,
+    complex_suite_max_selected_tokens_per_virtual_file: float | None = None,
+    complex_suite_max_selected_responses_per_virtual_file: float | None = None,
+    complex_suite_min_selected_progress_score: float | None = None,
+    complex_suite_min_selected_context_target_recall: float | None = None,
+    complex_suite_min_selected_context_target_precision: float | None = None,
+    complex_suite_min_repo_instructions_manifest_rate: float | None = None,
+    complex_suite_min_repo_instructions_read_first_rate: float | None = None,
+    complex_suite_min_acceptance_rubric_manifest_rate: float | None = None,
+    complex_suite_min_acceptance_rubric_read_first_rate: float | None = None,
+    complex_suite_min_acceptance_rubric_alignment_rate: float | None = None,
+    complex_suite_min_agent_trajectory_score: float | None = None,
+    complex_suite_min_contextual_verifier_rate: float | None = None,
+    complex_suite_min_process_quality_score: float | None = None,
+    complex_suite_max_process_risky_validated_tasks: int | None = None,
+    complex_suite_min_target_alignment_rate: float | None = None,
 ) -> EvidenceRefreshReport:
     report = build_evidence_refresh_report(
         project_root=project_root,
@@ -88,6 +214,64 @@ def write_evidence_refresh_report(
         docker_smoke_skip_run=docker_smoke_skip_run,
         docker_smoke_image=docker_smoke_image,
         docker_binary=docker_binary,
+        include_complex_suite=include_complex_suite,
+        complex_suite_spec_path=complex_suite_spec_path,
+        complex_suite_attempt_dirs=complex_suite_attempt_dirs,
+        complex_suite_output_dir=complex_suite_output_dir,
+        complex_suite_benchmark=complex_suite_benchmark,
+        complex_suite_min_validation_rate=complex_suite_min_validation_rate,
+        complex_suite_min_live_provider_tasks=complex_suite_min_live_provider_tasks,
+        complex_suite_min_unique_tasks=complex_suite_min_unique_tasks,
+        complex_suite_max_selected_cost_per_validated_task_usd=(
+            complex_suite_max_selected_cost_per_validated_task_usd
+        ),
+        complex_suite_max_selected_tokens_per_validated_task=(
+            complex_suite_max_selected_tokens_per_validated_task
+        ),
+        complex_suite_max_selected_virtual_files_per_validated_task=(
+            complex_suite_max_selected_virtual_files_per_validated_task
+        ),
+        complex_suite_max_selected_tokens_per_virtual_file=(
+            complex_suite_max_selected_tokens_per_virtual_file
+        ),
+        complex_suite_max_selected_responses_per_virtual_file=(
+            complex_suite_max_selected_responses_per_virtual_file
+        ),
+        complex_suite_min_selected_progress_score=(
+            complex_suite_min_selected_progress_score
+        ),
+        complex_suite_min_selected_context_target_recall=(
+            complex_suite_min_selected_context_target_recall
+        ),
+        complex_suite_min_selected_context_target_precision=(
+            complex_suite_min_selected_context_target_precision
+        ),
+        complex_suite_min_repo_instructions_manifest_rate=(
+            complex_suite_min_repo_instructions_manifest_rate
+        ),
+        complex_suite_min_repo_instructions_read_first_rate=(
+            complex_suite_min_repo_instructions_read_first_rate
+        ),
+        complex_suite_min_acceptance_rubric_manifest_rate=(
+            complex_suite_min_acceptance_rubric_manifest_rate
+        ),
+        complex_suite_min_acceptance_rubric_read_first_rate=(
+            complex_suite_min_acceptance_rubric_read_first_rate
+        ),
+        complex_suite_min_acceptance_rubric_alignment_rate=(
+            complex_suite_min_acceptance_rubric_alignment_rate
+        ),
+        complex_suite_min_agent_trajectory_score=complex_suite_min_agent_trajectory_score,
+        complex_suite_min_contextual_verifier_rate=(
+            complex_suite_min_contextual_verifier_rate
+        ),
+        complex_suite_min_process_quality_score=(
+            complex_suite_min_process_quality_score
+        ),
+        complex_suite_max_process_risky_validated_tasks=(
+            complex_suite_max_process_risky_validated_tasks
+        ),
+        complex_suite_min_target_alignment_rate=complex_suite_min_target_alignment_rate,
     )
     write_markdown(output_path, render_evidence_refresh_report(report))
     if json_output_path is not None:

@@ -14,7 +14,6 @@ def final_evaluation_decisions(
     readiness: DemoReadinessReport,
     metrics: list[FinalEvaluationMetric],
     deepagents_modes: dict[str, int],
-    openai_agents_modes: dict[str, int],
 ) -> list[str]:
     decisions = [
         (
@@ -50,7 +49,7 @@ def final_evaluation_decisions(
             "Failure cases are preserved for review: "
             f"{_failure_summary(readiness.failure_categories)}."
         )
-    decisions.extend(_adapter_decisions(deepagents_modes, openai_agents_modes))
+    decisions.extend(_adapter_decisions(deepagents_modes))
     live_providers = _live_model_providers(readiness)
     if live_providers:
         decisions.append(
@@ -67,10 +66,8 @@ def final_evaluation_decisions(
 def final_evaluation_limitations(
     readiness: DemoReadinessReport,
     deepagents_modes: dict[str, int],
-    openai_agents_modes: dict[str, int],
 ) -> list[str]:
     package_runs = deepagents_modes.get("package_available", 0)
-    openai_agents_package_runs = openai_agents_modes.get("package_available", 0)
     live_providers = _live_model_providers(readiness)
     deepagents_live_providers = [
         provider for provider in live_providers if provider == "deepagents_openai_chat"
@@ -84,20 +81,10 @@ def final_evaluation_limitations(
         if deepagents_live_providers
         else _uncalibrated_deepagents_limitation(package_runs)
     )
-    openai_agents_limitation = (
-        "OpenAI Agents package-backed adapter smoke evidence exists, but live OpenAI "
-        "Agents model execution remains uncalibrated."
-        if openai_agents_package_runs
-        else (
-            "OpenAI Agents evidence is adapter compatibility evidence unless the optional "
-            "package and live model provider are installed and reflected in saved artifacts."
-        )
-    )
     limitations = [
         "The seeded suite is intentionally small and controlled; it proves workflow plumbing and comparative instrumentation, not broad real-world coding-agent quality.",
         "Current public-demo mode should use seeded or preselected repositories until sandboxing is hardened for arbitrary untrusted repos.",
         deepagents_limitation,
-        openai_agents_limitation,
     ]
     if not live_providers:
         limitations.append(
@@ -182,7 +169,6 @@ def _patch_search_decision(patch_rows: list[FinalEvaluationMetric]) -> str:
 
 def _adapter_decisions(
     deepagents_modes: dict[str, int],
-    openai_agents_modes: dict[str, int],
 ) -> list[str]:
     decisions: list[str] = []
     package_runs = deepagents_modes.get("package_available", 0)
@@ -192,15 +178,6 @@ def _adapter_decisions(
             f"DeepAgents adapter evidence now includes {package_runs} package-backed "
             f"run(s) and {compatibility_runs} compatibility-mode run(s); this proves "
             "optional-package import compatibility, not live DeepAgents model quality."
-        )
-    openai_agents_package_runs = openai_agents_modes.get("package_available", 0)
-    openai_agents_compatibility_runs = openai_agents_modes.get("compatibility_mode", 0)
-    if openai_agents_package_runs:
-        decisions.append(
-            "OpenAI Agents adapter evidence now includes "
-            f"{openai_agents_package_runs} package-backed run(s) and "
-            f"{openai_agents_compatibility_runs} compatibility-mode run(s); this proves "
-            "optional-package import compatibility, not live OpenAI Agents model quality."
         )
     return decisions
 
