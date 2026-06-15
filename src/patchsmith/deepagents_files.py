@@ -8,6 +8,16 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from patchsmith.deepagents_context_budget import (
+    context_budget_manifest,
+    context_budget_metadata,
+)
+from patchsmith.deepagents_context_utils import (
+    clean_context_excerpt,
+    context_symbols,
+    display_terms,
+    omitted_contexts,
+)
 from patchsmith.deepagents_manifests import (
     STABLE_TIMESTAMP,
     add_virtual_files,
@@ -432,96 +442,6 @@ def _optional_nonnegative_int(value: Any) -> int | None:
     return value
 
 
-def context_budget_manifest(
-    retrieved_context: list[RetrievedContext],
-    selected_context: list[RetrievedContext],
-    *,
-    max_context_files: int,
-    max_excerpt_chars: int = 1200,
-) -> str | None:
-    metadata = context_budget_metadata(
-        retrieved_context,
-        selected_context,
-        max_context_files=max_context_files,
-    )
-    if metadata is None:
-        return None
-    omitted_context = _omitted_contexts(retrieved_context, selected_context)
-    lines = [
-        "# PatchSmith Context Budget Manifest",
-        "",
-        f"- Max mounted repository files: `{metadata['max_context_files']}`",
-        f"- Retrieved context files: `{metadata['retrieved_file_count']}`",
-        f"- Mounted repository files: `{metadata['mounted_file_count']}`",
-        f"- Omitted retrieved files: `{metadata['omitted_file_count']}`",
-        "",
-        "PatchSmith mounted only the selected repository files in this DeepAgents "
-        "filesystem to keep the run within the configured context budget. Omitted "
-        "files below are retrieval evidence, not readable source files in this run.",
-        "",
-        "Use omitted-file summaries as routing evidence before final target selection. "
-        "Do not return an omitted path unless it is also listed as a mounted provided "
-        "file; choose a mounted control point that directly governs the omitted signal.",
-        "",
-        "## Mounted Repository Files",
-        "",
-    ]
-    for context in selected_context:
-        lines.append(f"- `{context.path}`")
-    lines.extend(["", "## Omitted Retrieved Files", ""])
-    for context in omitted_context:
-        symbols = _context_symbols(context)
-        terms = _display_terms(context.matched_terms)
-        excerpt = clean_context_excerpt(context.excerpt).strip()
-        if len(excerpt) > max_excerpt_chars:
-            excerpt = excerpt[: max_excerpt_chars - 15] + "...[truncated]"
-        lines.extend(
-            [
-                f"### `{context.path}`",
-                f"- Rank: `{context.rank}`",
-                f"- Score: `{context.score:.4f}`",
-                f"- Method: `{context.method}`",
-                "- Symbols: "
-                + (", ".join(f"`{symbol}`" for symbol in symbols) if symbols else "none"),
-                "- Matched terms: "
-                + (", ".join(f"`{term}`" for term in terms) if terms else "none"),
-            ]
-        )
-        if excerpt:
-            lines.extend(["", "Excerpt:", "```text", excerpt, "```"])
-        lines.append("")
-    return "\n".join(lines).rstrip()
-
-
-def context_budget_metadata(
-    retrieved_context: list[RetrievedContext],
-    selected_context: list[RetrievedContext],
-    *,
-    max_context_files: int,
-) -> dict[str, object] | None:
-    if max_context_files <= 0 or len(retrieved_context) <= len(selected_context):
-        return None
-    omitted_context = _omitted_contexts(retrieved_context, selected_context)
-    if not omitted_context:
-        return None
-    return {
-        "max_context_files": max_context_files,
-        "retrieved_file_count": len(retrieved_context),
-        "mounted_file_count": len(selected_context),
-        "omitted_file_count": len(omitted_context),
-        "mounted_paths": [context.path for context in selected_context],
-        "omitted_paths": [context.path for context in omitted_context],
-    }
-
-
-def _omitted_contexts(
-    retrieved_context: list[RetrievedContext],
-    selected_context: list[RetrievedContext],
-) -> list[RetrievedContext]:
-    selected_ids = {id(context) for context in selected_context}
-    return [context for context in retrieved_context if id(context) not in selected_ids]
-
-
 def _ordered_unique_paths(paths: Iterable[str]) -> list[str]:
     ordered: list[str] = []
     for path in paths:
@@ -659,6 +579,7 @@ def repo_map_manifest(
     if not retrieved_context:
         return None
     selected_ids = {id(context) for context in selected_context}
+    omitted_context = omitted_contexts(retrieved_context, selected_context)
     lines = [
         "# PatchSmith Retrieved Repo Map",
         "",
@@ -679,7 +600,7 @@ def repo_map_manifest(
         max_terms_per_file=max_terms_per_file,
     )
     omitted_sections = _repo_map_sections(
-        [context for context in retrieved_context if id(context) not in selected_ids],
+        omitted_context,
         selected=False,
         virtual_to_repo=virtual_to_repo,
         files=files,
@@ -711,8 +632,8 @@ def _repo_map_sections(
             else clean_context_excerpt(context.excerpt)
         )
         definitions = _definition_signatures(source)
-        symbols = _context_symbols(context)
-        terms = _display_terms(context.matched_terms, limit=max_terms_per_file)
+        symbols = context_symbols(context)
+        terms = display_terms(context.matched_terms, limit=max_terms_per_file)
         sections.extend(
             [
                 f"### `{repo_path}`",
@@ -745,7 +666,7 @@ def source_hint_manifest(
 ) -> str | None:
     sections: list[str] = []
     for context in retrieved_context:
-        symbols = _context_symbols(context)
+        symbols = context_symbols(context)
         if "reviewed_source_hint" not in context.matched_terms and not symbols:
             continue
         virtual_path = "/" + context.path.lstrip("/")
@@ -1012,40 +933,12 @@ def _trim_span_to_char_budget(
     return text
 
 
-def clean_context_excerpt(excerpt: str) -> str:
-    lines = []
-    for line in excerpt.splitlines():
-        lines.append(re.sub(r"^\s*\d+:\s?", "", line))
-    return "\n".join(lines)
-
-
 def path_modified_at(path: Path) -> str:
     return datetime.fromtimestamp(path.stat().st_mtime, tz=UTC).isoformat()
 
 
 def stable_timestamp() -> str:
     return STABLE_TIMESTAMP
-
-
-def _context_symbols(context: RetrievedContext) -> list[str]:
-    symbols = []
-    for term in context.matched_terms:
-        if term.startswith("symbol:"):
-            symbol = term.removeprefix("symbol:").strip()
-            if symbol:
-                symbols.append(symbol)
-    return sorted(dict.fromkeys(symbols))
-
-
-def _display_terms(terms: Iterable[str], *, limit: int = 12) -> list[str]:
-    displayed: list[str] = []
-    for term in terms:
-        stripped = term.strip()
-        if stripped and stripped not in displayed:
-            displayed.append(stripped)
-        if len(displayed) >= limit:
-            break
-    return displayed
 
 
 def _definition_signatures(source: str) -> list[str]:
