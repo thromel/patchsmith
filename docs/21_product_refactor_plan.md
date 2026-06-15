@@ -11,8 +11,8 @@ tests.
 
 ## Current Evidence
 
-- Source size: 279 Python files under `src/patchsmith`, about 59.6k lines.
-- Test size: 103 Python files under `tests`, about 33.9k lines.
+- Source size: 280 Python files under `src/patchsmith`, about 59.6k lines.
+- Test size: 104 Python files under `tests`, about 34.0k lines.
 - Largest source files:
   - `src/patchsmith/cli/commands/run.py`: 1139 lines.
   - `src/patchsmith/runtime/attempts.py`: 1108 lines.
@@ -31,7 +31,7 @@ tests.
 - Current validation:
   - `uv run ruff check src tests docs README.md`: passed.
   - `uv run mypy src`: passed.
-  - `uv run pytest -q`: 721 passed.
+  - `uv run pytest -q`: 725 passed.
 - Current local smoke:
   - `patchsmith chat` persisted a natural-language memory note and reloaded it
     from `.patchsmith/instructions.md`.
@@ -44,7 +44,7 @@ than the product actually is.
 
 | Area | Files | Lines | Read |
 | --- | ---: | ---: | --- |
-| root modules | 88 | 18383 | Agent shell compatibility, DeepAgents, workflow, retrieval, patching, models, safety, and mixed helpers are still colocated. |
+| root modules | 89 | 18396 | Agent shell compatibility, DeepAgents, workflow, retrieval, patching, models, safety, and mixed helpers are still colocated. |
 | evaluation | 62 | 15132 | Rich benchmark functionality; the complex-suite runner is now thin, but CLI and issue-corpus flows still need simplification. |
 | portfolio | 52 | 9188 | Public status/evidence reporting is separated, but many modules are report-fragment style rather than domain services. |
 | cli | 25 | 5479 | Command surface is split by broad command groups, but `run.py` still owns multiple products. |
@@ -503,6 +503,12 @@ Progress:
   reads and fast patch packet rendering. The legacy `deepagents_files` alias
   remains intact, with focused coverage in
   `tests/test_deepagents_repair_interface.py`; `deepagents_files.py` is now 384
+  lines.
+- 2026-06-16: DeepAgents mounted source-file shaping moved into
+  `patchsmith.deepagents_context_files`, including repo-backed reads, focused
+  source spans, timestamps, and excerpt fallback behavior. The legacy
+  `deepagents_files` exports remain intact, with focused coverage in
+  `tests/test_deepagents_context_files.py`; `deepagents_files.py` is now 172
   lines.
 - 2026-06-15: Phase 3 started by moving complex benchmark suite models,
   threshold/config resolution, spec loading, and suite input preflight into
