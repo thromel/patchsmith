@@ -38,7 +38,6 @@ from patchsmith.agent_plan import (
     plan_items_payload,
 )
 from patchsmith.agent_session import (
-    session_usage_payload,
     transcript_rows,
 )
 from patchsmith.chat.commands import ChatCommandContext, build_command_registry
@@ -46,11 +45,7 @@ from patchsmith.chat.handlers.context import context_commands
 from patchsmith.chat.handlers.diff_apply import diff_apply_commands
 from patchsmith.chat.handlers.execution import execution_commands
 from patchsmith.chat.handlers.memory import memory_instruction_commands
-from patchsmith.chat.handlers.model_budget import (
-    budget_label,
-    model_budget_commands,
-    model_label,
-)
+from patchsmith.chat.handlers.model_budget import model_budget_commands
 from patchsmith.chat.handlers.permissions import permission_commands
 from patchsmith.chat.handlers.project import project_commands
 from patchsmith.chat.handlers.session_evidence import session_evidence_commands
@@ -58,6 +53,7 @@ from patchsmith.chat.handlers.session_plan import (
     agent_feedback_context,
     plan_feedback_commands,
 )
+from patchsmith.chat.handlers.session_state import session_state_commands
 from patchsmith.chat.routing import parse_slash_command, route_natural_command
 from patchsmith.chat.state import AgentChatRuntime, AgentChatState
 from patchsmith.model_preflight import ModelPreflightResult
@@ -79,6 +75,7 @@ _REGISTERED_CHAT_COMMANDS = build_command_registry(
         *session_evidence_commands(),
         *diff_apply_commands(),
         *execution_commands(),
+        *session_state_commands(),
     )
 )
 
@@ -264,15 +261,6 @@ def _handle_slash_command(
     if command == "help":
         _print_help(output_stream)
         return True
-    if command == "status":
-        _print_status(runtime=runtime, output_stream=output_stream)
-        return True
-    if command == "history":
-        _print_history(runtime=runtime, output_stream=output_stream)
-        return True
-    if command == "mode":
-        _handle_mode(runtime=runtime, argument=argument, output_stream=output_stream)
-        return True
     registered_command = _REGISTERED_CHAT_COMMANDS.get(command)
     if registered_command is not None:
         registered_command.handler(
@@ -283,19 +271,6 @@ def _handle_slash_command(
                 runner_cls=runner_cls,
                 model_preflight_checker=model_preflight_checker,
             ),
-        )
-        return True
-    if command == "cancel":
-        _handle_cancel(runtime=runtime, argument=argument, output_stream=output_stream)
-        return True
-    if command == "clear":
-        _handle_clear(runtime=runtime, output_stream=output_stream)
-        return True
-    if command == "compact":
-        _handle_compact(
-            runtime=runtime,
-            note=argument,
-            output_stream=output_stream,
         )
         return True
     if command == "checkpoint":
@@ -341,57 +316,6 @@ def _handle_preflight(
     _record(runtime, "preflight", payload)
     _write_line(output_stream, f"Preflight: {payload['status']}")
     _print_checks(payload["checks"], output_stream)
-
-
-def _handle_mode(
-    *,
-    runtime: AgentChatRuntime,
-    argument: str,
-    output_stream: TextIO,
-) -> None:
-    value = argument.strip().lower()
-    if not value:
-        _write_line(output_stream, f"Chat mode: {runtime.chat_mode}")
-        return
-    aliases = {
-        "act": "act",
-        "run": "act",
-        "edit": "act",
-        "plan": "plan",
-        "planning": "plan",
-    }
-    mode = aliases.get(value)
-    if mode is None:
-        _write_line(output_stream, "Usage: /mode [act|plan]")
-        return
-    runtime.chat_mode = mode
-    _record(runtime, "chat_mode_update", {"mode": mode})
-    if mode == "plan":
-        _write_line(
-            output_stream,
-            "Chat mode: plan. Plain text runs /preflight; use /run <task> to execute.",
-        )
-        return
-    _write_line(output_stream, "Chat mode: act. Plain text runs the repair loop.")
-
-
-def _handle_cancel(
-    *,
-    runtime: AgentChatRuntime,
-    argument: str,
-    output_stream: TextIO,
-) -> None:
-    value = argument.strip().lower()
-    if value not in {"", "plan", "planned", "planned task", "task"}:
-        _write_line(output_stream, "Usage: /cancel [plan]")
-        return
-    task = runtime.pending_planned_task
-    if task is None:
-        _write_line(output_stream, "No pending planned task.")
-        return
-    runtime.pending_planned_task = None
-    _record(runtime, "plan_mode_cancel", {"task": task})
-    _write_line(output_stream, f"Cancelled planned task: {task}")
 
 
 def _preflight_payload(
@@ -560,38 +484,6 @@ def _handle_custom_command(
         model_preflight_checker=model_preflight_checker,
     )
     return True
-
-
-def _handle_clear(*, runtime: AgentChatRuntime, output_stream: TextIO) -> None:
-    payload = {
-        "cleared_history_count": len(runtime.history or []),
-        "cleared_plan_count": len(runtime.plan_items or []),
-        "cleared_feedback_count": len(runtime.feedback_items or []),
-        "cleared_last_run_id": _last_run_value(runtime, "run_id"),
-        "cleared_last_apply": runtime.last_apply.status if runtime.last_apply else None,
-        "cleared_last_rewind": runtime.last_rewind.status if runtime.last_rewind else None,
-    }
-    _clear_runtime_state(runtime)
-    _record(runtime, "session_clear", payload)
-    _write_line(output_stream, "Session state cleared. Transcript retained.")
-
-
-def _handle_compact(
-    *,
-    runtime: AgentChatRuntime,
-    note: str,
-    output_stream: TextIO,
-) -> None:
-    payload = _compaction_payload(runtime=runtime, note=note)
-    runtime.compaction_summary = payload
-    runtime.last_task = None
-    runtime.history = []
-    _record(runtime, "session_compact", payload)
-    _write_line(
-        output_stream,
-        f"Session compacted. Summarized {payload['compacted_task_count']} task(s).",
-    )
-    _write_line(output_stream, "Last run artifact pointers were preserved.")
 
 
 def _handle_checkpoint(
@@ -774,48 +666,6 @@ def _string_list_from_payload(value: object) -> list[str]:
 
 def _checkpoint_text(value: object) -> str:
     return "n/a" if value is None else str(value)
-
-
-def _clear_runtime_state(runtime: AgentChatRuntime) -> None:
-    runtime.last_task = None
-    runtime.last_run = None
-    runtime.last_run_payload = None
-    runtime.last_apply = None
-    runtime.last_rewind = None
-    runtime.compaction_summary = None
-    runtime.pending_planned_task = None
-    runtime.history = []
-    runtime.plan_items = []
-    runtime.feedback_items = []
-
-
-def _compaction_payload(
-    *,
-    runtime: AgentChatRuntime,
-    note: str,
-) -> dict[str, object]:
-    usage = _session_usage_payload(runtime)
-    history = list(runtime.history or [])
-    payload: dict[str, object] = {
-        "note": note.strip() or None,
-        "compacted_task_count": len(history),
-        "recent_tasks": history[-5:],
-        "plan_items": plan_items_payload(runtime.plan_items or []),
-        "feedback_items": list(runtime.feedback_items or []),
-        "pending_planned_task": runtime.pending_planned_task,
-        "usage": usage,
-        "context_paths": list(runtime.state.config.context_paths),
-        "model": runtime.state.config.deepagents_model,
-        "budget": {
-            "max_model_responses": runtime.state.config.max_model_responses,
-            "max_model_tokens": runtime.state.config.max_model_tokens,
-        },
-        "last_run_id": _last_run_value(runtime, "run_id"),
-        "last_status": _last_run_value(runtime, "status"),
-        "last_report_path": _optional_text(_last_run_value(runtime, "report_path")),
-        "last_diff_path": _optional_text(_last_run_value(runtime, "final_diff_path")),
-    }
-    return payload
 
 
 def _handle_task(
@@ -1020,66 +870,6 @@ def _print_run_summary(*, chat_run: AgentCliRun, output_stream: TextIO) -> None:
             output_stream,
             f"Apply: {chat_run.apply_result.status} - {chat_run.apply_result.message}",
         )
-
-
-def _print_status(*, runtime: AgentChatRuntime, output_stream: TextIO) -> None:
-    config = runtime.state.config
-    _write_line(output_stream, f"Session: {runtime.state.session_id}")
-    _write_line(output_stream, f"Chat mode: {runtime.chat_mode}")
-    if runtime.pending_planned_task:
-        _write_line(output_stream, f"Pending planned task: {runtime.pending_planned_task}")
-    else:
-        _write_line(output_stream, "Pending planned task: none")
-    _write_line(output_stream, f"Repo: {config.repo}")
-    _write_line(output_stream, f"Context provider: {config.context_provider}")
-    _write_line(output_stream, f"Model override: {model_label(config)}")
-    _write_line(output_stream, f"Agent profile: {config.agent_profile or 'none'}")
-    _write_line(
-        output_stream,
-        f"Project instructions: {len(config.agent_instruction_files)} file(s)",
-    )
-    _write_line(output_stream, f"Session plan items: {len(runtime.plan_items or [])}")
-    _write_line(output_stream, f"Session feedback items: {len(runtime.feedback_items or [])}")
-    _write_line(output_stream, f"Budget: {budget_label(config)}")
-    if config.context_paths:
-        _write_line(output_stream, f"Context hints: {', '.join(config.context_paths)}")
-    else:
-        _write_line(output_stream, "Context hints: none")
-    _write_line(output_stream, f"Top K: {config.top_k}")
-    _write_line(output_stream, f"Apply by default: {str(config.apply).lower()}")
-    _write_line(
-        output_stream,
-        f"Dirty apply allowed: {str(config.allow_dirty_apply).lower()}",
-    )
-    _write_line(output_stream, f"Transcript: {runtime.state.transcript_path}")
-    if runtime.compaction_summary is not None:
-        compacted = runtime.compaction_summary.get("compacted_task_count")
-        _write_line(output_stream, f"Last compaction: {compacted} task(s)")
-    last_run_id = _last_run_value(runtime, "run_id")
-    if last_run_id is None:
-        _write_line(output_stream, "Last run: none")
-        return
-    _write_line(output_stream, f"Last run: {last_run_id}")
-    _write_line(output_stream, f"Last status: {_last_run_value(runtime, 'status')}")
-    _write_line(output_stream, f"Last report: {_last_run_value(runtime, 'report_path')}")
-    _write_line(output_stream, f"Last diff: {_last_run_value(runtime, 'final_diff_path')}")
-    if runtime.last_apply is not None:
-        _write_line(output_stream, f"Last apply: {runtime.last_apply.status}")
-    if runtime.last_rewind is not None:
-        _write_line(output_stream, f"Last rewind: {runtime.last_rewind.status}")
-
-
-def _print_history(*, runtime: AgentChatRuntime, output_stream: TextIO) -> None:
-    if not runtime.history:
-        if runtime.compaction_summary is not None:
-            compacted = runtime.compaction_summary.get("compacted_task_count")
-            _write_line(output_stream, "No tasks since last compaction.")
-            _write_line(output_stream, f"Last compaction summarized {compacted} task(s).")
-            return
-        _write_line(output_stream, "No tasks in this session yet.")
-        return
-    for index, task in enumerate(runtime.history, start=1):
-        _write_line(output_stream, f"{index}. {task}")
 
 
 def _print_help(output_stream: TextIO) -> None:
@@ -1352,10 +1142,6 @@ def _runtime_from_transcript(
         plan_items=plan_items,
         feedback_items=feedback_items,
     )
-
-
-def _session_usage_payload(runtime: AgentChatRuntime) -> dict[str, object]:
-    return session_usage_payload(runtime.state.transcript_path)
 
 
 def _config_from_payload(

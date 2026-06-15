@@ -11,10 +11,10 @@ tests.
 
 ## Current Evidence
 
-- Source size: 258 Python files under `src/patchsmith`, about 59.2k lines.
-- Test size: 87 Python files under `tests`, about 31.6k lines.
+- Source size: 259 Python files under `src/patchsmith`, about 59.3k lines.
+- Test size: 88 Python files under `tests`, about 31.8k lines.
 - Largest source files:
-  - `src/patchsmith/agent_chat.py`: 1704 lines.
+  - `src/patchsmith/agent_chat.py`: 1490 lines.
   - `src/patchsmith/deepagents_files.py`: 1328 lines.
   - `src/patchsmith/cli/commands/run.py`: 1139 lines.
   - `src/patchsmith/runtime/attempts.py`: 1108 lines.
@@ -29,7 +29,7 @@ tests.
 - Current validation:
   - `uv run ruff check src tests docs README.md`: passed.
   - `uv run mypy src`: passed.
-  - `uv run pytest -q`: 664 passed.
+  - `uv run pytest -q`: 669 passed.
 - Current local smoke:
   - `patchsmith chat` persisted a natural-language memory note and reloaded it
     from `.patchsmith/instructions.md`.
@@ -63,7 +63,7 @@ Definition-count hotspots:
 
 | Module | Definitions | Read |
 | --- | ---: | --- |
-| `agent_chat.py` | 64 | Needs controller extraction after command handlers stabilize. |
+| `agent_chat.py` | 55 | Needs controller extraction after command handlers stabilize. |
 | `deepagents_files.py` | 46 | Needs virtual-file and manifest registry. |
 | `evaluation/complex/trace_readers.py` | 32 | Newly extracted pure trace readers; keep adding fixture coverage here. |
 | `evaluation/complex/followups.py` | 31 | Newly extracted follow-up candidate policy for budget, verifier, retry, and quality reruns. |
@@ -360,6 +360,11 @@ Progress:
   `patchsmith.chat.handlers.permissions`. Focused tests live under
   `tests/chat/test_project_commands.py` and
   `tests/chat/test_permission_commands.py`; `agent_chat.py` is now 1704 lines.
+- 2026-06-16: The `/status`, `/history`, `/mode`, `/cancel`, `/clear`, and
+  `/compact` command family moved into
+  `patchsmith.chat.handlers.session_state`, with direct coverage in
+  `tests/chat/test_session_state_commands.py`; `agent_chat.py` is now
+  1490 lines.
 - 2026-06-15: Phase 1 typed-transcript slice added `patchsmith.session.events`
   and `patchsmith.session.store`. Existing transcript writes and
   `agent_session.transcript_rows` now use the store compatibility layer, with
