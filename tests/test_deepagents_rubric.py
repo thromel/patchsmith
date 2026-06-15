@@ -6,6 +6,7 @@ from patchsmith.deepagents_files import (
     _acceptance_rubric_manifest,
     _repo_instructions_manifest,
 )
+from patchsmith.deepagents_repo_instructions import repo_instructions_manifest
 from patchsmith.deepagents_rubric import acceptance_rubric_manifest
 from patchsmith.models import RetrievedContext
 
@@ -62,6 +63,10 @@ def test_deepagents_files_keeps_legacy_rubric_alias() -> None:
     assert _acceptance_rubric_manifest is acceptance_rubric_manifest
 
 
+def test_deepagents_files_keeps_legacy_repo_instructions_alias() -> None:
+    assert _repo_instructions_manifest is repo_instructions_manifest
+
+
 def test_repo_instructions_manifest_is_scoped_to_mounted_ancestors(
     tmp_path: Path,
 ) -> None:
@@ -81,7 +86,7 @@ def test_repo_instructions_manifest_is_scoped_to_mounted_ancestors(
         encoding="utf-8",
     )
 
-    manifest = _repo_instructions_manifest(
+    manifest = repo_instructions_manifest(
         repo,
         [_context("src/pkg/module.py")],
     )

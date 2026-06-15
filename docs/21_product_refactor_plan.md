@@ -11,11 +11,11 @@ tests.
 
 ## Current Evidence
 
-- Source size: 272 Python files under `src/patchsmith`, about 59.5k lines.
+- Source size: 273 Python files under `src/patchsmith`, about 59.5k lines.
 - Test size: 98 Python files under `tests`, about 33.4k lines.
 - Largest source files:
-  - `src/patchsmith/deepagents_files.py`: 1271 lines.
   - `src/patchsmith/cli/commands/run.py`: 1139 lines.
+  - `src/patchsmith/deepagents_files.py`: 1138 lines.
   - `src/patchsmith/runtime/attempts.py`: 1108 lines.
   - `src/patchsmith/runtime/feedback.py`: 735 lines.
   - `src/patchsmith/session/recommendations.py`: 716 lines.
@@ -30,7 +30,7 @@ tests.
 - Current validation:
   - `uv run ruff check src tests docs README.md`: passed.
   - `uv run mypy src`: passed.
-  - `uv run pytest -q`: 700 passed.
+  - `uv run pytest -q`: 701 passed.
 - Current local smoke:
   - `patchsmith chat` persisted a natural-language memory note and reloaded it
     from `.patchsmith/instructions.md`.
@@ -43,7 +43,7 @@ than the product actually is.
 
 | Area | Files | Lines | Read |
 | --- | ---: | ---: | --- |
-| root modules | 81 | 18312 | Agent shell compatibility, DeepAgents, workflow, retrieval, patching, models, safety, and mixed helpers are still colocated. |
+| root modules | 82 | 18316 | Agent shell compatibility, DeepAgents, workflow, retrieval, patching, models, safety, and mixed helpers are still colocated. |
 | evaluation | 62 | 15132 | Rich benchmark functionality; the complex-suite runner is now thin, but CLI and issue-corpus flows still need simplification. |
 | portfolio | 52 | 9188 | Public status/evidence reporting is separated, but many modules are report-fragment style rather than domain services. |
 | cli | 25 | 5479 | Command surface is split by broad command groups, but `run.py` still owns multiple products. |
@@ -66,9 +66,9 @@ Definition-count hotspots:
 
 | Module | Definitions | Read |
 | --- | ---: | --- |
-| `deepagents_files.py` | 46 | Virtual-file and manifest registry started, but context-manifest renderers still keep this module large. |
 | `runtime/feedback.py` | 43 | Feedback extraction, localization, and retry guidance are still dense. |
 | `patch_quality.py` | 41 | Patch quality heuristics should be grouped behind smaller policy helpers. |
+| `deepagents_files.py` | 40 | Virtual-file and repo-instruction manifest boundaries are split out, but context-budget, repo-map, source-hint, and target-history renderers still keep this module large. |
 | `runtime/attempts.py` | 39 | Attempt orchestration and artifact selection remain broad. |
 | `python_patch_safety.py` | 32 | Python-specific safety checks are still concentrated in one module. |
 | `evaluation/complex/trace_readers.py` | 32 | Newly extracted pure trace readers; keep adding fixture coverage here. |
@@ -471,6 +471,11 @@ Progress:
   and repair-interface required reads now consume that registry while preserving
   the existing planner/run-interface API. Focused coverage lives in
   `tests/test_deepagents_manifests.py`; `deepagents_files.py` is now 1271 lines.
+- 2026-06-16: Scoped AGENTS.md-style repository instruction manifest rendering
+  moved into `patchsmith.deepagents_repo_instructions`, with the legacy
+  `deepagents_files` alias preserved. Focused coverage in
+  `tests/test_deepagents_rubric.py` now exercises the dedicated module directly;
+  `deepagents_files.py` is now 1138 lines.
 - 2026-06-15: Phase 3 started by moving complex benchmark suite models,
   threshold/config resolution, spec loading, and suite input preflight into
   `patchsmith.evaluation.complex.models` and
