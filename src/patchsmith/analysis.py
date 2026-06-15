@@ -16,6 +16,7 @@ class RepairOutcomeAnalysis:
     test_exit_code: int | None
     failure_category: str | None
     next_action: str
+    patch_quality_severity: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -26,6 +27,7 @@ def analyze_repair_outcome(
     patch_status: str,
     final_diff: str,
     test_result: CommandResult | None,
+    patch_quality_severity: str | None = None,
 ) -> RepairOutcomeAnalysis:
     patch_generated = bool(final_diff.strip()) and patch_status == "patch_generated"
     if test_result is None:
@@ -42,11 +44,30 @@ def analyze_repair_outcome(
             test_exit_code=None,
             failure_category="missing_test_command",
             next_action="Provide or detect a targeted test command before judging repair quality.",
+            patch_quality_severity=patch_quality_severity,
         )
 
     tests_passed = test_result.exit_code == 0
     infrastructure_failure = _infrastructure_failure_category(test_result)
     if patch_generated and tests_passed:
+        if patch_quality_severity == "high":
+            return RepairOutcomeAnalysis(
+                status="validated_with_warnings",
+                verdict="patch_validated_quality_warning",
+                summary=(
+                    "Patch candidate generated and targeted sandbox tests passed, "
+                    "but patch quality risk is high."
+                ),
+                patch_generated=True,
+                tests_passed=True,
+                test_exit_code=test_result.exit_code,
+                failure_category="high_risk_patch_quality",
+                next_action=(
+                    "Review maintainability risk and broaden validation before treating "
+                    "this as a clean repair."
+                ),
+                patch_quality_severity=patch_quality_severity,
+            )
         return RepairOutcomeAnalysis(
             status="validated",
             verdict="patch_validated",
@@ -56,6 +77,7 @@ def analyze_repair_outcome(
             test_exit_code=test_result.exit_code,
             failure_category=None,
             next_action="Review final diff and broaden validation if needed.",
+            patch_quality_severity=patch_quality_severity,
         )
 
     if patch_generated and not tests_passed:
@@ -74,6 +96,7 @@ def analyze_repair_outcome(
                 next_action=(
                     "Fix the validation environment or test command before retrying the model."
                 ),
+                patch_quality_severity=patch_quality_severity,
             )
         return RepairOutcomeAnalysis(
             status="needs_followup",
@@ -84,6 +107,7 @@ def analyze_repair_outcome(
             test_exit_code=test_result.exit_code,
             failure_category="test_failure_after_patch",
             next_action="Use sandbox stdout/stderr to refine the repair plan or retry.",
+            patch_quality_severity=patch_quality_severity,
         )
 
     if tests_passed:
@@ -96,6 +120,7 @@ def analyze_repair_outcome(
             test_exit_code=test_result.exit_code,
             failure_category="tests_do_not_reproduce_issue",
             next_action="Check whether the issue reproduces under the selected test command.",
+            patch_quality_severity=patch_quality_severity,
         )
 
     if infrastructure_failure is not None:
@@ -111,6 +136,7 @@ def analyze_repair_outcome(
             test_exit_code=test_result.exit_code,
             failure_category=infrastructure_failure,
             next_action="Fix the validation environment or test command before retrying the model.",
+            patch_quality_severity=patch_quality_severity,
         )
 
     return RepairOutcomeAnalysis(
@@ -122,6 +148,7 @@ def analyze_repair_outcome(
         test_exit_code=test_result.exit_code,
         failure_category="no_patch_generated",
         next_action="Improve retrieval or planning before rerunning the sandbox command.",
+        patch_quality_severity=patch_quality_severity,
     )
 
 

@@ -15,6 +15,22 @@ def test_analyze_repair_outcome_validates_generated_patch() -> None:
     assert analysis.tests_passed is True
 
 
+def test_analyze_repair_outcome_warns_on_high_risk_validated_patch() -> None:
+    analysis = analyze_repair_outcome(
+        patch_status="patch_generated",
+        final_diff="--- a/src/a.py\n+++ b/src/a.py\n",
+        test_result=_command_result(exit_code=0),
+        patch_quality_severity="high",
+    )
+
+    assert analysis.status == "validated_with_warnings"
+    assert analysis.verdict == "patch_validated_quality_warning"
+    assert analysis.patch_generated is True
+    assert analysis.tests_passed is True
+    assert analysis.failure_category == "high_risk_patch_quality"
+    assert analysis.patch_quality_severity == "high"
+
+
 def test_analyze_repair_outcome_classifies_failed_unpatched_run() -> None:
     analysis = analyze_repair_outcome(
         patch_status="no_patch_generated",

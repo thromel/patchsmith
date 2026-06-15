@@ -32,6 +32,7 @@ class RunRequest:
     sandbox_mode: str = "local"
     sandbox_image: str = "python:3.12-slim"
     context_paths: tuple[str, ...] = ()
+    runtime_config: dict[str, object] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -186,3 +187,4 @@ class RepairRunResult:
     snapshot: RepositorySnapshot
     retrieved_context: list[RetrievedContext]
     test_result: CommandResult | None
+    model_usage: dict[str, Any] = field(default_factory=dict)

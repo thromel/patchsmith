@@ -15,6 +15,7 @@ class ModelPricing:
 
 
 OPENAI_MODEL_PRICING: dict[str, ModelPricing] = {
+    "gpt-5-mini": ModelPricing(input_cost_per_1m=0.25, output_cost_per_1m=2.00),
     "gpt-5.5": ModelPricing(input_cost_per_1m=5.00, output_cost_per_1m=30.00),
     "gpt-5.4": ModelPricing(input_cost_per_1m=2.50, output_cost_per_1m=15.00),
     "gpt-5.4-mini": ModelPricing(
@@ -24,9 +25,33 @@ OPENAI_MODEL_PRICING: dict[str, ModelPricing] = {
     "gpt-5.4-nano": ModelPricing(input_cost_per_1m=0.20, output_cost_per_1m=1.25),
 }
 
+OPENAI_ENCRYPTED_REASONING_MODEL_PREFIXES = ("gpt-5", "o1", "o3", "o4")
+
 
 def openai_model_pricing(model: str) -> ModelPricing | None:
-    return OPENAI_MODEL_PRICING.get(model.strip())
+    model = model.strip()
+    if model in OPENAI_MODEL_PRICING:
+        return OPENAI_MODEL_PRICING[model]
+    for prefix, pricing in sorted(
+        OPENAI_MODEL_PRICING.items(),
+        key=lambda item: len(item[0]),
+        reverse=True,
+    ):
+        if model.startswith(f"{prefix}-"):
+            return pricing
+    return None
+
+
+def openai_model_supports_encrypted_reasoning(model: str) -> bool:
+    """Return whether an OpenAI model id is expected to support reasoning items."""
+
+    normalized = model.strip().lower().rsplit("/", 1)[-1]
+    if not normalized:
+        return False
+    for prefix in OPENAI_ENCRYPTED_REASONING_MODEL_PREFIXES:
+        if normalized == prefix or normalized.startswith((f"{prefix}-", f"{prefix}.")):
+            return True
+    return False
 
 
 def configured_model_pricing(

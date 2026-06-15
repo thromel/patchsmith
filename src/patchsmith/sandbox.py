@@ -4,11 +4,23 @@ import os
 import subprocess
 import time
 import uuid
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Protocol
 
 from patchsmith.models import CommandResult
 from patchsmith.security import CommandPolicy
+
+
+@dataclass(frozen=True)
+class DockerSandboxAvailability:
+    available: bool
+    errors: tuple[str, ...] = ()
+    evidence: tuple[str, ...] = ()
+    next_actions: tuple[str, ...] = ()
+
+    def to_dict(self) -> dict[str, object]:
+        return asdict(self)
 
 
 class SandboxRunner(Protocol):
@@ -224,6 +236,48 @@ def create_sandbox_runner(
     raise ValueError(f"unsupported sandbox mode: {mode}")
 
 
+def check_docker_sandbox_availability(
+    *,
+    image: str,
+    docker_binary: str = "docker",
+    timeout_seconds: int = 10,
+) -> DockerSandboxAvailability:
+    daemon = _run_docker_preflight_command(
+        [docker_binary, "version", "--format", "{{.Server.Version}}"],
+        timeout_seconds=timeout_seconds,
+    )
+    if daemon.returncode != 0:
+        message = daemon.stderr.strip() or daemon.stdout.strip() or "no output"
+        return DockerSandboxAvailability(
+            available=False,
+            errors=(f"`{docker_binary} version` failed: {message}",),
+            next_actions=(
+                "Start Docker Desktop or point DOCKER_HOST at a reachable daemon.",
+            ),
+        )
+    image_check = _run_docker_preflight_command(
+        [docker_binary, "image", "inspect", image],
+        timeout_seconds=timeout_seconds,
+    )
+    if image_check.returncode != 0:
+        message = image_check.stderr.strip() or image_check.stdout.strip() or "image not found"
+        return DockerSandboxAvailability(
+            available=False,
+            errors=(f"`{image}` is not available locally: {message}",),
+            evidence=(f"Docker server version `{daemon.stdout.strip() or 'unknown'}` is reachable.",),
+            next_actions=(
+                f"Run `docker build -f docker/seeded-smoke.Dockerfile -t {image} .`.",
+            ),
+        )
+    return DockerSandboxAvailability(
+        available=True,
+        evidence=(
+            f"Docker server version `{daemon.stdout.strip() or 'unknown'}` is reachable.",
+            f"`{image}` is available locally.",
+        ),
+    )
+
+
 def _sanitized_env(workspace: Path) -> dict[str, str]:
     env = {
         "HOME": str(workspace),
@@ -242,6 +296,29 @@ def _docker_host_env() -> dict[str, str]:
         if key in os.environ:
             env[key] = os.environ[key]
     return env
+
+
+def _run_docker_preflight_command(
+    command: list[str],
+    *,
+    timeout_seconds: int,
+) -> subprocess.CompletedProcess[str]:
+    try:
+        return subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout_seconds,
+            env=_docker_host_env(),
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        return subprocess.CompletedProcess(
+            command,
+            returncode=127,
+            stdout="",
+            stderr=str(error),
+        )
 
 
 def _docker_user_args() -> list[str]:

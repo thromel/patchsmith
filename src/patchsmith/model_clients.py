@@ -19,6 +19,7 @@ class ModelCallMetadata:
     provider: str
     model: str | None = None
     response_id: str | None = None
+    response_count: int | None = None
     input_tokens: int | None = None
     output_tokens: int | None = None
     total_tokens: int | None = None
@@ -30,6 +31,7 @@ class ModelCallMetadata:
             "provider": self.provider,
             "model": self.model,
             "response_id": self.response_id,
+            "response_count": self.response_count,
             "input_tokens": self.input_tokens,
             "output_tokens": self.output_tokens,
             "total_tokens": self.total_tokens,
@@ -160,6 +162,7 @@ class OpenAIResponsesModelClient:
             provider="openai_responses",
             model=str(response.get("model") or self.model),
             response_id=str(response.get("id")) if response.get("id") else None,
+            response_count=1,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             total_tokens=total_tokens,

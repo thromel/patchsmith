@@ -10,6 +10,7 @@ from dataclasses import asdict, dataclass, field
 from patchsmith.model_config import DEFAULT_OPENAI_MODEL
 
 OPENAI_MODELS_ENDPOINT = "https://api.openai.com/v1/models"
+OPENAI_API_KEY_PREFIXES = ("sk-", "sk_proj_", "sk-proj-")
 
 
 @dataclass(frozen=True)
@@ -84,6 +85,19 @@ def openai_model_preflight(
             error=(
                 "OPENAI_API_KEY contains whitespace or non-ASCII characters and cannot "
                 "be sent as an HTTP authorization header."
+            ),
+        )
+    if not _looks_like_openai_api_key(api_key):
+        return ModelPreflightResult(
+            provider="openai_models",
+            model=model,
+            endpoint=endpoint,
+            status="invalid_credentials_format",
+            available=False,
+            error=(
+                "OPENAI_API_KEY does not look like an OpenAI API key. Expected a "
+                "`sk-` or `sk-proj-` style value; check that the clipboard or shell "
+                "environment did not contain notes, a URL, or another provider key."
             ),
         )
     request = urllib.request.Request(
@@ -200,3 +214,15 @@ def _open_url(request: urllib.request.Request, timeout_seconds: float) -> bytes:
 
 def _unsafe_header_value(value: str) -> bool:
     return any(character.isspace() or ord(character) > 127 for character in value)
+
+
+def _looks_like_openai_api_key(value: str) -> bool:
+    if not value.startswith(OPENAI_API_KEY_PREFIXES):
+        return False
+    if len(value) < 20:
+        return False
+    return all(
+        character.isascii()
+        and (character.isalnum() or character in {"-", "_"})
+        for character in value
+    )

@@ -93,6 +93,24 @@ LOW_SIGNAL_EXCERPT_TERMS = STOPWORDS | {
     "validation",
     "write_text",
 }
+RUNTIME_CACHE_QUERY_MARKERS = (
+    "stale path cache hypothesis",
+    "retry source search terms",
+)
+RUNTIME_CACHE_SOURCE_TERMS = {
+    "assertionrewritinghook": "AssertionRewritingHook",
+    "cache_from_source": "cache_from_source",
+    "co_filename": "co_filename",
+    "exec(co": "exec(co, ...)",
+    "importlib.invalidate_caches": "importlib.invalidate_caches",
+    "module_name_from_path": "module_name_from_path",
+    "pyc": ".pyc",
+    "source_stat": "source_stat",
+    "sys.modules": "sys.modules",
+    "_read_pyc": "_read_pyc",
+    "_write_pyc": "_write_pyc",
+    "__pycache__": "__pycache__",
+}
 
 
 def _tokens(text: str) -> set[str]:
@@ -130,6 +148,32 @@ def _path_hints(issue_text: str) -> set[str]:
         if normalized:
             hints.add(normalized)
     return hints
+
+
+def _runtime_cache_retry_query(issue_text: str) -> bool:
+    lowered = issue_text.lower()
+    return any(marker in lowered for marker in RUNTIME_CACHE_QUERY_MARKERS)
+
+
+def _runtime_cache_source_score(
+    *,
+    path: str,
+    text: str,
+    enabled: bool,
+) -> tuple[float, list[str]]:
+    if not enabled or not path.startswith(("src/", "lib/", "patchsmith/")):
+        return 0.0, []
+    lowered = text.lower()
+    matched = [
+        label
+        for needle, label in RUNTIME_CACHE_SOURCE_TERMS.items()
+        if needle in lowered
+    ]
+    if not matched:
+        return 0.0, []
+    return 20_000.0 + (750.0 * len(matched)), [
+        f"runtime_cache_signal:{label}" for label in matched
+    ]
 
 
 def _normalize_path_hint(path: str) -> str:

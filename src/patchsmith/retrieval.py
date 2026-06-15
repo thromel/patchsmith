@@ -17,6 +17,8 @@ from patchsmith.retrieval_features import (
     _path_prior,
     _path_terms,
     _repo_file_exists,
+    _runtime_cache_retry_query,
+    _runtime_cache_source_score,
     _safe_read,
     _stack_symbols,
     _symbols,
@@ -89,6 +91,7 @@ class HybridRetriever:
         query_terms = _tokens(issue_text)
         path_hints = _path_hints(issue_text)
         stack_symbols = _stack_symbols(issue_text)
+        runtime_cache_retry = _runtime_cache_retry_query(issue_text)
         if not query_terms and not path_hints and not stack_symbols:
             return []
 
@@ -112,6 +115,13 @@ class HybridRetriever:
                 matched_features.append("path_hint")
             if stack_symbol_matches:
                 matched_features.extend(f"stack_symbol:{symbol}" for symbol in stack_symbol_matches)
+            runtime_cache_score, runtime_cache_features = _runtime_cache_source_score(
+                path=file.path,
+                text=text,
+                enabled=runtime_cache_retry,
+            )
+            if runtime_cache_features:
+                matched_features.extend(runtime_cache_features)
             if not matched_features:
                 continue
 
@@ -132,8 +142,12 @@ class HybridRetriever:
                 score += 4.0
             if is_test:
                 score -= 3.0
+            score += runtime_cache_score
 
-            excerpt = _excerpt(text, matched_terms or stack_symbol_matches)
+            excerpt = _excerpt(
+                text,
+                matched_terms or stack_symbol_matches or runtime_cache_features,
+            )
             scored.append((score, file.path, sorted(set(matched_features)), excerpt))
 
         scored.sort(key=lambda item: (-item[0], item[1]))

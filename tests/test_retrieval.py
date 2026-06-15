@@ -149,6 +149,60 @@ NameError: name 're' is not defined
     assert "stack_symbol:slugify" in contexts[0].matched_terms
 
 
+def test_hybrid_retrieval_boosts_runtime_cache_source_on_feedback_query(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    (repo / "src" / "_pytest" / "assertion").mkdir(parents=True)
+    (repo / "testing").mkdir()
+    (repo / "doc").mkdir()
+    (repo / "src" / "_pytest" / "assertion" / "rewrite.py").write_text(
+        "\n".join(
+            [
+                "class AssertionRewritingHook:",
+                "    def _read_pyc(self, pathname):",
+                "        source_stat = pathname.stat()",
+                "        exec(co, module.__dict__)",
+                "    def get_data(self, pathname):",
+                "        pyc = pathname + 'c'",
+                "        return pyc",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (repo / "testing" / "test_noisy.py").write_text(
+        ("assertionerror cache captured behavior expected actual " * 300),
+        encoding="utf-8",
+    )
+    (repo / "doc" / "reference.py").write_text(
+        ("assertionerror cache captured behavior expected actual " * 300),
+        encoding="utf-8",
+    )
+    repo_index = index_repository(repo)
+    issue = (
+        "Failure localization cues: Stale path cache hypothesis. "
+        "Retry source search terms: sys.modules, importlib.invalidate_caches, "
+        "module_name_from_path, AssertionRewritingHook, _read_pyc, _write_pyc, "
+        "cache_from_source, source_stat, exec(co, module.__dict__), pyc, "
+        "__pycache__, co_filename."
+    )
+
+    contexts = HybridRetriever().retrieve(
+        repo_path=repo,
+        repo_index=repo_index,
+        issue_text=issue,
+        top_k=3,
+    )
+
+    assert contexts[0].path == "src/_pytest/assertion/rewrite.py"
+    assert "runtime_cache_signal:AssertionRewritingHook" in contexts[0].matched_terms
+    assert "runtime_cache_signal:_read_pyc" in contexts[0].matched_terms
+    assert "runtime_cache_signal:source_stat" in contexts[0].matched_terms
+    assert "runtime_cache_signal:exec(co, ...)" in contexts[0].matched_terms
+    assert "runtime_cache_signal:.pyc" in contexts[0].matched_terms
+    assert "class AssertionRewritingHook" in contexts[0].excerpt
+
+
 def test_graph_retrieval_expands_source_to_related_tests(tmp_path: Path) -> None:
     fixture = Path("evals/tasks/seeded_bugs_v1/task_002_import_bug")
     snapshot = clone_or_copy_repository(str(fixture / "repo"), tmp_path / "repo")
