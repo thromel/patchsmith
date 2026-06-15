@@ -12,12 +12,14 @@ from patchsmith.cli.commands import (
     model_preflight,
     observability,
     portfolio,
+    repository,
     run,
 )
 
 _COMMAND_MODULES = (
     run,
     model_preflight,
+    repository,
     demo,
     evals,
     issue_corpus,

@@ -90,7 +90,7 @@ def test_main_without_command_prints_help_and_returns_2(capsys) -> None:
 
 
 def test_main_dispatches_to_handler(monkeypatch, capsys) -> None:
-    import patchsmith.cli.commands.run as run_commands
+    import patchsmith.cli.commands.repository as repository_commands
 
     calls: list[str] = []
 
@@ -98,7 +98,7 @@ def test_main_dispatches_to_handler(monkeypatch, capsys) -> None:
         calls.append(args.command)
         return 0
 
-    monkeypatch.setitem(run_commands.register.__globals__, "_index_command", fake_handler)
+    monkeypatch.setitem(repository_commands.register.__globals__, "_index_command", fake_handler)
     # Re-registering picks up the patched handler through the module dict.
     parser, handlers = _build_parser_and_handlers()
     args = parser.parse_args(["index", "--repo", "."])
