@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TextIO
 
 from patchsmith.chat.commands import ChatCommand, ChatCommandContext
+from patchsmith.chat.preflight import preflight_payload, print_checks
 from patchsmith.chat.state import AgentChatRuntime
+from patchsmith.models import CommandResult
+from patchsmith.sandbox import create_sandbox_runner
 
 
 def execution_commands() -> tuple[ChatCommand, ...]:
@@ -33,13 +37,20 @@ def handle_preflight_command(
     output_stream: TextIO,
     context: ChatCommandContext,
 ) -> None:
-    if context.preflight_task is None:
-        raise RuntimeError("preflight task handler is not configured")
-    context.preflight_task(
-        runtime=runtime,
+    if not argument:
+        _write_line(output_stream, "Usage: /preflight <task>")
+        return
+    payload, error = preflight_payload(
+        config=runtime.state.config,
         task=argument,
-        output_stream=output_stream,
     )
+    if error:
+        _write_line(output_stream, error)
+        context.record(runtime, "preflight_error", {"message": error})
+        return
+    context.record(runtime, "preflight", payload)
+    _write_line(output_stream, f"Preflight: {payload['status']}")
+    print_checks(payload["checks"], output_stream)
 
 
 def handle_verify_command(
@@ -49,13 +60,38 @@ def handle_verify_command(
     output_stream: TextIO,
     context: ChatCommandContext,
 ) -> None:
-    if context.verify_command is None:
-        raise RuntimeError("verify command handler is not configured")
-    context.verify_command(
-        runtime=runtime,
-        argument=argument,
-        output_stream=output_stream,
+    command = argument.strip() or runtime.state.config.test_command
+    if not command:
+        _write_line(output_stream, "Usage: /verify <allowed-test-command>")
+        _write_line(output_stream, "No test command is configured for this session.")
+        return
+    sandbox = create_sandbox_runner(
+        mode=runtime.state.config.sandbox_mode,
+        image=runtime.state.config.sandbox_image,
     )
+    result = sandbox.run(
+        command=command,
+        workspace=Path(runtime.state.config.repo),
+        timeout_seconds=60,
+    )
+    payload: dict[str, object] = {
+        "sandbox_mode": runtime.state.config.sandbox_mode,
+        "sandbox_image": runtime.state.config.sandbox_image,
+        "result": result.to_dict(),
+        "status": _verify_status(result),
+    }
+    context.record(runtime, "verify_result", payload)
+    _write_line(output_stream, f"Verify: {payload['status']}")
+    _write_line(output_stream, f"Command: {result.command}")
+    exit_code = result.exit_code if result.exit_code is not None else "n/a"
+    _write_line(output_stream, f"Exit code: {exit_code}")
+    _write_line(output_stream, f"Duration: {result.duration_ms} ms")
+    if not result.policy_decision.allowed:
+        _write_line(output_stream, f"Policy: blocked - {result.policy_decision.reason}")
+    if result.timed_out:
+        _write_line(output_stream, "Timed out: true")
+    _print_verify_output("stdout", result.stdout, output_stream)
+    _print_verify_output("stderr", result.stderr, output_stream)
 
 
 def handle_run_command(
@@ -80,6 +116,30 @@ def handle_run_command(
         task=task,
         output_stream=output_stream,
     )
+
+
+def _verify_status(result: CommandResult) -> str:
+    if not result.policy_decision.allowed:
+        return "blocked"
+    if result.timed_out:
+        return "timed_out"
+    if result.exit_code == 0:
+        return "passed"
+    return "failed"
+
+
+def _print_verify_output(label: str, text: str, output_stream: TextIO) -> None:
+    value = text.strip()
+    if not value:
+        return
+    _write_line(output_stream, f"{label}: {_truncate_line(value)}")
+
+
+def _truncate_line(text: str, limit: int = 240) -> str:
+    single_line = " ".join(text.split())
+    if len(single_line) <= limit:
+        return single_line
+    return single_line[: limit - 3].rstrip() + "..."
 
 
 def _write_line(output_stream: TextIO, message: str) -> None:

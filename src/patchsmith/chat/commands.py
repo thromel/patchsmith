@@ -40,26 +40,6 @@ class RunTaskHandler(Protocol):
     ) -> None: ...
 
 
-class TextCommandHandler(Protocol):
-    def __call__(
-        self,
-        *,
-        runtime: AgentChatRuntime,
-        argument: str,
-        output_stream: TextIO,
-    ) -> None: ...
-
-
-class PreflightTaskHandler(Protocol):
-    def __call__(
-        self,
-        *,
-        runtime: AgentChatRuntime,
-        task: str,
-        output_stream: TextIO,
-    ) -> None: ...
-
-
 class ApplyDiff(Protocol):
     def __call__(
         self,
@@ -87,8 +67,6 @@ class ChatCommandContext:
     check_agent_run_diff: ApplyDiff | None = None
     reverse_agent_run_diff: ReverseDiff | None = None
     run_task: RunTaskHandler | None = None
-    preflight_task: PreflightTaskHandler | None = None
-    verify_command: TextCommandHandler | None = None
 
 
 class ChatCommandHandler(Protocol):

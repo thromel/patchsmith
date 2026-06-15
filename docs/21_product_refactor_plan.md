@@ -11,14 +11,14 @@ tests.
 
 ## Current Evidence
 
-- Source size: 262 Python files under `src/patchsmith`, about 59.4k lines.
-- Test size: 90 Python files under `tests`, about 32.2k lines.
+- Source size: 263 Python files under `src/patchsmith`, about 59.3k lines.
+- Test size: 90 Python files under `tests`, about 32.3k lines.
 - Largest source files:
   - `src/patchsmith/deepagents_files.py`: 1328 lines.
   - `src/patchsmith/cli/commands/run.py`: 1139 lines.
   - `src/patchsmith/runtime/attempts.py`: 1108 lines.
-  - `src/patchsmith/agent_chat.py`: 851 lines.
   - `src/patchsmith/runtime/feedback.py`: 735 lines.
+  - `src/patchsmith/agent_chat.py`: 734 lines.
   - `src/patchsmith/session/recommendations.py`: 716 lines.
 - Largest tests:
   - `tests/test_agent_chat.py`: 3641 lines.
@@ -29,7 +29,7 @@ tests.
 - Current validation:
   - `uv run ruff check src tests docs README.md`: passed.
   - `uv run mypy src`: passed.
-  - `uv run pytest -q`: 677 passed.
+  - `uv run pytest -q`: 681 passed.
 - Current local smoke:
   - `patchsmith chat` persisted a natural-language memory note and reloaded it
     from `.patchsmith/instructions.md`.
@@ -42,11 +42,11 @@ than the product actually is.
 
 | Area | Files | Lines | Read |
 | --- | ---: | ---: | --- |
-| root modules | 80 | 18968 | Agent shell, DeepAgents, workflow, retrieval, patching, models, safety, and mixed helpers are still colocated. |
+| root modules | 80 | 18851 | Agent shell, DeepAgents, workflow, retrieval, patching, models, safety, and mixed helpers are still colocated. |
 | evaluation | 62 | 15132 | Rich benchmark functionality; the complex-suite runner is now thin, but CLI and issue-corpus flows still need simplification. |
 | portfolio | 52 | 9188 | Public status/evidence reporting is separated, but many modules are report-fragment style rather than domain services. |
 | cli | 25 | 5479 | Command surface is split by broad command groups, but `run.py` still owns multiple products. |
-| chat | 18 | 3255 | Command handlers and shared replay helpers are split out, but the controller still owns runtime execution and resume hydration. |
+| chat | 19 | 3340 | Command handlers and shared replay helpers are split out, but the controller still owns runtime execution and resume hydration. |
 | session | 9 | 2612 | Typed store/metrics/gates/reporting are split out behind compatibility exports. |
 | runtime | 6 | 2414 | Runtime execution is compact relative to evaluation/chat, but attempt and feedback modules are large. |
 | observability | 10 | 2321 | HTML/report rendering is reasonably isolated. |
@@ -68,7 +68,7 @@ Definition-count hotspots:
 | `deepagents_files.py` | 46 | Needs virtual-file and manifest registry. |
 | `evaluation/complex/trace_readers.py` | 32 | Newly extracted pure trace readers; keep adding fixture coverage here. |
 | `evaluation/complex/followups.py` | 31 | Newly extracted follow-up candidate policy for budget, verifier, retry, and quality reruns. |
-| `agent_chat.py` | 25 | Command handlers are mostly registered modules; controller extraction is now the next chat boundary. |
+| `agent_chat.py` | 18 | Command handlers are mostly registered modules; controller extraction is now the next chat boundary. |
 | `evaluation/complex/summary.py` | 24 | Newly extracted summary aggregation and resource-budget accounting. |
 | `evaluation/complex/spec.py` | 18 | Newly extracted suite spec/config parsing; now consumes the threshold registry for resolution and validation. |
 | `evaluation/complex/extract.py` | 16 | Newly extracted saved-attempt result parsing and failure classification. |
@@ -348,9 +348,9 @@ Progress:
   `patchsmith.chat.handlers.diff_apply`, with focused tests under
   `tests/chat/test_diff_apply_commands.py`.
 - 2026-06-15: The `/run`, `/preflight`, and `/verify` command family moved into
-  `patchsmith.chat.handlers.execution`, with execution callbacks preserving the
-  existing repair-loop implementation in `agent_chat.py`. Focused tests live
-  under `tests/chat/test_execution_commands.py`.
+  `patchsmith.chat.handlers.execution`, with callbacks initially preserving the
+  existing repair-loop, preflight, and verify implementation in `agent_chat.py`.
+  Focused tests live under `tests/chat/test_execution_commands.py`.
 - 2026-06-16: The `/cost`, `/metrics`, `/timeline`, `/next`, `/gate`, `/trace`,
   `/evidence`, and `/export` command family moved into
   `patchsmith.chat.handlers.session_evidence`, preserving transcript events
@@ -379,6 +379,12 @@ Progress:
   `tests/chat/test_system_commands.py`. `agent_chat.py` is now 851 lines and
   25 top-level definitions; slash dispatch now has registered command handling,
   exit/quit session termination, and project custom-command fallback.
+- 2026-06-16: `/preflight` and `/verify` are now fully implemented in
+  `patchsmith.chat.handlers.execution`; `patchsmith.chat.preflight` carries the
+  shared preflight payload builder used by both `/preflight` and the pre-run
+  guard. Focused execution tests now assert transcript payloads and sandbox
+  summaries directly. `agent_chat.py` is now 734 lines and 18 top-level
+  definitions.
 - 2026-06-15: Phase 1 typed-transcript slice added `patchsmith.session.events`
   and `patchsmith.session.store`. Existing transcript writes and
   `agent_session.transcript_rows` now use the store compatibility layer, with

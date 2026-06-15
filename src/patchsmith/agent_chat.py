@@ -17,11 +17,9 @@ from patchsmith.agent_apply import (
 from patchsmith.agent_cli import (
     AgentCliConfig,
     AgentCliRun,
-    agent_preflight_payload,
     config_with_loaded_agent_instructions,
     run_agent_once,
     run_result_payload,
-    validate_agent_cli_config,
 )
 from patchsmith.agent_commands import (
     load_custom_command,
@@ -43,7 +41,7 @@ from patchsmith.chat.commands import ChatCommandContext, build_command_registry
 from patchsmith.chat.handlers.checkpoints import checkpoint_commands
 from patchsmith.chat.handlers.context import context_commands
 from patchsmith.chat.handlers.diff_apply import diff_apply_commands
-from patchsmith.chat.handlers.execution import execution_commands
+from patchsmith.chat.handlers.execution import execution_commands, handle_preflight_command
 from patchsmith.chat.handlers.memory import memory_instruction_commands
 from patchsmith.chat.handlers.model_budget import model_budget_commands
 from patchsmith.chat.handlers.permissions import permission_commands
@@ -55,6 +53,7 @@ from patchsmith.chat.handlers.session_plan import (
 )
 from patchsmith.chat.handlers.session_state import session_state_commands
 from patchsmith.chat.handlers.system import system_commands
+from patchsmith.chat.preflight import preflight_payload
 from patchsmith.chat.routing import parse_slash_command, route_natural_command
 from patchsmith.chat.session_payloads import (
     apply_config_update,
@@ -72,8 +71,6 @@ from patchsmith.chat.session_payloads import (
 )
 from patchsmith.chat.state import AgentChatRuntime, AgentChatState
 from patchsmith.model_preflight import ModelPreflightResult
-from patchsmith.models import CommandResult
-from patchsmith.sandbox import create_sandbox_runner
 from patchsmith.session.store import append_transcript_event
 from patchsmith.workflow import RepairRunner
 
@@ -201,10 +198,11 @@ def run_chat_session(
                 output_stream,
                 "Plan mode: running preflight only. Say 'go ahead' or use /run to execute.",
             )
-            _handle_preflight(
+            handle_preflight_command(
                 runtime=runtime,
-                task=raw,
+                argument=raw,
                 output_stream=output_stream,
+                context=ChatCommandContext(record=_record),
             )
             _write_line(output_stream, f"Pending planned task: {raw}")
             continue
@@ -256,8 +254,6 @@ def _chat_command_context(
         check_agent_run_diff=check_agent_run_diff,
         reverse_agent_run_diff=reverse_agent_run_diff,
         run_task=run_task,
-        preflight_task=_handle_preflight,
-        verify_command=_handle_verify,
     )
 
 
@@ -299,122 +295,6 @@ def _handle_slash_command(
     _write_line(output_stream, f"Unknown command: /{command}")
     _write_line(output_stream, "Type /help for available commands.")
     return True
-
-
-def _handle_preflight(
-    *,
-    runtime: AgentChatRuntime,
-    task: str,
-    output_stream: TextIO,
-) -> None:
-    if not task:
-        _write_line(output_stream, "Usage: /preflight <task>")
-        return
-    payload, error = _preflight_payload(runtime=runtime, task=task)
-    if error:
-        _write_line(output_stream, error)
-        _record(runtime, "preflight_error", {"message": error})
-        return
-    _record(runtime, "preflight", payload)
-    _write_line(output_stream, f"Preflight: {payload['status']}")
-    _print_checks(payload["checks"], output_stream)
-
-
-def _preflight_payload(
-    *,
-    runtime: AgentChatRuntime,
-    task: str,
-) -> tuple[dict[str, object], str | None]:
-    runtime_config, apply_preflight, error = validate_agent_cli_config(
-        runtime.state.config,
-        require_apply_ready=False,
-    )
-    if error:
-        return {}, error
-    return (
-        agent_preflight_payload(
-            config=runtime.state.config,
-            issue_text=task,
-            runtime_config=runtime_config,
-            apply_preflight=apply_preflight,
-        ),
-        None,
-    )
-
-
-def _handle_verify(
-    *,
-    runtime: AgentChatRuntime,
-    argument: str,
-    output_stream: TextIO,
-) -> None:
-    command = argument.strip() or runtime.state.config.test_command
-    if not command:
-        _write_line(output_stream, "Usage: /verify <allowed-test-command>")
-        _write_line(output_stream, "No test command is configured for this session.")
-        return
-    sandbox = create_sandbox_runner(
-        mode=runtime.state.config.sandbox_mode,
-        image=runtime.state.config.sandbox_image,
-    )
-    result = sandbox.run(
-        command=command,
-        workspace=Path(runtime.state.config.repo),
-        timeout_seconds=60,
-    )
-    payload: dict[str, object] = {
-        "sandbox_mode": runtime.state.config.sandbox_mode,
-        "sandbox_image": runtime.state.config.sandbox_image,
-        "result": result.to_dict(),
-        "status": _verify_status(result),
-    }
-    _record(runtime, "verify_result", payload)
-    _write_line(output_stream, f"Verify: {payload['status']}")
-    _write_line(output_stream, f"Command: {result.command}")
-    exit_code = result.exit_code if result.exit_code is not None else "n/a"
-    _write_line(output_stream, f"Exit code: {exit_code}")
-    _write_line(output_stream, f"Duration: {result.duration_ms} ms")
-    if not result.policy_decision.allowed:
-        _write_line(output_stream, f"Policy: blocked - {result.policy_decision.reason}")
-    if result.timed_out:
-        _write_line(output_stream, "Timed out: true")
-    _print_verify_output("stdout", result.stdout, output_stream)
-    _print_verify_output("stderr", result.stderr, output_stream)
-
-
-def _verify_status(result: CommandResult) -> str:
-    if not result.policy_decision.allowed:
-        return "blocked"
-    if result.timed_out:
-        return "timed_out"
-    if result.exit_code == 0:
-        return "passed"
-    return "failed"
-
-
-def _print_verify_output(label: str, text: str, output_stream: TextIO) -> None:
-    value = text.strip()
-    if not value:
-        return
-    _write_line(output_stream, f"{label}: {_truncate_line(value)}")
-
-
-def _truncate_line(text: str, limit: int = 240) -> str:
-    single_line = " ".join(text.split())
-    if len(single_line) <= limit:
-        return single_line
-    return single_line[: limit - 3].rstrip() + "..."
-
-
-def _print_checks(checks: object, output_stream: TextIO) -> None:
-    if not isinstance(checks, list):
-        return
-    for check in checks:
-        if isinstance(check, dict):
-            _write_line(
-                output_stream,
-                f"- {check['name']}: {check['status']} - {check['message']}",
-            )
 
 
 def _handle_custom_command(
@@ -516,7 +396,10 @@ def _handle_task(
         },
     )
     issue_text = _task_with_session_context(runtime=runtime, task=task)
-    run_preflight, preflight_error = _preflight_payload(runtime=runtime, task=issue_text)
+    run_preflight, preflight_error = preflight_payload(
+        config=runtime.state.config,
+        task=issue_text,
+    )
     if preflight_error:
         _write_line(output_stream, preflight_error)
         _record(
