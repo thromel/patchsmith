@@ -661,6 +661,13 @@ Progress:
   threshold counts, gate result metadata, and `eval-complex-suite` flag
   registration now consume the registry, with drift coverage in
   `tests/evaluation/complex/test_spec.py`.
+- 2026-06-16: Phase 4 artifact compatibility hardening started with
+  `docs/22_artifact_compatibility_policy.md`, transcript migration coverage for
+  older JSONL rows without `timestamp` or `session_id`, and
+  `patchsmith.evaluation.complex.compatibility.load_complex_benchmark_results`
+  for older flat benchmark result rows. Focused tests live in
+  `tests/session/test_transcript_migration.py` and
+  `tests/evaluation/complex/test_compatibility.py`.
 
 ### Phase 0: Stabilize
 
