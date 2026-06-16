@@ -580,6 +580,10 @@ Progress:
   from the domain views while preserving the flat follow-up candidate schema.
   Focused coverage in `tests/evaluation/complex/test_followups.py` preserves
   budget-critical reruns and acceptance-rubric verifier reruns.
+- 2026-06-16: The extracted `patchsmith.evaluation.complex.*` package now has a
+  scoped mypy override with `check_untyped_defs` and `disallow_untyped_defs`
+  enabled. This starts the gradual type-strictness track on the benchmark
+  package without changing global typing policy.
 - 2026-06-15: Phase 3 started by moving complex benchmark suite models,
   threshold/config resolution, spec loading, and suite input preflight into
   `patchsmith.evaluation.complex.models` and

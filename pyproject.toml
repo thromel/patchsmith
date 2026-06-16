@@ -60,6 +60,7 @@ no_implicit_optional = true
 module = [
   "patchsmith.models",
   "patchsmith.evaluation_models",
+  "patchsmith.evaluation.complex.*",
   "patchsmith.runtime.core",
 ]
 check_untyped_defs = true
