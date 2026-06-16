@@ -588,6 +588,11 @@ Progress:
   scoped mypy strictness override, keeping typed transcript store, metrics,
   gates, recommendations, summaries, timelines, and reports on the strictness
   track without changing global typing policy.
+- 2026-06-16: The extracted chat and CLI packages plus the DeepAgents root
+  module set now share the scoped mypy strictness override. Four missing return
+  annotations were added at the package boundaries, and strict probes for
+  `src/patchsmith/chat`, `src/patchsmith/cli`, and `src/patchsmith/deepagents_*.py`
+  pass before the full source-tree mypy check.
 - 2026-06-16: Focused DeepAgents unit tests moved from root-level
   `tests/test_deepagents_*.py` files into the `tests/deepagents/` product
   boundary. The package now includes the planned

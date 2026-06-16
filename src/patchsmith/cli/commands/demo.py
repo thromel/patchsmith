@@ -10,6 +10,7 @@ from typing import Any
 from patchsmith.artifacts import load_json, write_json, write_markdown
 from patchsmith.cli._types import CommandHandler
 from patchsmith.evaluation.seeded import load_seeded_tasks
+from patchsmith.evaluation_models import SeededTask
 from patchsmith.models import RepairRunResult, RunRequest
 from patchsmith.workflow import RepairRunner
 
@@ -106,7 +107,7 @@ def _inspect_command(args: argparse.Namespace) -> int:
     return 0
 
 
-def _load_demo_task(task_id: str):
+def _load_demo_task(task_id: str) -> SeededTask:
     for task in load_seeded_tasks(DEMO_DATASET):
         if task.task_id == task_id:
             return task

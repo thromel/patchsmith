@@ -20,7 +20,12 @@ from patchsmith.agent_diff import (
     summarize_agent_diff,
 )
 from patchsmith.agent_session import transcript_rows
-from patchsmith.chat.commands import ChatCommand, ChatCommandContext
+from patchsmith.chat.commands import (
+    ApplyDiff,
+    ChatCommand,
+    ChatCommandContext,
+    ReverseDiff,
+)
 from patchsmith.chat.formatting import write_line
 from patchsmith.chat.state import AgentChatRuntime
 
@@ -491,13 +496,13 @@ def _run_hooks(
     )
 
 
-def _apply_agent_run_diff(context: ChatCommandContext):
+def _apply_agent_run_diff(context: ChatCommandContext) -> ApplyDiff:
     return context.apply_agent_run_diff or default_apply_agent_run_diff
 
 
-def _check_agent_run_diff(context: ChatCommandContext):
+def _check_agent_run_diff(context: ChatCommandContext) -> ApplyDiff:
     return context.check_agent_run_diff or default_check_agent_run_diff
 
 
-def _reverse_agent_run_diff(context: ChatCommandContext):
+def _reverse_agent_run_diff(context: ChatCommandContext) -> ReverseDiff:
     return context.reverse_agent_run_diff or default_reverse_agent_run_diff
