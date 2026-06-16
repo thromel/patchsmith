@@ -11,7 +11,7 @@ tests.
 
 ## Current Evidence
 
-- Source size: 286 Python files under `src/patchsmith`, about 60.2k lines.
+- Source size: 286 Python files under `src/patchsmith`, about 60.3k lines.
 - Test size: 111 Python files under `tests`, about 35.0k lines.
 - Largest source files:
   - `src/patchsmith/runtime/attempts.py`: 1108 lines.
@@ -570,6 +570,11 @@ Progress:
   result fields. Existing render coverage in
   `tests/evaluation/complex/test_render.py` preserves report output and claim
   boundary text.
+- 2026-06-16: Complex benchmark attempt selection now ranks attempts and builds
+  selection reasons from the domain views while preserving the flat
+  `ComplexBenchmarkSelection` output schema. Focused coverage in
+  `tests/evaluation/complex/test_selection.py` preserves strict-validation,
+  cost, context-budget, resource-budget, and selected-result behavior.
 - 2026-06-15: Phase 3 started by moving complex benchmark suite models,
   threshold/config resolution, spec loading, and suite input preflight into
   `patchsmith.evaluation.complex.models` and
