@@ -26,7 +26,7 @@ tests.
   - `tests/test_agent_chat.py`: 3661 lines.
   - `tests/evaluation/test_runners.py`: 2608 lines.
   - `tests/evaluation/test_issue_corpus_public_issues.py`: 2586 lines.
-  - `tests/test_deepagents_planner.py`: 2398 lines.
+  - `tests/deepagents/test_planner.py`: 2398 lines.
   - `tests/test_cli.py`: 1770 lines.
 - Current validation:
   - `uv run ruff check src tests docs README.md`: passed.
@@ -452,78 +452,78 @@ Progress:
 - 2026-06-15: Phase 2 started by moving DeepAgents subagent routing and
   resource-budget policy into `patchsmith.deepagents_routing`. Planner behavior
   is preserved through compatibility imports, with focused tests in
-  `tests/test_deepagents_routing.py`.
+  `tests/deepagents/test_budget_routing.py`.
 - 2026-06-15: DeepAgents structured-output parsing and target-policy validation
   moved into `patchsmith.deepagents_plan_validation`, leaving the planner to
   orchestrate invocation and metadata updates. Focused tests live in
-  `tests/test_deepagents_plan_validation.py`.
+  `tests/deepagents/test_plan_validation.py`.
 - 2026-06-15: DeepAgents repair-interface and agent-file assembly moved into
   `patchsmith.deepagents_run_interface`, giving Phase 2 a first
   RunInterfaceBuilder-style boundary. Focused tests live in
-  `tests/test_deepagents_run_interface.py`.
+  `tests/deepagents/test_run_interface.py`.
 - 2026-06-15: DeepAgents context selection, target-context auto-capping,
   retry-aware preferred patch paths, and preferred symbol focus moved into
   `patchsmith.deepagents_context_selection`. The planner now delegates that
   policy and is down to 636 lines, with focused tests in
-  `tests/test_deepagents_context_selection.py`.
+  `tests/deepagents/test_context_selection.py`.
 - 2026-06-15: DeepAgents provider invocation, prompt payload assembly, success
   metadata, structured-output failure metadata, and resource-budget-exceeded
   accounting moved into `patchsmith.deepagents_invoke`. The planner is now down
-  to 521 lines, with focused tests in `tests/test_deepagents_invoke.py`.
+  to 521 lines, with focused tests in `tests/deepagents/test_invoke.py`.
 - 2026-06-16: DeepAgents virtual-file records and manifest definitions moved into
   `patchsmith.deepagents_manifests`. `patchsmith.deepagents_files.agent_files`
   and repair-interface required reads now consume that registry while preserving
   the existing planner/run-interface API. Focused coverage lives in
-  `tests/test_deepagents_manifests.py`; `deepagents_files.py` is now 1271 lines.
+  `tests/deepagents/test_manifests.py`; `deepagents_files.py` is now 1271 lines.
 - 2026-06-16: Scoped AGENTS.md-style repository instruction manifest rendering
   moved into `patchsmith.deepagents_repo_instructions`, with the legacy
   `deepagents_files` alias preserved. Focused coverage in
-  `tests/test_deepagents_rubric.py` now exercises the dedicated module directly;
+  `tests/deepagents/test_rubric.py` now exercises the dedicated module directly;
   `deepagents_files.py` is now 1138 lines.
 - 2026-06-16: DeepAgents context-budget manifest and metadata rendering moved
   into `patchsmith.deepagents_context_budget`, and shared context rendering
   helpers moved into `patchsmith.deepagents_context_utils`. The legacy
   `deepagents_files` aliases remain intact, with focused coverage in
-  `tests/test_deepagents_context_budget.py`; `deepagents_files.py` is now 1031
+  `tests/deepagents/test_context_budget.py`; `deepagents_files.py` is now 1031
   lines.
 - 2026-06-16: DeepAgents retrieved repo-map manifest rendering moved into
   `patchsmith.deepagents_repo_map`, including definition-signature extraction
   for mounted and omitted files. The legacy `deepagents_files` alias remains
-  intact, with focused coverage in `tests/test_deepagents_repo_map.py`;
+  intact, with focused coverage in `tests/deepagents/test_repo_map.py`;
   `deepagents_files.py` is now 900 lines.
 - 2026-06-16: DeepAgents reviewed source-hint manifest rendering moved into
   `patchsmith.deepagents_source_hints`. The legacy `deepagents_files` alias
   remains intact, with focused coverage in
-  `tests/test_deepagents_source_hints.py`; `deepagents_files.py` is now 849
+  `tests/deepagents/test_source_hints.py`; `deepagents_files.py` is now 849
   lines.
 - 2026-06-16: DeepAgents target-history manifest rendering moved into
   `patchsmith.deepagents_target_history`, including retry target reason priority
   ordering. The legacy `deepagents_files` alias remains intact, with focused
-  coverage in `tests/test_deepagents_target_history.py`; `deepagents_files.py`
+  coverage in `tests/deepagents/test_target_history.py`; `deepagents_files.py`
   is now 736 lines.
 - 2026-06-16: DeepAgents repair-interface manifest assembly moved into
   `patchsmith.deepagents_repair_interface`, including budget-critical required
   reads and fast patch packet rendering. The legacy `deepagents_files` alias
   remains intact, with focused coverage in
-  `tests/test_deepagents_repair_interface.py`; `deepagents_files.py` is now 384
+  `tests/deepagents/test_repair_interface.py`; `deepagents_files.py` is now 384
   lines.
 - 2026-06-16: DeepAgents mounted source-file shaping moved into
   `patchsmith.deepagents_context_files`, including repo-backed reads, focused
   source spans, timestamps, and excerpt fallback behavior. The legacy
   `deepagents_files` exports remain intact, with focused coverage in
-  `tests/test_deepagents_context_files.py`; `deepagents_files.py` is now 172
+  `tests/deepagents/test_context_files.py`; `deepagents_files.py` is now 172
   lines.
 - 2026-06-16: DeepAgents manifest content mounting now flows through
   `patchsmith.deepagents_manifests.ManifestContents`, so the run-interface
   builder can pass one registry-backed bundle into repair-interface rendering
   and virtual-file assembly. Focused coverage in
-  `tests/test_deepagents_manifests.py` pins bundle specs, required reads, and
+  `tests/deepagents/test_manifests.py` pins bundle specs, required reads, and
   `agent_files` mounting; `deepagents_files.py` is now 175 lines.
 - 2026-06-16: DeepAgents contract metadata and invoke prompt path selection now
   consume the same `ManifestContents` bundle returned by the run-interface
   builder. Legacy boolean/string arguments remain compatible, while focused
-  coverage in `tests/test_deepagents_contract.py` and
-  `tests/test_deepagents_invoke.py` pins registry-backed manifest paths,
+  coverage in `tests/deepagents/test_contract.py` and
+  `tests/deepagents/test_invoke.py` pins registry-backed manifest paths,
   allowed reads, and budget-critical read policy.
 - 2026-06-16: The standalone `openai-model-preflight` CLI command moved into
   `patchsmith.cli.commands.model_preflight`, while the agent runtime keeps its
@@ -584,6 +584,12 @@ Progress:
   scoped mypy override with `check_untyped_defs` and `disallow_untyped_defs`
   enabled. This starts the gradual type-strictness track on the benchmark
   package without changing global typing policy.
+- 2026-06-16: Focused DeepAgents unit tests moved from root-level
+  `tests/test_deepagents_*.py` files into the `tests/deepagents/` product
+  boundary. The package now includes the planned
+  `tests/deepagents/test_run_interface.py` and
+  `tests/deepagents/test_budget_routing.py` coverage while broader planner and
+  workflow scenario tests remain as smoke coverage.
 - 2026-06-15: Phase 3 started by moving complex benchmark suite models,
   threshold/config resolution, spec loading, and suite input preflight into
   `patchsmith.evaluation.complex.models` and
