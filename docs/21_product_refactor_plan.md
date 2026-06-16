@@ -584,6 +584,10 @@ Progress:
   scoped mypy override with `check_untyped_defs` and `disallow_untyped_defs`
   enabled. This starts the gradual type-strictness track on the benchmark
   package without changing global typing policy.
+- 2026-06-16: The extracted `patchsmith.session.*` package now has the same
+  scoped mypy strictness override, keeping typed transcript store, metrics,
+  gates, recommendations, summaries, timelines, and reports on the strictness
+  track without changing global typing policy.
 - 2026-06-16: Focused DeepAgents unit tests moved from root-level
   `tests/test_deepagents_*.py` files into the `tests/deepagents/` product
   boundary. The package now includes the planned

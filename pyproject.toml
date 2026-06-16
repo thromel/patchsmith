@@ -62,6 +62,7 @@ module = [
   "patchsmith.evaluation_models",
   "patchsmith.evaluation.complex.*",
   "patchsmith.runtime.core",
+  "patchsmith.session.*",
 ]
 check_untyped_defs = true
 disallow_untyped_defs = true
