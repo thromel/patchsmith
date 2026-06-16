@@ -221,9 +221,9 @@ PYTHONPATH=src python3 -m patchsmith.cli release-gate \
 
 The release gate adds the product-hardening checks that sit above the local
 quality gate: focused smoke tests, CLI help snapshots, sample transcript export,
-and saved complex benchmark result validation. Use `passed` as release evidence;
-use `passed_with_skips` only when every skipped check is called out in the claim
-boundary.
+product-boundary ownership docs, and saved complex benchmark result validation.
+Use `passed` as release evidence; use `passed_with_skips` only when every
+skipped check is called out in the claim boundary.
 
 Generate the delivery audit:
 

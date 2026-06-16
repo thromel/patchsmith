@@ -688,10 +688,10 @@ PYTHONPATH=src python3 -m patchsmith.cli release-gate \
 
 The release gate layers product-release checks on top of local verification:
 full pytest, focused smoke tests, package build, top-level/agent/chat CLI help
-snapshots, a sample transcript export, and saved complex benchmark result
-validation when `complex_benchmark_results.json` is available. Treat skipped
-benchmark validation as a visible caveat unless the release claim does not
-depend on saved benchmark evidence.
+snapshots, product-boundary ownership docs, a sample transcript export, and
+saved complex benchmark result validation when `complex_benchmark_results.json`
+is available. Treat skipped benchmark validation as a visible caveat unless the
+release claim does not depend on saved benchmark evidence.
 
 Release hygiene:
 

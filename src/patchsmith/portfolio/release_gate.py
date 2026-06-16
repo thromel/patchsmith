@@ -17,6 +17,18 @@ from patchsmith.session.report import export_session_report
 from patchsmith.session.store import append_transcript_event
 
 DEFAULT_RELEASE_GATE_TIMEOUT_SECONDS = 900
+REQUIRED_OWNERSHIP_BOUNDARY_REFERENCES = (
+    "patchsmith.chat",
+    "patchsmith.session",
+    "patchsmith.cli",
+    "patchsmith.deepagents_",
+    "patchsmith.runtime",
+    "patchsmith.evaluation.complex",
+    "patchsmith.evaluation.issue_corpus",
+    "patchsmith.portfolio",
+    "patchsmith.context",
+    "patchsmith.patching",
+)
 
 
 def build_release_gate_report(
@@ -56,6 +68,7 @@ def build_release_gate_report(
             include_build=include_build,
             include_cli_help=include_cli_help,
         ),
+        _ownership_docs_check(project_root=project_root),
         _sample_transcript_export_check(
             project_root=project_root,
             artifacts_dir=artifacts_dir,
@@ -78,6 +91,7 @@ def build_release_gate_report(
         skipped_count=status_counts.get("skipped", 0),
         checks=checks,
         review_artifacts=_release_gate_review_artifacts(
+            project_root=project_root,
             artifacts_dir=artifacts_dir,
             benchmark_results_path=benchmark_results_path,
         ),
@@ -320,6 +334,56 @@ def _sample_transcript_export_check(
     )
 
 
+def _ownership_docs_check(*, project_root: Path) -> QualityGateCheck:
+    started = time.perf_counter()
+    docs_path = project_root / "docs" / "23_product_boundary_ownership.md"
+    if not docs_path.is_file():
+        return _in_process_check(
+            name="Product boundary ownership docs",
+            command=["internal", "ownership-docs"],
+            project_root=project_root,
+            status="failed",
+            duration_ms=_duration_ms(started),
+            summary=f"Missing ownership docs: {docs_path}.",
+        )
+    try:
+        text = docs_path.read_text(encoding="utf-8")
+    except OSError as error:
+        return _in_process_check(
+            name="Product boundary ownership docs",
+            command=["internal", "ownership-docs"],
+            project_root=project_root,
+            status="failed",
+            duration_ms=_duration_ms(started),
+            summary=f"{type(error).__name__}: {error}",
+        )
+    missing = [
+        reference
+        for reference in REQUIRED_OWNERSHIP_BOUNDARY_REFERENCES
+        if reference not in text
+    ]
+    if missing:
+        return _in_process_check(
+            name="Product boundary ownership docs",
+            command=["internal", "ownership-docs"],
+            project_root=project_root,
+            status="failed",
+            duration_ms=_duration_ms(started),
+            summary="Missing boundary references: " + ", ".join(missing) + ".",
+        )
+    return _in_process_check(
+        name="Product boundary ownership docs",
+        command=["internal", "ownership-docs"],
+        project_root=project_root,
+        status="passed",
+        duration_ms=_duration_ms(started),
+        summary=(
+            f"Ownership docs cover {len(REQUIRED_OWNERSHIP_BOUNDARY_REFERENCES)} "
+            "required boundary references."
+        ),
+    )
+
+
 def _saved_benchmark_validation_check(
     *,
     project_root: Path,
@@ -392,10 +456,12 @@ def _in_process_check(
 
 def _release_gate_review_artifacts(
     *,
+    project_root: Path,
     artifacts_dir: Path,
     benchmark_results_path: Path,
 ) -> list[str]:
     candidates = [
+        project_root / "docs" / "23_product_boundary_ownership.md",
         artifacts_dir / "experiments" / "release_gate" / "sample_session.jsonl",
         artifacts_dir / "experiments" / "release_gate" / "sample_session.md",
         benchmark_results_path,

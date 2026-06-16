@@ -57,7 +57,7 @@ def test_release_gate_runs_help_export_and_saved_benchmark_checks(
     )
 
     assert report.release_status == "passed_with_skips"
-    assert report.passed_count == 7
+    assert report.passed_count == 8
     assert report.skipped_count == 1
     assert len(calls) == 5
     assert calls[0][-3:] == [
@@ -86,6 +86,14 @@ def test_release_gate_runs_help_export_and_saved_benchmark_checks(
     )
     assert benchmark_check.status == "passed"
     assert "1 validated" in benchmark_check.summary
+    ownership_check = next(
+        check for check in report.checks if check.name == "Product boundary ownership docs"
+    )
+    assert ownership_check.status == "passed"
+    assert any(
+        artifact.endswith("docs/23_product_boundary_ownership.md")
+        for artifact in report.review_artifacts
+    )
 
 
 def test_release_gate_cli_writes_json_summary_without_running_heavy_steps(
@@ -116,6 +124,6 @@ def test_release_gate_cli_writes_json_summary_without_running_heavy_steps(
     assert exit_code == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["release_status"] == "passed_with_skips"
-    assert payload["passed_count"] == 1
+    assert payload["passed_count"] == 2
     assert output_path.is_file()
     assert json_output_path.is_file()

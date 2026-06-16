@@ -674,6 +674,11 @@ Progress:
   sample transcript export, and saved complex benchmark validation checks with
   Markdown/JSON reports plus command logs. Focused coverage lives in
   `tests/portfolio/test_release_gate.py`.
+- 2026-06-16: Product-boundary ownership docs were added in
+  `docs/23_product_boundary_ownership.md`, covering chat, session, CLI,
+  DeepAgents, runtime, complex benchmark, issue corpus, portfolio, retrieval,
+  patch safety, and shared model/artifact boundaries. `patchsmith release-gate`
+  now checks that the ownership doc names the required boundary references.
 
 ### Phase 0: Stabilize
 
