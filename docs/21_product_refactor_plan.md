@@ -593,6 +593,9 @@ Progress:
 - 2026-06-16: CLI tests moved into the `tests/cli/` product boundary, including
   focused command modules for agent, chat, model-preflight, repository, shared
   agent args, legacy run, and the broad CLI command registry smoke coverage.
+- 2026-06-16: Focused apply/check policy coverage moved into
+  `tests/chat/test_apply_policy.py`, matching the chat test boundary while
+  keeping broad chat and CLI scenario files as smoke coverage.
 - 2026-06-15: Phase 3 started by moving complex benchmark suite models,
   threshold/config resolution, spec loading, and suite input preflight into
   `patchsmith.evaluation.complex.models` and
