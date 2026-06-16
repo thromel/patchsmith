@@ -19,7 +19,6 @@ from patchsmith.agent_diff import (
     review_agent_diff,
     summarize_agent_diff,
 )
-from patchsmith.agent_session import transcript_rows
 from patchsmith.chat.commands import (
     ApplyDiff,
     ChatCommand,
@@ -28,6 +27,8 @@ from patchsmith.chat.commands import (
 )
 from patchsmith.chat.formatting import write_line
 from patchsmith.chat.state import AgentChatRuntime
+from patchsmith.session.events import TranscriptEvent
+from patchsmith.session.store import read_known_transcript_events
 
 
 def diff_apply_commands() -> tuple[ChatCommand, ...]:
@@ -302,7 +303,7 @@ def apply_guard(
     runtime: AgentChatRuntime,
     diff_path: Path,
 ) -> dict[str, object] | None:
-    rows = transcript_rows(runtime.state.transcript_path)
+    rows = read_known_transcript_events(runtime.state.transcript_path)
     run_index = _latest_event_index(rows, "run_result")
     review_index, review_payload = _latest_event_with_path(
         rows=rows,
@@ -386,7 +387,7 @@ def apply_decision_payload(
     status: str,
     reason: str,
 ) -> tuple[dict[str, object], str | None]:
-    rows = transcript_rows(runtime.state.transcript_path)
+    rows = read_known_transcript_events(runtime.state.transcript_path)
     run_index = _latest_event_index(rows, "run_result")
     review_index, review_payload = _latest_event_with_path(
         rows=rows,
@@ -449,7 +450,7 @@ def _apply_block_payload(
 
 def _latest_event_with_path(
     *,
-    rows: list[dict[str, object]],
+    rows: list[TranscriptEvent],
     event: str,
     diff_path: Path,
 ) -> tuple[int, dict[str, object]]:
@@ -457,11 +458,9 @@ def _latest_event_with_path(
     expected_resolved = str(diff_path.resolve())
     for index in range(len(rows) - 1, -1, -1):
         row = rows[index]
-        if row.get("event") != event:
+        if row.event != event:
             continue
-        payload = row.get("payload")
-        if not isinstance(payload, dict):
-            continue
+        payload = row.payload
         raw_path = payload.get("diff_path") or payload.get("path")
         if raw_path not in {expected_path, expected_resolved}:
             continue
@@ -469,9 +468,9 @@ def _latest_event_with_path(
     return -1, {}
 
 
-def _latest_event_index(rows: list[dict[str, object]], event: str) -> int:
+def _latest_event_index(rows: list[TranscriptEvent], event: str) -> int:
     for index in range(len(rows) - 1, -1, -1):
-        if rows[index].get("event") == event:
+        if rows[index].event == event:
             return index
     return -1
 

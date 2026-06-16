@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import TextIO
 from uuid import uuid4
 
-from patchsmith.agent_session import transcript_rows
 from patchsmith.chat.commands import ChatCommand, ChatCommandContext
 from patchsmith.chat.formatting import write_line
 from patchsmith.chat.session_payloads import (
@@ -13,6 +12,7 @@ from patchsmith.chat.session_payloads import (
     restore_checkpoint_state,
 )
 from patchsmith.chat.state import AgentChatRuntime
+from patchsmith.session.store import read_known_transcript_events
 
 
 def checkpoint_commands() -> tuple[ChatCommand, ...]:
@@ -109,15 +109,12 @@ def _checkpoint_payload(
 
 def _checkpoint_payloads(transcript_path: Path) -> list[dict[str, object]]:
     checkpoints: list[dict[str, object]] = []
-    for row in transcript_rows(transcript_path):
-        if row.get("event") != "session_checkpoint":
+    for row in read_known_transcript_events(transcript_path):
+        if row.event != "session_checkpoint":
             continue
-        payload = row.get("payload")
-        if not isinstance(payload, dict):
-            continue
-        checkpoint = dict(payload)
-        timestamp = row.get("timestamp")
-        if isinstance(timestamp, str):
+        checkpoint = dict(row.payload)
+        timestamp = row.timestamp
+        if timestamp:
             checkpoint["timestamp"] = timestamp
         checkpoints.append(checkpoint)
     return checkpoints
