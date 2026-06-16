@@ -48,3 +48,11 @@ def read_transcript_rows(path: Path) -> list[dict[str, object]]:
 
 def read_transcript_events(path: Path) -> list[TranscriptRow]:
     return [decode_transcript_row(row) for row in read_transcript_rows(path)]
+
+
+def read_known_transcript_events(path: Path) -> list[TranscriptEvent]:
+    return [
+        row
+        for row in read_transcript_events(path)
+        if isinstance(row, TranscriptEvent)
+    ]

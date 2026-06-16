@@ -3,7 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from patchsmith.session.store import read_transcript_rows
+from patchsmith.session.events import TranscriptEvent
+from patchsmith.session.store import read_known_transcript_events
 
 
 @dataclass(frozen=True)
@@ -156,6 +157,10 @@ class AgentSessionMetrics:
 
 
 def session_usage_payload(transcript_path: Path) -> dict[str, object]:
+    return _session_usage_payload(read_known_transcript_events(transcript_path))
+
+
+def _session_usage_payload(events: list[TranscriptEvent]) -> dict[str, object]:
     payload: dict[str, object] = {
         "task_count": 0,
         "run_count": 0,
@@ -166,11 +171,9 @@ def session_usage_payload(transcript_path: Path) -> dict[str, object]:
         "model_total_tokens": 0,
         "estimated_cost_usd": 0.0,
     }
-    for row in read_transcript_rows(transcript_path):
-        event = row.get("event")
-        row_payload = row.get("payload")
-        if not isinstance(row_payload, dict):
-            continue
+    for row in events:
+        event = row.event
+        row_payload = row.payload
         if event == "user_task":
             payload["task_count"] = _increment_int(payload["task_count"])
         elif event == "run_result":
@@ -186,8 +189,8 @@ def session_usage_payload(transcript_path: Path) -> dict[str, object]:
 
 
 def session_metrics(transcript_path: Path) -> AgentSessionMetrics:
-    rows = read_transcript_rows(transcript_path)
-    usage = session_usage_payload(transcript_path)
+    rows = read_known_transcript_events(transcript_path)
+    usage = _session_usage_payload(rows)
     preflight_count = 0
     preflight_passed_count = 0
     run_preflight_count = 0
@@ -235,10 +238,8 @@ def session_metrics(transcript_path: Path) -> AgentSessionMetrics:
     timeline_view_count = 0
     next_view_count = 0
     for row in rows:
-        event = row.get("event")
-        payload = row.get("payload")
-        if not isinstance(payload, dict):
-            continue
+        event = row.event
+        payload = row.payload
         if event == "preflight":
             preflight_count += 1
             if payload.get("status") == "passed":
@@ -476,7 +477,7 @@ def format_session_metrics(metrics: AgentSessionMetrics) -> str:
 
 
 def _current_session_quality_window(
-    rows: list[dict[str, object]],
+    rows: list[TranscriptEvent],
 ) -> dict[str, int]:
     latest_run_index = _latest_event_index(rows, "run_result")
     if latest_run_index < 0:
@@ -487,11 +488,9 @@ def _current_session_quality_window(
         }
     diff_reviews: list[tuple[int, dict[str, object]]] = []
     for index, row in enumerate(rows[latest_run_index + 1 :], start=latest_run_index + 1):
-        if row.get("event") != "diff_review":
+        if row.event != "diff_review":
             continue
-        payload = row.get("payload")
-        if isinstance(payload, dict):
-            diff_reviews.append((index, payload))
+        diff_reviews.append((index, row.payload))
     if not diff_reviews:
         return {
             "diff_review_count": 0,
@@ -501,10 +500,9 @@ def _current_session_quality_window(
     latest_review_index, latest_review_payload = diff_reviews[-1]
     ready_apply_checks = 0
     for row in rows[latest_review_index + 1 :]:
-        if row.get("event") != "apply_check_result":
+        if row.event != "apply_check_result":
             continue
-        payload = row.get("payload")
-        if isinstance(payload, dict) and payload.get("status") == "ready":
+        if row.payload.get("status") == "ready":
             ready_apply_checks += 1
     return {
         "diff_review_count": len(diff_reviews),
@@ -515,9 +513,9 @@ def _current_session_quality_window(
     }
 
 
-def _latest_event_index(rows: list[dict[str, object]], event: str) -> int:
+def _latest_event_index(rows: list[TranscriptEvent], event: str) -> int:
     for index in range(len(rows) - 1, -1, -1):
-        if rows[index].get("event") == event:
+        if rows[index].event == event:
             return index
     return -1
 

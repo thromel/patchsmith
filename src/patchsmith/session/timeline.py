@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from patchsmith.session.store import read_transcript_rows
+from patchsmith.session.store import read_known_transcript_events
 
 
 @dataclass(frozen=True)
@@ -26,19 +26,13 @@ def session_timeline(
     limit: int = 20,
 ) -> list[AgentSessionTimelineEntry]:
     entries: list[AgentSessionTimelineEntry] = []
-    for row in read_transcript_rows(transcript_path):
-        event = row.get("event")
-        payload = row.get("payload")
-        timestamp = row.get("timestamp")
-        if not isinstance(event, str):
-            continue
-        if not isinstance(timestamp, str):
-            timestamp = "n/a"
+    for row in read_known_transcript_events(transcript_path):
+        timestamp = row.timestamp or "n/a"
         entries.append(
             AgentSessionTimelineEntry(
                 timestamp=timestamp,
-                event=event,
-                summary=_event_summary(event, payload if isinstance(payload, dict) else {}),
+                event=row.event,
+                summary=_event_summary(row.event, row.payload),
             )
         )
     if limit <= 0:
