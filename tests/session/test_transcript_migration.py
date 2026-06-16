@@ -5,10 +5,12 @@ from pathlib import Path
 
 import pytest
 
-from patchsmith.session.events import TranscriptEvent
+from patchsmith.session.events import TranscriptEvent, UnknownTranscriptEvent
 from patchsmith.session.metrics import session_metrics, session_usage_payload
+from patchsmith.session.recommendations import session_recommendation
 from patchsmith.session.report import session_markdown_report
 from patchsmith.session.store import read_transcript_events
+from patchsmith.session.summaries import session_summary
 from patchsmith.session.timeline import session_timeline
 
 pytestmark = pytest.mark.unit
@@ -23,6 +25,7 @@ def test_legacy_transcript_rows_without_metadata_still_feed_session_reducers(
         "\n".join(
             [
                 json.dumps({"event": "user_task", "payload": {"task": "fix parser"}}),
+                json.dumps({"event": "run_result", "payload": "not-a-payload"}),
                 json.dumps(
                     {
                         "event": "run_result",
@@ -36,6 +39,7 @@ def test_legacy_transcript_rows_without_metadata_still_feed_session_reducers(
                         },
                     }
                 ),
+                json.dumps({"payload": {"ignored": True}}),
                 json.dumps({"event": "session_timeline", "payload": {}}),
             ]
         )
@@ -47,6 +51,8 @@ def test_legacy_transcript_rows_without_metadata_still_feed_session_reducers(
     metrics = session_metrics(transcript_path)
     timeline = session_timeline(transcript_path, limit=0)
     report = session_markdown_report(transcript_path)
+    summary = session_summary(transcript_path)
+    recommendation = session_recommendation(transcript_path)
 
     assert decoded[0] == TranscriptEvent(
         timestamp="",
@@ -54,6 +60,10 @@ def test_legacy_transcript_rows_without_metadata_still_feed_session_reducers(
         event="user_task",
         payload={"task": "fix parser"},
     )
+    assert isinstance(decoded[1], UnknownTranscriptEvent)
+    assert decoded[1].reason == "invalid_payload"
+    assert isinstance(decoded[3], UnknownTranscriptEvent)
+    assert decoded[3].reason == "missing_event"
     assert session_usage_payload(transcript_path) == {
         "task_count": 1,
         "run_count": 1,
@@ -70,5 +80,10 @@ def test_legacy_transcript_rows_without_metadata_still_feed_session_reducers(
     assert metrics.timeline_view_count == 1
     assert timeline[0].timestamp == "n/a"
     assert timeline[0].summary == "fix parser"
+    assert summary.session_id == "legacy-session"
+    assert summary.run_count == 1
     assert "- Session: `legacy-session`" in report
     assert "- Validated runs: `1`" in report
+    assert "not-a-payload" not in report
+    assert recommendation.action == "Inspect the latest validated run artifacts."
+    assert "trace_review=missing_after_latest_run" in recommendation.evidence

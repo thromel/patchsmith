@@ -3,8 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from patchsmith.session.events import TranscriptEvent
 from patchsmith.session.metrics import session_metrics
-from patchsmith.session.store import read_transcript_rows
+from patchsmith.session.store import read_known_transcript_events
 
 
 @dataclass(frozen=True)
@@ -33,7 +34,7 @@ class AgentRepeatedFailure:
 
 
 def session_recommendation(transcript_path: Path) -> AgentSessionRecommendation:
-    rows = read_transcript_rows(transcript_path)
+    rows = read_known_transcript_events(transcript_path)
     metrics = session_metrics(transcript_path)
     last_run = _latest_payload(rows, "run_result")
     last_error = _latest_payload(rows, "run_error")
@@ -405,13 +406,11 @@ def format_session_recommendation(
     return "\n".join(lines)
 
 
-def _latest_config(rows: list[dict[str, object]]) -> dict[str, object] | None:
+def _latest_config(rows: list[TranscriptEvent]) -> dict[str, object] | None:
     config: dict[str, object] | None = None
     for row in rows:
-        event = row.get("event")
-        payload = row.get("payload")
-        if not isinstance(payload, dict):
-            continue
+        event = row.event
+        payload = row.payload
         if event == "session_start":
             value = payload.get("config")
             if isinstance(value, dict):
@@ -474,44 +473,42 @@ def _apply_config_update(
 
 
 def _payloads(
-    rows: list[dict[str, object]],
+    rows: list[TranscriptEvent],
     event: str,
 ) -> list[dict[str, object]]:
     payloads: list[dict[str, object]] = []
     for row in rows:
-        if row.get("event") != event:
+        if row.event != event:
             continue
-        payload = row.get("payload")
-        if isinstance(payload, dict):
-            payloads.append(payload)
+        payloads.append(row.payload)
     return payloads
 
 
 def _latest_payload(
-    rows: list[dict[str, object]],
+    rows: list[TranscriptEvent],
     event: str,
 ) -> dict[str, object] | None:
     payloads = _payloads(rows, event)
     return payloads[-1] if payloads else None
 
 
-def _latest_event_index(rows: list[dict[str, object]], event: str) -> int:
+def _latest_event_index(rows: list[TranscriptEvent], event: str) -> int:
     for index in range(len(rows) - 1, -1, -1):
-        if rows[index].get("event") == event:
+        if rows[index].event == event:
             return index
     return -1
 
 
-def _latest_event_is(rows: list[dict[str, object]], event: str) -> bool:
+def _latest_event_is(rows: list[TranscriptEvent], event: str) -> bool:
     for row in reversed(rows):
-        if row.get("event") == "user_command":
+        if row.event == "user_command":
             continue
-        return row.get("event") == event
+        return row.event == event
     return False
 
 
 def _latest_repeated_failure(
-    rows: list[dict[str, object]],
+    rows: list[TranscriptEvent],
     *,
     threshold: int = 2,
 ) -> AgentRepeatedFailure | None:
@@ -522,7 +519,7 @@ def _latest_repeated_failure(
         return None
 
     latest_payload = _payload_at(rows[latest_run_index])
-    if latest_payload is None or not _run_is_unresolved(latest_payload):
+    if not _run_is_unresolved(latest_payload):
         return None
     signature = _failure_signature(latest_payload)
     count = 0
@@ -531,12 +528,11 @@ def _latest_repeated_failure(
     retrieved_files = _string_tuple(latest_payload.get("retrieved_files"))
 
     for row in reversed(rows[: latest_run_index + 1]):
-        event = row.get("event")
+        event = row.event
         if event == "run_result":
             payload = _payload_at(row)
             if (
-                payload is None
-                or not _run_is_unresolved(payload)
+                not _run_is_unresolved(payload)
                 or _failure_signature(payload) != signature
             ):
                 break
@@ -556,9 +552,8 @@ def _latest_repeated_failure(
     )
 
 
-def _payload_at(row: dict[str, object]) -> dict[str, object] | None:
-    payload = row.get("payload")
-    return payload if isinstance(payload, dict) else None
+def _payload_at(row: TranscriptEvent) -> dict[str, object]:
+    return row.payload
 
 
 def _run_is_unresolved(payload: dict[str, object]) -> bool:
@@ -616,8 +611,8 @@ def _failure_signature(payload: dict[str, object]) -> str:
     )
 
 
-def _strategy_update_event(row: dict[str, object]) -> bool:
-    event = row.get("event")
+def _strategy_update_event(row: TranscriptEvent) -> bool:
+    event = row.event
     if event in {
         "agent_profile_update",
         "context_update",
@@ -628,9 +623,7 @@ def _strategy_update_event(row: dict[str, object]) -> bool:
     }:
         return True
     if event == "config_update":
-        payload = _payload_at(row)
-        if payload is None:
-            return False
+        payload = row.payload
         return _optional_str(payload.get("field")) in {
             "agent_profile",
             "deepagents_model",
@@ -642,13 +635,13 @@ def _strategy_update_event(row: dict[str, object]) -> bool:
 
 
 def _pending_planned_task(
-    rows: list[dict[str, object]],
+    rows: list[TranscriptEvent],
 ) -> tuple[str, int] | None:
     pending: tuple[str, int] | None = None
     for index, row in enumerate(rows):
-        event = row.get("event")
-        payload = row.get("payload")
-        if event == "plan_mode_task" and isinstance(payload, dict):
+        event = row.event
+        payload = row.payload
+        if event == "plan_mode_task":
             task = payload.get("task")
             if isinstance(task, str) and task.strip():
                 pending = (task.strip(), index)
@@ -659,7 +652,7 @@ def _pending_planned_task(
             "user_task",
         }:
             pending = None
-        elif event == "session_restore" and isinstance(payload, dict):
+        elif event == "session_restore":
             state = payload.get("state")
             if isinstance(state, dict):
                 task = state.get("pending_planned_task")

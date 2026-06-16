@@ -4,8 +4,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from patchsmith.session.events import TranscriptEvent
 from patchsmith.session.metrics import session_metrics, session_usage_payload
-from patchsmith.session.store import read_transcript_rows
+from patchsmith.session.store import read_known_transcript_events
 
 
 @dataclass(frozen=True)
@@ -32,7 +33,7 @@ def export_session_report(
 
 
 def session_markdown_report(transcript_path: Path) -> str:
-    rows = read_transcript_rows(transcript_path)
+    rows = read_known_transcript_events(transcript_path)
     usage = session_usage_payload(transcript_path)
     metrics = session_metrics(transcript_path)
     session_id = _first_text(rows, "session_id") or transcript_path.stem
@@ -155,7 +156,7 @@ def session_markdown_report(transcript_path: Path) -> str:
     context_events = [
         row
         for row in rows
-        if row.get("event")
+        if row.event
         in {
             "context_update",
             "config_update",
@@ -236,19 +237,15 @@ def _latest_run_lines(payload: dict[str, object]) -> list[str]:
     ]
 
 
-def _event_line(row: dict[str, object]) -> str:
-    event = _plain_text(row.get("event"))
-    payload = row.get("payload")
-    return f"- `{event}`: `{_plain_text(payload)}`"
+def _event_line(row: TranscriptEvent) -> str:
+    return f"- `{row.event}`: `{_plain_text(row.payload)}`"
 
 
-def _latest_config(rows: list[dict[str, object]]) -> dict[str, object] | None:
+def _latest_config(rows: list[TranscriptEvent]) -> dict[str, object] | None:
     config: dict[str, object] | None = None
     for row in rows:
-        event = row.get("event")
-        payload = row.get("payload")
-        if not isinstance(payload, dict):
-            continue
+        event = row.event
+        payload = row.payload
         if event == "session_start":
             value = payload.get("config")
             if isinstance(value, dict):
@@ -311,32 +308,38 @@ def _apply_config_update(
 
 
 def _payloads(
-    rows: list[dict[str, object]],
+    rows: list[TranscriptEvent],
     event: str,
 ) -> list[dict[str, object]]:
     payloads: list[dict[str, object]] = []
     for row in rows:
-        if row.get("event") != event:
+        if row.event != event:
             continue
-        payload = row.get("payload")
-        if isinstance(payload, dict):
-            payloads.append(payload)
+        payloads.append(row.payload)
     return payloads
 
 
 def _latest_payload(
-    rows: list[dict[str, object]],
+    rows: list[TranscriptEvent],
     event: str,
 ) -> dict[str, object] | None:
     payloads = _payloads(rows, event)
     return payloads[-1] if payloads else None
 
 
-def _first_text(rows: list[dict[str, object]], key: str) -> str | None:
+def _first_text(rows: list[TranscriptEvent], key: str) -> str | None:
     for row in rows:
-        value = row.get(key)
-        if isinstance(value, str):
+        value = _event_text_field(row, key)
+        if value:
             return value
+    return None
+
+
+def _event_text_field(row: TranscriptEvent, key: str) -> str | None:
+    if key == "timestamp":
+        return row.timestamp or None
+    if key == "session_id":
+        return row.session_id or None
     return None
 
 

@@ -679,6 +679,12 @@ Progress:
   DeepAgents, runtime, complex benchmark, issue corpus, portfolio, retrieval,
   patch safety, and shared model/artifact boundaries. `patchsmith release-gate`
   now checks that the ownership doc names the required boundary references.
+- 2026-06-16: Session metrics, summaries, timelines, Markdown reports,
+  recommendations, and chat resume hydration now consume decoded
+  `TranscriptEvent` rows through `read_known_transcript_events`, leaving the raw
+  JSONL reader as the compatibility boundary for malformed historical rows.
+  Migration coverage in `tests/session/test_transcript_migration.py` proves
+  valid legacy rows still feed reducers while unknown rows stay isolated.
 
 ### Phase 0: Stabilize
 

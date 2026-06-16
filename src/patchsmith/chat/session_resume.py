@@ -5,7 +5,6 @@ from dataclasses import replace as dataclass_replace
 from patchsmith.agent_apply import AgentApplyResult
 from patchsmith.agent_cli import AgentCliConfig
 from patchsmith.agent_plan import AgentPlanItem, plan_items_from_payload
-from patchsmith.agent_session import transcript_rows
 from patchsmith.chat.session_payloads import (
     apply_config_update,
     apply_result_from_payload,
@@ -19,6 +18,7 @@ from patchsmith.chat.session_payloads import (
     string_list_from_payload,
 )
 from patchsmith.chat.state import AgentChatRuntime, AgentChatState
+from patchsmith.session.store import read_known_transcript_events
 
 
 def runtime_from_transcript(
@@ -38,11 +38,9 @@ def runtime_from_transcript(
     feedback_items: list[str] = []
     chat_mode = "act"
     pending_planned_task: str | None = None
-    for row in transcript_rows(state.transcript_path):
-        event = row.get("event")
-        payload = row.get("payload")
-        if not isinstance(payload, dict):
-            continue
+    for row in read_known_transcript_events(state.transcript_path):
+        event = row.event
+        payload = row.payload
         if event == "session_start":
             config_payload = payload.get("config")
             if isinstance(config_payload, dict):
