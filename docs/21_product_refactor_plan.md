@@ -11,17 +11,17 @@ tests.
 
 ## Current Evidence
 
-- Source size: 283 Python files under `src/patchsmith`, about 59.8k lines.
-- Test size: 108 Python files under `tests`, about 34.6k lines.
+- Source size: 284 Python files under `src/patchsmith`, about 59.8k lines.
+- Test size: 109 Python files under `tests`, about 34.7k lines.
 - Largest source files:
   - `src/patchsmith/runtime/attempts.py`: 1108 lines.
-  - `src/patchsmith/cli/commands/run.py`: 738 lines.
   - `src/patchsmith/runtime/feedback.py`: 735 lines.
   - `src/patchsmith/session/recommendations.py`: 716 lines.
   - `src/patchsmith/evaluation/issue_corpus/public_issue_repairs.py`: 637 lines.
   - `src/patchsmith/evaluation/complex/summary.py`: 631 lines.
   - `src/patchsmith/workflow.py`: 625 lines.
   - `src/patchsmith/agent_cli.py`: 608 lines.
+  - `src/patchsmith/session/metrics.py`: 588 lines.
 - Largest tests:
   - `tests/test_agent_chat.py`: 3661 lines.
   - `tests/evaluation/test_runners.py`: 2608 lines.
@@ -30,8 +30,8 @@ tests.
   - `tests/test_cli.py`: 1770 lines.
 - Current validation:
   - `uv run ruff check src tests docs README.md`: passed.
-  - `uv run mypy src`: passed on 283 source files.
-  - `uv run pytest -q`: 736 passed.
+  - `uv run mypy src`: passed on 284 source files.
+  - `uv run pytest -q`: 738 passed.
 - Current local smoke:
   - `patchsmith chat` persisted a natural-language memory note and reloaded it
     from `.patchsmith/instructions.md`.
@@ -47,7 +47,7 @@ than the product actually is.
 | root modules | 89 | 18506 | Agent shell compatibility, DeepAgents, workflow, retrieval, patching, models, safety, and mixed helpers are still colocated. |
 | evaluation | 62 | 15132 | Rich benchmark functionality; the complex-suite runner is now thin, but CLI and issue-corpus flows still need simplification. |
 | portfolio | 52 | 9188 | Public status/evidence reporting is separated, but many modules are report-fragment style rather than domain services. |
-| cli | 28 | 5546 | Command surface is split by broad command groups, with model preflight, direct repository commands, and shared agent argument/config helpers now isolated; `run.py` still owns agent/chat/run handlers. |
+| cli | 29 | 5564 | Command surface is split by broad command groups, with model preflight, direct repository commands, chat/offline session actions, and shared agent argument/config helpers now isolated; `run.py` still owns agent and legacy run handlers. |
 | chat | 27 | 4085 | Command handlers, custom command fallback, command registry, task execution, resume hydration, controller lifecycle, hooks, transcript recording, terminal formatting, and shared replay helpers are split out. |
 | session | 9 | 2612 | Typed store/metrics/gates/reporting are split out behind compatibility exports. |
 | runtime | 6 | 2414 | Runtime execution is compact relative to evaluation/chat, but attempt and feedback modules are large. |
@@ -57,11 +57,11 @@ Top internal coupling hotspots by number of imported PatchSmith areas:
 
 | Module | Internal areas imported | Risk |
 | --- | ---: | --- |
-| `chat/controller.py` | 2 | Chat controller owns REPL/session glue, slash dispatch, and workflow callbacks while custom commands, registry assembly, hook execution, transcript writes, and terminal formatting are isolated. |
-| `cli/commands/run.py` | 13 | One CLI module still owns `agent`, `chat`, legacy `run` handlers, offline session actions, and agent model-preflight guard output, while shared agent args are isolated. |
 | `deepagents_planner.py` | 12 | Planner owns or coordinates nearly every DeepAgents concern. |
 | `workflow.py` | 12 | Main repair workflow imports analysis, planning, reporting, runtime, sandbox, tracing, and restore paths. |
 | `evaluation/runners/patch_search.py` | 11 | Evaluation runner is coupled to artifacts, context, ingestion, patching, reports, retrieval, and sandbox. |
+| `cli/commands/run.py` | 8 | CLI run module now owns only `agent` and legacy `run` handlers, while delegating shared args and interactive chat/session actions. |
+| `chat/controller.py` | 2 | Chat controller owns REPL/session glue, slash dispatch, and workflow callbacks while custom commands, registry assembly, hook execution, transcript writes, and terminal formatting are isolated. |
 
 Definition-count hotspots:
 
@@ -79,7 +79,8 @@ Definition-count hotspots:
 | `session/recommendations.py` | 25 | Recommendation policy is separated but still dense enough to split if new strategy hints keep growing. |
 | `evaluation/complex/summary.py` | 24 | Newly extracted summary aggregation and resource-budget accounting. |
 | `portfolio/_helpers.py` | 23 | Shared portfolio rendering helpers are still broad. |
-| `cli/commands/run.py` | 22 | CLI command execution remains a major product boundary. |
+| `retrieval_features.py` | 21 | Retrieval feature extraction remains broad. |
+| `agent_evidence.py` | 21 | Agent evidence helpers remain broad. |
 
 ## Findings
 
@@ -239,10 +240,11 @@ Acceptance criteria:
 
 ### P2: Split CLI Registration From Command Execution
 
-`cli/commands/run.py` still registers `agent`, `chat`, and legacy `run`, while
-also implementing argument validation, offline chat actions, config
-construction, preflight printing, session gating, and run output. The standalone
-model preflight and direct repository commands now live in dedicated modules.
+`cli/commands/run.py` still registers `agent` and legacy `run`, while also
+implementing non-interactive agent validation, agent preflight printing, and
+run output. The standalone model preflight, direct repository commands, chat
+command/offline session actions, and shared agent argument/config helpers now
+live in dedicated modules.
 
 Target shape:
 
@@ -540,6 +542,13 @@ Progress:
   `tests/test_cli_agent_args.py` pins defaults, profile merge behavior, missing
   profile errors, and issue-file loading; `cli/commands/run.py` is now 738
   lines and 22 top-level definitions.
+- 2026-06-16: The `chat` CLI command, scripted chat startup, saved-session
+  offline actions, project command/hook/profile/instruction listing, and
+  session gate/export helpers moved into `patchsmith.cli.commands.chat`.
+  `agent --interactive` now reuses that boundary for chat startup and offline
+  session actions. Focused coverage in `tests/test_cli_chat_command.py` pins
+  direct chat command registration and offline-action validation;
+  `cli/commands/run.py` is now 326 lines and 7 top-level definitions.
 - 2026-06-15: Phase 3 started by moving complex benchmark suite models,
   threshold/config resolution, spec loading, and suite input preflight into
   `patchsmith.evaluation.complex.models` and

@@ -6,6 +6,7 @@ import argparse
 
 from patchsmith.cli._types import CommandHandler
 from patchsmith.cli.commands import (
+    chat,
     demo,
     evals,
     issue_corpus,
@@ -18,6 +19,7 @@ from patchsmith.cli.commands import (
 
 _COMMAND_MODULES = (
     run,
+    chat,
     model_preflight,
     repository,
     demo,

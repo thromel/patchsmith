@@ -641,7 +641,7 @@ def test_agent_command_rejects_prompt_and_issue_file(tmp_path, capsys) -> None:
 
 
 def test_chat_command_starts_interactive_session(monkeypatch) -> None:
-    import patchsmith.cli.commands.run as run_commands
+    import patchsmith.cli.commands.chat as chat_commands
 
     captured: dict[str, object] = {}
 
@@ -664,7 +664,7 @@ def test_chat_command_starts_interactive_session(monkeypatch) -> None:
         captured["resume"] = resume
         return 0
 
-    monkeypatch.setattr(run_commands, "run_chat_session", fake_run_chat_session)
+    monkeypatch.setattr(chat_commands, "run_chat_session", fake_run_chat_session)
 
     exit_code = main(
         [
@@ -687,12 +687,12 @@ def test_chat_command_starts_interactive_session(monkeypatch) -> None:
     assert config.deepagents_model == "gpt-5-mini"
     assert captured["session_id"] is None
     assert captured["resume"] is False
-    assert captured["runner_cls"] is run_commands.RepairRunner
-    assert captured["model_preflight_checker"] is run_commands._openai_model_preflight_for_config
+    assert captured["runner_cls"] is chat_commands.RepairRunner
+    assert captured["model_preflight_checker"] is chat_commands._openai_model_preflight_for_config
 
 
 def test_chat_command_resumes_named_session(monkeypatch) -> None:
-    import patchsmith.cli.commands.run as run_commands
+    import patchsmith.cli.commands.chat as chat_commands
 
     captured: dict[str, object] = {}
 
@@ -714,7 +714,7 @@ def test_chat_command_resumes_named_session(monkeypatch) -> None:
         captured["resume"] = resume
         return 0
 
-    monkeypatch.setattr(run_commands, "run_chat_session", fake_run_chat_session)
+    monkeypatch.setattr(chat_commands, "run_chat_session", fake_run_chat_session)
 
     exit_code = main(["chat", "--repo", ".", "--resume", "session-123"])
 
@@ -722,7 +722,7 @@ def test_chat_command_resumes_named_session(monkeypatch) -> None:
     assert captured["initial_prompt"] == ""
     assert captured["session_id"] == "session-123"
     assert captured["resume"] is True
-    assert captured["model_preflight_checker"] is run_commands._openai_model_preflight_for_config
+    assert captured["model_preflight_checker"] is chat_commands._openai_model_preflight_for_config
     assert captured["config"].repo == "."
 
 
@@ -1288,7 +1288,7 @@ def test_chat_command_reads_script_file(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import patchsmith.cli.commands.run as run_commands
+    import patchsmith.cli.commands.chat as chat_commands
 
     script_path = tmp_path / "session.patchsmith"
     script_path.write_text("/status\n/exit\n", encoding="utf-8")
@@ -1312,7 +1312,7 @@ def test_chat_command_reads_script_file(
         captured["resume"] = resume
         return 0
 
-    monkeypatch.setattr(run_commands, "run_chat_session", fake_run_chat_session)
+    monkeypatch.setattr(chat_commands, "run_chat_session", fake_run_chat_session)
 
     exit_code = main(["chat", "--repo", ".", "--script", str(script_path)])
 
@@ -1331,7 +1331,7 @@ def test_chat_command_rejects_missing_script(tmp_path: Path, capsys) -> None:
 
 
 def test_agent_interactive_starts_chat_without_prompt(monkeypatch) -> None:
-    import patchsmith.cli.commands.run as run_commands
+    import patchsmith.cli.commands.chat as chat_commands
 
     captured: dict[str, object] = {}
 
@@ -1352,7 +1352,7 @@ def test_agent_interactive_starts_chat_without_prompt(monkeypatch) -> None:
         captured["resume"] = resume
         return 0
 
-    monkeypatch.setattr(run_commands, "run_chat_session", fake_run_chat_session)
+    monkeypatch.setattr(chat_commands, "run_chat_session", fake_run_chat_session)
 
     exit_code = main(["agent", "--interactive", "--repo", "."])
 
@@ -1364,7 +1364,7 @@ def test_agent_interactive_starts_chat_without_prompt(monkeypatch) -> None:
 
 
 def test_agent_interactive_can_resume_named_session(monkeypatch) -> None:
-    import patchsmith.cli.commands.run as run_commands
+    import patchsmith.cli.commands.chat as chat_commands
 
     captured: dict[str, object] = {}
 
@@ -1385,7 +1385,7 @@ def test_agent_interactive_can_resume_named_session(monkeypatch) -> None:
         captured["resume"] = resume
         return 0
 
-    monkeypatch.setattr(run_commands, "run_chat_session", fake_run_chat_session)
+    monkeypatch.setattr(chat_commands, "run_chat_session", fake_run_chat_session)
 
     exit_code = main(["agent", "--interactive", "--repo", ".", "--resume", "session-123"])
 
