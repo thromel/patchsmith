@@ -117,9 +117,7 @@ def resource_budget_pressure_reason(
 
 
 def resource_budget_response_limit(resource_budget: Mapping[str, int]) -> int | None:
-    remaining = optional_nonnegative_resource_int(
-        resource_budget.get("remaining_model_responses")
-    )
+    remaining = optional_nonnegative_resource_int(resource_budget.get("remaining_model_responses"))
     if remaining is not None:
         return remaining
     return optional_nonnegative_resource_int(resource_budget.get("max_model_responses"))
@@ -133,9 +131,7 @@ def is_budget_critical(resource_budget: Mapping[str, int] | None) -> bool:
 
 
 def resource_budget_token_limit(resource_budget: Mapping[str, int]) -> int | None:
-    remaining = optional_nonnegative_resource_int(
-        resource_budget.get("remaining_model_tokens")
-    )
+    remaining = optional_nonnegative_resource_int(resource_budget.get("remaining_model_tokens"))
     if remaining is not None:
         return remaining
     return optional_nonnegative_resource_int(resource_budget.get("max_model_tokens"))
@@ -161,8 +157,7 @@ def estimate_resource_budget_cost(
     ):
         return None
     return (
-        input_tokens * config.input_cost_per_1m
-        + output_tokens * config.output_cost_per_1m
+        input_tokens * config.input_cost_per_1m + output_tokens * config.output_cost_per_1m
     ) / 1_000_000
 
 

@@ -19,9 +19,8 @@ from patchsmith.evaluation.complex.thresholds import (
 T = TypeVar("T")
 
 DEFAULT_COMPLEX_BENCHMARK = "public_issue_repair_attempts"
-DEFAULT_COMPLEX_SUITE_OUTPUT_DIR = Path(
-    "artifacts/experiments/complex_deepagents_suite_v1"
-)
+DEFAULT_COMPLEX_SUITE_OUTPUT_DIR = Path("artifacts/experiments/complex_deepagents_suite_v1")
+
 
 def resolve_complex_benchmark_suite_thresholds(
     *,
@@ -135,8 +134,7 @@ def resolve_complex_benchmark_suite_config(
             if suite_spec
             else DEFAULT_COMPLEX_BENCHMARK
         ),
-        attempt_dirs=tuple(attempt_dirs or ())
-        or (suite_spec.attempt_dirs if suite_spec else ()),
+        attempt_dirs=tuple(attempt_dirs or ()) or (suite_spec.attempt_dirs if suite_spec else ()),
         output_dir=(
             output_dir
             or (suite_spec.output_dir if suite_spec and suite_spec.output_dir else None)
@@ -236,7 +234,9 @@ def _explicit_or_spec(explicit_value: T | None, spec_value: T | None) -> T | Non
 
 def _required_path_list(value: Any, field_name: str) -> tuple[Path, ...]:
     if not isinstance(value, list) or not value:
-        raise ValueError(f"complex benchmark suite spec field {field_name} must be a non-empty list")
+        raise ValueError(
+            f"complex benchmark suite spec field {field_name} must be a non-empty list"
+        )
     paths: list[Path] = []
     for index, item in enumerate(value):
         text = _optional_spec_string(item)
@@ -310,9 +310,7 @@ def _optional_spec_rate(value: Any, field_name: str) -> float | None:
     if parsed is None:
         return None
     if parsed < 0.0 or parsed > 1.0:
-        raise ValueError(
-            f"complex benchmark suite spec field {field_name} must be between 0 and 1"
-        )
+        raise ValueError(f"complex benchmark suite spec field {field_name} must be between 0 and 1")
     return parsed
 
 
@@ -321,9 +319,7 @@ def _optional_spec_nonnegative_float(value: Any, field_name: str) -> float | Non
     if parsed is None:
         return None
     if parsed < 0.0:
-        raise ValueError(
-            f"complex benchmark suite spec field {field_name} must be non-negative"
-        )
+        raise ValueError(f"complex benchmark suite spec field {field_name} must be non-negative")
     return parsed
 
 
@@ -333,9 +329,7 @@ def _optional_spec_nonnegative_int(value: Any, field_name: str) -> int | None:
     if isinstance(value, bool) or not isinstance(value, int):
         raise ValueError(f"complex benchmark suite spec field {field_name} must be an integer")
     if value < 0:
-        raise ValueError(
-            f"complex benchmark suite spec field {field_name} must be non-negative"
-        )
+        raise ValueError(f"complex benchmark suite spec field {field_name} must be non-negative")
     return value
 
 
@@ -357,9 +351,7 @@ def _validate_optional_rate_threshold(value: object, field_name: str) -> None:
         return
     parsed = _validate_number_threshold(value, field_name)
     if parsed < 0.0 or parsed > 1.0:
-        raise ValueError(
-            f"complex benchmark suite threshold {field_name} must be between 0 and 1"
-        )
+        raise ValueError(f"complex benchmark suite threshold {field_name} must be between 0 and 1")
 
 
 def _validate_optional_nonnegative_float_threshold(
@@ -370,9 +362,7 @@ def _validate_optional_nonnegative_float_threshold(
         return
     parsed = _validate_number_threshold(value, field_name)
     if parsed < 0.0:
-        raise ValueError(
-            f"complex benchmark suite threshold {field_name} must be non-negative"
-        )
+        raise ValueError(f"complex benchmark suite threshold {field_name} must be non-negative")
 
 
 def _validate_optional_nonnegative_int_threshold(
@@ -382,18 +372,12 @@ def _validate_optional_nonnegative_int_threshold(
     if value is None:
         return
     if isinstance(value, bool) or not isinstance(value, int):
-        raise ValueError(
-            f"complex benchmark suite threshold {field_name} must be an integer"
-        )
+        raise ValueError(f"complex benchmark suite threshold {field_name} must be an integer")
     if value < 0:
-        raise ValueError(
-            f"complex benchmark suite threshold {field_name} must be non-negative"
-        )
+        raise ValueError(f"complex benchmark suite threshold {field_name} must be non-negative")
 
 
 def _validate_number_threshold(value: object, field_name: str) -> float:
     if isinstance(value, bool) or not isinstance(value, int | float):
-        raise ValueError(
-            f"complex benchmark suite threshold {field_name} must be a number"
-        )
+        raise ValueError(f"complex benchmark suite threshold {field_name} must be a number")
     return float(value)

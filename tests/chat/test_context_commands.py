@@ -61,9 +61,7 @@ def test_context_command_updates_runtime_context_paths(tmp_path: Path) -> None:
         output_stream=duplicate_output,
         context=ChatCommandContext(record=_record_to(events)),
     )
-    assert duplicate_output.getvalue() == (
-        "Context already includes: src/simple_calc.py#add\n"
-    )
+    assert duplicate_output.getvalue() == ("Context already includes: src/simple_calc.py#add\n")
     assert len(events) == 1
 
     remove_output = io.StringIO()
@@ -122,9 +120,7 @@ def test_context_command_prints_usage_for_missing_or_unknown_actions(
         output_stream=remove_output,
         context=ChatCommandContext(record=_record_to(events)),
     )
-    assert remove_output.getvalue() == (
-        "Usage: /context remove <repo-relative-path[#symbol]>\n"
-    )
+    assert remove_output.getvalue() == ("Usage: /context remove <repo-relative-path[#symbol]>\n")
 
     unknown_output = io.StringIO()
     command.handler(

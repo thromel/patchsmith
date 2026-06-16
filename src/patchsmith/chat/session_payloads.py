@@ -51,12 +51,8 @@ def checkpoint_state_payload(runtime: AgentChatRuntime) -> dict[str, object]:
         "plan_items": plan_items_payload(runtime.plan_items or []),
         "feedback_items": list(runtime.feedback_items or []),
         "last_run_payload": runtime.last_run_payload,
-        "last_apply": (
-            runtime.last_apply.to_dict() if runtime.last_apply is not None else None
-        ),
-        "last_rewind": (
-            runtime.last_rewind.to_dict() if runtime.last_rewind is not None else None
-        ),
+        "last_apply": (runtime.last_apply.to_dict() if runtime.last_apply is not None else None),
+        "last_rewind": (runtime.last_rewind.to_dict() if runtime.last_rewind is not None else None),
         "compaction_summary": runtime.compaction_summary,
     }
 

@@ -91,11 +91,7 @@ class ManifestContents:
         object.__setattr__(
             self,
             "contents",
-            {
-                key: value
-                for key, value in self.contents.items()
-                if key in _MANIFEST_KEYS
-            },
+            {key: value for key, value in self.contents.items() if key in _MANIFEST_KEYS},
         )
 
     @classmethod
@@ -276,8 +272,7 @@ MANIFEST_DEFINITIONS: tuple[ManifestDefinition, ...] = (
 
 _MANIFEST_KEYS = {definition.key for definition in MANIFEST_DEFINITIONS}
 _DEFINITIONS_BY_KEY = {
-    definition.key: definition
-    for definition in (*CORE_DEFINITIONS, *MANIFEST_DEFINITIONS)
+    definition.key: definition for definition in (*CORE_DEFINITIONS, *MANIFEST_DEFINITIONS)
 }
 
 

@@ -157,15 +157,11 @@ def _result(
         deepagents_virtual_file_count=deepagents_virtual_file_count,
         deepagents_context_budgeted=deepagents_context_budgeted,
         deepagents_max_context_files=deepagents_max_context_files,
-        deepagents_context_budget_omitted_file_count=(
-            deepagents_context_budget_omitted_file_count
-        ),
+        deepagents_context_budget_omitted_file_count=(deepagents_context_budget_omitted_file_count),
         deepagents_resource_budgeted=deepagents_resource_budgeted,
         deepagents_resource_budget_max_model_responses=(
             deepagents_resource_budget_max_model_responses
         ),
-        deepagents_resource_budget_max_model_tokens=(
-            deepagents_resource_budget_max_model_tokens
-        ),
+        deepagents_resource_budget_max_model_tokens=(deepagents_resource_budget_max_model_tokens),
         agent_trajectory_score=agent_trajectory_score,
     )

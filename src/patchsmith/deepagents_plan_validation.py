@@ -279,9 +279,7 @@ def _target_symbol_policy_violation(
     if path is None:
         return None
     normalized_path = path.strip().lstrip("/")
-    symbols = _ordered_unique_symbols(
-        preferred_target_symbols.get(normalized_path, [])
-    )
+    symbols = _ordered_unique_symbols(preferred_target_symbols.get(normalized_path, []))
     if not symbols:
         return None
     old_span = _payload_string(payload, "old") or ""
@@ -343,9 +341,7 @@ def _old_span_is_inside_preferred_symbol(
     except SyntaxError:
         return False
     preferred_bases = {
-        symbol.rsplit(".", maxsplit=1)[-1].strip()
-        for symbol in preferred_symbols
-        if symbol.strip()
+        symbol.rsplit(".", maxsplit=1)[-1].strip() for symbol in preferred_symbols if symbol.strip()
     }
     if not preferred_bases:
         return False
@@ -355,11 +351,7 @@ def _old_span_is_inside_preferred_symbol(
         if node.name not in preferred_bases:
             continue
         node_end = getattr(node, "end_lineno", None)
-        if (
-            node.lineno <= start_line
-            and isinstance(node_end, int)
-            and end_line <= node_end
-        ):
+        if node.lineno <= start_line and isinstance(node_end, int) and end_line <= node_end:
             return True
     return False
 

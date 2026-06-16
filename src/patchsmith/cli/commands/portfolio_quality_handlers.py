@@ -57,9 +57,7 @@ def _quality_gate_command(args: argparse.Namespace) -> int:
 def _release_gate_command(args: argparse.Namespace) -> int:
     json_output_path = Path(args.json_output) if args.json_output else None
     logs_dir = Path(args.logs_dir) if args.logs_dir else None
-    benchmark_results_path = (
-        Path(args.benchmark_results) if args.benchmark_results else None
-    )
+    benchmark_results_path = Path(args.benchmark_results) if args.benchmark_results else None
     report = write_release_gate_report(
         project_root=Path(args.project_root),
         artifacts_dir=Path(args.artifacts_dir),
@@ -147,19 +145,13 @@ def _refresh_evidence_command(args: argparse.Namespace) -> int:
         complex_suite_spec_path=(
             Path(args.complex_suite_spec) if args.complex_suite_spec else None
         ),
-        complex_suite_attempt_dirs=tuple(
-            Path(path) for path in args.complex_suite_attempt_dir
-        ),
+        complex_suite_attempt_dirs=tuple(Path(path) for path in args.complex_suite_attempt_dir),
         complex_suite_output_dir=(
-            Path(args.complex_suite_output_dir)
-            if args.complex_suite_output_dir
-            else None
+            Path(args.complex_suite_output_dir) if args.complex_suite_output_dir else None
         ),
         complex_suite_benchmark=args.complex_suite_benchmark,
         complex_suite_min_validation_rate=args.complex_suite_min_validation_rate,
-        complex_suite_min_live_provider_tasks=(
-            args.complex_suite_min_live_provider_tasks
-        ),
+        complex_suite_min_live_provider_tasks=(args.complex_suite_min_live_provider_tasks),
         complex_suite_min_unique_tasks=args.complex_suite_min_unique_tasks,
         complex_suite_max_selected_cost_per_validated_task_usd=(
             args.complex_suite_max_selected_cost_per_validated_task_usd
@@ -176,9 +168,7 @@ def _refresh_evidence_command(args: argparse.Namespace) -> int:
         complex_suite_max_selected_responses_per_virtual_file=(
             args.complex_suite_max_selected_responses_per_virtual_file
         ),
-        complex_suite_min_selected_progress_score=(
-            args.complex_suite_min_selected_progress_score
-        ),
+        complex_suite_min_selected_progress_score=(args.complex_suite_min_selected_progress_score),
         complex_suite_min_selected_context_target_recall=(
             args.complex_suite_min_selected_context_target_recall
         ),
@@ -200,21 +190,15 @@ def _refresh_evidence_command(args: argparse.Namespace) -> int:
         complex_suite_min_acceptance_rubric_alignment_rate=(
             args.complex_suite_min_acceptance_rubric_alignment_rate
         ),
-        complex_suite_min_agent_trajectory_score=(
-            args.complex_suite_min_agent_trajectory_score
-        ),
+        complex_suite_min_agent_trajectory_score=(args.complex_suite_min_agent_trajectory_score),
         complex_suite_min_contextual_verifier_rate=(
             args.complex_suite_min_contextual_verifier_rate
         ),
-        complex_suite_min_process_quality_score=(
-            args.complex_suite_min_process_quality_score
-        ),
+        complex_suite_min_process_quality_score=(args.complex_suite_min_process_quality_score),
         complex_suite_max_process_risky_validated_tasks=(
             args.complex_suite_max_process_risky_validated_tasks
         ),
-        complex_suite_min_target_alignment_rate=(
-            args.complex_suite_min_target_alignment_rate
-        ),
+        complex_suite_min_target_alignment_rate=(args.complex_suite_min_target_alignment_rate),
     )
     if args.json:
         print_json_payload(

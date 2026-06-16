@@ -108,9 +108,7 @@ def _set_apply_permission(
     updated_config = dataclass_replace(
         runtime.state.config,
         apply=apply_after_run,
-        allow_dirty_apply=(
-            runtime.state.config.allow_dirty_apply if apply_after_run else False
-        ),
+        allow_dirty_apply=(runtime.state.config.allow_dirty_apply if apply_after_run else False),
     )
     runtime.state = dataclass_replace(runtime.state, config=updated_config)
     context.record(runtime, "config_update", _permission_update_payload(updated_config))

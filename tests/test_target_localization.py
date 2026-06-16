@@ -54,9 +54,7 @@ def test_target_localization_ranks_import_cache_source_target_over_raw_order() -
             ),
             _context(
                 "src/_pytest/assertion/rewrite.py",
-                "def _read_pyc(source, pyc):\n"
-                "    co = marshal.load(fp)\n"
-                "    return co\n",
+                "def _read_pyc(source, pyc):\n    co = marshal.load(fp)\n    return co\n",
             ),
         ],
     )
@@ -100,8 +98,7 @@ def test_target_localization_can_include_historical_targets_after_new_targets() 
         retrieved_context=[
             _context(
                 "src/_pytest/pathlib.py",
-                "module_name = module_name_from_path(path)\n"
-                "return sys.modules[module_name]\n",
+                "module_name = module_name_from_path(path)\nreturn sys.modules[module_name]\n",
             ),
             _context(
                 "src/_pytest/assertion/rewrite.py",
@@ -146,8 +143,7 @@ def test_target_localization_prefers_stale_path_control_point_on_retry() -> None
             ),
             _context(
                 "src/_pytest/pathlib.py",
-                "with contextlib.suppress(KeyError):\n"
-                "    return sys.modules[module_name]\n",
+                "with contextlib.suppress(KeyError):\n    return sys.modules[module_name]\n",
                 score=1.0,
             ),
         ],
@@ -197,9 +193,7 @@ def test_target_localization_prefers_symbol_control_point_over_generic_retry_noi
         retrieved_context=[
             _context(
                 "src/_pytest/config/__init__.py",
-                "def parse(args):\n"
-                "    if cached and co_filename:\n"
-                "        return config\n",
+                "def parse(args):\n    if cached and co_filename:\n        return config\n",
                 score=40.0,
                 matched_terms=noisy_terms,
             ),
@@ -242,7 +236,7 @@ def test_target_localization_revives_reviewed_source_hint_with_exact_identifier(
             _context(
                 "src/requests/exceptions.py",
                 "class ChunkedEncodingError(RequestException):\n"
-                "    \"\"\"The server declared chunked encoding but sent an invalid chunk.\"\"\"\n",
+                '    """The server declared chunked encoding but sent an invalid chunk."""\n',
                 score=1.0,
                 matched_terms=[
                     "reviewed_source_hint",

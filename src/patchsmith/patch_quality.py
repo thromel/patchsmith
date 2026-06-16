@@ -257,7 +257,9 @@ def _documentation_semantic_regression_findings(
     if len(missing_terms) / len(old_terms) < 0.3:
         return []
     severity = "medium" if implementation_changed else "high"
-    scope = "implementation replacement" if implementation_changed else "documentation-only replacement"
+    scope = (
+        "implementation replacement" if implementation_changed else "documentation-only replacement"
+    )
     return [
         PatchQualityFinding(
             code="documentation_semantic_regression",
@@ -369,9 +371,7 @@ def _import_cache_invalidation_count(text: str) -> int:
 def _added_stripped_lines(*, old: str, new: str) -> list[str]:
     old_lines = {line.strip() for line in old.splitlines() if line.strip()}
     return [
-        line.strip()
-        for line in new.splitlines()
-        if line.strip() and line.strip() not in old_lines
+        line.strip() for line in new.splitlines() if line.strip() and line.strip() not in old_lines
     ]
 
 
@@ -446,10 +446,13 @@ def _is_broad_exception_handler(line: str) -> bool:
         stripped,
     ):
         return True
-    return re.match(
-        r"except\s*\([^)]*\b(?:Exception|BaseException)\b[^)]*\)\s*:",
-        stripped,
-    ) is not None
+    return (
+        re.match(
+            r"except\s*\([^)]*\b(?:Exception|BaseException)\b[^)]*\)\s*:",
+            stripped,
+        )
+        is not None
+    )
 
 
 def _handler_suppresses_exception(

@@ -69,18 +69,14 @@ def test_release_gate_runs_help_export_and_saved_benchmark_checks(
     assert calls[2][-1] == "--help"
     assert calls[3][-2:] == ["agent", "--help"]
     assert calls[4][-2:] == ["chat", "--help"]
-    assert (tmp_path / "release_gate.md").read_text(encoding="utf-8").startswith(
-        "# PatchSmith Release Gate Report"
+    assert (
+        (tmp_path / "release_gate.md")
+        .read_text(encoding="utf-8")
+        .startswith("# PatchSmith Release Gate Report")
     )
     payload = json.loads((tmp_path / "release_gate.json").read_text(encoding="utf-8"))
     assert payload["release_status"] == "passed_with_skips"
-    assert (
-        tmp_path
-        / "artifacts"
-        / "experiments"
-        / "release_gate"
-        / "sample_session.md"
-    ).is_file()
+    assert (tmp_path / "artifacts" / "experiments" / "release_gate" / "sample_session.md").is_file()
     benchmark_check = next(
         check for check in report.checks if check.name == "Saved benchmark suite validation"
     )

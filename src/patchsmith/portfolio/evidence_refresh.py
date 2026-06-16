@@ -92,40 +92,22 @@ def build_evidence_refresh_report(
         max_selected_virtual_files_per_validated_task=(
             complex_suite_max_selected_virtual_files_per_validated_task
         ),
-        max_selected_tokens_per_virtual_file=(
-            complex_suite_max_selected_tokens_per_virtual_file
-        ),
+        max_selected_tokens_per_virtual_file=(complex_suite_max_selected_tokens_per_virtual_file),
         max_selected_responses_per_virtual_file=(
             complex_suite_max_selected_responses_per_virtual_file
         ),
         min_selected_progress_score=complex_suite_min_selected_progress_score,
-        min_selected_context_target_recall=(
-            complex_suite_min_selected_context_target_recall
-        ),
-        min_selected_context_target_precision=(
-            complex_suite_min_selected_context_target_precision
-        ),
-        min_repo_instructions_manifest_rate=(
-            complex_suite_min_repo_instructions_manifest_rate
-        ),
-        min_repo_instructions_read_first_rate=(
-            complex_suite_min_repo_instructions_read_first_rate
-        ),
-        min_acceptance_rubric_manifest_rate=(
-            complex_suite_min_acceptance_rubric_manifest_rate
-        ),
-        min_acceptance_rubric_read_first_rate=(
-            complex_suite_min_acceptance_rubric_read_first_rate
-        ),
-        min_acceptance_rubric_alignment_rate=(
-            complex_suite_min_acceptance_rubric_alignment_rate
-        ),
+        min_selected_context_target_recall=(complex_suite_min_selected_context_target_recall),
+        min_selected_context_target_precision=(complex_suite_min_selected_context_target_precision),
+        min_repo_instructions_manifest_rate=(complex_suite_min_repo_instructions_manifest_rate),
+        min_repo_instructions_read_first_rate=(complex_suite_min_repo_instructions_read_first_rate),
+        min_acceptance_rubric_manifest_rate=(complex_suite_min_acceptance_rubric_manifest_rate),
+        min_acceptance_rubric_read_first_rate=(complex_suite_min_acceptance_rubric_read_first_rate),
+        min_acceptance_rubric_alignment_rate=(complex_suite_min_acceptance_rubric_alignment_rate),
         min_agent_trajectory_score=complex_suite_min_agent_trajectory_score,
         min_contextual_verifier_rate=complex_suite_min_contextual_verifier_rate,
         min_process_quality_score=complex_suite_min_process_quality_score,
-        max_process_risky_validated_tasks=(
-            complex_suite_max_process_risky_validated_tasks
-        ),
+        max_process_risky_validated_tasks=(complex_suite_max_process_risky_validated_tasks),
         min_target_alignment_rate=complex_suite_min_target_alignment_rate,
         default_output_dir=artifacts_dir / "experiments" / "complex_benchmark_suite",
     )
@@ -237,9 +219,7 @@ def write_evidence_refresh_report(
         complex_suite_max_selected_responses_per_virtual_file=(
             complex_suite_max_selected_responses_per_virtual_file
         ),
-        complex_suite_min_selected_progress_score=(
-            complex_suite_min_selected_progress_score
-        ),
+        complex_suite_min_selected_progress_score=(complex_suite_min_selected_progress_score),
         complex_suite_min_selected_context_target_recall=(
             complex_suite_min_selected_context_target_recall
         ),
@@ -262,12 +242,8 @@ def write_evidence_refresh_report(
             complex_suite_min_acceptance_rubric_alignment_rate
         ),
         complex_suite_min_agent_trajectory_score=complex_suite_min_agent_trajectory_score,
-        complex_suite_min_contextual_verifier_rate=(
-            complex_suite_min_contextual_verifier_rate
-        ),
-        complex_suite_min_process_quality_score=(
-            complex_suite_min_process_quality_score
-        ),
+        complex_suite_min_contextual_verifier_rate=(complex_suite_min_contextual_verifier_rate),
+        complex_suite_min_process_quality_score=(complex_suite_min_process_quality_score),
         complex_suite_max_process_risky_validated_tasks=(
             complex_suite_max_process_risky_validated_tasks
         ),

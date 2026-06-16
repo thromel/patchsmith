@@ -95,11 +95,7 @@ def _normalize_preflight_gates(
     normalized: list[dict[str, str]] = []
     for gate in gates or []:
         normalized.append(
-            {
-                str(key): str(value)
-                for key, value in gate.items()
-                if value is not None
-            }
+            {str(key): str(value) for key, value in gate.items() if value is not None}
         )
     return normalized
 

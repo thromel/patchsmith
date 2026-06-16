@@ -73,9 +73,7 @@ def test_format_session_timeline_keeps_agent_session_compatibility(
     compatibility_entries = compatibility_session_timeline(transcript_path, limit=0)
 
     assert compatibility_entries == entries
-    assert format_session_timeline(entries) == compatibility_format_session_timeline(
-        entries
-    )
+    assert format_session_timeline(entries) == compatibility_format_session_timeline(entries)
     text = format_session_timeline(entries)
     assert text.startswith("Session timeline:")
     assert "2026-06-15T00:00:00 | session_start | repo=/repo" in text

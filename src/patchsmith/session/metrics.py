@@ -179,9 +179,7 @@ def _session_usage_payload(events: list[TranscriptEvent]) -> dict[str, object]:
         elif event == "run_result":
             payload["run_count"] = _increment_int(payload["run_count"])
             if row_payload.get("test_exit_code") == 0:
-                payload["validated_run_count"] = _increment_int(
-                    payload["validated_run_count"]
-                )
+                payload["validated_run_count"] = _increment_int(payload["validated_run_count"])
             _add_usage(payload, row_payload)
         elif event == "run_error":
             payload["run_error_count"] = _increment_int(payload["run_error_count"])
@@ -468,10 +466,7 @@ def format_session_metrics(metrics: AgentSessionMetrics) -> str:
             f"- Model responses: {metrics.model_response_count}",
             f"- Model tokens: {metrics.model_total_tokens}",
             f"- Estimated cost: {_format_cost(metrics.estimated_cost_usd)}",
-            (
-                "- Cost per validated run: "
-                f"{_format_cost(metrics.cost_per_validated_run_usd)}"
-            ),
+            (f"- Cost per validated run: {_format_cost(metrics.cost_per_validated_run_usd)}"),
         ]
     )
 
@@ -506,9 +501,7 @@ def _current_session_quality_window(
             ready_apply_checks += 1
     return {
         "diff_review_count": len(diff_reviews),
-        "diff_review_high_count": (
-            1 if latest_review_payload.get("risk_level") == "high" else 0
-        ),
+        "diff_review_high_count": (1 if latest_review_payload.get("risk_level") == "high" else 0),
         "apply_check_ready_count": ready_apply_checks,
     }
 

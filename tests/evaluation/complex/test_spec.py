@@ -32,16 +32,22 @@ def test_threshold_registry_matches_model_fields() -> None:
     assert tuple(field.name for field in fields(ComplexBenchmarkSuiteThresholds)) == (
         COMPLEX_BENCHMARK_SUITE_THRESHOLD_NAMES
     )
-    assert tuple(
-        field.name
-        for field in fields(ComplexBenchmarkSuiteSpec)
-        if field.name in threshold_names
-    ) == COMPLEX_BENCHMARK_SUITE_THRESHOLD_NAMES
-    assert tuple(
-        field.name
-        for field in fields(ComplexBenchmarkSuiteGate)
-        if field.name in threshold_names
-    ) == COMPLEX_BENCHMARK_SUITE_THRESHOLD_NAMES
+    assert (
+        tuple(
+            field.name
+            for field in fields(ComplexBenchmarkSuiteSpec)
+            if field.name in threshold_names
+        )
+        == COMPLEX_BENCHMARK_SUITE_THRESHOLD_NAMES
+    )
+    assert (
+        tuple(
+            field.name
+            for field in fields(ComplexBenchmarkSuiteGate)
+            if field.name in threshold_names
+        )
+        == COMPLEX_BENCHMARK_SUITE_THRESHOLD_NAMES
+    )
 
 
 def test_load_complex_benchmark_suite_spec_parses_thresholds(tmp_path: Path) -> None:
@@ -144,9 +150,7 @@ def test_threshold_validation_rejects_invalid_values() -> None:
 
 
 def test_runner_keeps_legacy_suite_spec_exports() -> None:
-    assert runner_complex.load_complex_benchmark_suite_spec is (
-        load_complex_benchmark_suite_spec
-    )
+    assert runner_complex.load_complex_benchmark_suite_spec is (load_complex_benchmark_suite_spec)
     assert runner_complex.resolve_complex_benchmark_suite_config is (
         resolve_complex_benchmark_suite_config
     )

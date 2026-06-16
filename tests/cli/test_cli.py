@@ -364,6 +364,7 @@ def test_agent_command_loads_project_instructions_into_request(
 def test_agent_preflight_reports_config_without_running(
     monkeypatch,
     capsys,
+    deepagents_dependency_available: None,
 ) -> None:
     import patchsmith.cli.commands.agent as agent_commands
 
@@ -413,16 +414,12 @@ def test_agent_preflight_reports_config_without_running(
         "apply_target": "skipped",
     }
     deepagents_headroom_check = next(
-        check
-        for check in payload["checks"]
-        if check["name"] == "deepagents_token_headroom"
+        check for check in payload["checks"] if check["name"] == "deepagents_token_headroom"
     )
     assert deepagents_headroom_check["max_model_tokens"] == 200000
     assert deepagents_headroom_check["recommended_min_tokens"] == 90000
     headroom_check = next(
-        check
-        for check in payload["checks"]
-        if check["name"] == "reasoning_token_headroom"
+        check for check in payload["checks"] if check["name"] == "reasoning_token_headroom"
     )
     assert headroom_check["reasoning_model"] is True
     assert headroom_check["max_model_tokens"] == 200000
@@ -432,6 +429,7 @@ def test_agent_preflight_reports_config_without_running(
 def test_agent_preflight_warns_for_low_reasoning_token_headroom(
     monkeypatch,
     capsys,
+    deepagents_dependency_available: None,
 ) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
 
@@ -452,9 +450,7 @@ def test_agent_preflight_warns_for_low_reasoning_token_headroom(
     assert exit_code == 0
     assert payload["status"] == "passed"
     headroom_check = next(
-        check
-        for check in payload["checks"]
-        if check["name"] == "reasoning_token_headroom"
+        check for check in payload["checks"] if check["name"] == "reasoning_token_headroom"
     )
     assert headroom_check["status"] == "passed"
     assert headroom_check["severity"] == "warning"
@@ -466,6 +462,7 @@ def test_agent_preflight_warns_for_low_reasoning_token_headroom(
 def test_agent_preflight_skips_headroom_for_non_reasoning_model(
     monkeypatch,
     capsys,
+    deepagents_dependency_available: None,
 ) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
 
@@ -485,18 +482,14 @@ def test_agent_preflight_skips_headroom_for_non_reasoning_model(
 
     assert exit_code == 0
     deepagents_headroom_check = next(
-        check
-        for check in payload["checks"]
-        if check["name"] == "deepagents_token_headroom"
+        check for check in payload["checks"] if check["name"] == "deepagents_token_headroom"
     )
     assert deepagents_headroom_check["status"] == "passed"
     assert deepagents_headroom_check["severity"] == "warning"
     assert deepagents_headroom_check["max_model_tokens"] == 12000
     assert "below recommended initial headroom" in deepagents_headroom_check["message"]
     headroom_check = next(
-        check
-        for check in payload["checks"]
-        if check["name"] == "reasoning_token_headroom"
+        check for check in payload["checks"] if check["name"] == "reasoning_token_headroom"
     )
     assert headroom_check["status"] == "skipped"
     assert headroom_check["reasoning_model"] is False
@@ -510,9 +503,7 @@ def test_agent_preflight_blocks_when_openai_key_is_missing(monkeypatch, capsys) 
 
     assert exit_code == 2
     assert payload["status"] == "blocked"
-    openai_check = next(
-        check for check in payload["checks"] if check["name"] == "openai_api_key"
-    )
+    openai_check = next(check for check in payload["checks"] if check["name"] == "openai_api_key")
     assert openai_check["status"] == "blocked"
     assert "not set" in openai_check["message"]
 
@@ -1117,10 +1108,7 @@ def test_chat_command_prints_saved_repeated_failure_next_json(
         "/context add <path[#symbol]>",
     ]
     assert "repeat_count=2" in recommendation["evidence"]
-    assert any(
-        item.startswith("failure=no_patch_generated")
-        for item in recommendation["evidence"]
-    )
+    assert any(item.startswith("failure=no_patch_generated") for item in recommendation["evidence"])
 
 
 def test_chat_command_exports_saved_session(tmp_path: Path, capsys) -> None:
@@ -1238,10 +1226,7 @@ def test_chat_command_rejects_invalid_session_gate_args(capsys) -> None:
         )
         == 2
     )
-    assert (
-        "--max-high-risk-diff-reviews must be non-negative"
-        in capsys.readouterr().err
-    )
+    assert "--max-high-risk-diff-reviews must be non-negative" in capsys.readouterr().err
 
 
 def test_chat_command_rejects_missing_saved_session(tmp_path: Path, capsys) -> None:
@@ -1458,10 +1443,7 @@ def test_agent_interactive_can_list_project_custom_commands_json(
     command_dir = tmp_path / ".patchsmith" / "commands"
     command_dir.mkdir(parents=True)
     (command_dir / "review.md").write_text(
-        "---\n"
-        "description: Review generated patch evidence\n"
-        "---\n"
-        "Review $ARGUMENTS\n",
+        "---\ndescription: Review generated patch evidence\n---\nReview $ARGUMENTS\n",
         encoding="utf-8",
     )
 

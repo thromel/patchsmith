@@ -19,14 +19,8 @@ def selected_results(
             (
                 result
                 for result in grouped_results.get(selection.task_id, [])
-                if (
-                    result.repair_attempt.attempt_index
-                    == selection.selected_attempt_index
-                )
-                and (
-                    result.repair_attempt.attempt_count
-                    == selection.selected_attempt_count
-                )
+                if (result.repair_attempt.attempt_index == selection.selected_attempt_index)
+                and (result.repair_attempt.attempt_count == selection.selected_attempt_count)
             ),
             None,
         )
@@ -136,9 +130,7 @@ def selection_reason(result: ComplexBenchmarkResult) -> str:
     if usage.estimated_cost_usd is not None:
         basis.append(f"cost={format_cost(usage.estimated_cost_usd)}")
     if cost.live_cost_budget_overage_usd is not None:
-        basis.append(
-            f"budget_overage={format_cost(cost.live_cost_budget_overage_usd)}"
-        )
+        basis.append(f"budget_overage={format_cost(cost.live_cost_budget_overage_usd)}")
     if usage.total_tokens is not None:
         basis.append(f"tokens={usage.total_tokens}")
     if usage.response_count is not None:
@@ -148,9 +140,7 @@ def selection_reason(result: ComplexBenchmarkResult) -> str:
     if context.context_budgeted and context.max_context_files is not None:
         basis.append(f"context_cap={context.max_context_files}")
     if context.context_budget_omitted_file_count is not None:
-        basis.append(
-            f"context_omitted={context.context_budget_omitted_file_count}"
-        )
+        basis.append(f"context_omitted={context.context_budget_omitted_file_count}")
     if cost.resource_budgeted:
         response_cap = cost.resource_budget_max_model_responses
         token_cap = cost.resource_budget_max_model_tokens

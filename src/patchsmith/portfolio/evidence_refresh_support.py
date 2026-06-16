@@ -113,23 +113,17 @@ def _evidence_refresh_summary(result: Any) -> str:
         )
         selected_progress_score = getattr(result, "selected_avg_progress_score", None)
         selected_progress_score_text = (
-            "n/a"
-            if selected_progress_score is None
-            else f"{selected_progress_score:.2f}"
+            "n/a" if selected_progress_score is None else f"{selected_progress_score:.2f}"
         )
         partial_progress_tasks = getattr(result, "partial_progress_tasks", None)
         partial_progress_tasks_text = (
             "n/a" if partial_progress_tasks is None else str(partial_progress_tasks)
         )
-        failure_class_counts_text = _format_count_map(
-            getattr(result, "failure_class_counts", None)
-        )
+        failure_class_counts_text = _format_count_map(getattr(result, "failure_class_counts", None))
         selected_failure_class_counts_text = _format_count_map(
             getattr(result, "selected_failure_class_counts", None)
         )
-        harness_layer_counts_text = _format_count_map(
-            getattr(result, "harness_layer_counts", None)
-        )
+        harness_layer_counts_text = _format_count_map(getattr(result, "harness_layer_counts", None))
         selected_harness_layer_counts_text = _format_count_map(
             getattr(result, "selected_harness_layer_counts", None)
         )
@@ -154,9 +148,7 @@ def _evidence_refresh_summary(result: Any) -> str:
             None,
         )
         tokens_per_virtual_file_text = (
-            "n/a"
-            if tokens_per_virtual_file is None
-            else f"{tokens_per_virtual_file:.2f}"
+            "n/a" if tokens_per_virtual_file is None else f"{tokens_per_virtual_file:.2f}"
         )
         responses_per_virtual_file = getattr(
             result,
@@ -164,16 +156,12 @@ def _evidence_refresh_summary(result: Any) -> str:
             None,
         )
         responses_per_virtual_file_text = (
-            "n/a"
-            if responses_per_virtual_file is None
-            else f"{responses_per_virtual_file:.2f}"
+            "n/a" if responses_per_virtual_file is None else f"{responses_per_virtual_file:.2f}"
         )
         context_recall = getattr(result, "selected_context_target_recall", None)
         context_recall_text = "n/a" if context_recall is None else f"{context_recall:.2f}"
         context_precision = getattr(result, "selected_context_target_precision", None)
-        context_precision_text = (
-            "n/a" if context_precision is None else f"{context_precision:.2f}"
-        )
+        context_precision_text = "n/a" if context_precision is None else f"{context_precision:.2f}"
         acceptance_manifest_rate = getattr(
             result,
             "acceptance_rubric_manifest_rate",
@@ -200,9 +188,7 @@ def _evidence_refresh_summary(result: Any) -> str:
             else f"{repo_instructions_read_first_rate:.2f}"
         )
         acceptance_manifest_rate_text = (
-            "n/a"
-            if acceptance_manifest_rate is None
-            else f"{acceptance_manifest_rate:.2f}"
+            "n/a" if acceptance_manifest_rate is None else f"{acceptance_manifest_rate:.2f}"
         )
         acceptance_read_first_rate = getattr(
             result,
@@ -210,9 +196,7 @@ def _evidence_refresh_summary(result: Any) -> str:
             None,
         )
         acceptance_read_first_rate_text = (
-            "n/a"
-            if acceptance_read_first_rate is None
-            else f"{acceptance_read_first_rate:.2f}"
+            "n/a" if acceptance_read_first_rate is None else f"{acceptance_read_first_rate:.2f}"
         )
         acceptance_alignment_rate = getattr(
             result,
@@ -220,9 +204,7 @@ def _evidence_refresh_summary(result: Any) -> str:
             None,
         )
         acceptance_alignment_rate_text = (
-            "n/a"
-            if acceptance_alignment_rate is None
-            else f"{acceptance_alignment_rate:.2f}"
+            "n/a" if acceptance_alignment_rate is None else f"{acceptance_alignment_rate:.2f}"
         )
         contextual_verifier_rate = getattr(
             result,
@@ -230,9 +212,7 @@ def _evidence_refresh_summary(result: Any) -> str:
             None,
         )
         contextual_verifier_rate_text = (
-            "n/a"
-            if contextual_verifier_rate is None
-            else f"{contextual_verifier_rate:.2f}"
+            "n/a" if contextual_verifier_rate is None else f"{contextual_verifier_rate:.2f}"
         )
         return (
             f"suite_status={result.complex_suite_status}, "

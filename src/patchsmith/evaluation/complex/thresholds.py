@@ -29,10 +29,7 @@ COMPLEX_BENCHMARK_SUITE_THRESHOLDS: tuple[ComplexBenchmarkThreshold, ...] = (
     ComplexBenchmarkThreshold(
         name="min_live_provider_tasks",
         value_kind="nonnegative_int",
-        cli_help=(
-            "Fail when fewer than this many attempted rows contain live-provider "
-            "metadata."
-        ),
+        cli_help=("Fail when fewer than this many attempted rows contain live-provider metadata."),
     ),
     ComplexBenchmarkThreshold(
         name="min_unique_tasks",
@@ -52,9 +49,7 @@ COMPLEX_BENCHMARK_SUITE_THRESHOLDS: tuple[ComplexBenchmarkThreshold, ...] = (
     ComplexBenchmarkThreshold(
         name="max_attempted_responses_per_validated_task",
         value_kind="nonnegative_float",
-        cli_help=(
-            "Fail when attempted model responses per validated task exceeds this cap."
-        ),
+        cli_help=("Fail when attempted model responses per validated task exceeds this cap."),
     ),
     ComplexBenchmarkThreshold(
         name="max_attempted_task_cost_usd",
@@ -84,41 +79,31 @@ COMPLEX_BENCHMARK_SUITE_THRESHOLDS: tuple[ComplexBenchmarkThreshold, ...] = (
     ComplexBenchmarkThreshold(
         name="max_selected_responses_per_validated_task",
         value_kind="nonnegative_float",
-        cli_help=(
-            "Fail when selected model responses per validated task exceeds this cap."
-        ),
+        cli_help=("Fail when selected model responses per validated task exceeds this cap."),
     ),
     ComplexBenchmarkThreshold(
         name="max_selected_virtual_files_per_validated_task",
         value_kind="nonnegative_float",
         cli_help=(
-            "Fail when selected DeepAgents virtual files per validated task exceeds "
-            "this cap."
+            "Fail when selected DeepAgents virtual files per validated task exceeds this cap."
         ),
     ),
     ComplexBenchmarkThreshold(
         name="max_selected_tokens_per_virtual_file",
         value_kind="nonnegative_float",
-        cli_help=(
-            "Fail when selected model tokens per DeepAgents virtual file exceeds "
-            "this cap."
-        ),
+        cli_help=("Fail when selected model tokens per DeepAgents virtual file exceeds this cap."),
     ),
     ComplexBenchmarkThreshold(
         name="max_selected_responses_per_virtual_file",
         value_kind="nonnegative_float",
         cli_help=(
-            "Fail when selected model responses per DeepAgents virtual file exceeds "
-            "this cap."
+            "Fail when selected model responses per DeepAgents virtual file exceeds this cap."
         ),
     ),
     ComplexBenchmarkThreshold(
         name="min_selected_progress_score",
         value_kind="rate",
-        cli_help=(
-            "Fail when selected-attempt partial progress score is below this "
-            "threshold."
-        ),
+        cli_help=("Fail when selected-attempt partial progress score is below this threshold."),
     ),
     ComplexBenchmarkThreshold(
         name="min_selected_context_target_recall",
@@ -161,16 +146,12 @@ COMPLEX_BENCHMARK_SUITE_THRESHOLDS: tuple[ComplexBenchmarkThreshold, ...] = (
     ComplexBenchmarkThreshold(
         name="min_contextual_verifier_rate",
         value_kind="rate",
-        cli_help=(
-            "Fail when contextual-verifier trajectory coverage is below this rate."
-        ),
+        cli_help=("Fail when contextual-verifier trajectory coverage is below this rate."),
     ),
     ComplexBenchmarkThreshold(
         name="min_process_quality_score",
         value_kind="rate",
-        cli_help=(
-            "Fail when average trace-derived process quality is below this threshold."
-        ),
+        cli_help=("Fail when average trace-derived process quality is below this threshold."),
     ),
     ComplexBenchmarkThreshold(
         name="max_process_risky_validated_tasks",
@@ -185,16 +166,12 @@ COMPLEX_BENCHMARK_SUITE_THRESHOLDS: tuple[ComplexBenchmarkThreshold, ...] = (
     ComplexBenchmarkThreshold(
         name="min_repo_instructions_manifest_rate",
         value_kind="rate",
-        cli_help=(
-            "Fail when scoped repo-instructions manifest coverage is below this rate."
-        ),
+        cli_help=("Fail when scoped repo-instructions manifest coverage is below this rate."),
     ),
     ComplexBenchmarkThreshold(
         name="min_repo_instructions_read_first_rate",
         value_kind="rate",
-        cli_help=(
-            "Fail when scoped repo-instructions read-first rate is below this rate."
-        ),
+        cli_help=("Fail when scoped repo-instructions read-first rate is below this rate."),
     ),
     ComplexBenchmarkThreshold(
         name="min_acceptance_rubric_manifest_rate",
@@ -219,22 +196,14 @@ COMPLEX_BENCHMARK_SUITE_THRESHOLD_NAMES: tuple[str, ...] = tuple(
 
 
 def complex_threshold_kwargs_from_mapping(mapping: Mapping[str, Any]) -> dict[str, Any]:
-    return {
-        name: mapping.get(name)
-        for name in COMPLEX_BENCHMARK_SUITE_THRESHOLD_NAMES
-    }
+    return {name: mapping.get(name) for name in COMPLEX_BENCHMARK_SUITE_THRESHOLD_NAMES}
 
 
 def complex_threshold_kwargs_from_object(source: object) -> dict[str, Any]:
-    return {
-        name: getattr(source, name)
-        for name in COMPLEX_BENCHMARK_SUITE_THRESHOLD_NAMES
-    }
+    return {name: getattr(source, name) for name in COMPLEX_BENCHMARK_SUITE_THRESHOLD_NAMES}
 
 
 def complex_threshold_count(source: object) -> int:
     return sum(
-        1
-        for value in complex_threshold_kwargs_from_object(source).values()
-        if value is not None
+        1 for value in complex_threshold_kwargs_from_object(source).values() if value is not None
     )

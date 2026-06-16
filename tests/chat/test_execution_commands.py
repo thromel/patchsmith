@@ -96,6 +96,7 @@ def test_run_command_without_task_prints_usage(tmp_path: Path) -> None:
 def test_preflight_command_records_config_payload(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    deepagents_dependency_available: None,
 ) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     runtime = _runtime(tmp_path)
@@ -144,9 +145,7 @@ def test_preflight_command_reports_config_errors(tmp_path: Path) -> None:
     )
 
     assert output.getvalue() == "--allow-dirty-apply requires --apply.\n"
-    assert events == [
-        ("preflight_error", {"message": "--allow-dirty-apply requires --apply."})
-    ]
+    assert events == [("preflight_error", {"message": "--allow-dirty-apply requires --apply."})]
 
 
 def test_preflight_command_without_task_prints_usage(tmp_path: Path) -> None:
@@ -212,11 +211,7 @@ def test_verify_command_records_sandbox_result(
 
     assert calls == [("pytest -q", tmp_path, 60)]
     assert output.getvalue() == (
-        "Verify: passed\n"
-        "Command: pytest -q\n"
-        "Exit code: 0\n"
-        "Duration: 12 ms\n"
-        "stdout: ok\n"
+        "Verify: passed\nCommand: pytest -q\nExit code: 0\nDuration: 12 ms\nstdout: ok\n"
     )
     assert events[-1][0] == "verify_result"
     assert events[-1][1]["status"] == "passed"
@@ -248,8 +243,7 @@ def test_verify_command_without_command_prints_usage(tmp_path: Path) -> None:
     )
 
     assert output.getvalue() == (
-        "Usage: /verify <allowed-test-command>\n"
-        "No test command is configured for this session.\n"
+        "Usage: /verify <allowed-test-command>\nNo test command is configured for this session.\n"
     )
     assert events == []
 

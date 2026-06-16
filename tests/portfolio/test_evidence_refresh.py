@@ -33,8 +33,7 @@ def test_evidence_refresh_report_runs_lightweight_status_refresh(
     assert any(step.name == "Docker smoke" and step.status == "skipped" for step in report.steps)
     assert any(step.name == "Quality gate" and step.status == "skipped" for step in report.steps)
     assert any(
-        step.name == "Complex benchmark suite" and step.status == "skipped"
-        for step in report.steps
+        step.name == "Complex benchmark suite" and step.status == "skipped" for step in report.steps
     )
     assert any(
         step.name == "Public issue repair readiness" and step.status == "skipped"
@@ -533,9 +532,7 @@ def test_evidence_refresh_can_refresh_complex_benchmark_suite(
     assert "contextual_verifier=1.00" in complex_step.summary
     assert (suite_output_dir / "complex_benchmark_suite_report.md").exists()
     gate_payload = json.loads(
-        (suite_output_dir / "complex_benchmark_suite_gate.json").read_text(
-            encoding="utf-8"
-        )
+        (suite_output_dir / "complex_benchmark_suite_gate.json").read_text(encoding="utf-8")
     )
     assert gate_payload["status"] == "passed"
     assert gate_payload["min_selected_progress_score"] == 1.0

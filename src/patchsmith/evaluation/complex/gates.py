@@ -46,10 +46,7 @@ def complex_benchmark_suite_gate(
     min_acceptance_rubric_alignment_rate: float | None = None,
 ) -> ComplexBenchmarkSuiteGate:
     failures: list[str] = []
-    if (
-        min_validation_rate is not None
-        and summary.validation_rate < min_validation_rate
-    ):
+    if min_validation_rate is not None and summary.validation_rate < min_validation_rate:
         failures.append(
             "validation_rate "
             f"{summary.validation_rate:.2f} below required {min_validation_rate:.2f}"
@@ -227,8 +224,7 @@ def complex_benchmark_suite_gate(
             failures.append("max selected task tokens is unavailable")
         elif max_selected_tokens > max_selected_task_tokens:
             failures.append(
-                "max selected task tokens "
-                f"{max_selected_tokens} exceeds {max_selected_task_tokens}"
+                f"max selected task tokens {max_selected_tokens} exceeds {max_selected_task_tokens}"
             )
     if max_selected_task_responses is not None:
         max_selected_responses = summary.max_selected_task_responses
@@ -241,8 +237,7 @@ def complex_benchmark_suite_gate(
             )
     if (
         max_live_cost_budget_overage_tasks is not None
-        and summary.live_cost_budget_overage_tasks
-        > max_live_cost_budget_overage_tasks
+        and summary.live_cost_budget_overage_tasks > max_live_cost_budget_overage_tasks
     ):
         failures.append(
             "live cost budget overage tasks "
@@ -278,8 +273,7 @@ def complex_benchmark_suite_gate(
         )
     if (
         max_process_risky_validated_tasks is not None
-        and summary.process_risky_validated_tasks
-        > max_process_risky_validated_tasks
+        and summary.process_risky_validated_tasks > max_process_risky_validated_tasks
     ):
         failures.append(
             "process-risky validated tasks "
@@ -308,8 +302,7 @@ def complex_benchmark_suite_gate(
             )
     if (
         min_repo_instructions_read_first_rate is not None
-        and summary.repo_instructions_read_first_rate
-        < min_repo_instructions_read_first_rate
+        and summary.repo_instructions_read_first_rate < min_repo_instructions_read_first_rate
     ):
         failures.append(
             "repo-instructions read-first rate "
@@ -329,8 +322,7 @@ def complex_benchmark_suite_gate(
             )
     if (
         min_acceptance_rubric_read_first_rate is not None
-        and summary.acceptance_rubric_read_first_rate
-        < min_acceptance_rubric_read_first_rate
+        and summary.acceptance_rubric_read_first_rate < min_acceptance_rubric_read_first_rate
     ):
         failures.append(
             "acceptance-rubric read-first rate "
@@ -339,8 +331,7 @@ def complex_benchmark_suite_gate(
         )
     if (
         min_acceptance_rubric_alignment_rate is not None
-        and summary.acceptance_rubric_alignment_rate
-        < min_acceptance_rubric_alignment_rate
+        and summary.acceptance_rubric_alignment_rate < min_acceptance_rubric_alignment_rate
     ):
         failures.append(
             "acceptance-rubric alignment rate "

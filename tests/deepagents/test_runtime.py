@@ -160,8 +160,8 @@ def test_deepagents_runtime_suggests_nearest_source_excerpt_for_bad_old_span(
     target = src / "module.py"
     target.write_text(
         "def runpytest(self, *args: str | os.PathLike[str], **kwargs: Any) -> RunResult:\n"
-        "    \"\"\"Run pytest inline.\"\"\"\n"
-        "    if self._request.config.getoption(\"runpytest\") == \"inprocess\":\n"
+        '    """Run pytest inline."""\n'
+        '    if self._request.config.getoption("runpytest") == "inprocess":\n'
         "        return self.inline_run(*args, **kwargs)\n",
         encoding="utf-8",
     )
@@ -215,8 +215,7 @@ def test_deepagents_runtime_applies_high_similarity_nearest_source_span(
     src.mkdir(parents=True)
     target = src / "module.py"
     target.write_text(
-        "def calculate(left: int, right: int) -> int:\n"
-        "    return left - right\n",
+        "def calculate(left: int, right: int) -> int:\n    return left - right\n",
         encoding="utf-8",
     )
     planner = ModelBackedRepairPlanner(
@@ -275,10 +274,7 @@ def test_deepagents_runtime_records_high_risk_patch_quality(
     src.mkdir(parents=True)
     target = src / "runner.py"
     target.write_text(
-        "import types\n"
-        "\n"
-        "def call(testfunction, filename):\n"
-        "    return testfunction()\n",
+        "import types\n\ndef call(testfunction, filename):\n    return testfunction()\n",
         encoding="utf-8",
     )
     planner = ModelBackedRepairPlanner(
@@ -737,8 +733,9 @@ def test_deepagents_runtime_provides_source_hint_manifest_to_native_agent(
     assert "reviewed reproduction source hint" in manifest
     assert PATCHSMITH_DEEPAGENTS_SOURCE_HINTS_PATH in prompt
     assert contract["source_hint_manifest_path"] == PATCHSMITH_DEEPAGENTS_SOURCE_HINTS_PATH
-    assert PATCHSMITH_DEEPAGENTS_SOURCE_HINTS_PATH in (
-        contract["filesystem_policy"]["allowed_read_paths"]
+    assert (
+        PATCHSMITH_DEEPAGENTS_SOURCE_HINTS_PATH
+        in (contract["filesystem_policy"]["allowed_read_paths"])
     )
     assert contract["planning_policy"]["source_hint_manifest_read_first"] is True
     assert plan_event["metadata"]["failure_localization"] == {
@@ -815,8 +812,9 @@ def test_deepagents_runtime_provides_retry_feedback_manifest_to_native_agent(
     assert "Do not repeat diff" in files[PATCHSMITH_DEEPAGENTS_RETRY_FEEDBACK_PATH]["content"]
     assert PATCHSMITH_DEEPAGENTS_RETRY_FEEDBACK_PATH in prompt
     assert contract["retry_feedback_manifest_path"] == PATCHSMITH_DEEPAGENTS_RETRY_FEEDBACK_PATH
-    assert PATCHSMITH_DEEPAGENTS_RETRY_FEEDBACK_PATH in (
-        contract["filesystem_policy"]["allowed_read_paths"]
+    assert (
+        PATCHSMITH_DEEPAGENTS_RETRY_FEEDBACK_PATH
+        in (contract["filesystem_policy"]["allowed_read_paths"])
     )
     assert contract["planning_policy"]["retry_feedback_manifest_read_first"] is True
     assert plan_event["metadata"]["failure_localization"] == {

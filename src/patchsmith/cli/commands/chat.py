@@ -145,9 +145,7 @@ def run_chat_from_args(
             output_stream=sys.stdout,
             runner_cls=RepairRunner,
             model_preflight_checker=(
-                None
-                if args.skip_model_preflight
-                else _openai_model_preflight_for_config
+                None if args.skip_model_preflight else _openai_model_preflight_for_config
             ),
             session_id=args.resume,
             resume=bool(args.resume),
@@ -409,17 +407,11 @@ def _validate_session_gate_args(args: argparse.Namespace) -> str | None:
         value = getattr(args, name)
         if value is not None and not 0.0 <= value <= 1.0:
             return f"--{name.replace('_', '-')} must be between 0.0 and 1.0."
-    if (
-        args.max_cost_per_validated_run_usd is not None
-        and args.max_cost_per_validated_run_usd < 0
-    ):
+    if args.max_cost_per_validated_run_usd is not None and args.max_cost_per_validated_run_usd < 0:
         return "--max-cost-per-validated-run-usd must be non-negative."
     if args.max_run_errors is not None and args.max_run_errors < 0:
         return "--max-run-errors must be non-negative."
-    if (
-        args.max_high_risk_diff_reviews is not None
-        and args.max_high_risk_diff_reviews < 0
-    ):
+    if args.max_high_risk_diff_reviews is not None and args.max_high_risk_diff_reviews < 0:
         return "--max-high-risk-diff-reviews must be non-negative."
     return None
 

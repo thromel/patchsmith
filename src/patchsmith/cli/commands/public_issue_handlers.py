@@ -155,17 +155,12 @@ def _execute_public_issue_repairs_command(args: argparse.Namespace) -> int:
     max_tasks = None if args.max_tasks == 0 else args.max_tasks
     if args.deepagents_max_context_files < 0:
         raise ValueError("--deepagents-max-context-files must be non-negative")
-    if (
-        args.max_actual_model_responses is not None
-        and args.max_actual_model_responses < 0
-    ):
+    if args.max_actual_model_responses is not None and args.max_actual_model_responses < 0:
         raise ValueError("--max-actual-model-responses must be non-negative")
     if args.max_actual_model_tokens is not None and args.max_actual_model_tokens < 0:
         raise ValueError("--max-actual-model-tokens must be non-negative")
     deepagents_max_context_files = (
-        args.deepagents_max_context_files
-        if args.deepagents_max_context_files > 0
-        else None
+        args.deepagents_max_context_files if args.deepagents_max_context_files > 0 else None
     )
     results, summary = execute_public_issue_repairs(
         readiness_path=Path(args.readiness),

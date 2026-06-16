@@ -54,9 +54,7 @@ def build_deepagents_agent(
     files: dict[str, dict[str, str]],
     subagents: list[dict[str, str]] | None = None,
 ) -> Any:
-    configured_subagents = (
-        deepagents_patch_review_subagents() if subagents is None else subagents
-    )
+    configured_subagents = deepagents_patch_review_subagents() if subagents is None else subagents
     agent_files = _agent_files(
         files,
         subagents_enabled=bool(configured_subagents),
@@ -140,18 +138,11 @@ def _resource_budget_callbacks(config: DeepAgentsPlannerConfig) -> list[Any]:
                 self.output_tokens += token_usage.output_tokens
             if token_usage.total_tokens is not None:
                 self.total_tokens += token_usage.total_tokens
-            elif (
-                token_usage.input_tokens is not None
-                or token_usage.output_tokens is not None
-            ):
-                self.total_tokens += (
-                    (token_usage.input_tokens or 0)
-                    + (token_usage.output_tokens or 0)
+            elif token_usage.input_tokens is not None or token_usage.output_tokens is not None:
+                self.total_tokens += (token_usage.input_tokens or 0) + (
+                    token_usage.output_tokens or 0
                 )
-            if (
-                config.max_model_tokens is not None
-                and self.total_tokens > config.max_model_tokens
-            ):
+            if config.max_model_tokens is not None and self.total_tokens > config.max_model_tokens:
                 raise DeepAgentsResourceBudgetExceeded(
                     "DeepAgents model token budget exceeded: "
                     f"{self.total_tokens} > {config.max_model_tokens}",

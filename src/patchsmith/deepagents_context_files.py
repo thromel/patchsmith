@@ -170,9 +170,7 @@ def _term_candidates(term: str) -> list[str]:
         raw = raw.rsplit(":", 1)[-1].strip()
     raw = raw.strip("`'\"")
     candidates = [raw] if len(raw) >= 4 else []
-    candidates.extend(
-        part for part in re.split(r"[^A-Za-z0-9_]+", raw) if len(part) >= 4
-    )
+    candidates.extend(part for part in re.split(r"[^A-Za-z0-9_]+", raw) if len(part) >= 4)
     return [candidate for candidate in dict.fromkeys(candidates) if candidate]
 
 

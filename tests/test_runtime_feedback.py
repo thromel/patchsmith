@@ -353,7 +353,7 @@ def test_safety_gate_rejection_summary_includes_span_boundary_guidance() -> None
             "summary": (
                 "replacement old span for src/_pytest/assertion/rewrite.py ends "
                 "on Python compound statement without its body: "
-                "`if int.from_bytes(size_data, \"little\") != size & 0xFFFFFFFF:`"
+                '`if int.from_bytes(size_data, "little") != size & 0xFFFFFFFF:`'
             ),
         }
     ]
@@ -450,9 +450,7 @@ def test_patch_plan_feedback_summary_includes_target_symbol_violation() -> None:
                             "selected path matched the constrained patchable path policy, "
                             "but the exact old span did not enter a preferred symbol"
                         ),
-                        "required_symbol_policy": (
-                            "old must include one of the preferred symbols"
-                        ),
+                        "required_symbol_policy": ("old must include one of the preferred symbols"),
                         "preferred_symbols": ["_read_pyc"],
                     }
                 },
@@ -740,7 +738,7 @@ def test_retry_feedback_labels_classify_quality_and_target_history_retry() -> No
             {
                 "patch_target": "src/example.py",
                 "progress_classification": "partial_assertion_progress",
-            }
+            },
         ],
     )
 
@@ -921,7 +919,7 @@ def test_retry_feedback_brief_rejects_high_risk_source_text_recompile() -> None:
         [
             "diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py",
             "@@ -397,6 +397,7 @@",
-            "+        co = compile(source.read_text(encoding=\"utf-8\"), str(source), \"exec\")",
+            '+        co = compile(source.read_text(encoding="utf-8"), str(source), "exec")',
         ]
     )
 
@@ -1286,8 +1284,8 @@ def test_retry_feedback_allows_same_target_after_partial_assertion_progress() ->
         [
             "diff --git a/src/requests/exceptions.py b/src/requests/exceptions.py",
             "@@ -130,7 +130,7 @@",
-            "-    \"\"\"The server declared chunked encoding but sent an invalid chunk.\"\"\"",
-            "+    \"\"\"The server declared chunked encoding but the connection was reset or sent an invalid chunk.\"\"\"",
+            '-    """The server declared chunked encoding but sent an invalid chunk."""',
+            '+    """The server declared chunked encoding but the connection was reset or sent an invalid chunk."""',
         ]
     )
     old_hash = "c62150ea2492"

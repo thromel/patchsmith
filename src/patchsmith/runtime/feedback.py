@@ -49,9 +49,7 @@ def sandbox_feedback_summary(
         if basename_warning:
             patch_effect_warnings.append(basename_warning)
         if patch_effect_warnings:
-            sections.extend(
-                ["Patch effect warning:", *_bullet_lines(patch_effect_warnings)]
-            )
+            sections.extend(["Patch effect warning:", *_bullet_lines(patch_effect_warnings)])
     return "\n".join(sections) if sections else "No compact sandbox feedback available."
 
 
@@ -163,9 +161,7 @@ def patch_plan_feedback_summary(runtime_trace: list[dict[str, Any]]) -> str:
         if "target_char_count" in diagnostics:
             lines.append(f"- Target chars: {diagnostics.get('target_char_count')}")
         if "old_found" in diagnostics:
-            lines.append(
-                f"- Old span found in clean target: {bool(diagnostics.get('old_found'))}"
-            )
+            lines.append(f"- Old span found in clean target: {bool(diagnostics.get('old_found'))}")
         if "old_occurrences" in diagnostics:
             lines.append(f"- Old span occurrences: {diagnostics.get('old_occurrences')}")
         old = diagnostics.get("old")
@@ -212,8 +208,7 @@ def safety_gate_rejection_summary(runtime_trace: list[dict[str, Any]]) -> str:
             "for the larger span."
         )
         lines.append(
-            "- Rejected unbound names: "
-            + ", ".join(f"`{name}`" for name in unbound_names)
+            "- Rejected unbound names: " + ", ".join(f"`{name}`" for name in unbound_names)
         )
     if _looks_like_incomplete_python_span_rejection(summary):
         lines.append(
@@ -280,10 +275,7 @@ def _latest_patch_quality_assessment(
 
 
 def _patch_quality_lines(quality: dict[str, Any]) -> list[str]:
-    lines = [
-        "- Patch quality risk: "
-        f"{_clean_feedback_value(quality.get('severity', 'unknown'))}"
-    ]
+    lines = [f"- Patch quality risk: {_clean_feedback_value(quality.get('severity', 'unknown'))}"]
     findings = quality.get("findings")
     if isinstance(findings, list):
         for finding in findings[:5]:
@@ -352,8 +344,7 @@ def _no_op_patch_violation_lines(violation: dict[str, Any]) -> list[str]:
     return [
         "- No-op patch policy rejected replacement for path: "
         f"{_clean_feedback_value(violation.get('path', ''))}",
-        "- Rejection reason: "
-        f"{_clean_feedback_value(violation.get('reason', ''))}",
+        f"- Rejection reason: {_clean_feedback_value(violation.get('reason', ''))}",
         "- Required patch policy: "
         f"{_clean_feedback_value(violation.get('required_patch_policy', ''))}",
         "- Retry correction: keep the selected control point if it is still right, "
@@ -366,8 +357,7 @@ def _target_history_violation_lines(violation: dict[str, Any]) -> list[str]:
     lines = [
         "- Repeated target rejected by target-history guard: "
         f"{_clean_feedback_value(violation.get('path', ''))}",
-        "- Rejection reason: "
-        f"{_clean_feedback_value(violation.get('reason', ''))}",
+        f"- Rejection reason: {_clean_feedback_value(violation.get('reason', ''))}",
         "- Required next-target evidence: "
         f"{_clean_feedback_value(violation.get('required_evidence', ''))}",
     ]
@@ -392,8 +382,7 @@ def _target_selection_violation_lines(violation: dict[str, Any]) -> list[str]:
     lines = [
         "- Patchable target policy rejected path: "
         f"{_clean_feedback_value(violation.get('path', ''))}",
-        "- Rejection reason: "
-        f"{_clean_feedback_value(violation.get('reason', ''))}",
+        f"- Rejection reason: {_clean_feedback_value(violation.get('reason', ''))}",
         "- Required path policy: "
         f"{_clean_feedback_value(violation.get('required_path_policy', ''))}",
     ]
@@ -418,8 +407,7 @@ def _target_symbol_violation_lines(violation: dict[str, Any]) -> list[str]:
     lines = [
         "- Preferred symbol policy rejected old span for path: "
         f"{_clean_feedback_value(violation.get('path', ''))}",
-        "- Rejection reason: "
-        f"{_clean_feedback_value(violation.get('reason', ''))}",
+        f"- Rejection reason: {_clean_feedback_value(violation.get('reason', ''))}",
         "- Required symbol policy: "
         f"{_clean_feedback_value(violation.get('required_symbol_policy', ''))}",
     ]
@@ -517,12 +505,8 @@ def _failure_signals(text: str, *, limit: int = 8) -> list[str]:
 
 def _membership_assertion_values(text: str) -> list[tuple[str, str]]:
     patterns = [
-        re.compile(
-            r"assert\s+\((['\"])(?P<missing>.+?)\1\s+in\s+(['\"])(?P<observed>.+?)\3\)"
-        ),
-        re.compile(
-            r"assert\s+(['\"])(?P<missing>.+?)\1\s+in\s+(['\"])(?P<observed>.+?)\3"
-        ),
+        re.compile(r"assert\s+\((['\"])(?P<missing>.+?)\1\s+in\s+(['\"])(?P<observed>.+?)\3\)"),
+        re.compile(r"assert\s+(['\"])(?P<missing>.+?)\1\s+in\s+(['\"])(?P<observed>.+?)\3"),
     ]
     matches: list[tuple[str, str]] = []
     for raw_line in text.splitlines():
@@ -674,7 +658,9 @@ def _first_differing_tail_segment(
 
 
 def _first_failure_location(text: str) -> str:
-    location_pattern = re.compile(r"^(.+?\.py):(\d+):\s+([A-Za-z_][A-Za-z0-9_]*(?:Error|Exception))")
+    location_pattern = re.compile(
+        r"^(.+?\.py):(\d+):\s+([A-Za-z_][A-Za-z0-9_]*(?:Error|Exception))"
+    )
     for raw_line in text.splitlines():
         stripped = raw_line.strip()
         match = location_pattern.match(stripped)

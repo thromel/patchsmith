@@ -38,11 +38,7 @@ def test_target_context_selection_auto_caps_to_localized_control_point() -> None
                     "co_filename",
                     "pyc",
                 ],
-                excerpt=(
-                    "def _read_pyc(source, pyc):\n"
-                    "    co = marshal.load(pyc)\n"
-                    "    return co"
-                ),
+                excerpt=("def _read_pyc(source, pyc):\n    co = marshal.load(pyc)\n    return co"),
             ),
             _context(
                 path="testing/test_issue_14552_repro.py",
@@ -67,9 +63,7 @@ def test_target_context_selection_auto_caps_to_localized_control_point() -> None
     ]
     assert selection.target_candidates[0].path == "src/_pytest/assertion/rewrite.py"
     assert selection.preferred_target_paths == ["src/_pytest/assertion/rewrite.py"]
-    assert selection.preferred_target_symbols == {
-        "src/_pytest/assertion/rewrite.py": ["_read_pyc"]
-    }
+    assert selection.preferred_target_symbols == {"src/_pytest/assertion/rewrite.py": ["_read_pyc"]}
 
 
 def test_pinned_paths_are_merged_before_localized_context_paths() -> None:
@@ -141,9 +135,7 @@ def test_first_attempt_preferred_target_paths_filter_when_top_target_is_stale_co
         reasons=("symbol_identifiers:import_path",),
     )
 
-    assert first_attempt_preferred_target_paths([stale, import_path]) == [
-        "src/rewrite.py"
-    ]
+    assert first_attempt_preferred_target_paths([stale, import_path]) == ["src/rewrite.py"]
 
 
 def test_symbol_focus_deduplicates_reviewed_and_detected_symbols() -> None:
@@ -163,23 +155,26 @@ def test_symbol_focus_deduplicates_reviewed_and_detected_symbols() -> None:
 
 
 def test_context_selection_max_files_keeps_unbounded_mode_without_strong_target() -> None:
-    assert context_selection_max_files(
-        config=DeepAgentsPlannerConfig(
-            model="gpt-test",
-            context_selection_mode="target",
-        ),
-        candidates=[
-            TargetLocalizationCandidate(
-                path="src/calc.py",
-                score=1.0,
-                reasons=("retrieval_score",),
-            )
-        ],
-        retrieved_context=[
-            _context(path="src/calc.py"),
-            _context(path="src/other.py"),
-        ],
-    ) == 0
+    assert (
+        context_selection_max_files(
+            config=DeepAgentsPlannerConfig(
+                model="gpt-test",
+                context_selection_mode="target",
+            ),
+            candidates=[
+                TargetLocalizationCandidate(
+                    path="src/calc.py",
+                    score=1.0,
+                    reasons=("retrieval_score",),
+                )
+            ],
+            retrieved_context=[
+                _context(path="src/calc.py"),
+                _context(path="src/other.py"),
+            ],
+        )
+        == 0
+    )
 
 
 def _context(

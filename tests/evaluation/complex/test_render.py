@@ -153,8 +153,7 @@ def _result(**overrides: object) -> ComplexBenchmarkResult:
 
 def _summary(**overrides: object) -> ComplexBenchmarkSummary:
     values: dict[str, object] = {
-        field.name: _summary_default(field.name)
-        for field in fields(ComplexBenchmarkSummary)
+        field.name: _summary_default(field.name) for field in fields(ComplexBenchmarkSummary)
     }
     values.update(
         {

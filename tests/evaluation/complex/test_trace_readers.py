@@ -31,9 +31,7 @@ def test_trace_readers_extract_context_budget_and_target_alignment(
                                 "virtual_file_paths": ["/src/calc.py"],
                                 "virtual_file_count": 1,
                                 "max_context_files": 1,
-                                "context_budget_manifest_path": (
-                                    "/.patchsmith/context-budget.md"
-                                ),
+                                "context_budget_manifest_path": ("/.patchsmith/context-budget.md"),
                                 "repo_map_manifest_path": "/.patchsmith/repo-map.md",
                                 "repo_instructions_manifest_path": (
                                     "/.patchsmith/repo-instructions.md"
@@ -98,11 +96,7 @@ def test_trace_readers_extract_context_budget_and_target_alignment(
     )
     diff_path = tmp_path / "final.diff"
     diff_path.write_text(
-        "--- a/src/calc.py\n"
-        "+++ b/src/calc.py\n"
-        "@@\n"
-        "-    return a - b\n"
-        "+    return a + b\n",
+        "--- a/src/calc.py\n+++ b/src/calc.py\n@@\n-    return a - b\n+    return a + b\n",
         encoding="utf-8",
     )
 
@@ -135,9 +129,7 @@ def test_trace_readers_return_empty_fallbacks_for_missing_paths(tmp_path: Path) 
     assert trace_metrics(missing)["trace_event_count"] == 0
     assert deepagents_context_budget(missing)["deepagents_context_budgeted"] is False
     assert (
-        patch_target_alignment(trace_path=missing, final_diff_path=None)[
-            "target_alignment_status"
-        ]
+        patch_target_alignment(trace_path=missing, final_diff_path=None)["target_alignment_status"]
         == "unavailable"
     )
     assert retry_feedback_artifacts(missing) == ()

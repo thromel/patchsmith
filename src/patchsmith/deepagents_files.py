@@ -28,9 +28,7 @@ from patchsmith.deepagents_source_hints import source_hint_manifest
 from patchsmith.deepagents_target_history import target_history_manifest
 from patchsmith.models import RetrievedContext
 
-context_file_content_and_timestamp = (
-    _context_file_exports.context_file_content_and_timestamp
-)
+context_file_content_and_timestamp = _context_file_exports.context_file_content_and_timestamp
 context_files = _context_file_exports.context_files
 focused_file_content = _context_file_exports.focused_file_content
 path_modified_at = _context_file_exports.path_modified_at
@@ -98,10 +96,7 @@ def agent_files(
             "context_budget": context_budget_manifest,
         }
     )
-    manifest_files = [
-        spec.to_virtual_file()
-        for spec in manifest_specs_from_contents(contents)
-    ]
+    manifest_files = [spec.to_virtual_file() for spec in manifest_specs_from_contents(contents)]
     return add_virtual_files(files, [*core_files, *manifest_files])
 
 

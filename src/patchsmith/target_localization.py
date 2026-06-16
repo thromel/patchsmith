@@ -362,9 +362,7 @@ def _exact_identifier_matches(issue_text: str, excerpt: str) -> list[str]:
 
 def _symbol_identifier_matches(issue_text: str, matched_terms: Iterable[str]) -> list[str]:
     issue_identifiers = {
-        identifier.lower()
-        for identifier in _identifiers(issue_text)
-        if len(identifier) >= 4
+        identifier.lower() for identifier in _identifiers(issue_text) if len(identifier) >= 4
     }
     matches: list[str] = []
     for term in matched_terms:

@@ -442,9 +442,7 @@ def _eval_complex_command(args: argparse.Namespace) -> int:
 
 def _eval_complex_suite_command(args: argparse.Namespace) -> int:
     suite_spec = (
-        load_complex_benchmark_suite_spec(Path(args.suite_spec))
-        if args.suite_spec
-        else None
+        load_complex_benchmark_suite_spec(Path(args.suite_spec)) if args.suite_spec else None
     )
     threshold_kwargs = {
         threshold.name: getattr(args, threshold.name)
@@ -473,13 +471,11 @@ def _eval_complex_suite_command(args: argparse.Namespace) -> int:
             json_output=args.json,
         )
         return 0 if preflight.status == "passed" else 1
-    results, summary, attempt_summaries, followup_candidates = (
-        summarize_complex_benchmark_suite(
-            attempt_dirs=list(config.attempt_dirs),
-            output_dir=config.output_dir,
-            benchmark=config.benchmark,
-            thresholds=config.thresholds,
-        )
+    results, summary, attempt_summaries, followup_candidates = summarize_complex_benchmark_suite(
+        attempt_dirs=list(config.attempt_dirs),
+        output_dir=config.output_dir,
+        benchmark=config.benchmark,
+        thresholds=config.thresholds,
     )
     gate = config.thresholds.gate(summary)
     if config.gate_requested:
@@ -493,17 +489,13 @@ def _eval_complex_suite_command(args: argparse.Namespace) -> int:
             json.dumps(
                 {
                     "result_count": len(results),
-                    "report_path": str(
-                        config.output_dir / "complex_benchmark_suite_report.md"
-                    ),
+                    "report_path": str(config.output_dir / "complex_benchmark_suite_report.md"),
                     "summary": summary.to_dict(),
                     "attempt_summaries": [
-                        attempt_summary.to_dict()
-                        for attempt_summary in attempt_summaries
+                        attempt_summary.to_dict() for attempt_summary in attempt_summaries
                     ],
                     "followup_candidates": [
-                        candidate.to_dict()
-                        for candidate in followup_candidates
+                        candidate.to_dict() for candidate in followup_candidates
                     ],
                     "gate": gate.to_dict(),
                 },

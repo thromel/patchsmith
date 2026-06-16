@@ -647,9 +647,7 @@ def _retry_failure_focus(failure_class: str) -> str:
             "choose an allowed, untried source control point or justify the distinct branch "
             "inside a previously rejected target."
         ),
-        "no_patch": (
-            "produce one bounded patch plan with a valid target path and exact old span."
-        ),
+        "no_patch": ("produce one bounded patch plan with a valid target path and exact old span."),
         "missing_validation": (
             "produce a patch and make the validation assumption explicit; there was no "
             "sandbox result to confirm behavior."
@@ -694,9 +692,7 @@ def _retry_guidance(
             "high-risk mechanism unchanged; avoid the Patch Plan Diagnostics quality "
             "findings and move the repair to a lower-risk source control point."
         ]
-        source_recompile_guidance = _high_risk_source_text_recompile_guidance(
-            runtime_trace or []
-        )
+        source_recompile_guidance = _high_risk_source_text_recompile_guidance(runtime_trace or [])
         if source_recompile_guidance:
             lines.append(source_recompile_guidance)
         broad_exception_guidance = _broad_exception_swallow_guidance(runtime_trace or [])
@@ -936,9 +932,7 @@ def _failed_naked_import_cache_invalidation_guidance(
     test_result: CommandResult,
     runtime_trace: list[dict[str, object]],
 ) -> str:
-    if "naked_import_cache_invalidation" not in _latest_patch_quality_finding_codes(
-        runtime_trace
-    ):
+    if "naked_import_cache_invalidation" not in _latest_patch_quality_finding_codes(runtime_trace):
         return ""
     signature = sandbox_failure_signature(test_result)
     if "path:" not in signature:

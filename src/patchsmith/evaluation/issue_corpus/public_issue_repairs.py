@@ -299,8 +299,7 @@ def _public_repair_sandbox_preflight(
     if not availability.available:
         return PublicRepairSandboxPreflight(
             errors=tuple(
-                f"Docker sandbox preflight failed: {error}"
-                for error in availability.errors
+                f"Docker sandbox preflight failed: {error}" for error in availability.errors
             ),
             evidence=availability.evidence,
             next_actions=availability.next_actions,

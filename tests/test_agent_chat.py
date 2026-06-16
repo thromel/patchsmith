@@ -26,6 +26,7 @@ pytestmark = pytest.mark.unit
 def test_chat_session_runs_preflight_task_apply_and_writes_transcript(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    deepagents_dependency_available: None,
 ) -> None:
     artifacts = tmp_path / "artifacts"
     diff_path = artifacts / "runs" / "run-chat" / "final.diff"
@@ -166,10 +167,7 @@ def test_chat_session_runs_preflight_task_apply_and_writes_transcript(
     }
 
     transcript_path = artifacts / "chat_sessions" / "test-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     assert [row["event"] for row in rows] == [
         "session_start",
         "user_command",
@@ -244,6 +242,7 @@ def test_chat_session_treats_plain_text_as_run(
 def test_chat_session_model_preflight_blocks_before_runner(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    deepagents_dependency_available: None,
 ) -> None:
     artifacts = tmp_path / "artifacts"
 
@@ -288,10 +287,7 @@ def test_chat_session_model_preflight_blocks_before_runner(
     assert "Model preflight blocked: OpenAI Models API error 401" in text
     assert "Running PatchSmith agent..." not in text
     transcript_path = artifacts / "chat_sessions" / "model-preflight-blocked-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     model_preflight = next(row for row in rows if row["event"] == "model_preflight")
     assert model_preflight["payload"]["status"] == "http_error"
     assert model_preflight["payload"]["available"] is False
@@ -338,10 +334,7 @@ def test_chat_session_routes_obvious_natural_commands_without_running_agent(
     assert "No run is available." in text
     assert "No run is available to apply." in text
     transcript_path = artifacts / "chat_sessions" / "natural-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     routed = [row["payload"]["routed_command"] for row in rows if row["event"] == "natural_command"]
     assert routed == [
         "/next",
@@ -358,6 +351,7 @@ def test_chat_session_routes_obvious_natural_commands_without_running_agent(
 def test_chat_session_plan_mode_preflights_plain_text_until_approved(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    deepagents_dependency_available: None,
 ) -> None:
     artifacts = tmp_path / "artifacts"
     diff_path = artifacts / "runs" / "run-after-plan" / "final.diff"
@@ -389,13 +383,7 @@ def test_chat_session_plan_mode_preflights_plain_text_until_approved(
             test_command="pytest -q",
             artifacts_dir=str(artifacts),
         ),
-        input_stream=io.StringIO(
-            "plan mode\n"
-            "fix parser\n"
-            "show status\n"
-            "go ahead\n"
-            "exit\n"
-        ),
+        input_stream=io.StringIO("plan mode\nfix parser\nshow status\ngo ahead\nexit\n"),
         output_stream=output,
         runner_cls=FakeRepairRunner,
         session_id="plan-mode-session",
@@ -413,15 +401,8 @@ def test_chat_session_plan_mode_preflights_plain_text_until_approved(
     assert "Approved planned task: fix parser" in text
     assert "Run ID: run-after-plan" in text
     transcript_path = artifacts / "chat_sessions" / "plan-mode-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
-    mode_updates = [
-        row["payload"]["mode"]
-        for row in rows
-        if row["event"] == "chat_mode_update"
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
+    mode_updates = [row["payload"]["mode"] for row in rows if row["event"] == "chat_mode_update"]
     assert mode_updates == ["plan"]
     assert [row["event"] for row in rows].count("plan_mode_task") == 1
     assert [row["event"] for row in rows].count("plan_mode_approval") == 1
@@ -450,13 +431,7 @@ def test_chat_session_cancel_plan_mode_task_prevents_later_approval(
             test_command="pytest -q",
             artifacts_dir=str(artifacts),
         ),
-        input_stream=io.StringIO(
-            "plan mode\n"
-            "fix parser\n"
-            "cancel plan\n"
-            "go ahead\n"
-            "exit\n"
-        ),
+        input_stream=io.StringIO("plan mode\nfix parser\ncancel plan\ngo ahead\nexit\n"),
         output_stream=output,
         runner_cls=FakeRepairRunner,
         session_id="plan-cancel-session",
@@ -468,10 +443,7 @@ def test_chat_session_cancel_plan_mode_task_prevents_later_approval(
     assert "Cancelled planned task: fix parser" in text
     assert "No pending planned task. Usage: /run <task>" in text
     transcript_path = artifacts / "chat_sessions" / "plan-cancel-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     assert [row["event"] for row in rows].count("plan_mode_task") == 1
     assert [row["event"] for row in rows].count("plan_mode_cancel") == 1
     assert [row["event"] for row in rows].count("plan_mode_approval") == 0
@@ -481,6 +453,7 @@ def test_chat_session_cancel_plan_mode_task_prevents_later_approval(
 def test_chat_session_next_recommends_pending_plan_decision(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    deepagents_dependency_available: None,
 ) -> None:
     artifacts = tmp_path / "artifacts"
 
@@ -499,12 +472,7 @@ def test_chat_session_next_recommends_pending_plan_decision(
             test_command="pytest -q",
             artifacts_dir=str(artifacts),
         ),
-        input_stream=io.StringIO(
-            "plan mode\n"
-            "fix parser\n"
-            "what next\n"
-            "exit\n"
-        ),
+        input_stream=io.StringIO("plan mode\nfix parser\nwhat next\nexit\n"),
         output_stream=output,
         runner_cls=FakeRepairRunner,
         session_id="plan-next-session",
@@ -516,14 +484,9 @@ def test_chat_session_next_recommends_pending_plan_decision(
     assert "- Commands: /run, /cancel plan, /mode act" in text
     assert "- Evidence: pending_task=fix parser, plan_mode=pending" in text
     transcript_path = artifacts / "chat_sessions" / "plan-next-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     next_event = next(row for row in rows if row["event"] == "session_next")
-    assert next_event["payload"]["action"] == (
-        "Approve or cancel the pending planned task."
-    )
+    assert next_event["payload"]["action"] == ("Approve or cancel the pending planned task.")
     assert next_event["payload"]["commands"] == [
         "/run",
         "/cancel plan",
@@ -554,12 +517,7 @@ def test_chat_session_next_blocks_pending_plan_when_preflight_failed(
             test_command="pytest -q",
             artifacts_dir=str(artifacts),
         ),
-        input_stream=io.StringIO(
-            "plan mode\n"
-            "fix parser\n"
-            "/next\n"
-            "exit\n"
-        ),
+        input_stream=io.StringIO("plan mode\nfix parser\n/next\nexit\n"),
         output_stream=output,
         runner_cls=FakeRepairRunner,
         session_id="plan-next-blocked-session",
@@ -571,14 +529,9 @@ def test_chat_session_next_blocks_pending_plan_when_preflight_failed(
     assert "- Commands: /doctor, /preflight fix parser, /cancel plan" in text
     assert "- Evidence: pending_task=fix parser, latest_preflight=blocked" in text
     transcript_path = artifacts / "chat_sessions" / "plan-next-blocked-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     next_event = next(row for row in rows if row["event"] == "session_next")
-    assert next_event["payload"]["action"] == (
-        "Fix readiness or cancel the pending planned task."
-    )
+    assert next_event["payload"]["action"] == ("Fix readiness or cancel the pending planned task.")
     assert next_event["payload"]["commands"] == [
         "/doctor",
         "/preflight fix parser",
@@ -614,11 +567,7 @@ def test_chat_session_updates_model_and_budget_before_run(tmp_path: Path) -> Non
     exit_code = run_chat_session(
         config=AgentCliConfig(repo=str(tmp_path), artifacts_dir=str(artifacts)),
         input_stream=io.StringIO(
-            "/model gpt-5-mini\n"
-            "/budget set 6 90000\n"
-            "/status\n"
-            "/run fix parser\n"
-            "/exit\n"
+            "/model gpt-5-mini\n/budget set 6 90000\n/status\n/run fix parser\n/exit\n"
         ),
         output_stream=output,
         runner_cls=FakeRepairRunner,
@@ -639,10 +588,7 @@ def test_chat_session_updates_model_and_budget_before_run(tmp_path: Path) -> Non
         },
     }
     transcript_path = artifacts / "chat_sessions" / "config-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     config_updates = [row for row in rows if row["event"] == "config_update"]
     assert config_updates == [
         {
@@ -712,17 +658,13 @@ def test_chat_session_updates_permissions_and_resumes_them(tmp_path: Path) -> No
     assert "Dirty apply: allowed" in resumed_text
 
     transcript_path = artifacts / "chat_sessions" / "permission-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     permission_view = next(row for row in rows if row["event"] == "permission_view")
     assert permission_view["payload"]["apply_after_run"] is False
     permission_updates = [
         row["payload"]
         for row in rows
-        if row["event"] == "config_update"
-        and row["payload"].get("field") == "permissions"
+        if row["event"] == "config_update" and row["payload"].get("field") == "permissions"
     ]
     assert permission_updates == [
         {"field": "permissions", "apply": True, "allow_dirty_apply": False},
@@ -736,6 +678,7 @@ def test_chat_session_updates_permissions_and_resumes_them(tmp_path: Path) -> No
 def test_chat_session_doctor_and_cost_report_transcript_usage(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    deepagents_dependency_available: None,
 ) -> None:
     artifacts = tmp_path / "artifacts"
     diff_path = artifacts / "runs" / "run-usage" / "final.diff"
@@ -801,10 +744,7 @@ def test_chat_session_doctor_and_cost_report_transcript_usage(
     assert "1. fix parser" in report
     assert "`run-usage`" in report
     transcript_path = artifacts / "chat_sessions" / "usage-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     assert any(row["event"] == "doctor" for row in rows)
     assert any(row["event"] == "session_export" for row in rows)
     usage = next(row for row in rows if row["event"] == "session_usage")
@@ -820,15 +760,18 @@ def test_chat_session_doctor_and_cost_report_transcript_usage(
     }
 
 
-def test_chat_session_verify_runs_policy_checked_test_command(tmp_path: Path) -> None:
+def test_chat_session_verify_runs_policy_checked_test_command(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     artifacts = tmp_path / "artifacts"
     tests_dir = tmp_path / "tests"
     tests_dir.mkdir()
     (tests_dir / "test_smoke.py").write_text(
-        "def test_smoke():\n"
-        "    assert 1 + 1 == 2\n",
+        "def test_smoke():\n    assert 1 + 1 == 2\n",
         encoding="utf-8",
     )
+    monkeypatch.setenv("PATH", str(Path(sys.executable).parent))
 
     output = io.StringIO()
     assert (
@@ -851,13 +794,13 @@ def test_chat_session_verify_runs_policy_checked_test_command(tmp_path: Path) ->
     assert "Exit code: 0" in text
     assert "- Verify runs: 1" in text
     assert "- Passed verify runs: 1" in text
-    assert "verify_result | status=passed exit=0 command=python -m pytest tests/test_smoke.py -q" in text
+    assert (
+        "verify_result | status=passed exit=0 command=python -m pytest tests/test_smoke.py -q"
+        in text
+    )
 
     transcript_path = artifacts / "chat_sessions" / "verify-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     verify = next(row for row in rows if row["event"] == "verify_result")
     assert verify["payload"]["status"] == "passed"
     assert verify["payload"]["result"]["exit_code"] == 0
@@ -888,10 +831,7 @@ def test_chat_session_verify_blocks_unallowlisted_command(tmp_path: Path) -> Non
     assert "- Passed verify runs: 0" in text
 
     transcript_path = artifacts / "chat_sessions" / "verify-block-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     verify = next(row for row in rows if row["event"] == "verify_result")
     assert verify["payload"]["status"] == "blocked"
     assert verify["payload"]["result"]["policy_decision"]["allowed"] is False
@@ -900,6 +840,7 @@ def test_chat_session_verify_blocks_unallowlisted_command(tmp_path: Path) -> Non
 def test_chat_session_metrics_report_process_rates(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    deepagents_dependency_available: None,
 ) -> None:
     artifacts = tmp_path / "artifacts"
     command_dir = tmp_path / ".patchsmith" / "commands"
@@ -997,13 +938,13 @@ def test_chat_session_metrics_report_process_rates(
             "/context add src/a.py#target\n"
             "/permissions apply auto\n"
             "/model gpt-test\n"
-                "/budget set 3 50000\n"
-                "/review parser behavior\n"
-                "/diff review\n"
-                "/apply check\n"
-                "/apply\n"
-                f"/metrics\n/export {report_path}\n"
-                "/exit\n"
+            "/budget set 3 50000\n"
+            "/review parser behavior\n"
+            "/diff review\n"
+            "/apply check\n"
+            "/apply\n"
+            f"/metrics\n/export {report_path}\n"
+            "/exit\n"
         ),
         output_stream=output,
         runner_cls=FakeRepairRunner,
@@ -1034,10 +975,7 @@ def test_chat_session_metrics_report_process_rates(
     assert "- Cost per validated run: $0.004000" in text
 
     transcript_path = artifacts / "chat_sessions" / "metrics-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     metrics_event = next(row for row in rows if row["event"] == "session_metrics")
     deferred = next(row for row in rows if row["event"] == "apply_auto_deferred")
     assert deferred["payload"]["reason_code"] == "interactive_apply_requires_review"
@@ -1075,9 +1013,12 @@ def test_chat_session_trace_summarizes_last_run_artifacts(tmp_path: Path) -> Non
         encoding="utf-8",
     )
     trace_path.write_text(
-        json.dumps({"node": "retrieve", "status": "completed"}) + "\n"
-        + json.dumps({"node_name": "plan", "status": "completed"}) + "\n"
-        + json.dumps({"event_type": "sandbox", "status": "failed"}) + "\n",
+        json.dumps({"node": "retrieve", "status": "completed"})
+        + "\n"
+        + json.dumps({"node_name": "plan", "status": "completed"})
+        + "\n"
+        + json.dumps({"event_type": "sandbox", "status": "failed"})
+        + "\n",
         encoding="utf-8",
     )
     report_path.write_text("# Report\n\nvalidated\n", encoding="utf-8")
@@ -1145,10 +1086,7 @@ def test_chat_session_trace_summarizes_last_run_artifacts(tmp_path: Path) -> Non
     assert "Run evidence: run-trace" in resumed_output.getvalue()
 
     transcript_path = artifacts / "chat_sessions" / "trace-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     evidence_events = [row for row in rows if row["event"] == "run_evidence"]
     assert len(evidence_events) == 2
     assert evidence_events[0]["payload"]["trace_event_count"] == 3
@@ -1206,13 +1144,7 @@ def test_chat_session_diff_stat_and_preview_are_transcripted(tmp_path: Path) -> 
         run_chat_session(
             config=AgentCliConfig(repo=str(tmp_path), artifacts_dir=str(artifacts)),
             input_stream=io.StringIO(
-                "/run fix diff\n"
-                "/diff\n"
-                "/diff stat\n"
-                "/diff show 6\n"
-                "/timeline 12\n"
-                "/metrics\n"
-                "/exit\n"
+                "/run fix diff\n/diff\n/diff stat\n/diff show 6\n/timeline 12\n/metrics\n/exit\n"
             ),
             output_stream=output,
             runner_cls=FakeRepairRunner,
@@ -1234,10 +1166,7 @@ def test_chat_session_diff_stat_and_preview_are_transcripted(tmp_path: Path) -> 
     assert "- Diff views: 3" in text
 
     transcript_path = artifacts / "chat_sessions" / "diff-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     diff_events = [row for row in rows if row["event"] == "diff_view"]
     assert [row["payload"]["mode"] for row in diff_events] == ["path", "stat", "show"]
     assert diff_events[-1]["payload"]["changed_files"] == [
@@ -1327,16 +1256,12 @@ def test_chat_session_timeline_summarizes_recent_events(tmp_path: Path) -> None:
     assert "- Timeline views: 1" in text
 
     transcript_path = artifacts / "chat_sessions" / "timeline-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     timeline = next(row for row in rows if row["event"] == "session_timeline")
     assert timeline["payload"]["limit"] == 12
     assert timeline["payload"]["entry_count"] == 12
     assert any(
-        entry["event"] == "run_result"
-        and "run=run-timeline" in entry["summary"]
+        entry["event"] == "run_result" and "run=run-timeline" in entry["summary"]
         for entry in timeline["payload"]["entries"]
     )
     metrics = next(row for row in rows if row["event"] == "session_metrics")
@@ -1417,10 +1342,7 @@ def test_chat_session_next_recommends_evidence_backed_actions(tmp_path: Path) ->
     assert "- Next recommendations: 4" in text
 
     transcript_path = artifacts / "chat_sessions" / "next-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     next_events = [row for row in rows if row["event"] == "session_next"]
     assert [row["payload"]["action"] for row in next_events] == [
         "Run a bounded preflight, then start the first repair run.",
@@ -1500,13 +1422,7 @@ def test_chat_session_next_breaks_repeated_failure_loop(
     assert (
         run_chat_session(
             config=AgentCliConfig(repo=str(tmp_path), artifacts_dir=str(artifacts)),
-            input_stream=io.StringIO(
-                "/run fix parser\n"
-                "/trace\n"
-                "/run fix parser\n"
-                "/next\n"
-                "/exit\n"
-            ),
+            input_stream=io.StringIO("/run fix parser\n/trace\n/run fix parser\n/next\n/exit\n"),
             output_stream=output,
             runner_cls=FakeRepairRunner,
             session_id="stuck-next-session",
@@ -1519,10 +1435,7 @@ def test_chat_session_next_breaks_repeated_failure_loop(
     assert "failure=no_patch_generated" in text
     assert "repeat_count=2" in text
     transcript_path = artifacts / "chat_sessions" / "stuck-next-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     run_results = [row for row in rows if row["event"] == "run_result"]
     assert [row["payload"]["repair_failure_category"] for row in run_results] == [
         "no_patch_generated",
@@ -1628,10 +1541,7 @@ def test_chat_session_next_flags_budget_exhausted_no_patch(
     assert "- Model preflights: 1" in text
     assert "- Passed model preflights: 1" in text
     transcript_path = artifacts / "chat_sessions" / "budget-exhausted-next-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     next_event = next(row for row in rows if row["event"] == "session_next")
     assert next_event["payload"]["action"] == (
         "Adjust budget, model, or context strategy before retrying."
@@ -1732,10 +1642,7 @@ def test_chat_session_checks_apply_without_mutating_repo(tmp_path: Path) -> None
     assert (repo / "app.py").read_text(encoding="utf-8") == "value = 1\n"
 
     transcript_path = artifacts / "chat_sessions" / "apply-check-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     diff_review = next(row for row in rows if row["event"] == "diff_review")
     assert diff_review["payload"]["risk_level"] == "low"
     assert diff_review["payload"]["decision"] == "ready_for_apply_check"
@@ -1796,12 +1703,7 @@ def test_chat_session_diff_review_blocks_empty_diff(tmp_path: Path) -> None:
     assert (
         run_chat_session(
             config=AgentCliConfig(repo=str(repo), artifacts_dir=str(artifacts)),
-            input_stream=io.StringIO(
-                "/run update app value\n"
-                "/diff review\n"
-                "/apply check\n"
-                "/exit\n"
-            ),
+            input_stream=io.StringIO("/run update app value\n/diff review\n/apply check\n/exit\n"),
             output_stream=output,
             runner_cls=FakeRepairRunner,
             session_id="empty-diff-review-session",
@@ -1817,10 +1719,7 @@ def test_chat_session_diff_review_blocks_empty_diff(tmp_path: Path) -> None:
     assert "Apply check: empty_diff - generated diff is empty; nothing to apply" in text
 
     transcript_path = artifacts / "chat_sessions" / "empty-diff-review-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     diff_review = next(row for row in rows if row["event"] == "diff_review")
     assert diff_review["payload"]["risk_level"] == "not_available"
     assert diff_review["payload"]["decision"] == "blocked"
@@ -2002,10 +1901,7 @@ def test_chat_session_diff_review_stops_high_risk_apply_path(tmp_path: Path) -> 
     assert "- High-risk diff reviews: 1" in text
 
     transcript_path = artifacts / "chat_sessions" / "high-risk-diff-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     diff_review = next(row for row in rows if row["event"] == "diff_review")
     assert diff_review["payload"]["risk_level"] == "high"
     assert diff_review["payload"]["confirmation_required"] is True
@@ -2098,14 +1994,9 @@ def test_chat_session_next_honors_diff_review_without_prior_diff_view(
     assert "Approve or reject the high-risk reviewed diff." in text
     assert "Review the generated diff before applying it." not in text
     transcript_path = artifacts / "chat_sessions" / "high-risk-ready-next-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     next_event = next(row for row in rows if row["event"] == "session_next")
-    assert next_event["payload"]["action"] == (
-        "Approve or reject the high-risk reviewed diff."
-    )
+    assert next_event["payload"]["action"] == ("Approve or reject the high-risk reviewed diff.")
     assert next_event["payload"]["commands"] == [
         "/approve apply <reason>",
         "/reject apply <reason>",
@@ -2211,26 +2102,18 @@ def test_chat_session_high_risk_apply_requires_explicit_approval(
     assert test_file.read_text(encoding="utf-8") == "assert value == 2\n"
 
     transcript_path = artifacts / "chat_sessions" / "approved-risk-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     approval = next(row for row in rows if row["event"] == "apply_approval")
     assert approval["payload"]["risk_level"] == "high"
-    assert approval["payload"]["reason"] == (
-        "accepted because this fixture is the explicit target"
-    )
+    assert approval["payload"]["reason"] == ("accepted because this fixture is the explicit target")
     rejection = next(row for row in rows if row["event"] == "apply_rejection")
     assert rejection["payload"]["risk_level"] == "high"
     assert rejection["payload"]["reason"] == "not accepted without fixture owner review"
     next_events = [row for row in rows if row["event"] == "session_next"]
-    assert next_events[0]["payload"]["action"] == (
-        "Approve or reject the high-risk reviewed diff."
-    )
+    assert next_events[0]["payload"]["action"] == ("Approve or reject the high-risk reviewed diff.")
     next_event = next_events[1]
     assert (
-        next_event["payload"]["action"]
-        == "Turn the rejected diff into feedback before retrying."
+        next_event["payload"]["action"] == "Turn the rejected diff into feedback before retrying."
     )
     apply_blocks = [row for row in rows if row["event"] == "apply_blocked"]
     assert [row["payload"]["reason_code"] for row in apply_blocks] == [
@@ -2300,13 +2183,7 @@ def test_chat_session_apply_requires_review_and_ready_check(
     assert (
         run_chat_session(
             config=AgentCliConfig(repo=str(tmp_path), artifacts_dir=str(artifacts)),
-            input_stream=io.StringIO(
-                "/run guarded apply\n"
-                "/apply\n"
-                "/metrics\n"
-                "/timeline 10\n"
-                "/exit\n"
-            ),
+            input_stream=io.StringIO("/run guarded apply\n/apply\n/metrics\n/timeline 10\n/exit\n"),
             output_stream=output,
             runner_cls=FakeRepairRunner,
             session_id="guarded-apply-session",
@@ -2320,10 +2197,7 @@ def test_chat_session_apply_requires_review_and_ready_check(
     assert "apply_blocked | reason=missing_diff_review" in text
 
     transcript_path = artifacts / "chat_sessions" / "guarded-apply-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     apply_block = next(row for row in rows if row["event"] == "apply_blocked")
     assert apply_block["payload"]["reason_code"] == "missing_diff_review"
     metrics = next(row for row in rows if row["event"] == "session_metrics")
@@ -2365,10 +2239,7 @@ def test_chat_session_lists_saved_sessions(tmp_path: Path) -> None:
     assert "listing-session" in text
     assert "1 | 1 | 1 | 0 | $0.002000" in text
     transcript_path = artifacts / "chat_sessions" / "listing-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     session_list = next(row for row in rows if row["event"] == "session_list")
     assert session_list["payload"]["count"] == 3
 
@@ -2389,8 +2260,7 @@ def test_chat_session_runs_project_custom_slash_commands(tmp_path: Path) -> None
     nested_dir = command_dir / "bench"
     nested_dir.mkdir()
     (nested_dir / "live.md").write_text(
-        "Plan a bounded live benchmark.\n\n"
-        "Constraints: {{arguments}}\n",
+        "Plan a bounded live benchmark.\n\nConstraints: {{arguments}}\n",
         encoding="utf-8",
     )
     captured_tasks: list[str] = []
@@ -2419,10 +2289,7 @@ def test_chat_session_runs_project_custom_slash_commands(tmp_path: Path) -> None
     exit_code = run_chat_session(
         config=AgentCliConfig(repo=str(tmp_path), artifacts_dir=str(artifacts)),
         input_stream=io.StringIO(
-            "/commands\n"
-            "/review parser edge cases\n"
-            "/bench:live cost cap $0.05\n"
-            "/exit\n"
+            "/commands\n/review parser edge cases\n/bench:live cost cap $0.05\n/exit\n"
         ),
         output_stream=output,
         runner_cls=FakeRepairRunner,
@@ -2446,10 +2313,7 @@ def test_chat_session_runs_project_custom_slash_commands(tmp_path: Path) -> None
     assert "Constraints: cost cap $0.05" in captured_tasks[1]
 
     transcript_path = artifacts / "chat_sessions" / "custom-command-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     command_list = next(row for row in rows if row["event"] == "custom_command_list")
     assert command_list["payload"]["count"] == 2
     custom_events = [row for row in rows if row["event"] == "custom_command"]
@@ -2499,10 +2363,7 @@ def test_chat_session_lists_project_hooks(tmp_path: Path) -> None:
     assert "PreRun: guard-expensive-run [benchmark] timeout=4s" in text
     assert "PreApply: preapply-1 [*] timeout=30s" in text
     transcript_path = artifacts / "chat_sessions" / "hook-list-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     hook_list = next(row for row in rows if row["event"] == "hook_list")
     assert hook_list["payload"]["count"] == 2
 
@@ -2560,10 +2421,7 @@ def test_chat_session_prerun_hook_can_block_task(tmp_path: Path) -> None:
     assert "Hook blocked PreRun: budget exhausted" in text
     assert "Last run: none" in text
     transcript_path = artifacts / "chat_sessions" / "blocked-prerun-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     assert not any(row["event"] == "user_task" for row in rows)
     hook_result = next(row for row in rows if row["event"] == "hook_result")
     assert hook_result["payload"]["event"] == "PreRun"
@@ -2665,10 +2523,7 @@ def test_chat_session_preapply_hook_can_block_apply(
     assert "Run ID: run-hook-apply" in text
     assert "Hook blocked PreApply: diff needs review" in text
     transcript_path = artifacts / "chat_sessions" / "blocked-apply-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     assert any(row["event"] == "run_result" for row in rows)
     assert not any(row["event"] == "apply_result" for row in rows)
     hook_result = [row for row in rows if row["event"] == "hook_result"][-1]
@@ -2724,12 +2579,7 @@ def test_chat_session_lists_and_applies_project_agent_profile(tmp_path: Path) ->
         run_chat_session(
             config=AgentCliConfig(repo=str(tmp_path), artifacts_dir=str(artifacts)),
             input_stream=io.StringIO(
-                "/agents\n"
-                "/agent verifier\n"
-                "/status\n"
-                "/run fix parser\n"
-                "/metrics\n"
-                "/exit\n"
+                "/agents\n/agent verifier\n/status\n/run fix parser\n/metrics\n/exit\n"
             ),
             output_stream=output,
             runner_cls=FakeRepairRunner,
@@ -2769,16 +2619,12 @@ def test_chat_session_lists_and_applies_project_agent_profile(tmp_path: Path) ->
     }
 
     transcript_path = artifacts / "chat_sessions" / "profile-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     assert any(row["event"] == "agent_profile_list" for row in rows)
     profile_update = next(
         row
         for row in rows
-        if row["event"] == "config_update"
-        and row["payload"].get("field") == "agent_profile"
+        if row["event"] == "config_update" and row["payload"].get("field") == "agent_profile"
     )
     assert profile_update["payload"]["agent_profile"] == "verifier"
     assert "Localize the failure" in profile_update["payload"]["agent_profile_instructions"]
@@ -2787,9 +2633,7 @@ def test_chat_session_lists_and_applies_project_agent_profile(tmp_path: Path) ->
 def test_chat_session_loads_project_instructions_into_runs(tmp_path: Path) -> None:
     artifacts = tmp_path / "artifacts"
     (tmp_path / "AGENTS.md").write_text(
-        "## Repository expectations\n"
-        "- Keep parser fixes minimal.\n"
-        "- Run focused parser tests.\n",
+        "## Repository expectations\n- Keep parser fixes minimal.\n- Run focused parser tests.\n",
         encoding="utf-8",
     )
     captured: dict[str, object] = {}
@@ -2817,13 +2661,7 @@ def test_chat_session_loads_project_instructions_into_runs(tmp_path: Path) -> No
     assert (
         run_chat_session(
             config=AgentCliConfig(repo=str(tmp_path), artifacts_dir=str(artifacts)),
-            input_stream=io.StringIO(
-                "/instructions\n"
-                "/status\n"
-                "/run fix parser\n"
-                "/metrics\n"
-                "/exit\n"
-            ),
+            input_stream=io.StringIO("/instructions\n/status\n/run fix parser\n/metrics\n/exit\n"),
             output_stream=output,
             runner_cls=FakeRepairRunner,
             session_id="instruction-session",
@@ -2845,10 +2683,7 @@ def test_chat_session_loads_project_instructions_into_runs(tmp_path: Path) -> No
     assert project_instructions["instruction_chars"] > 0
 
     transcript_path = artifacts / "chat_sessions" / "instruction-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     session_start = rows[0]["payload"]["config"]
     assert session_start["agent_instruction_files"] == ["AGENTS.md"]
     assert "Keep parser fixes minimal." in session_start["agent_instructions"]
@@ -2860,8 +2695,7 @@ def test_chat_session_exposes_project_memory_as_first_class_command(
 ) -> None:
     artifacts = tmp_path / "artifacts"
     (tmp_path / "AGENTS.md").write_text(
-        "## Repository memory\n"
-        "- Prefer minimal parser patches.\n",
+        "## Repository memory\n- Prefer minimal parser patches.\n",
         encoding="utf-8",
     )
 
@@ -2877,17 +2711,12 @@ def test_chat_session_exposes_project_memory_as_first_class_command(
         run_chat_session(
             config=AgentCliConfig(repo=str(tmp_path), artifacts_dir=str(artifacts)),
             input_stream=io.StringIO(
-                "show memory\n"
-                "/memory reload\n"
-                "/memory clear\n"
-                "/memory\n"
-                "/metrics\n"
-                "/exit\n"
-                ),
-                output_stream=output,
-                runner_cls=NoRunRepairRunner,
-                session_id="memory-session",
-            )
+                "show memory\n/memory reload\n/memory clear\n/memory\n/metrics\n/exit\n"
+            ),
+            output_stream=output,
+            runner_cls=NoRunRepairRunner,
+            session_id="memory-session",
+        )
         == 0
     )
 
@@ -2901,10 +2730,7 @@ def test_chat_session_exposes_project_memory_as_first_class_command(
     assert "- Instruction views: 0" in text
 
     transcript_path = artifacts / "chat_sessions" / "memory-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     memory_views = [row for row in rows if row["event"] == "memory_view"]
     assert [row["payload"]["count"] for row in memory_views] == [1, 0]
     metrics = next(row for row in rows if row["event"] == "session_metrics")
@@ -2974,10 +2800,7 @@ def test_chat_session_plan_guides_runs_and_resumes(tmp_path: Path) -> None:
     assert "Task:\nfix parser" in request.issue_text
 
     transcript_path = artifacts / "chat_sessions" / "plan-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     plan_updates = [row for row in rows if row["event"] == "plan_update"]
     assert [row["payload"]["action"] for row in plan_updates] == [
         "set",
@@ -3077,10 +2900,7 @@ def test_chat_session_feedback_guides_runs_and_resumes(tmp_path: Path) -> None:
     assert "Task:\nfix parser" in request.issue_text
 
     transcript_path = artifacts / "chat_sessions" / "feedback-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     feedback_updates = [row for row in rows if row["event"] == "feedback_update"]
     assert [row["payload"]["item"] for row in feedback_updates] == [
         "keep the public API stable",
@@ -3106,7 +2926,9 @@ def test_chat_session_feedback_guides_runs_and_resumes(tmp_path: Path) -> None:
     assert (
         run_chat_session(
             config=AgentCliConfig(repo=str(tmp_path), artifacts_dir=str(artifacts)),
-            input_stream=io.StringIO("/feedback show\n/status\n/feedback clear\n/feedback\n/exit\n"),
+            input_stream=io.StringIO(
+                "/feedback show\n/status\n/feedback clear\n/feedback\n/exit\n"
+            ),
             output_stream=resumed_output,
             runner_cls=NoRunRepairRunner,
             session_id="feedback-session",
@@ -3183,10 +3005,7 @@ def test_chat_session_can_rewind_last_applied_diff(tmp_path: Path) -> None:
     assert (repo / "app.py").read_text(encoding="utf-8") == "value = 1\n"
 
     transcript_path = artifacts / "chat_sessions" / "rewind-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     rewind = next(row for row in rows if row["event"] == "rewind_result")
     assert rewind["payload"]["status"] == "reverted"
     metrics_event = next(row for row in rows if row["event"] == "session_metrics")
@@ -3227,12 +3046,7 @@ def test_chat_session_gate_profiles_report_pass_and_failure(tmp_path: Path) -> N
         run_chat_session(
             config=AgentCliConfig(repo=str(tmp_path), artifacts_dir=str(artifacts)),
             input_stream=io.StringIO(
-                "/gate\n"
-                "/run fix parser\n"
-                "/gate clean\n"
-                "/gate cost 0.001\n"
-                "/metrics\n"
-                "/exit\n"
+                "/gate\n/run fix parser\n/gate clean\n/gate cost 0.001\n/metrics\n/exit\n"
             ),
             output_stream=output,
             runner_cls=FakeRepairRunner,
@@ -3250,10 +3064,7 @@ def test_chat_session_gate_profiles_report_pass_and_failure(tmp_path: Path) -> N
     assert "- Failed session gates: 2" in text
 
     transcript_path = artifacts / "chat_sessions" / "gate-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     gates = [row for row in rows if row["event"] == "session_gate"]
     assert [row["payload"]["gate"]["status"] for row in gates] == [
         "failed",
@@ -3438,11 +3249,7 @@ def test_chat_session_compacts_and_clears_replayable_state(tmp_path: Path) -> No
         run_chat_session(
             config=AgentCliConfig(repo=str(tmp_path), artifacts_dir=str(artifacts)),
             input_stream=io.StringIO(
-                "/run first task\n"
-                "/compact keep target notes\n"
-                "/history\n"
-                "/run second task\n"
-                "/exit\n"
+                "/run first task\n/compact keep target notes\n/history\n/run second task\n/exit\n"
             ),
             output_stream=first_output,
             runner_cls=FakeRepairRunner,
@@ -3569,10 +3376,7 @@ def test_chat_session_checkpoints_restore_state_and_resume(tmp_path: Path) -> No
     assert "- Restores: 1" in text
 
     transcript_path = artifacts / "chat_sessions" / "checkpoint-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     checkpoint = next(row for row in rows if row["event"] == "session_checkpoint")
     assert checkpoint["payload"]["label"] == "stable"
     assert checkpoint["payload"]["state"]["history"] == ["fix one"]
@@ -3650,10 +3454,7 @@ def test_chat_session_records_run_error_without_crashing(tmp_path: Path) -> None
     assert "DeepAgents extra is missing" in text
     assert "Last run: none" in text
     transcript_path = artifacts / "chat_sessions" / "error-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     run_error = next(row for row in rows if row["event"] == "run_error")
     assert run_error["payload"] == {
         "error_type": "RuntimeError",

@@ -72,10 +72,7 @@ def repair_interface_manifest(
         f"- Subagent mode: `{subagent_mode}`",
         f"- Subagents enabled: `{str(subagents_enabled).lower()}`",
         "- Routing reasons: "
-        + (
-            ", ".join(f"`{reason}`" for reason in subagent_routing_reasons if reason)
-            or "none"
-        ),
+        + (", ".join(f"`{reason}`" for reason in subagent_routing_reasons if reason) or "none"),
         f"- Context mode: `{context_mode}`",
         f"- Context window lines: `{context_window_lines}`",
         "",
@@ -235,13 +232,9 @@ def _resource_budget_lines(resource_budget: Mapping[str, Any] | None) -> list[st
     if not resource_budget:
         return []
     lines: list[str] = []
-    max_model_responses = _optional_nonnegative_int(
-        resource_budget.get("max_model_responses")
-    )
+    max_model_responses = _optional_nonnegative_int(resource_budget.get("max_model_responses"))
     max_model_tokens = _optional_nonnegative_int(resource_budget.get("max_model_tokens"))
-    used_model_responses = _optional_nonnegative_int(
-        resource_budget.get("used_model_responses")
-    )
+    used_model_responses = _optional_nonnegative_int(resource_budget.get("used_model_responses"))
     used_model_tokens = _optional_nonnegative_int(resource_budget.get("used_model_tokens"))
     remaining_model_responses = _optional_nonnegative_int(
         resource_budget.get("remaining_model_responses")
@@ -258,17 +251,12 @@ def _resource_budget_lines(resource_budget: Mapping[str, Any] | None) -> list[st
     if used_model_tokens is not None:
         lines.append(f"- Used model tokens before this attempt: `{used_model_tokens}`")
     if remaining_model_responses is not None:
-        lines.append(
-            f"- Remaining model responses for this attempt: `{remaining_model_responses}`"
-        )
+        lines.append(f"- Remaining model responses for this attempt: `{remaining_model_responses}`")
     if remaining_model_tokens is not None:
-        lines.append(
-            f"- Remaining model tokens for this attempt: `{remaining_model_tokens}`"
-        )
+        lines.append(f"- Remaining model tokens for this attempt: `{remaining_model_tokens}`")
     if remaining_model_responses is not None or remaining_model_tokens is not None:
         lines.append(
-            "- If remaining budget is tight, localize and review inline before using "
-            "subagents."
+            "- If remaining budget is tight, localize and review inline before using subagents."
         )
     return lines
 
@@ -278,9 +266,7 @@ def _resource_budget_response_limit(
 ) -> int | None:
     if not resource_budget:
         return None
-    remaining = _optional_nonnegative_int(
-        resource_budget.get("remaining_model_responses")
-    )
+    remaining = _optional_nonnegative_int(resource_budget.get("remaining_model_responses"))
     if remaining is not None:
         return remaining
     return _optional_nonnegative_int(resource_budget.get("max_model_responses"))
@@ -324,8 +310,7 @@ def _fast_patch_packet_lines(
             [
                 f"### `{path}` via `{virtual_path}`",
                 "",
-                "Preferred symbols: "
-                + _preferred_symbol_text(preferred_target_symbols, path=path),
+                "Preferred symbols: " + _preferred_symbol_text(preferred_target_symbols, path=path),
                 "",
                 "```python",
                 snippet.rstrip(),
@@ -347,9 +332,7 @@ def _preferred_symbol_text(
 ) -> str:
     if not preferred_target_symbols:
         return "none"
-    symbols = _ordered_unique_symbols(
-        preferred_target_symbols.get(path, [])
-    )
+    symbols = _ordered_unique_symbols(preferred_target_symbols.get(path, []))
     return ", ".join(f"`{symbol}`" for symbol in symbols) if symbols else "none"
 
 
@@ -380,10 +363,7 @@ def _preferred_target_symbol_lines(
     for path in preferred:
         symbols = _ordered_unique_symbols(preferred_target_symbols.get(path, []))
         if symbols:
-            lines.append(
-                f"- `{path}`: "
-                + ", ".join(f"`{symbol}`" for symbol in symbols)
-            )
+            lines.append(f"- `{path}`: " + ", ".join(f"`{symbol}`" for symbol in symbols))
     return lines
 
 

@@ -131,9 +131,13 @@ def test_retry_context_merge_deprioritizes_ineffective_targets() -> None:
             _retrieved("testing/repro.py", rank=3, terms=["validation_fixture"]),
         ],
         refreshed=[
-            _retrieved("src/assertion/rewrite.py", rank=1, terms=["runtime_cache_signal:_read_pyc"]),
+            _retrieved(
+                "src/assertion/rewrite.py", rank=1, terms=["runtime_cache_signal:_read_pyc"]
+            ),
             _retrieved("src/config.py", rank=2, terms=["runtime_cache_signal:sys.modules"]),
-            _retrieved("src/pathlib.py", rank=3, terms=["runtime_cache_signal:module_name_from_path"]),
+            _retrieved(
+                "src/pathlib.py", rank=3, terms=["runtime_cache_signal:module_name_from_path"]
+            ),
         ],
         limit=4,
         deprioritized_paths={"src/pathlib.py", "src/assertion/rewrite.py"},
@@ -583,10 +587,7 @@ def test_deepagents_runner_marks_high_risk_passing_patch_as_warning(
     src = repo / "src"
     src.mkdir(parents=True)
     (src / "runner.py").write_text(
-        "import types\n"
-        "\n"
-        "def call(testfunction, filename):\n"
-        "    return testfunction()\n",
+        "import types\n\ndef call(testfunction, filename):\n    return testfunction()\n",
         encoding="utf-8",
     )
     planner = HighRiskPassingPlanner()
@@ -633,10 +634,7 @@ def test_deepagents_runner_retries_high_risk_passing_patch_when_budget_remains(
     src = repo / "src"
     src.mkdir(parents=True)
     (src / "runner.py").write_text(
-        "import types\n"
-        "\n"
-        "def call(testfunction, filename):\n"
-        "    return testfunction()\n",
+        "import types\n\ndef call(testfunction, filename):\n    return testfunction()\n",
         encoding="utf-8",
     )
     planner = HighRiskThenSafePlanner()
@@ -683,9 +681,7 @@ def test_deepagents_runner_retries_high_risk_passing_patch_when_budget_remains(
     trace_events = [
         json.loads(line) for line in result.trace_path.read_text(encoding="utf-8").splitlines()
     ]
-    analysis_events = [
-        event for event in trace_events if event["event_type"] == "repair_outcome"
-    ]
+    analysis_events = [event for event in trace_events if event["event_type"] == "repair_outcome"]
     assert [event["status"] for event in analysis_events] == [
         "validated_with_warnings",
         "validated",

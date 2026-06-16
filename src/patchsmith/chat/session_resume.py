@@ -95,21 +95,13 @@ def runtime_from_transcript(
                     config = config_from_payload(config_payload, config)
                 history = string_list_from_payload(state_payload.get("history"))
                 plan_items = plan_items_from_payload(state_payload.get("plan_items"))
-                feedback_items = string_list_from_payload(
-                    state_payload.get("feedback_items")
-                )
+                feedback_items = string_list_from_payload(state_payload.get("feedback_items"))
                 last_run_payload = dict_or_none(state_payload.get("last_run_payload"))
                 last_apply = apply_result_from_state(state_payload.get("last_apply"))
-                last_rewind = apply_result_from_state(
-                    state_payload.get("last_rewind")
-                )
+                last_rewind = apply_result_from_state(state_payload.get("last_rewind"))
                 chat_mode = chat_mode_from_payload(state_payload.get("chat_mode"))
-                pending_planned_task = optional_text(
-                    state_payload.get("pending_planned_task")
-                )
-                compaction_summary = dict_or_none(
-                    state_payload.get("compaction_summary")
-                )
+                pending_planned_task = optional_text(state_payload.get("pending_planned_task"))
+                compaction_summary = dict_or_none(state_payload.get("compaction_summary"))
     return AgentChatRuntime(
         state=dataclass_replace(state, config=config),
         chat_mode=chat_mode,

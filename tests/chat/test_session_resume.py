@@ -221,9 +221,7 @@ def test_runtime_from_transcript_replays_clear_compact_and_restore(
     assert restored_runtime.chat_mode == "plan"
     assert restored_runtime.pending_planned_task == "restore pending task"
     assert restored_runtime.history == ["restored task"]
-    assert restored_runtime.plan_items == [
-        AgentPlanItem(text="restore plan", status="in_progress")
-    ]
+    assert restored_runtime.plan_items == [AgentPlanItem(text="restore plan", status="in_progress")]
     assert restored_runtime.feedback_items == ["restore feedback"]
     assert restored_runtime.last_run_payload == restored_state["last_run_payload"]
     assert restored_runtime.last_apply == restored_apply

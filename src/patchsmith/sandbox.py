@@ -251,9 +251,7 @@ def check_docker_sandbox_availability(
         return DockerSandboxAvailability(
             available=False,
             errors=(f"`{docker_binary} version` failed: {message}",),
-            next_actions=(
-                "Start Docker Desktop or point DOCKER_HOST at a reachable daemon.",
-            ),
+            next_actions=("Start Docker Desktop or point DOCKER_HOST at a reachable daemon.",),
         )
     image_check = _run_docker_preflight_command(
         [docker_binary, "image", "inspect", image],
@@ -264,10 +262,10 @@ def check_docker_sandbox_availability(
         return DockerSandboxAvailability(
             available=False,
             errors=(f"`{image}` is not available locally: {message}",),
-            evidence=(f"Docker server version `{daemon.stdout.strip() or 'unknown'}` is reachable.",),
-            next_actions=(
-                f"Run `docker build -f docker/seeded-smoke.Dockerfile -t {image} .`.",
+            evidence=(
+                f"Docker server version `{daemon.stdout.strip() or 'unknown'}` is reachable.",
             ),
+            next_actions=(f"Run `docker build -f docker/seeded-smoke.Dockerfile -t {image} .`.",),
         )
     return DockerSandboxAvailability(
         available=True,

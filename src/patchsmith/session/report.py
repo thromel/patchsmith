@@ -82,16 +82,10 @@ def session_markdown_report(transcript_path: Path) -> str:
             f"- Diff reviews: `{metrics.diff_review_count}`",
             f"- High-risk diff reviews: `{metrics.diff_review_high_count}`",
             f"- Current diff reviews: `{metrics.current_diff_review_count}`",
-            (
-                "- Current high-risk diff reviews: "
-                f"`{metrics.current_diff_review_high_count}`"
-            ),
+            (f"- Current high-risk diff reviews: `{metrics.current_diff_review_high_count}`"),
             f"- Apply checks: `{metrics.apply_check_count}`",
             f"- Ready apply checks: `{metrics.apply_check_ready_count}`",
-            (
-                "- Current ready apply checks: "
-                f"`{metrics.current_apply_check_ready_count}`"
-            ),
+            (f"- Current ready apply checks: `{metrics.current_apply_check_ready_count}`"),
             f"- Apply approvals: `{metrics.apply_approval_count}`",
             f"- High-risk apply approvals: `{metrics.high_risk_apply_approval_count}`",
             f"- Apply rejections: `{metrics.apply_rejection_count}`",

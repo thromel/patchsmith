@@ -65,9 +65,7 @@ class EvidenceRefreshConfig:
         return [str(self.experiment_path(path)) for path in relative_paths]
 
     def complex_suite_output_path(self) -> Path:
-        return self.complex_suite_output_dir or self.experiment_path(
-            "complex_benchmark_suite"
-        )
+        return self.complex_suite_output_dir or self.experiment_path("complex_benchmark_suite")
 
     def complex_suite_output_paths(self, *filenames: str) -> list[str]:
         output_dir = self.complex_suite_output_path()
@@ -400,15 +398,12 @@ def _write_complex_suite_refresh(
     )
     if preflight.status != "passed":
         raise RuntimeError(
-            "complex benchmark suite preflight failed: "
-            + "; ".join(preflight.errors)
+            "complex benchmark suite preflight failed: " + "; ".join(preflight.errors)
         )
-    _results, summary, _attempt_summaries, _followup_candidates = (
-        summarize_complex_benchmark_suite(
-            attempt_dirs=list(config.complex_suite_attempt_dirs),
-            output_dir=output_dir,
-            benchmark=config.complex_suite_benchmark,
-        )
+    _results, summary, _attempt_summaries, _followup_candidates = summarize_complex_benchmark_suite(
+        attempt_dirs=list(config.complex_suite_attempt_dirs),
+        output_dir=output_dir,
+        benchmark=config.complex_suite_benchmark,
     )
     gate = config.complex_suite_thresholds.gate(summary)
     write_json(
@@ -417,9 +412,7 @@ def _write_complex_suite_refresh(
         trailing_newline=True,
     )
     if gate.status != "passed":
-        raise RuntimeError(
-            "complex benchmark suite gate failed: " + "; ".join(gate.failures)
-        )
+        raise RuntimeError("complex benchmark suite gate failed: " + "; ".join(gate.failures))
     return ComplexSuiteEvidenceRefreshResult(
         complex_suite_status=gate.status,
         attempt_dir_count=len(config.complex_suite_attempt_dirs),
@@ -438,9 +431,7 @@ def _write_complex_suite_refresh(
         retry_failure_class_counts=summary.retry_failure_class_counts,
         process_quality_label_counts=summary.process_quality_label_counts,
         process_quality_flag_counts=summary.process_quality_flag_counts,
-        selected_cost_per_validated_task_usd=(
-            summary.selected_cost_per_validated_task_usd
-        ),
+        selected_cost_per_validated_task_usd=(summary.selected_cost_per_validated_task_usd),
         selected_tokens_per_validated_task=summary.selected_tokens_per_validated_task,
         selected_virtual_files_per_validated_task=(
             summary.selected_virtual_files_per_validated_task

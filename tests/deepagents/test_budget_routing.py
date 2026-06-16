@@ -103,18 +103,27 @@ def test_resource_budget_limits_and_pressure_are_pure_policy() -> None:
     assert resource_budget_response_limit(budget) == 3
     assert resource_budget_token_limit(budget) == 34_279
     assert is_budget_critical(budget) is True
-    assert resource_budget_pressure_reason(
-        budget,
-        retry_feedback_manifest="retry",
-    ) == "remaining_response_budget_pressure_inline"
-    assert resource_budget_pressure_reason(
-        {"max_model_tokens": 200_000, "remaining_model_tokens": 90_000},
-        retry_feedback_manifest="retry",
-    ) == "remaining_token_budget_pressure_inline"
-    assert resource_budget_pressure_reason(
-        {"remaining_model_responses": 0},
-        retry_feedback_manifest="retry",
-    ) == "remaining_response_budget_exhausted_inline"
+    assert (
+        resource_budget_pressure_reason(
+            budget,
+            retry_feedback_manifest="retry",
+        )
+        == "remaining_response_budget_pressure_inline"
+    )
+    assert (
+        resource_budget_pressure_reason(
+            {"max_model_tokens": 200_000, "remaining_model_tokens": 90_000},
+            retry_feedback_manifest="retry",
+        )
+        == "remaining_token_budget_pressure_inline"
+    )
+    assert (
+        resource_budget_pressure_reason(
+            {"remaining_model_responses": 0},
+            retry_feedback_manifest="retry",
+        )
+        == "remaining_response_budget_exhausted_inline"
+    )
 
 
 def test_cost_estimation_and_validation_fixture_detection() -> None:
@@ -124,16 +133,22 @@ def test_cost_estimation_and_validation_fixture_detection() -> None:
         output_cost_per_1m=1.00,
     )
 
-    assert estimate_resource_budget_cost(
-        input_tokens=1_000_000,
-        output_tokens=500_000,
-        config=config,
-    ) == 0.75
-    assert estimate_resource_budget_cost(
-        input_tokens=None,
-        output_tokens=500_000,
-        config=config,
-    ) is None
+    assert (
+        estimate_resource_budget_cost(
+            input_tokens=1_000_000,
+            output_tokens=500_000,
+            config=config,
+        )
+        == 0.75
+    )
+    assert (
+        estimate_resource_budget_cost(
+            input_tokens=None,
+            output_tokens=500_000,
+            config=config,
+        )
+        is None
+    )
     assert has_validation_fixture_context([_context(path="testing/test_repro.py")])
     assert has_validation_fixture_context(
         [_context(path="src/calc.py", matched_terms=["reproduction_fixture"])]

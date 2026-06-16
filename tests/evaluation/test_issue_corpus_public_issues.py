@@ -1431,9 +1431,7 @@ def test_execute_public_issue_repairs_blocks_docker_preflight_before_run(
     assert "Docker sandbox preflight failed" in ";".join(results[0].errors)
     assert "Start Docker Desktop." in results[0].next_actions
     assert not (output_dir / "public_issue_repair_attempts").exists()
-    report = (output_dir / "public_issue_repair_attempt_report.md").read_text(
-        encoding="utf-8"
-    )
+    report = (output_dir / "public_issue_repair_attempt_report.md").read_text(encoding="utf-8")
     assert "Docker sandbox preflight failed" in report
 
 
@@ -1527,9 +1525,7 @@ def test_execute_public_issue_repairs_blocks_model_preflight_before_run(
     assert "OpenAI model preflight failed" in ";".join(results[0].errors)
     assert "OPENAI_API_KEY" in ";".join(results[0].errors)
     assert not (output_dir / "public_issue_repair_attempts").exists()
-    report = (output_dir / "public_issue_repair_attempt_report.md").read_text(
-        encoding="utf-8"
-    )
+    report = (output_dir / "public_issue_repair_attempt_report.md").read_text(encoding="utf-8")
     assert "blocked (sandbox:skipped; model:blocked)" in report
 
 
@@ -1692,9 +1688,7 @@ def test_execute_public_issue_repairs_blocks_live_budget_before_run(
     assert results[0].preflight_gates[2]["projected_cost_usd"] == "0.020000"
     assert "Live cost budget preflight failed" in ";".join(results[0].errors)
     assert not (output_dir / "public_issue_repair_attempts").exists()
-    report = (output_dir / "public_issue_repair_attempt_report.md").read_text(
-        encoding="utf-8"
-    )
+    report = (output_dir / "public_issue_repair_attempt_report.md").read_text(encoding="utf-8")
     assert "blocked (sandbox:skipped; model:passed; budget:blocked)" in report
 
 
@@ -1838,9 +1832,7 @@ def test_execute_public_issue_repairs_flags_actual_live_budget_overrun(
     assert results[0].test_exit_code == 0
     assert results[0].model_total_tokens == 407344
     assert results[0].estimated_model_cost_usd == 0.314482
-    assert "actual live model cost exceeded configured cap" in ";".join(
-        results[0].warnings
-    )
+    assert "actual live model cost exceeded configured cap" in ";".join(results[0].warnings)
     assert "Actual model usage: 2 calls, 407344 tokens, estimated cost $0.314482." in (
         ";".join(results[0].evidence)
     )
@@ -1939,9 +1931,7 @@ def test_execute_public_issue_repairs_flags_actual_model_usage_cap_overrun(
     )
     assert saved_summary["max_actual_model_responses"] == 12
     assert saved_summary["max_actual_model_tokens"] == 200000
-    report = (output_dir / "public_issue_repair_attempt_report.md").read_text(
-        encoding="utf-8"
-    )
+    report = (output_dir / "public_issue_repair_attempt_report.md").read_text(encoding="utf-8")
     assert "Max actual model responses: `12`" in report
     assert "Max actual model tokens: `200000`" in report
 
@@ -2024,15 +2014,11 @@ def test_execute_public_issue_repairs_filters_by_task_id(tmp_path: Path) -> None
 
     assert exit_code == 0
     cli_results = json.loads(
-        (cli_output / "public_issue_repair_attempt_results.json").read_text(
-            encoding="utf-8"
-        )
+        (cli_output / "public_issue_repair_attempt_results.json").read_text(encoding="utf-8")
     )
     assert [result["task_id"] for result in cli_results] == ["public_task_b"]
     cli_summary = json.loads(
-        (cli_output / "public_issue_repair_attempt_summary.json").read_text(
-            encoding="utf-8"
-        )
+        (cli_output / "public_issue_repair_attempt_summary.json").read_text(encoding="utf-8")
     )
     assert cli_summary["deepagents_max_context_files"] == 3
     assert cli_summary["max_actual_model_responses"] == 12
@@ -2372,9 +2358,7 @@ def test_execute_public_issue_repairs_marks_high_risk_passing_patch_failed(
     assert results[0].test_exit_code == 0
     assert results[0].patch_generated is True
     assert "repair validation command exited zero" in results[0].evidence
-    assert "repair validation passed but final patch quality is high-risk" in results[
-        0
-    ].warnings
+    assert "repair validation passed but final patch quality is high-risk" in results[0].warnings
 
 
 def test_execute_public_issue_repairs_marks_diff_quality_warning_failed(
@@ -2474,9 +2458,7 @@ def test_execute_public_issue_repairs_marks_diff_quality_warning_failed(
     assert summary.validated_tasks == 0
     assert summary.failed_tasks == 1
     assert results[0].status == "failed"
-    assert "repair validation passed but final patch quality is high-risk" in results[
-        0
-    ].warnings
+    assert "repair validation passed but final patch quality is high-risk" in results[0].warnings
 
 
 def test_execute_public_issue_repairs_executes_local_heuristic_repair(
@@ -2575,9 +2557,9 @@ def test_execute_public_issue_repairs_executes_local_heuristic_repair(
     assert results[0].status == "validated"
     assert results[0].patch_generated
     assert results[0].test_exit_code == 0
-    assert "repair validation command exited zero with acceptable patch quality" in results[
-        0
-    ].evidence
+    assert (
+        "repair validation command exited zero with acceptable patch quality" in results[0].evidence
+    )
     assert results[0].validation_fixture_paths == ["tests/test_issue_repro.py"]
     assert results[0].report_path is not None
     assert Path(results[0].report_path).exists()

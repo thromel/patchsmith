@@ -67,7 +67,9 @@ def _print_help(output_stream: TextIO) -> None:
     write_line(output_stream, "  /hooks                List project lifecycle hooks.")
     write_line(output_stream, "  /agents               List project agent profiles.")
     write_line(output_stream, "  /agent [name|clear]   Show, select, or clear an agent profile.")
-    write_line(output_stream, "  /instructions         Show, reload, or clear project instructions.")
+    write_line(
+        output_stream, "  /instructions         Show, reload, or clear project instructions."
+    )
     write_line(output_stream, "  /memory               Show, add, reload, or clear project memory.")
     write_line(output_stream, "  /plan ...             Show or update the session plan.")
     write_line(output_stream, "  /feedback ...         Add, show, or clear session feedback.")

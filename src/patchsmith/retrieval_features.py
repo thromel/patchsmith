@@ -164,16 +164,10 @@ def _runtime_cache_source_score(
     if not enabled or not path.startswith(("src/", "lib/", "patchsmith/")):
         return 0.0, []
     lowered = text.lower()
-    matched = [
-        label
-        for needle, label in RUNTIME_CACHE_SOURCE_TERMS.items()
-        if needle in lowered
-    ]
+    matched = [label for needle, label in RUNTIME_CACHE_SOURCE_TERMS.items() if needle in lowered]
     if not matched:
         return 0.0, []
-    return 20_000.0 + (750.0 * len(matched)), [
-        f"runtime_cache_signal:{label}" for label in matched
-    ]
+    return 20_000.0 + (750.0 * len(matched)), [f"runtime_cache_signal:{label}" for label in matched]
 
 
 def _normalize_path_hint(path: str) -> str:

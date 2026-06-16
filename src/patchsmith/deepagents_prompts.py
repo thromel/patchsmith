@@ -382,9 +382,7 @@ def deepagents_planner_prompt(
             "evidence only; the final `path` must still be one of the mounted "
             "provided repository paths unless that omitted file is also listed above.\n\n"
         )
-    preferred_paths = [
-        path.strip() for path in (preferred_target_paths or []) if path.strip()
-    ]
+    preferred_paths = [path.strip() for path in (preferred_target_paths or []) if path.strip()]
     preferred_target_instruction = ""
     if preferred_paths and not target_history_manifest_path:
         preferred_symbol_lines = _preferred_symbol_instruction_lines(
@@ -466,10 +464,7 @@ def _preferred_symbol_instruction_lines(
     for path in preferred:
         symbols = _ordered_unique_symbols(preferred_target_symbols.get(path, []))
         if symbols:
-            lines.append(
-                f"- `{path}`: "
-                + ", ".join(f"`{symbol}`" for symbol in symbols)
-            )
+            lines.append(f"- `{path}`: " + ", ".join(f"`{symbol}`" for symbol in symbols))
     return lines
 
 
@@ -515,11 +510,11 @@ def deepagents_patch_review_subagents() -> list[dict[str, str]]:
                 "metadata assignments. Reject direct source-text recompilation such as "
                 "`compile(source.read_text(...), ...)` when the root issue is stale cache "
                 "reuse; prefer invalidating the stale cached entry before returning it. "
-        "Reject naked `importlib.invalidate_caches()` patches unless they are "
-        "paired with a controlling stale-cache branch. Reject Python replacements "
-        "whose old span ends on a compound statement header without including the "
-        "body, unless the new span is only replacing that header with another header. "
-        "Reject identical, comment-only, or whitespace-only replacement spans."
+                "Reject naked `importlib.invalidate_caches()` patches unless they are "
+                "paired with a controlling stale-cache branch. Reject Python replacements "
+                "whose old span ends on a compound statement header without including the "
+                "body, unless the new span is only replacing that header with another header. "
+                "Reject identical, comment-only, or whitespace-only replacement spans."
             ),
         },
     ]

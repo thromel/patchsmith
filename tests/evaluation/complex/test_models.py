@@ -173,18 +173,12 @@ def _result() -> ComplexBenchmarkResult:
         deepagents_context_budget_omitted_paths=("docs/example.md",),
         deepagents_repo_map_manifest_path="manifests/repo-map.json",
         deepagents_repo_map_manifest_read_first=True,
-        deepagents_repo_instructions_manifest_path=(
-            "manifests/repo-instructions.md"
-        ),
+        deepagents_repo_instructions_manifest_path=("manifests/repo-instructions.md"),
         deepagents_repo_instructions_manifest_read_first=True,
-        deepagents_acceptance_rubric_manifest_path=(
-            "manifests/acceptance-rubric.md"
-        ),
+        deepagents_acceptance_rubric_manifest_path=("manifests/acceptance-rubric.md"),
         deepagents_acceptance_rubric_manifest_read_first=True,
         deepagents_acceptance_rubric_aligned=True,
-        deepagents_repair_interface_manifest_path=(
-            "manifests/repair-interface.md"
-        ),
+        deepagents_repair_interface_manifest_path=("manifests/repair-interface.md"),
         deepagents_repair_interface_manifest_read_first=True,
         deepagents_resource_budgeted=True,
         deepagents_resource_budget_read_first=True,

@@ -115,12 +115,7 @@ def test_validate_deepagents_plan_result_rejects_span_outside_preferred_symbol(
 ) -> None:
     repo = tmp_path / "repo"
     (repo / "src").mkdir(parents=True)
-    source = (
-        "def add(a, b):\n"
-        "    return a - b\n\n"
-        "def unrelated():\n"
-        "    return 0\n"
-    )
+    source = "def add(a, b):\n    return a - b\n\ndef unrelated():\n    return 0\n"
     (repo / "src" / "calc.py").write_text(source, encoding="utf-8")
 
     result = validate_deepagents_plan_result(

@@ -52,18 +52,16 @@ def test_write_complex_outputs_persists_machine_and_markdown_artifacts(
         (output_dir / "complex_benchmark_results.json").read_text(encoding="utf-8")
     )
     followups_payload = json.loads(
-        (output_dir / "complex_benchmark_followup_candidates.json").read_text(
-            encoding="utf-8"
-        )
+        (output_dir / "complex_benchmark_followup_candidates.json").read_text(encoding="utf-8")
     )
     assert results_payload[0]["task_id"] == "expensive-task"
     assert followups_payload[0]["action"] == "cost_optimization_rerun"
-    assert "expensive-task" in (
-        output_dir / "complex_benchmark_results.csv"
-    ).read_text(encoding="utf-8")
-    assert "# Complex Benchmark Report" in (
-        output_dir / "complex_benchmark_report.md"
-    ).read_text(encoding="utf-8")
+    assert "expensive-task" in (output_dir / "complex_benchmark_results.csv").read_text(
+        encoding="utf-8"
+    )
+    assert "# Complex Benchmark Report" in (output_dir / "complex_benchmark_report.md").read_text(
+        encoding="utf-8"
+    )
     assert "# Complex Benchmark Follow-up Runbook" in (
         output_dir / "complex_benchmark_followup_runbook.md"
     ).read_text(encoding="utf-8")
@@ -91,13 +89,9 @@ def test_write_complex_suite_outputs_persists_attempt_summaries_and_report(
     )
 
     attempts_payload = json.loads(
-        (output_dir / "complex_benchmark_attempt_summaries.json").read_text(
-            encoding="utf-8"
-        )
+        (output_dir / "complex_benchmark_attempt_summaries.json").read_text(encoding="utf-8")
     )
-    report = (output_dir / "complex_benchmark_suite_report.md").read_text(
-        encoding="utf-8"
-    )
+    report = (output_dir / "complex_benchmark_suite_report.md").read_text(encoding="utf-8")
     assert attempts_payload[0]["task_count"] == 1
     assert "# Complex Benchmark Suite Report" in report
     assert "- Attempt directories: `1`" in report

@@ -41,13 +41,8 @@ def test_help_command_renders_chat_help(tmp_path: Path) -> None:
     assert "  /exit, /quit          End the session.\n" in text
     assert "Project commands are loaded from .patchsmith/commands/*.md.\n" in text
     assert "Project hooks are loaded from .patchsmith/hooks.json.\n" in text
-    assert (
-        "Project agent profiles are loaded from .patchsmith/agents/*.md.\n" in text
-    )
-    assert (
-        "Project instructions are loaded from AGENTS.md/CLAUDE.md-style files.\n"
-        in text
-    )
+    assert "Project agent profiles are loaded from .patchsmith/agents/*.md.\n" in text
+    assert "Project instructions are loaded from AGENTS.md/CLAUDE.md-style files.\n" in text
 
 
 def test_doctor_command_records_diagnostic_payload(

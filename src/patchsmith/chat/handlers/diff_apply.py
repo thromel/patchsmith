@@ -359,8 +359,7 @@ def apply_guard(
             diff_path=diff_path,
             reason_code="missing_apply_approval",
             message=(
-                "latest /diff review is high risk; run "
-                "/approve apply <reason> before /apply."
+                "latest /diff review is high risk; run /approve apply <reason> before /apply."
             ),
         )
     return None

@@ -37,3 +37,19 @@ def artifacts_dir(tmp_path: Path) -> Path:
     destination = tmp_path / "artifacts"
     destination.mkdir(parents=True, exist_ok=True)
     return destination
+
+
+@pytest.fixture
+def deepagents_dependency_available(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make unit-test preflight independent of optional live-agent packages."""
+    import patchsmith.agent_cli as agent_cli
+
+    monkeypatch.setattr(
+        agent_cli,
+        "_deepagents_dependency_check",
+        lambda: {
+            "name": "deepagents_dependency",
+            "status": "passed",
+            "message": "deepagents optional dependency is importable",
+        },
+    )

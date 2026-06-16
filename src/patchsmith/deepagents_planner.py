@@ -417,6 +417,7 @@ class DeepAgentsRepairPlanner:
             subagents=subagents,
         )
 
+
 def _runtime_config_string(runtime_config: object, key: str) -> str | None:
     if not isinstance(runtime_config, dict):
         return None

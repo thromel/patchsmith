@@ -54,9 +54,7 @@ def complex_result(row: dict[str, Any]) -> ComplexBenchmarkResult:
     retry_feedback_artifacts = _retry_feedback_artifacts(trace_path)
     status = str(row.get("status") or "unknown")
     test_exit_code = _optional_int(row.get("test_exit_code"))
-    validation_passed = (
-        status == "validated" and not patch_quality["patch_quality_warning"]
-    )
+    validation_passed = status == "validated" and not patch_quality["patch_quality_warning"]
     strict_status = _strict_status(
         status=status,
         patch_quality_warning=patch_quality["patch_quality_warning"],
@@ -82,8 +80,7 @@ def complex_result(row: dict[str, Any]) -> ComplexBenchmarkResult:
     )
     progress_score, progress_stage = _complex_progress(
         status=status,
-        reproduced=str(row.get("reproduction_execution_status") or "")
-        == "reproduced",
+        reproduced=str(row.get("reproduction_execution_status") or "") == "reproduced",
         patch_generated=bool(row.get("patch_generated")),
         validation_passed=validation_passed,
         patch_quality_warning=patch_quality["patch_quality_warning"],
@@ -93,8 +90,7 @@ def complex_result(row: dict[str, Any]) -> ComplexBenchmarkResult:
         status=status,
         preflight_status=_preflight_status(row.get("preflight_status")),
         preflight_gates=preflight_gates,
-        reproduced=str(row.get("reproduction_execution_status") or "")
-        == "reproduced",
+        reproduced=str(row.get("reproduction_execution_status") or "") == "reproduced",
         patch_generated=bool(row.get("patch_generated")),
         validation_passed=validation_passed,
         patch_quality_warning=patch_quality["patch_quality_warning"],
@@ -108,8 +104,7 @@ def complex_result(row: dict[str, Any]) -> ComplexBenchmarkResult:
         test_exit_code=test_exit_code,
         preflight_status=_preflight_status(row.get("preflight_status")),
         preflight_gates=preflight_gates,
-        reproduced=str(row.get("reproduction_execution_status") or "")
-        == "reproduced",
+        reproduced=str(row.get("reproduction_execution_status") or "") == "reproduced",
         patch_generated=bool(row.get("patch_generated")),
         validation_passed=validation_passed,
         patch_quality_warning=patch_quality["patch_quality_warning"],
@@ -166,9 +161,7 @@ def complex_result(row: dict[str, Any]) -> ComplexBenchmarkResult:
         deepagents_context_budget_omitted_paths=context_budget[
             "deepagents_context_budget_omitted_paths"
         ],
-        deepagents_repo_map_manifest_path=context_budget[
-            "deepagents_repo_map_manifest_path"
-        ],
+        deepagents_repo_map_manifest_path=context_budget["deepagents_repo_map_manifest_path"],
         deepagents_repo_map_manifest_read_first=context_budget[
             "deepagents_repo_map_manifest_read_first"
         ],
@@ -191,9 +184,7 @@ def complex_result(row: dict[str, Any]) -> ComplexBenchmarkResult:
         deepagents_repair_interface_manifest_read_first=context_budget[
             "deepagents_repair_interface_manifest_read_first"
         ],
-        deepagents_resource_budgeted=context_budget[
-            "deepagents_resource_budgeted"
-        ],
+        deepagents_resource_budgeted=context_budget["deepagents_resource_budgeted"],
         deepagents_resource_budget_read_first=context_budget[
             "deepagents_resource_budget_read_first"
         ],
@@ -377,9 +368,7 @@ def _acceptance_rubric_aligned(
     ):
         return False
     mounted = {
-        normalized
-        for path in mounted_paths
-        if (normalized := _normalized_path(path)) is not None
+        normalized for path in mounted_paths if (normalized := _normalized_path(path)) is not None
     }
     if not mounted:
         return False

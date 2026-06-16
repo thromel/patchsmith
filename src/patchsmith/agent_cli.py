@@ -88,11 +88,7 @@ def validate_agent_cli_config(
         if config.apply
         else None
     )
-    if (
-        require_apply_ready
-        and apply_preflight is not None
-        and apply_preflight.status != "ready"
-    ):
+    if require_apply_ready and apply_preflight is not None and apply_preflight.status != "ready":
         return {}, apply_preflight, apply_preflight.message
     return agent_runtime_config(config), apply_preflight, None
 
@@ -269,18 +265,14 @@ def _agent_diagnostic_checks(
 
 def _deepagents_dependency_check() -> dict[str, Any]:
     required_modules = ("deepagents", "langchain_openai")
-    missing = [
-        module
-        for module in required_modules
-        if importlib.util.find_spec(module) is None
-    ]
+    missing = [module for module in required_modules if importlib.util.find_spec(module) is None]
     if missing:
         return {
             "name": "deepagents_dependency",
             "status": "blocked",
             "message": (
                 "missing optional modules: "
-                f"{', '.join(missing)}; install with python -m pip install -e \".[deepagents]\""
+                f'{", ".join(missing)}; install with python -m pip install -e ".[deepagents]"'
             ),
             "missing_modules": missing,
         }
@@ -369,9 +361,7 @@ def _deepagents_token_headroom_check(config: AgentCliConfig) -> dict[str, Any]:
     return {
         "name": "deepagents_token_headroom",
         "status": "passed",
-        "message": (
-            f"DeepAgents token cap {token_cap} leaves initial prompt/tool headroom"
-        ),
+        "message": (f"DeepAgents token cap {token_cap} leaves initial prompt/tool headroom"),
         "recommended_min_tokens": RECOMMENDED_DEEPAGENTS_TOKEN_HEADROOM,
         "max_model_tokens": token_cap,
     }
@@ -422,9 +412,7 @@ def _reasoning_token_headroom_check(config: AgentCliConfig) -> dict[str, Any]:
     return {
         "name": "reasoning_token_headroom",
         "status": "passed",
-        "message": (
-            f"{model} token cap {token_cap} leaves initial reasoning/output headroom"
-        ),
+        "message": (f"{model} token cap {token_cap} leaves initial reasoning/output headroom"),
         "model": model,
         "reasoning_model": True,
         "recommended_min_tokens": RECOMMENDED_REASONING_TOKEN_HEADROOM,
@@ -451,9 +439,7 @@ def _apply_target_check(
 
 def _checks_status(checks: list[dict[str, Any]]) -> str:
     return (
-        "passed"
-        if all(check["status"] in {"passed", "skipped"} for check in checks)
-        else "blocked"
+        "passed" if all(check["status"] in {"passed", "skipped"} for check in checks) else "blocked"
     )
 
 

@@ -32,10 +32,7 @@ def test_repo_map_manifest_renders_mounted_and_omitted_context_sections() -> Non
         {
             "/src/selected.py": {
                 "content": (
-                    "def selected():\n"
-                    "    return 'old'\n\n"
-                    "class SelectedHelper:\n"
-                    "    pass\n"
+                    "def selected():\n    return 'old'\n\nclass SelectedHelper:\n    pass\n"
                 )
             }
         },
@@ -71,9 +68,7 @@ def test_repo_map_manifest_limits_terms_and_definition_signatures() -> None:
         {
             "/src/app.ts": {
                 "content": (
-                    "export function first() {}\n"
-                    "export class Second {}\n"
-                    "function third() {}\n"
+                    "export function first() {}\nexport class Second {}\nfunction third() {}\n"
                 )
             }
         },

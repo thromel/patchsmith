@@ -87,9 +87,7 @@ def invoke_deepagents_plan(
                             source_hint_manifest_path=(
                                 manifest_presence.path_if_enabled("source_hint")
                             ),
-                            repo_map_manifest_path=(
-                                manifest_presence.path_if_enabled("repo_map")
-                            ),
+                            repo_map_manifest_path=(manifest_presence.path_if_enabled("repo_map")),
                             repo_instructions_manifest_path=(
                                 manifest_presence.path_if_enabled("repo_instructions")
                             ),
@@ -159,24 +157,16 @@ def _failure_metadata(
         provider=DEEPAGENTS_PROVIDER,
         model=config.model,
         response_count=(
-            error.response_count
-            if isinstance(error, DeepAgentsResourceBudgetExceeded)
-            else None
+            error.response_count if isinstance(error, DeepAgentsResourceBudgetExceeded) else None
         ),
         input_tokens=(
-            error.input_tokens
-            if isinstance(error, DeepAgentsResourceBudgetExceeded)
-            else None
+            error.input_tokens if isinstance(error, DeepAgentsResourceBudgetExceeded) else None
         ),
         output_tokens=(
-            error.output_tokens
-            if isinstance(error, DeepAgentsResourceBudgetExceeded)
-            else None
+            error.output_tokens if isinstance(error, DeepAgentsResourceBudgetExceeded) else None
         ),
         total_tokens=(
-            error.total_tokens
-            if isinstance(error, DeepAgentsResourceBudgetExceeded)
-            else None
+            error.total_tokens if isinstance(error, DeepAgentsResourceBudgetExceeded) else None
         ),
         estimated_cost_usd=(
             estimate_resource_budget_cost(

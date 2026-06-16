@@ -107,9 +107,7 @@ def test_manifest_contents_drive_specs_and_required_reads_from_registry() -> Non
         PATCHSMITH_DEEPAGENTS_REPO_MAP_PATH,
         PATCHSMITH_DEEPAGENTS_ACCEPTANCE_RUBRIC_PATH,
     ]
-    assert contents.with_content("context_budget", "budget").is_enabled(
-        "context_budget"
-    )
+    assert contents.with_content("context_budget", "budget").is_enabled("context_budget")
 
 
 def test_add_virtual_files_preserves_existing_files_and_mounts_manifest_specs() -> None:

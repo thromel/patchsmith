@@ -89,9 +89,7 @@ def test_from_env_reads_configuration() -> None:
 
 
 def test_from_env_defaults_to_full_subagents_for_unknown_value() -> None:
-    planner = DeepAgentsRepairPlanner.from_env(
-        {"PATCHSMITH_DEEPAGENTS_SUBAGENTS": "surprise"}
-    )
+    planner = DeepAgentsRepairPlanner.from_env({"PATCHSMITH_DEEPAGENTS_SUBAGENTS": "surprise"})
 
     assert planner.config.subagent_mode == "full"
 
@@ -109,9 +107,7 @@ def test_from_env_allows_encrypted_reasoning_override() -> None:
     enabled = DeepAgentsRepairPlanner.from_env(
         {"PATCHSMITH_DEEPAGENTS_ENCRYPTED_REASONING": "enabled"}
     )
-    auto = DeepAgentsRepairPlanner.from_env(
-        {"PATCHSMITH_DEEPAGENTS_ENCRYPTED_REASONING": "auto"}
-    )
+    auto = DeepAgentsRepairPlanner.from_env({"PATCHSMITH_DEEPAGENTS_ENCRYPTED_REASONING": "auto"})
 
     assert disabled.config.encrypted_reasoning is False
     assert enabled.config.encrypted_reasoning is True
@@ -138,17 +134,13 @@ def test_deepagents_model_kwargs_omit_responses_only_options_when_disabled() -> 
 
 
 def test_deepagents_model_kwargs_include_encrypted_reasoning_for_reasoning_model() -> None:
-    kwargs = deepagents_model_kwargs(
-        DeepAgentsPlannerConfig(model="gpt-5.4-nano")
-    )
+    kwargs = deepagents_model_kwargs(DeepAgentsPlannerConfig(model="gpt-5.4-nano"))
 
     assert kwargs["include"] == ["reasoning.encrypted_content"]
 
 
 def test_deepagents_model_kwargs_omit_encrypted_reasoning_for_non_reasoning_model() -> None:
-    kwargs = deepagents_model_kwargs(
-        DeepAgentsPlannerConfig(model="gpt-4.1-mini")
-    )
+    kwargs = deepagents_model_kwargs(DeepAgentsPlannerConfig(model="gpt-4.1-mini"))
 
     assert kwargs["use_responses_api"] is True
     assert kwargs["store"] is False
@@ -366,9 +358,7 @@ def test_plan_builds_repair_plan_from_structured_response(tmp_path: Path) -> Non
     assert PATCHSMITH_DEEPAGENTS_ACCEPTANCE_RUBRIC_PATH in interface
     assert "Subagent mode: `full`" in interface
     assert "`src/calc.py` via `/src/calc.py`" in interface
-    rubric = agent.invocations[0]["files"][PATCHSMITH_DEEPAGENTS_ACCEPTANCE_RUBRIC_PATH][
-        "content"
-    ]
+    rubric = agent.invocations[0]["files"][PATCHSMITH_DEEPAGENTS_ACCEPTANCE_RUBRIC_PATH]["content"]
     assert "PatchSmith Acceptance Rubric" in rubric
     assert "add() subtracts" in rubric
     prompt = agent.invocations[0]["messages"][0]["content"]
@@ -417,18 +407,15 @@ def test_plan_inline_subagent_mode_records_inline_contract(tmp_path: Path) -> No
     prompt = agent.invocations[0]["messages"][0]["content"]
     files = agent.invocations[0]["files"]
     assert "Subagents are disabled for this run" in prompt
-    assert "Subagents are disabled for this run" in files[
-        PATCHSMITH_DEEPAGENTS_MEMORY_PATH
-    ]["content"]
+    assert (
+        "Subagents are disabled for this run" in files[PATCHSMITH_DEEPAGENTS_MEMORY_PATH]["content"]
+    )
     assert planner.last_plan_metadata is not None
     contract = planner.last_plan_metadata["deepagents_contract"]
     assert contract["subagent_mode"] == "inline"
     assert contract["subagents"] == []
     assert (
-        contract["planning_policy"][
-            "failure_localizer_subagent_for_validation_fixtures"
-        ]
-        is False
+        contract["planning_policy"]["failure_localizer_subagent_for_validation_fixtures"] is False
     )
     assert contract["planning_policy"]["patch_review_subagent_for_ambiguous_repairs"] is False
     assert contract["planning_policy"]["inline_failure_localization_required"] is True
@@ -526,10 +513,7 @@ def test_plan_auto_subagent_mode_enables_subagents_for_reviewed_hints(
         "enabled": True,
         "reasons": ["source_hint_manifest"],
     }
-    assert (
-        contract["planning_policy"]["failure_localizer_subagent_for_validation_fixtures"]
-        is True
-    )
+    assert contract["planning_policy"]["failure_localizer_subagent_for_validation_fixtures"] is True
 
 
 def test_plan_auto_subagent_mode_enables_subagents_for_validation_fixture(
@@ -603,9 +587,7 @@ def test_plan_resource_budget_uses_compact_auto_routing_and_manifest(
     build_configs: list[DeepAgentsPlannerConfig] = []
     planner = DeepAgentsRepairPlanner(
         DeepAgentsPlannerConfig(model="gpt-test"),
-        agent_factory=lambda **kwargs: (
-            build_configs.append(kwargs["config"]) or agent
-        ),
+        agent_factory=lambda **kwargs: build_configs.append(kwargs["config"]) or agent,
     )
 
     plan = planner.plan_for_task(
@@ -650,9 +632,9 @@ def test_plan_resource_budget_uses_compact_auto_routing_and_manifest(
     assert build_config.max_model_responses == 12
     assert build_config.max_model_tokens == 200000
     assert contract["planning_policy"]["resource_budget_read_first"] is True
-    repair_interface = agent.invocations[0]["files"][
-        PATCHSMITH_DEEPAGENTS_REPAIR_INTERFACE_PATH
-    ]["content"]
+    repair_interface = agent.invocations[0]["files"][PATCHSMITH_DEEPAGENTS_REPAIR_INTERFACE_PATH][
+        "content"
+    ]
     assert "## Resource Budget" in repair_interface
     assert "Max model responses: `12`" in repair_interface
     assert "Max total model tokens: `200000`" in repair_interface
@@ -675,9 +657,7 @@ def test_plan_budget_critical_interface_skips_generic_required_reads(
                 "path": "src/rewrite.py",
                 "old": "    return co",
                 "new": (
-                    "    if co.co_filename != str(source):\n"
-                    "        return None\n"
-                    "    return co"
+                    "    if co.co_filename != str(source):\n        return None\n    return co"
                 ),
                 "summary": "Reject stale code objects.",
                 "failure_mechanism": "cached code object keeps stale co_filename",
@@ -728,9 +708,9 @@ def test_plan_budget_critical_interface_skips_generic_required_reads(
     prompt = agent.invocations[0]["messages"][0]["content"]
     assert "Budget-critical mode is active" in prompt
     assert "Source hint manifest" not in prompt
-    repair_interface = agent.invocations[0]["files"][
-        PATCHSMITH_DEEPAGENTS_REPAIR_INTERFACE_PATH
-    ]["content"]
+    repair_interface = agent.invocations[0]["files"][PATCHSMITH_DEEPAGENTS_REPAIR_INTERFACE_PATH][
+        "content"
+    ]
     assert "## Budget-Critical Mode" in repair_interface
     assert "## Fast Patch Packet" in repair_interface
     assert "def _read_pyc(source):" in repair_interface
@@ -770,9 +750,7 @@ def test_plan_retry_resource_budget_pressure_keeps_subagents_inline(
     build_configs: list[DeepAgentsPlannerConfig] = []
     planner = DeepAgentsRepairPlanner(
         DeepAgentsPlannerConfig(model="gpt-test"),
-        agent_factory=lambda **kwargs: (
-            build_configs.append(kwargs["config"]) or agent
-        ),
+        agent_factory=lambda **kwargs: build_configs.append(kwargs["config"]) or agent,
     )
 
     plan = planner.plan_for_task(
@@ -830,9 +808,9 @@ def test_plan_retry_resource_budget_pressure_keeps_subagents_inline(
     build_config = build_configs[0]
     assert build_config.max_model_responses == 3
     assert build_config.max_model_tokens == 34279
-    repair_interface = agent.invocations[0]["files"][
-        PATCHSMITH_DEEPAGENTS_REPAIR_INTERFACE_PATH
-    ]["content"]
+    repair_interface = agent.invocations[0]["files"][PATCHSMITH_DEEPAGENTS_REPAIR_INTERFACE_PATH][
+        "content"
+    ]
     assert "Used model responses before this attempt: `9`" in repair_interface
     assert "Remaining model responses for this attempt: `3`" in repair_interface
     assert "Remaining model tokens for this attempt: `34279`" in repair_interface
@@ -842,11 +820,7 @@ def test_plan_span_context_mounts_focused_source_window(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     (repo / "src").mkdir(parents=True)
     before = "\n".join(f"def unrelated_{index}():\n    return {index}" for index in range(20))
-    target = (
-        "def _read_pyc(source):\n"
-        "    co = load_code(source)\n"
-        "    return co\n"
-    )
+    target = "def _read_pyc(source):\n    co = load_code(source)\n    return co\n"
     after = "\n".join(f"def later_{index}():\n    return {index}" for index in range(20))
     source = f"{before}\n{target}\n{after}\n"
     (repo / "src" / "rewrite.py").write_text(source, encoding="utf-8")
@@ -897,9 +871,9 @@ def test_plan_span_context_mounts_focused_source_window(tmp_path: Path) -> None:
     assert "co_filename" not in mounted
     assert "def unrelated_0" not in mounted
     assert "def later_19" not in mounted
-    repair_interface = agent.invocations[0]["files"][
-        PATCHSMITH_DEEPAGENTS_REPAIR_INTERFACE_PATH
-    ]["content"]
+    repair_interface = agent.invocations[0]["files"][PATCHSMITH_DEEPAGENTS_REPAIR_INTERFACE_PATH][
+        "content"
+    ]
     assert "Context mode: `span`" in repair_interface
     assert "Context window lines: `8`" in repair_interface
     assert planner.last_plan_metadata is not None
@@ -1026,8 +1000,8 @@ def test_plan_adds_repo_map_manifest_for_retrieved_context() -> None:
     contract = planner.last_plan_metadata["deepagents_contract"]
     assert contract["repo_map_manifest_path"] == PATCHSMITH_DEEPAGENTS_REPO_MAP_PATH
     assert contract["planning_policy"]["repo_map_manifest_read_first"] is True
-    assert PATCHSMITH_DEEPAGENTS_REPO_MAP_PATH in (
-        contract["filesystem_policy"]["allowed_read_paths"]
+    assert (
+        PATCHSMITH_DEEPAGENTS_REPO_MAP_PATH in (contract["filesystem_policy"]["allowed_read_paths"])
     )
 
 
@@ -1154,14 +1128,9 @@ def test_plan_for_task_orders_retry_targets_by_localization_score(
     repo = tmp_path / "repo"
     (repo / "src" / "_pytest" / "assertion").mkdir(parents=True)
     pathlib_dir = repo / "src" / "_pytest"
-    rewrite_source = (
-        "def _read_pyc(source, pyc):\n"
-        "    co = marshal.load(fp)\n"
-        "    return co\n"
-    )
+    rewrite_source = "def _read_pyc(source, pyc):\n    co = marshal.load(fp)\n    return co\n"
     python_source = (
-        "def pytest_pycollect_makemodule(module_path):\n"
-        "    return import_path(module_path)\n"
+        "def pytest_pycollect_makemodule(module_path):\n    return import_path(module_path)\n"
     )
     pathlib_source = (
         "module_name = module_name_from_path(path)\n"
@@ -1186,8 +1155,7 @@ def test_plan_for_task_orders_retry_targets_by_localization_score(
                 "path": "src/_pytest/pathlib.py",
                 "old": "return sys.modules[module_name]",
                 "new": (
-                    "existing = sys.modules[module_name]\n"
-                    "    return importlib.reload(existing)"
+                    "existing = sys.modules[module_name]\n    return importlib.reload(existing)"
                 ),
                 "summary": "Reload stale cached modules.",
                 "failure_mechanism": "sys.modules cache reuse preserves stale co_filename",
@@ -1227,14 +1195,10 @@ def test_plan_for_task_orders_retry_targets_by_localization_score(
     assert plan is not None
     files = agent.invocations[0]["files"]
     manifest = files[PATCHSMITH_DEEPAGENTS_TARGET_HISTORY_PATH]["content"]
-    assert manifest.index("`src/_pytest/pathlib.py`") < manifest.index(
-        "`src/_pytest/python.py`"
-    )
+    assert manifest.index("`src/_pytest/pathlib.py`") < manifest.index("`src/_pytest/python.py`")
     assert "python_import_cache_cues" in manifest
     prompt = agent.invocations[0]["messages"][0]["content"]
-    assert prompt.index("- `src/_pytest/pathlib.py`") < prompt.index(
-        "- `src/_pytest/python.py`"
-    )
+    assert prompt.index("- `src/_pytest/pathlib.py`") < prompt.index("- `src/_pytest/python.py`")
     assert planner.last_plan_metadata is not None
     assert planner.last_plan_metadata["target_localization"][0]["path"] == (
         "src/_pytest/pathlib.py"
@@ -1247,11 +1211,7 @@ def test_plan_for_task_prefers_stale_code_object_target_on_constrained_first_att
     repo = tmp_path / "repo"
     (repo / "src" / "_pytest" / "assertion").mkdir(parents=True)
     (repo / "src" / "_pytest").mkdir(exist_ok=True)
-    rewrite_source = (
-        "def _read_pyc(source, pyc):\n"
-        "    co = marshal.load(fp)\n"
-        "    return co\n"
-    )
+    rewrite_source = "def _read_pyc(source, pyc):\n    co = marshal.load(fp)\n    return co\n"
     pathlib_source = (
         "def import_path(path, root):\n"
         "    module_name = module_name_from_path(path, root)\n"
@@ -1260,8 +1220,7 @@ def test_plan_for_task_prefers_stale_code_object_target_on_constrained_first_att
         "    return importlib.import_module(module_name)\n"
     )
     python_source = (
-        "def pytest_pycollect_makemodule(module_path):\n"
-        "    return import_path(module_path)\n"
+        "def pytest_pycollect_makemodule(module_path):\n    return import_path(module_path)\n"
     )
     (repo / "src" / "_pytest" / "assertion" / "rewrite.py").write_text(
         rewrite_source,
@@ -1371,7 +1330,7 @@ def test_plan_for_task_rejects_preferred_path_with_wrong_symbol_span(
     (repo / "src" / "_pytest" / "assertion").mkdir(parents=True)
     rewrite_source = (
         "def _rewrite_test(fn, config):\n"
-        "    co = compile(fn.read_text(), str(fn), \"exec\")\n"
+        '    co = compile(fn.read_text(), str(fn), "exec")\n'
         "    return fn.stat(), co\n"
         "\n"
         "def _read_pyc(source, pyc):\n"
@@ -1390,12 +1349,12 @@ def test_plan_for_task_rejects_preferred_path_with_wrong_symbol_span(
                 "path": "src/_pytest/assertion/rewrite.py",
                 "old": (
                     "def _rewrite_test(fn, config):\n"
-                    "    co = compile(fn.read_text(), str(fn), \"exec\")\n"
+                    '    co = compile(fn.read_text(), str(fn), "exec")\n'
                     "    return fn.stat(), co"
                 ),
                 "new": (
                     "def _rewrite_test(fn, config):\n"
-                    "    co = compile(fn.read_text(), str(fn), \"exec\")\n"
+                    '    co = compile(fn.read_text(), str(fn), "exec")\n'
                     "    co = co.replace(co_filename=str(fn))\n"
                     "    return fn.stat(), co"
                 ),
@@ -1443,11 +1402,7 @@ def test_plan_for_task_rejects_no_op_preferred_symbol_patch(
 ) -> None:
     repo = tmp_path / "repo"
     (repo / "src" / "_pytest" / "assertion").mkdir(parents=True)
-    rewrite_source = (
-        "def _read_pyc(source, pyc):\n"
-        "    co = marshal.load(pyc)\n"
-        "    return co\n"
-    )
+    rewrite_source = "def _read_pyc(source, pyc):\n    co = marshal.load(pyc)\n    return co\n"
     (repo / "src" / "_pytest" / "assertion" / "rewrite.py").write_text(
         rewrite_source,
         encoding="utf-8",
@@ -1746,10 +1701,7 @@ def test_plan_for_task_rejects_live_style_generic_historical_target_rationale(
 ) -> None:
     repo = tmp_path / "repo"
     (repo / "src").mkdir(parents=True)
-    source = (
-        "with contextlib.suppress(KeyError):\n"
-        "    return sys.modules[module_name]\n"
-    )
+    source = "with contextlib.suppress(KeyError):\n    return sys.modules[module_name]\n"
     (repo / "src" / "pathlib.py").write_text(source, encoding="utf-8")
 
     agent = _FakeAgent(
@@ -1761,7 +1713,7 @@ def test_plan_for_task_rejects_live_style_generic_historical_target_rationale(
                 "new": (
                     "with contextlib.suppress(KeyError):\n"
                     "    existing = sys.modules[module_name]\n"
-                    "    if Path(getattr(existing, \"__file__\", \"\")).resolve() == path.resolve():\n"
+                    '    if Path(getattr(existing, "__file__", "")).resolve() == path.resolve():\n'
                     "        return existing"
                 ),
                 "summary": "Reload moved test modules when the cached module points elsewhere.",
@@ -1802,10 +1754,7 @@ def test_plan_for_task_allows_live_style_historical_target_with_old_span_identif
 ) -> None:
     repo = tmp_path / "repo"
     (repo / "src").mkdir(parents=True)
-    source = (
-        "with contextlib.suppress(KeyError):\n"
-        "    return sys.modules[module_name]\n"
-    )
+    source = "with contextlib.suppress(KeyError):\n    return sys.modules[module_name]\n"
     (repo / "src" / "pathlib.py").write_text(source, encoding="utf-8")
 
     agent = _FakeAgent(
@@ -1817,7 +1766,7 @@ def test_plan_for_task_allows_live_style_historical_target_with_old_span_identif
                 "new": (
                     "with contextlib.suppress(KeyError):\n"
                     "    existing = sys.modules[module_name]\n"
-                    "    if Path(getattr(existing, \"__file__\", \"\")).resolve() == path.resolve():\n"
+                    '    if Path(getattr(existing, "__file__", "")).resolve() == path.resolve():\n'
                     "        return existing"
                 ),
                 "summary": "Reload moved test modules when the cached module points elsewhere.",
@@ -1858,7 +1807,7 @@ def test_plan_for_task_rejects_reused_historical_old_span(
     (repo / "src").mkdir(parents=True)
     source = (
         "if not isinstance(co, types.CodeType):\n"
-        "    trace(f\"_read_pyc({source}): not a code object\")\n"
+        '    trace(f"_read_pyc({source}): not a code object")\n'
         "    return None\n"
         "return co\n"
     )
@@ -1941,13 +1890,11 @@ def test_plan_for_task_prefers_stale_path_control_point_from_retry_feedback(
             "structured_response": {
                 "path": "src/_pytest/assertion/rewrite.py",
                 "old": (
-                    "    if co.co_filename != str(source):\n"
-                    "        return None\n"
-                    "    return co"
+                    "    if co.co_filename != str(source):\n        return None\n    return co"
                 ),
                 "new": (
                     "    if co.co_filename != str(source):\n"
-                    "        trace(f\"_read_pyc({source}): stale co_filename {co.co_filename!r}\")\n"
+                    '        trace(f"_read_pyc({source}): stale co_filename {co.co_filename!r}")\n'
                     "        return None\n"
                     "    return co"
                 ),
@@ -2133,10 +2080,7 @@ def test_plan_for_task_allows_revived_historical_pathlib_target(
         config_source,
         encoding="utf-8",
     )
-    old_span = (
-        "    with contextlib.suppress(KeyError):\n"
-        "        return sys.modules[module_name]"
-    )
+    old_span = "    with contextlib.suppress(KeyError):\n        return sys.modules[module_name]"
 
     agent = _FakeAgent(
         {
@@ -2147,7 +2091,7 @@ def test_plan_for_task_allows_revived_historical_pathlib_target(
                 "new": (
                     "    with contextlib.suppress(KeyError):\n"
                     "        mod = sys.modules[module_name]\n"
-                    "        if Path(getattr(mod, \"__file__\", \"\")) == path:\n"
+                    '        if Path(getattr(mod, "__file__", "")) == path:\n'
                     "            return mod"
                 ),
                 "summary": "Avoid reusing stale moved modules.",
@@ -2197,9 +2141,7 @@ def test_plan_for_task_allows_revived_historical_pathlib_target(
     candidates = planner.last_plan_metadata["target_localization"]
     assert candidates[0]["path"] == "src/_pytest/pathlib.py"
     contract = planner.last_plan_metadata["deepagents_contract"]
-    assert contract["patch_selection_policy"]["patchable_paths"][0] == (
-        "src/_pytest/pathlib.py"
-    )
+    assert contract["patch_selection_policy"]["patchable_paths"][0] == ("src/_pytest/pathlib.py")
     assert "target_history_violation" not in planner.last_plan_metadata
 
 
@@ -2212,7 +2154,7 @@ def test_plan_for_task_revives_historical_reviewed_docstring_target(
         "class RequestException(IOError):\n"
         "    pass\n\n"
         "class ChunkedEncodingError(RequestException):\n"
-        "    \"\"\"The server declared chunked encoding but sent an invalid chunk.\"\"\"\n"
+        '    """The server declared chunked encoding but sent an invalid chunk."""\n'
     )
     models_source = (
         "def iter_content(self, chunk_size=1, decode_unicode=False):\n"
@@ -2229,7 +2171,7 @@ def test_plan_for_task_revives_historical_reviewed_docstring_target(
     )
     old_span = (
         "class ChunkedEncodingError(RequestException):\n"
-        "    \"\"\"The server declared chunked encoding but sent an invalid chunk.\"\"\""
+        '    """The server declared chunked encoding but sent an invalid chunk."""'
     )
 
     agent = _FakeAgent(
@@ -2240,10 +2182,10 @@ def test_plan_for_task_revives_historical_reviewed_docstring_target(
                 "old": old_span,
                 "new": (
                     "class ChunkedEncodingError(RequestException):\n"
-                    "    \"\"\"The server declared chunked encoding but sent an invalid chunk.\n\n"
+                    '    """The server declared chunked encoding but sent an invalid chunk.\n\n'
                     "    This can also surface when a transient connection reset interrupts a\n"
                     "    chunked response.\n"
-                    "    \"\"\""
+                    '    """'
                 ),
                 "summary": "Clarify transient reset ChunkedEncodingError documentation.",
                 "failure_mechanism": (

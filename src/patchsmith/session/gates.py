@@ -265,4 +265,3 @@ def _format_cost(value: object) -> str:
     if not isinstance(value, int | float):
         return "n/a"
     return f"${float(value):.6f}"
-

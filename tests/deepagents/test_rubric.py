@@ -49,9 +49,7 @@ def test_acceptance_rubric_manifest_is_task_local_and_targeted() -> None:
     assert "failure happens after cached bytecode is reused" in rubric
     assert rubric.count("src/_pytest/assertion/rewrite.py") >= 2
     assert (
-        "Preferred target order:\n\n"
-        "- `src/_pytest/assertion/rewrite.py`\n\n"
-        "Preferred symbol focus:"
+        "Preferred target order:\n\n- `src/_pytest/assertion/rewrite.py`\n\nPreferred symbol focus:"
     ) in rubric
     assert "- `src/_pytest/assertion/rewrite.py`: `_read_pyc`" in rubric
     assert "Mounted validation or reproduction files:" in rubric

@@ -144,9 +144,7 @@ class ComplexBenchmarkSuiteSpec:
 
     @property
     def thresholds(self) -> ComplexBenchmarkSuiteThresholds:
-        return ComplexBenchmarkSuiteThresholds(
-            **complex_threshold_kwargs_from_object(self)
-        )
+        return ComplexBenchmarkSuiteThresholds(**complex_threshold_kwargs_from_object(self))
 
 
 @dataclass(frozen=True)

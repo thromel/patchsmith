@@ -104,9 +104,7 @@ def test_agent_profile_command_updates_runtime_config(tmp_path: Path) -> None:
         context=ChatCommandContext(record=_record_to(events)),
     )
 
-    assert set_output.getvalue() == (
-        "Agent profile: /verifier\nDescription: Verify patches\n"
-    )
+    assert set_output.getvalue() == ("Agent profile: /verifier\nDescription: Verify patches\n")
     assert runtime.state.config.agent_profile == "verifier"
     assert runtime.state.config.agent_profile_path == str(profile_path)
     assert runtime.state.config.deepagents_model == "gpt-test"

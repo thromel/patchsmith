@@ -31,9 +31,7 @@ def complex_summary(
     selections: list[ComplexBenchmarkSelection],
 ) -> ComplexBenchmarkSummary:
     attempted = [
-        result
-        for result in results
-        if result.patch_outcome.status in {"validated", "failed"}
+        result for result in results if result.patch_outcome.status in {"validated", "failed"}
     ]
     providers = sorted(
         {
@@ -46,10 +44,7 @@ def complex_summary(
     attempted_by_task = {
         task_id: task_results
         for task_id, task_results in grouped_results.items()
-        if any(
-            result.patch_outcome.status in {"validated", "failed"}
-            for result in task_results
-        )
+        if any(result.patch_outcome.status in {"validated", "failed"} for result in task_results)
     }
     tasks_with_validated_attempt = sum(
         1
@@ -61,17 +56,13 @@ def complex_summary(
         for task_results in attempted_by_task.values()
         if not any(result.patch_outcome.validation_passed for result in task_results)
     )
-    selected_validated_tasks = sum(
-        1 for selection in selections if selection.validation_passed
-    )
+    selected_validated_tasks = sum(1 for selection in selections if selection.validation_passed)
     selected = _selected_results(results, selections)
     attempted_with_target_alignment = [
         result for result in attempted if result.patch_outcome.target_aligned is not None
     ]
     target_aligned_tasks = sum(
-        1
-        for result in attempted_with_target_alignment
-        if result.patch_outcome.target_aligned
+        1 for result in attempted_with_target_alignment if result.patch_outcome.target_aligned
     )
     (
         selected_context_target_available_tasks,
@@ -85,15 +76,9 @@ def complex_summary(
         task_count=len(results),
         attempted_tasks=len(attempted),
         reproduced_tasks=sum(1 for result in results if result.patch_outcome.reproduced),
-        validated_tasks=sum(
-            1 for result in results if result.patch_outcome.validation_passed
-        ),
-        failed_tasks=sum(
-            1 for result in attempted if not result.patch_outcome.validation_passed
-        ),
-        blocked_tasks=sum(
-            1 for result in results if result.patch_outcome.status == "blocked"
-        ),
+        validated_tasks=sum(1 for result in results if result.patch_outcome.validation_passed),
+        failed_tasks=sum(1 for result in attempted if not result.patch_outcome.validation_passed),
+        blocked_tasks=sum(1 for result in results if result.patch_outcome.status == "blocked"),
         preflight_passed_tasks=sum(
             1 for result in results if result.repair_attempt.preflight_status == "passed"
         ),
@@ -124,26 +109,19 @@ def complex_summary(
             sum(1 for result in results if result.patch_outcome.reproduced),
             len(results),
         ),
-        avg_trace_events=_average(
-            result.trace_evidence.trace_event_count for result in attempted
-        ),
+        avg_trace_events=_average(result.trace_evidence.trace_event_count for result in attempted),
         avg_runtime_nodes=_average(
             result.trace_evidence.runtime_node_count for result in attempted
         ),
         failed_trace_event_count=sum(
             result.trace_evidence.failed_trace_event_count for result in attempted
         ),
-        avg_retry_events=_average(
-            result.trace_evidence.retry_event_count for result in attempted
-        ),
+        avg_retry_events=_average(result.trace_evidence.retry_event_count for result in attempted),
         retry_feedback_artifact_tasks=sum(
-            1
-            for result in attempted
-            if result.trace_evidence.retry_feedback_artifact_count > 0
+            1 for result in attempted if result.trace_evidence.retry_feedback_artifact_count > 0
         ),
         retry_feedback_artifact_count=sum(
-            result.trace_evidence.retry_feedback_artifact_count
-            for result in attempted
+            result.trace_evidence.retry_feedback_artifact_count for result in attempted
         ),
         retry_label_counts=_merge_label_counts(
             result.trace_evidence.retry_label_counts for result in attempted
@@ -163,8 +141,7 @@ def complex_summary(
             if result.context_evidence.context_budget_manifest_path is not None
         ),
         context_budget_omitted_file_count=sum(
-            result.context_evidence.context_budget_omitted_file_count or 0
-            for result in attempted
+            result.context_evidence.context_budget_omitted_file_count or 0 for result in attempted
         ),
         avg_context_budget_omitted_files=_average_optional(
             result.context_evidence.context_budget_omitted_file_count
@@ -172,9 +149,7 @@ def complex_summary(
             if result.context_evidence.context_budget_manifest_path is not None
         ),
         repo_map_manifest_tasks=sum(
-            1
-            for result in attempted
-            if result.context_evidence.repo_map_manifest_path is not None
+            1 for result in attempted if result.context_evidence.repo_map_manifest_path is not None
         ),
         repo_instructions_manifest_tasks=sum(
             1
@@ -182,23 +157,15 @@ def complex_summary(
             if result.context_evidence.repo_instructions_manifest_path is not None
         ),
         repo_instructions_read_first_rate=_average(
-            (
-                1.0
-                if result.context_evidence.repo_instructions_manifest_read_first
-                else 0.0
-            )
+            (1.0 if result.context_evidence.repo_instructions_manifest_read_first else 0.0)
             for result in attempted
             if result.context_evidence.repo_instructions_manifest_path is not None
         ),
         acceptance_rubric_manifest_tasks=sum(
-            1
-            for result in attempted
-            if result.rubric_evidence.manifest_path is not None
+            1 for result in attempted if result.rubric_evidence.manifest_path is not None
         ),
         acceptance_rubric_read_first_rate=_average(
-            (
-                1.0 if result.rubric_evidence.manifest_read_first else 0.0
-            )
+            (1.0 if result.rubric_evidence.manifest_read_first else 0.0)
             for result in attempted
             if result.rubric_evidence.manifest_path is not None
         ),
@@ -216,9 +183,7 @@ def complex_summary(
             if result.context_evidence.repair_interface_manifest_path is not None
         ),
         repair_interface_read_first_rate=_average(
-            1.0
-            if result.context_evidence.repair_interface_manifest_read_first
-            else 0.0
+            1.0 if result.context_evidence.repair_interface_manifest_read_first else 0.0
             for result in attempted
             if result.context_evidence.repair_interface_manifest_path is not None
         ),
@@ -254,9 +219,7 @@ def complex_summary(
         ),
         target_alignment_available_tasks=len(attempted_with_target_alignment),
         target_aligned_tasks=target_aligned_tasks,
-        target_misaligned_tasks=(
-            len(attempted_with_target_alignment) - target_aligned_tasks
-        ),
+        target_misaligned_tasks=(len(attempted_with_target_alignment) - target_aligned_tasks),
         target_alignment_rate=_rate(
             target_aligned_tasks,
             len(attempted_with_target_alignment),
@@ -268,40 +231,30 @@ def complex_summary(
             result.process_quality.agent_trajectory_score for result in attempted
         ),
         todo_planning_rate=_average(
-            1.0 if result.process_quality.todo_planning else 0.0
-            for result in attempted
+            1.0 if result.process_quality.todo_planning else 0.0 for result in attempted
         ),
         constrained_filesystem_rate=_average(
-            1.0 if result.process_quality.constrained_filesystem else 0.0
-            for result in attempted
+            1.0 if result.process_quality.constrained_filesystem else 0.0 for result in attempted
         ),
         specialist_review_rate=_average(
-            1.0 if result.process_quality.specialist_review else 0.0
-            for result in attempted
+            1.0 if result.process_quality.specialist_review else 0.0 for result in attempted
         ),
         guardrails_rate=_average(
-            1.0 if result.process_quality.guardrails else 0.0
-            for result in attempted
+            1.0 if result.process_quality.guardrails else 0.0 for result in attempted
         ),
         structured_output_rate=_average(
-            1.0 if result.process_quality.structured_output else 0.0
-            for result in attempted
+            1.0 if result.process_quality.structured_output else 0.0 for result in attempted
         ),
         retry_feedback_rate=_average(
-            1.0 if result.process_quality.retry_feedback else 0.0
-            for result in attempted
+            1.0 if result.process_quality.retry_feedback else 0.0 for result in attempted
         ),
         patch_diagnostics_rate=_average(
-            1.0 if result.process_quality.patch_diagnostics else 0.0
-            for result in attempted
+            1.0 if result.process_quality.patch_diagnostics else 0.0 for result in attempted
         ),
         contextual_verifier_rate=_average(
-            1.0 if result.process_quality.contextual_verifier else 0.0
-            for result in attempted
+            1.0 if result.process_quality.contextual_verifier else 0.0 for result in attempted
         ),
-        avg_process_quality_score=_average(
-            result.process_quality.score for result in attempted
-        ),
+        avg_process_quality_score=_average(result.process_quality.score for result in attempted),
         process_quality_label_counts=_count_labels(
             result.process_quality.label for result in attempted
         ),
@@ -311,39 +264,25 @@ def complex_summary(
         process_risky_validated_tasks=sum(
             1
             for result in attempted
-            if result.patch_outcome.validation_passed
-            and result.process_quality.label == "risky"
+            if result.patch_outcome.validation_passed and result.process_quality.label == "risky"
         ),
         live_provider_tasks=sum(
-            1
-            for result in attempted
-            if result.model_usage.provider in LIVE_MODEL_PROVIDERS
+            1 for result in attempted if result.model_usage.provider in LIVE_MODEL_PROVIDERS
         ),
         live_cost_budgeted_tasks=sum(
-            1
-            for result in attempted
-            if result.cost_evidence.live_cost_budget_usd is not None
+            1 for result in attempted if result.cost_evidence.live_cost_budget_usd is not None
         ),
         live_cost_budget_overage_tasks=sum(
             1 for result in attempted if result.cost_evidence.live_cost_budget_overage
         ),
         max_live_cost_budget_overage_usd=_max_optional_float(
-            result.cost_evidence.live_cost_budget_overage_usd
-            for result in attempted
+            result.cost_evidence.live_cost_budget_overage_usd for result in attempted
         ),
         model_provider=",".join(providers) if providers else None,
-        response_count=_sum_optional(
-            result.model_usage.response_count for result in attempted
-        ),
-        input_tokens=_sum_optional(
-            result.model_usage.input_tokens for result in attempted
-        ),
-        output_tokens=_sum_optional(
-            result.model_usage.output_tokens for result in attempted
-        ),
-        total_tokens=_sum_optional(
-            result.model_usage.total_tokens for result in attempted
-        ),
+        response_count=_sum_optional(result.model_usage.response_count for result in attempted),
+        input_tokens=_sum_optional(result.model_usage.input_tokens for result in attempted),
+        output_tokens=_sum_optional(result.model_usage.output_tokens for result in attempted),
+        total_tokens=_sum_optional(result.model_usage.total_tokens for result in attempted),
         estimated_cost_usd=_sum_optional_float(
             result.model_usage.estimated_cost_usd for result in attempted
         ),
@@ -383,12 +322,8 @@ def complex_summary(
             selected_validated_tasks,
             len(selections),
         ),
-        selected_total_tokens=_sum_optional(
-            selection.total_tokens for selection in selections
-        ),
-        selected_response_count=_sum_optional(
-            selection.response_count for selection in selections
-        ),
+        selected_total_tokens=_sum_optional(selection.total_tokens for selection in selections),
+        selected_response_count=_sum_optional(selection.response_count for selection in selections),
         selected_estimated_cost_usd=_sum_optional_float(
             selection.estimated_cost_usd for selection in selections
         ),
@@ -403,9 +338,7 @@ def complex_summary(
         ),
         selected_tokens_per_virtual_file=_tokens_per_virtual_file(selected),
         selected_responses_per_virtual_file=_responses_per_virtual_file(selected),
-        selected_context_target_available_tasks=(
-            selected_context_target_available_tasks
-        ),
+        selected_context_target_available_tasks=(selected_context_target_available_tasks),
         selected_context_target_covered_tasks=selected_context_target_covered_tasks,
         selected_context_target_recall=selected_context_target_recall,
         selected_context_target_precision=selected_context_target_precision,
@@ -421,9 +354,7 @@ def complex_summary(
         max_selected_task_cost_usd=_max_optional_float(
             selection.estimated_cost_usd for selection in selections
         ),
-        max_selected_task_tokens=_max_optional(
-            selection.total_tokens for selection in selections
-        ),
+        max_selected_task_tokens=_max_optional(selection.total_tokens for selection in selections),
         max_selected_task_responses=_max_optional(
             selection.response_count for selection in selections
         ),
@@ -433,9 +364,7 @@ def complex_summary(
             if not result.patch_outcome.validation_passed
             and result.patch_outcome.progress_score >= 0.45
         ),
-        avg_progress_score=_average(
-            result.patch_outcome.progress_score for result in attempted
-        ),
+        avg_progress_score=_average(result.patch_outcome.progress_score for result in attempted),
         selected_avg_progress_score=_average(
             result.patch_outcome.progress_score for result in selected
         ),
@@ -465,10 +394,7 @@ def preflight_gate_blocked_from_gates(
     gates: list[dict[str, str]],
     name: str,
 ) -> bool:
-    return any(
-        gate.get("name") == name and gate.get("status") == "blocked"
-        for gate in gates
-    )
+    return any(gate.get("name") == name and gate.get("status") == "blocked" for gate in gates)
 
 
 def _average(values: Any) -> float:
@@ -537,9 +463,7 @@ def _per_validated_result_cost(
 ) -> float | None:
     return _cost_per_success(
         costs=[result.model_usage.estimated_cost_usd for result in attempted],
-        success_count=sum(
-            1 for result in attempted if result.patch_outcome.validation_passed
-        ),
+        success_count=sum(1 for result in attempted if result.patch_outcome.validation_passed),
     )
 
 
@@ -548,9 +472,7 @@ def _per_validated_result_tokens(
 ) -> float | None:
     return _tokens_per_success(
         tokens=[result.model_usage.total_tokens for result in attempted],
-        success_count=sum(
-            1 for result in attempted if result.patch_outcome.validation_passed
-        ),
+        success_count=sum(1 for result in attempted if result.patch_outcome.validation_passed),
     )
 
 
@@ -559,9 +481,7 @@ def _per_validated_result_responses(
 ) -> float | None:
     return _tokens_per_success(
         tokens=[result.model_usage.response_count for result in attempted],
-        success_count=sum(
-            1 for result in attempted if result.patch_outcome.validation_passed
-        ),
+        success_count=sum(1 for result in attempted if result.patch_outcome.validation_passed),
     )
 
 
@@ -672,9 +592,7 @@ def _context_target_metrics(
             covered_tasks += 1
 
     recall = covered_targets / total_targets if total_targets else None
-    precision = (
-        targeted_context_paths / total_context_paths if total_context_paths else None
-    )
+    precision = targeted_context_paths / total_context_paths if total_context_paths else None
     return len(available), covered_tasks, recall, precision
 
 

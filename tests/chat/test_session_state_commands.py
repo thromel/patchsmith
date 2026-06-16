@@ -127,8 +127,7 @@ def test_clear_and_compact_commands_record_replayable_state(tmp_path: Path) -> N
         context=ChatCommandContext(record=_record_to(events)),
     )
     assert compact_output.getvalue() == (
-        "Session compacted. Summarized 1 task(s).\n"
-        "Last run artifact pointers were preserved.\n"
+        "Session compacted. Summarized 1 task(s).\nLast run artifact pointers were preserved.\n"
     )
     assert runtime.history == []
     assert runtime.compaction_summary is not None

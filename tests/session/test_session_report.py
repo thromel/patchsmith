@@ -63,9 +63,7 @@ def test_export_session_report_writes_requested_path_and_keeps_compatibility(
     assert export.transcript_path == transcript_path
     assert export.report_path == report_path
     assert report_path.is_file()
-    assert report_path.read_text(encoding="utf-8").startswith(
-        "# PatchSmith Chat Session"
-    )
+    assert report_path.read_text(encoding="utf-8").startswith("# PatchSmith Chat Session")
     assert compatibility_export.transcript_path == transcript_path
     assert compatibility_export.report_path.is_file()
 

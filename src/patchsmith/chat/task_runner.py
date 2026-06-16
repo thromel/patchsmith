@@ -142,8 +142,7 @@ def run_chat_task(
             "run_id": chat_run.result.run_id,
             "diff_path": str(chat_run.result.final_diff_path),
             "message": (
-                "interactive auto-apply is deferred until /diff review, "
-                "/apply check, and /apply"
+                "interactive auto-apply is deferred until /diff review, /apply check, and /apply"
             ),
         }
         record(runtime, "apply_auto_deferred", deferred_payload)

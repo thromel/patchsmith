@@ -372,8 +372,7 @@ def _followup_attempt_output_dir(
     profile: str,
 ) -> str:
     return (
-        "artifacts/experiments/public_issue_corpus_v1/"
-        f"followup_{_slug(result.task_id)}_{profile}"
+        f"artifacts/experiments/public_issue_corpus_v1/followup_{_slug(result.task_id)}_{profile}"
     )
 
 
@@ -381,10 +380,7 @@ def _followup_complex_output_dir(
     result: ComplexBenchmarkResult,
     profile: str,
 ) -> str:
-    return (
-        "artifacts/experiments/"
-        f"complex_followup_{_slug(result.task_id)}_{profile}"
-    )
+    return f"artifacts/experiments/complex_followup_{_slug(result.task_id)}_{profile}"
 
 
 def _followup_env(
@@ -458,13 +454,8 @@ def _followup_action(result: ComplexBenchmarkResult) -> str:
     cost = result.cost_evidence
     if cost.live_cost_budget_overage or outcome.harness_layer == "budget":
         return "budget_contract_tightening"
-    if (
-        outcome.validation_passed
-        and (
-            _high_response_count(result)
-            or _high_token_count(result)
-            or _high_cost(result)
-        )
+    if outcome.validation_passed and (
+        _high_response_count(result) or _high_token_count(result) or _high_cost(result)
     ):
         return "cost_optimization_rerun"
     if outcome.harness_layer == "patch_quality" or outcome.quality_warning:

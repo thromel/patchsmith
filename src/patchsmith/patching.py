@@ -299,6 +299,5 @@ def _raise_for_python_unbound_names(
         return
     formatted = ", ".join(f"`{name}`" for name in names)
     raise PatchSafetyError(
-        f"replacement introduces potentially unbound Python name(s) in "
-        f"{relative_path}: {formatted}"
+        f"replacement introduces potentially unbound Python name(s) in {relative_path}: {formatted}"
     )

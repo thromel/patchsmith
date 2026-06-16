@@ -7,9 +7,7 @@ from pathlib import Path
 from patchsmith.agent_frontmatter import frontmatter_body, frontmatter_metadata
 
 CUSTOM_COMMAND_ROOT = ".patchsmith/commands"
-_COMMAND_NAME_PATTERN = re.compile(
-    r"^[a-z0-9][a-z0-9_.-]*(?::[a-z0-9][a-z0-9_.-]*)*$"
-)
+_COMMAND_NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_.-]*(?::[a-z0-9][a-z0-9_.-]*)*$")
 
 
 @dataclass(frozen=True)
@@ -76,9 +74,7 @@ def render_custom_command_prompt(
     if argument and rendered == template:
         rendered = f"{rendered}\n\nArguments:\n{argument}"
     return (
-        f"PatchSmith custom command /{command.name}\n"
-        f"Source: {command.path}\n\n"
-        f"{rendered.strip()}"
+        f"PatchSmith custom command /{command.name}\nSource: {command.path}\n\n{rendered.strip()}"
     ).rstrip()
 
 
@@ -127,4 +123,3 @@ def _command_name_from_path(command_dir: Path, path: Path) -> str:
 
 def _valid_command_name(name: str) -> bool:
     return bool(_COMMAND_NAME_PATTERN.fullmatch(name))
-

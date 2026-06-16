@@ -67,10 +67,7 @@ def session_recommendation(transcript_path: Path) -> AgentSessionRecommendation:
         ):
             return AgentSessionRecommendation(
                 action="Fix readiness or cancel the pending planned task.",
-                reason=(
-                    "Plan mode has a pending task, but the latest preflight "
-                    "did not pass."
-                ),
+                reason=("Plan mode has a pending task, but the latest preflight did not pass."),
                 commands=(
                     "/doctor",
                     f"/preflight {pending_planned_task}",
@@ -101,8 +98,7 @@ def session_recommendation(transcript_path: Path) -> AgentSessionRecommendation:
             return AgentSessionRecommendation(
                 action="Fix readiness before spending model tokens.",
                 reason=(
-                    "The transcript has no completed runs and the latest "
-                    "preflight is blocked."
+                    "The transcript has no completed runs and the latest preflight is blocked."
                 ),
                 commands=("/doctor", "/preflight <task>"),
                 evidence=(
@@ -164,10 +160,7 @@ def session_recommendation(transcript_path: Path) -> AgentSessionRecommendation:
     if budget_pressure is not None:
         return AgentSessionRecommendation(
             action="Adjust budget, model, or context strategy before retrying.",
-            reason=(
-                "The latest run produced no patch and exhausted the configured "
-                "model budget."
-            ),
+            reason=("The latest run produced no patch and exhausted the configured model budget."),
             commands=(
                 "/trace",
                 "/budget set <responses> <tokens>",
@@ -196,10 +189,7 @@ def session_recommendation(transcript_path: Path) -> AgentSessionRecommendation:
     if latest_evidence_index < latest_run_index:
         return AgentSessionRecommendation(
             action="Inspect the latest validated run artifacts.",
-            reason=(
-                "The latest run passed validation but has not been reviewed "
-                "with /trace."
-            ),
+            reason=("The latest run passed validation but has not been reviewed with /trace."),
             commands=("/trace", "/gate clean"),
             evidence=(
                 f"run={_plain_text(last_run.get('run_id'))}",
@@ -210,10 +200,7 @@ def session_recommendation(transcript_path: Path) -> AgentSessionRecommendation:
     if latest_gate_index < latest_run_index:
         return AgentSessionRecommendation(
             action="Gate the latest validated run before promotion.",
-            reason=(
-                "The latest run passed validation but no session gate was "
-                "recorded after it."
-            ),
+            reason=("The latest run passed validation but no session gate was recorded after it."),
             commands=("/gate clean", "/checkpoint validated"),
             evidence=(
                 f"run={_plain_text(last_run.get('run_id'))}",
@@ -248,17 +235,11 @@ def session_recommendation(transcript_path: Path) -> AgentSessionRecommendation:
                     "diff_risk_review=missing_after_latest_diff_review",
                 ),
             )
-        diff_review_is_high_risk = (
-            latest_diff_review is not None
-            and (
-                latest_diff_review.get("risk_level") == "high"
-                or latest_diff_review.get("confirmation_required") is True
-            )
+        diff_review_is_high_risk = latest_diff_review is not None and (
+            latest_diff_review.get("risk_level") == "high"
+            or latest_diff_review.get("confirmation_required") is True
         )
-        if (
-            diff_review_is_high_risk
-            and latest_apply_check_index < latest_diff_review_index
-        ):
+        if diff_review_is_high_risk and latest_apply_check_index < latest_diff_review_index:
             return AgentSessionRecommendation(
                 action="Resolve or explicitly review the high-risk diff before applying.",
                 reason="The latest deterministic diff review marked the patch high risk.",
@@ -285,8 +266,7 @@ def session_recommendation(transcript_path: Path) -> AgentSessionRecommendation:
             return AgentSessionRecommendation(
                 action="Resolve the apply-check failure before applying.",
                 reason=(
-                    "The latest apply check did not prove that the diff can be "
-                    "applied cleanly."
+                    "The latest apply check did not prove that the diff can be applied cleanly."
                 ),
                 commands=("/timeline 20", "/diff show", "/run <task>"),
                 evidence=(
@@ -320,10 +300,7 @@ def session_recommendation(transcript_path: Path) -> AgentSessionRecommendation:
                     f"apply_rejection={rejection_reason or 'recorded'}",
                 ),
             )
-        if (
-            diff_review_is_high_risk
-            and latest_apply_approval_index < latest_apply_check_index
-        ):
+        if diff_review_is_high_risk and latest_apply_approval_index < latest_apply_check_index:
             return AgentSessionRecommendation(
                 action="Approve or reject the high-risk reviewed diff.",
                 reason=(
@@ -354,8 +331,7 @@ def session_recommendation(transcript_path: Path) -> AgentSessionRecommendation:
         return AgentSessionRecommendation(
             action="Verify the applied working tree.",
             reason=(
-                "The latest run has an apply decision but no independent "
-                "verify command after it."
+                "The latest run has an apply decision but no independent verify command after it."
             ),
             commands=("/verify", "/checkpoint verified"),
             evidence=(
@@ -368,8 +344,7 @@ def session_recommendation(transcript_path: Path) -> AgentSessionRecommendation:
         return AgentSessionRecommendation(
             action="Checkpoint the post-verify session state.",
             reason=(
-                "The latest validated run has apply/verify evidence but no "
-                "checkpoint after it."
+                "The latest validated run has apply/verify evidence but no checkpoint after it."
             ),
             commands=("/checkpoint applied", "/export"),
             evidence=(
@@ -531,10 +506,7 @@ def _latest_repeated_failure(
         event = row.event
         if event == "run_result":
             payload = _payload_at(row)
-            if (
-                not _run_is_unresolved(payload)
-                or _failure_signature(payload) != signature
-            ):
+            if not _run_is_unresolved(payload) or _failure_signature(payload) != signature:
                 break
             count += 1
             continue
@@ -583,11 +555,7 @@ def _latest_budget_pressure(
     evidence: list[str] = []
     response_count = _optional_int(run_payload.get("model_response_count"))
     response_cap = _positive_int(config.get("max_model_responses"))
-    if (
-        response_count is not None
-        and response_cap is not None
-        and response_count >= response_cap
-    ):
+    if response_count is not None and response_cap is not None and response_count >= response_cap:
         evidence.append(f"response_budget={response_count}/{response_cap}")
     token_count = _optional_int(run_payload.get("model_total_tokens"))
     token_cap = _positive_int(config.get("max_model_tokens"))
@@ -656,11 +624,7 @@ def _pending_planned_task(
             state = payload.get("state")
             if isinstance(state, dict):
                 task = state.get("pending_planned_task")
-                pending = (
-                    (task.strip(), index)
-                    if isinstance(task, str) and task.strip()
-                    else None
-                )
+                pending = (task.strip(), index) if isinstance(task, str) and task.strip() else None
     return pending
 
 

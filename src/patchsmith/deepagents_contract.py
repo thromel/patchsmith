@@ -63,11 +63,7 @@ def deepagents_planning_contract(
     file_paths = sorted({path for path in virtual_file_paths if path})
     patchable_paths = _ordered_unique_paths(patchable_target_paths or [])
     historical_paths = sorted(
-        {
-            path.strip().lstrip("/")
-            for path in (historical_target_paths or [])
-            if path.strip()
-        }
+        {path.strip().lstrip("/") for path in (historical_target_paths or []) if path.strip()}
     )
     memory_paths = [PATCHSMITH_DEEPAGENTS_MEMORY_PATH]
     skill_sources = [PATCHSMITH_DEEPAGENTS_SKILL_DIR]
@@ -122,12 +118,8 @@ def deepagents_planning_contract(
         "max_file_chars": int(getattr(config, "max_file_chars", 0) or 0),
         "max_context_files": int(getattr(config, "max_context_files", 0) or 0),
         "context_mode": str(getattr(config, "context_mode", "") or "full"),
-        "context_selection_mode": str(
-            getattr(config, "context_selection_mode", "") or "retrieved"
-        ),
-        "context_window_lines": int(
-            getattr(config, "context_window_lines", 0) or 0
-        ),
+        "context_selection_mode": str(getattr(config, "context_selection_mode", "") or "retrieved"),
+        "context_window_lines": int(getattr(config, "context_window_lines", 0) or 0),
         "subagent_mode": subagent_mode,
         "reasoning_effort": getattr(config, "reasoning_effort", None),
         "use_responses_api": bool(getattr(config, "use_responses_api", False)),
@@ -214,14 +206,10 @@ def deepagents_planning_contract(
                 repo_instructions_manifest and not budget_critical
             ),
             "acceptance_rubric_manifest_read_first": acceptance_rubric_manifest,
-            "source_hint_manifest_read_first": (
-                source_hint_manifest and not budget_critical
-            ),
+            "source_hint_manifest_read_first": (source_hint_manifest and not budget_critical),
             "retry_feedback_manifest_read_first": retry_feedback_manifest,
             "target_history_manifest_read_first": target_history_manifest,
-            "failure_localizer_subagent_for_validation_fixtures": (
-                failure_localizer_enabled
-            ),
+            "failure_localizer_subagent_for_validation_fixtures": (failure_localizer_enabled),
             "patch_review_subagent_for_ambiguous_repairs": patch_reviewer_enabled,
             "inline_failure_localization_required": not failure_localizer_enabled,
             "inline_patch_review_required": not patch_reviewer_enabled,
@@ -262,11 +250,7 @@ def _preferred_symbol_contract_metadata(
 ) -> dict[str, list[str]]:
     if not preferred_target_symbols:
         return {}
-    patchable = {
-        path.strip().lstrip("/")
-        for path in patchable_paths
-        if path.strip()
-    }
+    patchable = {path.strip().lstrip("/") for path in patchable_paths if path.strip()}
     normalized: dict[str, list[str]] = {}
     for path, symbols in preferred_target_symbols.items():
         clean_path = path.strip().lstrip("/")
@@ -311,15 +295,11 @@ def _resource_budget_contract_metadata(
         "max_model_responses": _optional_nonnegative_int(
             resource_budget.get("max_model_responses")
         ),
-        "max_model_tokens": _optional_nonnegative_int(
-            resource_budget.get("max_model_tokens")
-        ),
+        "max_model_tokens": _optional_nonnegative_int(resource_budget.get("max_model_tokens")),
         "used_model_responses": _optional_nonnegative_int(
             resource_budget.get("used_model_responses")
         ),
-        "used_model_tokens": _optional_nonnegative_int(
-            resource_budget.get("used_model_tokens")
-        ),
+        "used_model_tokens": _optional_nonnegative_int(resource_budget.get("used_model_tokens")),
         "remaining_model_responses": _optional_nonnegative_int(
             resource_budget.get("remaining_model_responses")
         ),
@@ -333,9 +313,7 @@ def _resource_budget_contract_metadata(
 def _is_budget_critical(resource_budget: Mapping[str, Any] | None) -> bool:
     if not resource_budget:
         return False
-    remaining = _optional_nonnegative_int(
-        resource_budget.get("remaining_model_responses")
-    )
+    remaining = _optional_nonnegative_int(resource_budget.get("remaining_model_responses"))
     if remaining is not None:
         return remaining <= 6
     max_responses = _optional_nonnegative_int(resource_budget.get("max_model_responses"))

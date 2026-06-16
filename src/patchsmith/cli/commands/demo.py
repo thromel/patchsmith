@@ -123,7 +123,9 @@ def _write_demo_metadata(
 ) -> Path:
     payload = _run_result_payload(result, runtime="heuristic", planner="heuristic")
     selected_context = [context.to_dict() for context in result.retrieved_context]
-    write_json(result.run_dir / "context" / "selected_files.json", selected_context, trailing_newline=True)
+    write_json(
+        result.run_dir / "context" / "selected_files.json", selected_context, trailing_newline=True
+    )
     metadata = {
         "schema_version": "patchsmith.demo.v1",
         "demo": demo_name,
@@ -264,13 +266,10 @@ def _inspect_payload(run_dir: Path) -> dict[str, Any]:
         "runtime": run_payload.get("runtime") or "unknown",
         "planner": run_payload.get("planner") or "unknown",
         "repair_verdict": (
-            run_payload.get("repair_verdict")
-            or repair_outcome.get("verdict")
-            or "unknown"
+            run_payload.get("repair_verdict") or repair_outcome.get("verdict") or "unknown"
         ),
         "failure_category": (
-            run_payload.get("repair_failure_category")
-            or repair_outcome.get("failure_category")
+            run_payload.get("repair_failure_category") or repair_outcome.get("failure_category")
         ),
         "patch_generated": bool(
             run_payload.get("repair_patch_generated")

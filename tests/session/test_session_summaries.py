@@ -89,9 +89,7 @@ def test_list_and_format_session_summaries_keep_agent_session_compatibility(
 
     assert [summary.session_id for summary in summaries] == ["newer", "older"]
     assert compatibility_summaries == summaries
-    assert format_session_summaries(summaries) == compatibility_format_session_summaries(
-        summaries
-    )
+    assert format_session_summaries(summaries) == compatibility_format_session_summaries(summaries)
     text = format_session_summaries(summaries)
     assert "newer" in text
     assert "$0.200000" in text

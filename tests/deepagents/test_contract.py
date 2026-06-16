@@ -45,18 +45,14 @@ def test_deepagents_contract_uses_manifest_contents_for_paths_and_policy() -> No
     assert contract["repair_interface_manifest_path"] == (
         PATCHSMITH_DEEPAGENTS_REPAIR_INTERFACE_PATH
     )
-    assert contract["source_hint_manifest_path"] == (
-        PATCHSMITH_DEEPAGENTS_SOURCE_HINTS_PATH
-    )
+    assert contract["source_hint_manifest_path"] == (PATCHSMITH_DEEPAGENTS_SOURCE_HINTS_PATH)
     assert contract["repo_instructions_manifest_path"] == (
         PATCHSMITH_DEEPAGENTS_REPO_INSTRUCTIONS_PATH
     )
     assert contract["acceptance_rubric_manifest_path"] == (
         PATCHSMITH_DEEPAGENTS_ACCEPTANCE_RUBRIC_PATH
     )
-    assert contract["context_budget_manifest_path"] == (
-        PATCHSMITH_DEEPAGENTS_CONTEXT_BUDGET_PATH
-    )
+    assert contract["context_budget_manifest_path"] == (PATCHSMITH_DEEPAGENTS_CONTEXT_BUDGET_PATH)
     assert contract["context_budget"]["omitted_paths"] == ["src/other.py"]
     assert contract["repository_instructions"]["required"] is False
     assert contract["planning_policy"]["source_hint_manifest_read_first"] is False

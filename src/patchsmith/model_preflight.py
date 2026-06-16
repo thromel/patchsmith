@@ -222,7 +222,6 @@ def _looks_like_openai_api_key(value: str) -> bool:
     if len(value) < 20:
         return False
     return all(
-        character.isascii()
-        and (character.isalnum() or character in {"-", "_"})
+        character.isascii() and (character.isalnum() or character in {"-", "_"})
         for character in value
     )

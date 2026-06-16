@@ -176,9 +176,7 @@ def test_invoke_deepagents_plan_reports_structured_output_failures() -> None:
     assert invocation.failed is True
     assert invocation.model_metadata.status == "structured_output_parse_failed"
     assert invocation.model_call_dict()["error_type"] == "RuntimeError"
-    assert "Failed to parse structured output" in invocation.model_call_dict()[
-        "error_summary"
-    ]
+    assert "Failed to parse structured output" in invocation.model_call_dict()["error_summary"]
 
 
 def test_invoke_deepagents_plan_preserves_resource_budget_usage() -> None:

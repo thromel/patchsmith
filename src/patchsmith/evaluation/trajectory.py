@@ -50,8 +50,10 @@ def agent_trajectory_metrics(events: list[dict[str, Any]]) -> AgentTrajectoryMet
         if contract is not None
     ]
 
-    todo_planning = "runtime.todo" in node_names or "todo" in payload_nodes or any(
-        _planning_policy(contract).get("todos_required") is True for contract in contracts
+    todo_planning = (
+        "runtime.todo" in node_names
+        or "todo" in payload_nodes
+        or any(_planning_policy(contract).get("todos_required") is True for contract in contracts)
     )
     constrained_filesystem = any(
         bool(_filesystem_policy(contract).get("allowed_read_paths")) for contract in contracts
@@ -63,7 +65,10 @@ def agent_trajectory_metrics(events: list[dict[str, Any]]) -> AgentTrajectoryMet
     )
     guardrails = (
         "runtime.guardrails" in node_names
-        or any(_planning_policy(contract).get("one_bounded_replacement") is True for contract in contracts)
+        or any(
+            _planning_policy(contract).get("one_bounded_replacement") is True
+            for contract in contracts
+        )
         or any(_has_patch_plan(payload) for payload in runtime_payloads)
     )
     structured_output = any(
@@ -77,9 +82,7 @@ def agent_trajectory_metrics(events: list[dict[str, Any]]) -> AgentTrajectoryMet
     )
     patch_diagnostics = any(_has_patch_plan(payload) for payload in runtime_payloads)
     contextual_verifier = any(_has_contextual_verifier(contract) for contract in contracts)
-    process_quality_label, process_quality_score, process_quality_flags = (
-        _process_quality(events)
-    )
+    process_quality_label, process_quality_score, process_quality_flags = _process_quality(events)
 
     score = _average_bool(
         [

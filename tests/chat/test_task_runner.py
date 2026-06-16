@@ -19,6 +19,7 @@ pytestmark = pytest.mark.unit
 def test_run_chat_task_records_run_lifecycle(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    deepagents_dependency_available: None,
 ) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     runtime = _runtime(tmp_path)

@@ -191,9 +191,7 @@ def summarize_repair_results(
             1.0 if result.patch_quality_warning else 0.0 for result in completed
         ),
         avg_debuggability_score=_average(result.debuggability_score for result in completed),
-        avg_agent_trajectory_score=_average(
-            result.agent_trajectory_score for result in completed
-        ),
+        avg_agent_trajectory_score=_average(result.agent_trajectory_score for result in completed),
         todo_planning_rate=_average(1.0 if result.todo_planning else 0.0 for result in completed),
         constrained_filesystem_rate=_average(
             1.0 if result.constrained_filesystem else 0.0 for result in completed
@@ -205,9 +203,7 @@ def summarize_repair_results(
         structured_output_rate=_average(
             1.0 if result.structured_output else 0.0 for result in completed
         ),
-        retry_feedback_rate=_average(
-            1.0 if result.retry_feedback else 0.0 for result in completed
-        ),
+        retry_feedback_rate=_average(1.0 if result.retry_feedback else 0.0 for result in completed),
         patch_diagnostics_rate=_average(
             1.0 if result.patch_diagnostics else 0.0 for result in completed
         ),

@@ -18,10 +18,7 @@ def test_plan_feedback_commands_are_registered() -> None:
     registry = build_command_registry(plan_feedback_commands())
 
     assert sorted(registry) == ["feedback", "note", "notes", "plan"]
-    assert (
-        registry["plan"].usage
-        == "/plan [show|set|add|start|done|block|skip|pending|clear] ..."
-    )
+    assert registry["plan"].usage == "/plan [show|set|add|start|done|block|skip|pending|clear] ..."
     assert registry["feedback"].usage == "/feedback [show|add|clear] [guidance]"
     assert registry["note"] is registry["feedback"]
     assert registry["notes"] is registry["feedback"]

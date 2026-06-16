@@ -7,9 +7,7 @@ from pathlib import Path
 from patchsmith.agent_frontmatter import frontmatter_body, frontmatter_metadata
 
 AGENT_PROFILE_ROOT = ".patchsmith/agents"
-_PROFILE_NAME_PATTERN = re.compile(
-    r"^[a-z0-9][a-z0-9_.-]*(?::[a-z0-9][a-z0-9_.-]*)*$"
-)
+_PROFILE_NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_.-]*(?::[a-z0-9][a-z0-9_.-]*)*$")
 _SUBAGENT_MODES = {"auto", "full", "inline"}
 
 

@@ -41,16 +41,28 @@ def test_complex_followup_candidates_build_budget_critical_cost_rerun() -> None:
     assert candidate.priority == 60
     assert candidate.reasons == ("high_response_count", "high_token_count", "high_cost")
     assert candidate.recommended_env == {"OPENAI_API_KEY": "<required>"}
-    assert candidate.recommended_command[candidate.recommended_command.index("--task-id") + 1] == "requests-7341"
-    assert candidate.recommended_command[
-        candidate.recommended_command.index("--deepagents-max-context-files") + 1
-    ] == "4"
-    assert candidate.recommended_command[
-        candidate.recommended_command.index("--max-actual-model-responses") + 1
-    ] == "6"
-    assert candidate.recommended_command[
-        candidate.recommended_command.index("--max-live-cost-usd") + 1
-    ] == "0.07"
+    assert (
+        candidate.recommended_command[candidate.recommended_command.index("--task-id") + 1]
+        == "requests-7341"
+    )
+    assert (
+        candidate.recommended_command[
+            candidate.recommended_command.index("--deepagents-max-context-files") + 1
+        ]
+        == "4"
+    )
+    assert (
+        candidate.recommended_command[
+            candidate.recommended_command.index("--max-actual-model-responses") + 1
+        ]
+        == "6"
+    )
+    assert (
+        candidate.recommended_command[
+            candidate.recommended_command.index("--max-live-cost-usd") + 1
+        ]
+        == "0.07"
+    )
     assert "max_attempted_task_responses <= 6" in candidate.success_criteria
 
 
@@ -135,8 +147,7 @@ def _result(**overrides: object) -> ComplexBenchmarkResult:
 
 def _summary(**overrides: object) -> ComplexBenchmarkSummary:
     values: dict[str, object] = {
-        field.name: _summary_default(field.name)
-        for field in fields(ComplexBenchmarkSummary)
+        field.name: _summary_default(field.name) for field in fields(ComplexBenchmarkSummary)
     }
     values.update(
         {

@@ -499,7 +499,7 @@ def test_summarize_complex_benchmark_reads_public_issue_attempts(tmp_path: Path)
                     "trace_path": str(trace_path),
                     "report_path": str(trace_path.parent / "report.md"),
                     "final_diff_path": str(final_diff_path),
-                }
+                },
             ]
         ),
         encoding="utf-8",
@@ -671,11 +671,9 @@ def test_summarize_complex_benchmark_reads_public_issue_attempts(tmp_path: Path)
     assert "failed_quality" in report
     assert "manual_code_type_rebuild" in report
     selected_results = json.loads(
-        (
-            tmp_path
-            / "complex_benchmark"
-            / "complex_benchmark_selected_results.json"
-        ).read_text(encoding="utf-8")
+        (tmp_path / "complex_benchmark" / "complex_benchmark_selected_results.json").read_text(
+            encoding="utf-8"
+        )
     )
     assert selected_results[0]["task_id"] == "complex_task"
     assert selected_results[0]["selected_attempt_index"] == 2
@@ -685,11 +683,9 @@ def test_summarize_complex_benchmark_reads_public_issue_attempts(tmp_path: Path)
     assert selected_results[0]["failure_class"] == "quality_risk"
     assert "manual_code_type_rebuild" in selected_results[0]["patch_quality_codes"]
     followup_candidates = json.loads(
-        (
-            tmp_path
-            / "complex_benchmark"
-            / "complex_benchmark_followup_candidates.json"
-        ).read_text(encoding="utf-8")
+        (tmp_path / "complex_benchmark" / "complex_benchmark_followup_candidates.json").read_text(
+            encoding="utf-8"
+        )
     )
     assert len(followup_candidates) == 2
     assert followup_candidates[0]["task_id"] == "complex_task"
@@ -706,13 +702,10 @@ def test_summarize_complex_benchmark_reads_public_issue_attempts(tmp_path: Path)
     assert "quality_risk" in followup_candidates[0]["reasons"]
     assert "failure_class:quality_risk" in followup_candidates[0]["reasons"]
     assert "harness_layer:patch_quality" in followup_candidates[0]["reasons"]
-    assert (
-        "retry_failure:repeated_target_failure"
-        in followup_candidates[0]["reasons"]
+    assert "retry_failure:repeated_target_failure" in followup_candidates[0]["reasons"]
+    runbook = (tmp_path / "complex_benchmark" / "complex_benchmark_followup_runbook.md").read_text(
+        encoding="utf-8"
     )
-    runbook = (
-        tmp_path / "complex_benchmark" / "complex_benchmark_followup_runbook.md"
-    ).read_text(encoding="utf-8")
     assert "Complex Benchmark Follow-up Runbook" in runbook
     assert "quality_gate_rerun" in runbook
     assert "acceptance_rubric_verifier" in runbook
@@ -724,9 +717,7 @@ def test_summarize_complex_benchmark_reads_public_issue_attempts(tmp_path: Path)
         min_selected_progress_score=0.90,
     )
     assert progress_gate.status == "failed"
-    assert progress_gate.failures == (
-        "selected progress score 0.85 below required 0.90",
-    )
+    assert progress_gate.failures == ("selected progress score 0.85 below required 0.90",)
     target_alignment_gate = complex_benchmark_suite_gate(
         summary,
         min_target_alignment_rate=1.0,
@@ -744,9 +735,7 @@ def test_summarize_complex_benchmark_reads_public_issue_attempts(tmp_path: Path)
         max_process_risky_validated_tasks=0,
     )
     assert process_risk_gate.status == "failed"
-    assert process_risk_gate.failures == (
-        "process-risky validated tasks 1 exceeds 0",
-    )
+    assert process_risk_gate.failures == ("process-risky validated tasks 1 exceeds 0",)
 
 
 def test_summarize_complex_benchmark_aligns_failure_localized_patch_plan(
@@ -845,8 +834,7 @@ def test_summarize_complex_benchmark_aligns_failure_localized_patch_plan(
                                 },
                                 "failure_localization": {
                                     "failure_mechanism": (
-                                        "The validation inspects "
-                                        "ChunkedEncodingError.__doc__."
+                                        "The validation inspects ChunkedEncodingError.__doc__."
                                     ),
                                     "target_rationale": (
                                         "The controlling docstring is defined in "
@@ -950,9 +938,7 @@ def test_summarize_complex_benchmark_aligns_failure_localized_patch_plan(
     assert results[0].deepagents_virtual_file_paths == ("src/requests/exceptions.py",)
     assert results[0].deepagents_max_context_files == 2
     assert results[0].deepagents_context_budgeted is True
-    assert results[0].deepagents_context_budget_manifest_path == (
-        "/.patchsmith/context-budget.md"
-    )
+    assert results[0].deepagents_context_budget_manifest_path == ("/.patchsmith/context-budget.md")
     assert results[0].deepagents_context_budget_manifest_read_first is True
     assert results[0].deepagents_context_budget_omitted_file_count == 3
     assert results[0].deepagents_context_budget_omitted_paths == (
@@ -1110,11 +1096,9 @@ def test_summarize_complex_benchmark_selects_low_cost_validated_attempt(
     }
     assert summary.selected_failure_class_counts == {"validated": 1}
     selected_results = json.loads(
-        (
-            tmp_path
-            / "complex_selector"
-            / "complex_benchmark_selected_results.json"
-        ).read_text(encoding="utf-8")
+        (tmp_path / "complex_selector" / "complex_benchmark_selected_results.json").read_text(
+            encoding="utf-8"
+        )
     )
     assert selected_results == [
         {
@@ -1145,16 +1129,12 @@ def test_summarize_complex_benchmark_selects_low_cost_validated_attempt(
         }
     ]
     followup_candidates = json.loads(
-        (
-            tmp_path
-            / "complex_selector"
-            / "complex_benchmark_followup_candidates.json"
-        ).read_text(encoding="utf-8")
+        (tmp_path / "complex_selector" / "complex_benchmark_followup_candidates.json").read_text(
+            encoding="utf-8"
+        )
     )
     expensive_followup = next(
-        candidate
-        for candidate in followup_candidates
-        if candidate["attempt_index"] == 2
+        candidate for candidate in followup_candidates if candidate["attempt_index"] == 2
     )
     assert expensive_followup["action"] == "cost_optimization_rerun"
     assert expensive_followup["suggested_profile"] == "budget_critical_context_cap"
@@ -1276,9 +1256,9 @@ def test_summarize_complex_benchmark_selects_low_cost_validated_attempt(
     assert "selector_task | 3/3 | validated | validated" in report
     assert "cost_optimization_rerun" in report
     assert "budget_critical_context_cap" in report
-    runbook = (
-        tmp_path / "complex_selector" / "complex_benchmark_followup_runbook.md"
-    ).read_text(encoding="utf-8")
+    runbook = (tmp_path / "complex_selector" / "complex_benchmark_followup_runbook.md").read_text(
+        encoding="utf-8"
+    )
     assert "cost_optimization_rerun" in runbook
     assert "budget_critical_context_cap" in runbook
     assert "--max-actual-model-responses 6" in runbook
@@ -1420,11 +1400,9 @@ def test_summarize_complex_benchmark_aggregates_preflight_gates(
     assert "passed (sandbox:skipped; model:passed)" in report
     assert "blocked (sandbox:skipped; model:passed; budget:blocked)" in report
     results_json = json.loads(
-        (
-            tmp_path
-            / "complex_preflight"
-            / "complex_benchmark_results.json"
-        ).read_text(encoding="utf-8")
+        (tmp_path / "complex_preflight" / "complex_benchmark_results.json").read_text(
+            encoding="utf-8"
+        )
     )
     assert results_json[0]["preflight_gates"][1]["provider_status"] == "missing_credentials"
 
@@ -1486,21 +1464,17 @@ def test_summarize_complex_benchmark_flags_post_run_budget_overage(
         max_live_cost_budget_overage_tasks=0,
     )
     assert gate.status == "failed"
-    assert gate.failures == (
-        "live cost budget overage tasks 1 exceeds 0",
+    assert gate.failures == ("live cost budget overage tasks 1 exceeds 0",)
+    report = (tmp_path / "complex_budget_overage" / "complex_benchmark_report.md").read_text(
+        encoding="utf-8"
     )
-    report = (
-        tmp_path / "complex_budget_overage" / "complex_benchmark_report.md"
-    ).read_text(encoding="utf-8")
     assert "Live cost budget overage tasks: `1`" in report
     assert "Max live cost budget overage: `$0.105278`" in report
     assert "budget_overage=$0.105278" in report
     results_json = json.loads(
-        (
-            tmp_path
-            / "complex_budget_overage"
-            / "complex_benchmark_results.json"
-        ).read_text(encoding="utf-8")
+        (tmp_path / "complex_budget_overage" / "complex_benchmark_results.json").read_text(
+            encoding="utf-8"
+        )
     )
     assert results_json[0]["live_cost_budget_overage"] is True
 
@@ -1563,11 +1537,9 @@ def test_summarize_complex_benchmark_suite_aggregates_saved_attempt_dirs(
         encoding="utf-8",
     )
 
-    results, summary, attempt_summaries, followup_candidates = (
-        summarize_complex_benchmark_suite(
-            attempt_dirs=[attempt_a, attempt_b],
-            output_dir=tmp_path / "suite",
-        )
+    results, summary, attempt_summaries, followup_candidates = summarize_complex_benchmark_suite(
+        attempt_dirs=[attempt_a, attempt_b],
+        output_dir=tmp_path / "suite",
     )
 
     assert len(results) == 2
@@ -1620,11 +1592,9 @@ def test_summarize_complex_benchmark_suite_aggregates_saved_attempt_dirs(
     assert str(attempt_a) in suite_report
     assert str(attempt_b) in suite_report
     attempt_summaries_json = json.loads(
-        (
-            tmp_path
-            / "suite"
-            / "complex_benchmark_attempt_summaries.json"
-        ).read_text(encoding="utf-8")
+        (tmp_path / "suite" / "complex_benchmark_attempt_summaries.json").read_text(
+            encoding="utf-8"
+        )
     )
     assert [row["validated_tasks"] for row in attempt_summaries_json] == [1, 1]
 
@@ -1754,28 +1724,16 @@ def test_summarize_complex_benchmark_suite_aggregates_saved_attempt_dirs(
         "acceptance_rubric_alignment_missing",
     )
     assert "--min-contextual-verifier-rate" in first_followup.validation_command
-    assert (
-        "--min-acceptance-rubric-alignment-rate"
-        in first_followup.validation_command
-    )
-    assert (
-        "contextual_verifier_rate >= 1.0" in first_followup.success_criteria
-    )
-    assert (
-        "acceptance_rubric_alignment_rate >= 1.0"
-        in first_followup.success_criteria
-    )
+    assert "--min-acceptance-rubric-alignment-rate" in first_followup.validation_command
+    assert "contextual_verifier_rate >= 1.0" in first_followup.success_criteria
+    assert "acceptance_rubric_alignment_rate >= 1.0" in first_followup.success_criteria
     verifier_runbook = (
-        tmp_path
-        / "suite_verifier_debt"
-        / "complex_benchmark_followup_runbook.md"
+        tmp_path / "suite_verifier_debt" / "complex_benchmark_followup_runbook.md"
     ).read_text(encoding="utf-8")
     assert "verifier_contract_rerun" in verifier_runbook
     assert "--min-contextual-verifier-rate 1.0" in verifier_runbook
     verifier_suite_report = (
-        tmp_path
-        / "suite_verifier_debt"
-        / "complex_benchmark_suite_report.md"
+        tmp_path / "suite_verifier_debt" / "complex_benchmark_suite_report.md"
     ).read_text(encoding="utf-8")
     assert "verifier_contract_rerun" in verifier_suite_report
 
@@ -1935,10 +1893,7 @@ def test_eval_complex_suite_accepts_suite_spec(tmp_path: Path, capsys) -> None:
 
 def test_public_issue_verifier_suite_template_requires_verifier_gates() -> None:
     spec = load_complex_benchmark_suite_spec(
-        Path(
-            "evals/issue_corpora/public_issue_smoke_v1/"
-            "complex_suite_verifier.template.json"
-        )
+        Path("evals/issue_corpora/public_issue_smoke_v1/complex_suite_verifier.template.json")
     )
 
     assert spec.benchmark == "public_issue_repair_attempts"
@@ -2084,24 +2039,15 @@ def test_complex_suite_config_resolves_spec_and_explicit_overrides(
         ),
         (
             {"max_attempted_task_cost_usd": -1.0},
-            (
-                "complex benchmark suite threshold "
-                "max_attempted_task_cost_usd must be non-negative"
-            ),
+            ("complex benchmark suite threshold max_attempted_task_cost_usd must be non-negative"),
         ),
         (
             {"max_attempted_task_tokens": -1},
-            (
-                "complex benchmark suite threshold "
-                "max_attempted_task_tokens must be non-negative"
-            ),
+            ("complex benchmark suite threshold max_attempted_task_tokens must be non-negative"),
         ),
         (
             {"max_attempted_task_responses": -1},
-            (
-                "complex benchmark suite threshold "
-                "max_attempted_task_responses must be non-negative"
-            ),
+            ("complex benchmark suite threshold max_attempted_task_responses must be non-negative"),
         ),
         (
             {"max_selected_cost_per_validated_task_usd": -1.0},
@@ -2196,24 +2142,15 @@ def test_complex_suite_config_resolves_spec_and_explicit_overrides(
         ),
         (
             {"max_selected_task_cost_usd": -1.0},
-            (
-                "complex benchmark suite threshold "
-                "max_selected_task_cost_usd must be non-negative"
-            ),
+            ("complex benchmark suite threshold max_selected_task_cost_usd must be non-negative"),
         ),
         (
             {"max_selected_task_tokens": -1},
-            (
-                "complex benchmark suite threshold "
-                "max_selected_task_tokens must be non-negative"
-            ),
+            ("complex benchmark suite threshold max_selected_task_tokens must be non-negative"),
         ),
         (
             {"max_selected_task_responses": -1},
-            (
-                "complex benchmark suite threshold "
-                "max_selected_task_responses must be non-negative"
-            ),
+            ("complex benchmark suite threshold max_selected_task_responses must be non-negative"),
         ),
         (
             {"max_live_cost_budget_overage_tasks": -1},
@@ -2245,10 +2182,7 @@ def test_complex_suite_config_resolves_spec_and_explicit_overrides(
         ),
         (
             {"min_target_alignment_rate": -0.1},
-            (
-                "complex benchmark suite threshold "
-                "min_target_alignment_rate must be between 0 and 1"
-            ),
+            ("complex benchmark suite threshold min_target_alignment_rate must be between 0 and 1"),
         ),
     ],
 )
@@ -2484,16 +2418,12 @@ def _write_complex_trace(
                                     "filesystem_policy": {
                                         "allowed_read_paths": [
                                             *(
-                                                [
-                                                    "/.patchsmith/repo-instructions.md"
-                                                ]
+                                                ["/.patchsmith/repo-instructions.md"]
                                                 if repo_instructions
                                                 else []
                                             ),
                                             *(
-                                                [
-                                                    "/.patchsmith/acceptance-rubric.md"
-                                                ]
+                                                ["/.patchsmith/acceptance-rubric.md"]
                                                 if acceptance_rubric
                                                 else []
                                             ),
@@ -2508,16 +2438,12 @@ def _write_complex_trace(
                                         "todos_required": True,
                                         "one_bounded_replacement": True,
                                         **(
-                                            {
-                                                "repo_instructions_manifest_read_first": True
-                                            }
+                                            {"repo_instructions_manifest_read_first": True}
                                             if repo_instructions
                                             else {}
                                         ),
                                         **(
-                                            {
-                                                "acceptance_rubric_manifest_read_first": True
-                                            }
+                                            {"acceptance_rubric_manifest_read_first": True}
                                             if acceptance_rubric
                                             else {}
                                         ),

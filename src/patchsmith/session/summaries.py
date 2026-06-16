@@ -29,9 +29,7 @@ def list_session_summaries(artifacts_dir: Path) -> list[AgentSessionSummary]:
     if not transcript_dir.is_dir():
         return []
     summaries = [
-        session_summary(path)
-        for path in sorted(transcript_dir.glob("*.jsonl"))
-        if path.is_file()
+        session_summary(path) for path in sorted(transcript_dir.glob("*.jsonl")) if path.is_file()
     ]
     return sorted(
         summaries,

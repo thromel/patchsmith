@@ -51,8 +51,4 @@ def read_transcript_events(path: Path) -> list[TranscriptRow]:
 
 
 def read_known_transcript_events(path: Path) -> list[TranscriptEvent]:
-    return [
-        row
-        for row in read_transcript_events(path)
-        if isinstance(row, TranscriptEvent)
-    ]
+    return [row for row in read_transcript_events(path) if isinstance(row, TranscriptEvent)]

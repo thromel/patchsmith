@@ -80,49 +80,33 @@ def deepagents_context_budget(trace_path: str | None) -> dict[str, Any]:
             repo_map_path = _optional_str(contract.get("repo_map_manifest_path"))
             if repo_map_path:
                 repo_map_manifest_path = repo_map_path
-            repo_instructions_path = _optional_str(
-                contract.get("repo_instructions_manifest_path")
-            )
+            repo_instructions_path = _optional_str(contract.get("repo_instructions_manifest_path"))
             if repo_instructions_path:
                 repo_instructions_manifest_path = repo_instructions_path
-            acceptance_rubric_path = _optional_str(
-                contract.get("acceptance_rubric_manifest_path")
-            )
+            acceptance_rubric_path = _optional_str(contract.get("acceptance_rubric_manifest_path"))
             if acceptance_rubric_path:
                 acceptance_rubric_manifest_path = acceptance_rubric_path
-            repair_interface_path = _optional_str(
-                contract.get("repair_interface_manifest_path")
-            )
+            repair_interface_path = _optional_str(contract.get("repair_interface_manifest_path"))
             if repair_interface_path:
                 repair_interface_manifest_path = repair_interface_path
             planning_policy = contract.get("planning_policy")
             if isinstance(planning_policy, dict):
-                context_budget_manifest_read_first = (
-                    context_budget_manifest_read_first
-                    or bool(planning_policy.get("context_budget_manifest_read_first"))
+                context_budget_manifest_read_first = context_budget_manifest_read_first or bool(
+                    planning_policy.get("context_budget_manifest_read_first")
                 )
                 repo_map_manifest_read_first = repo_map_manifest_read_first or bool(
                     planning_policy.get("repo_map_manifest_read_first")
                 )
                 repo_instructions_manifest_read_first = (
                     repo_instructions_manifest_read_first
-                    or bool(
-                        planning_policy.get(
-                            "repo_instructions_manifest_read_first"
-                        )
-                    )
+                    or bool(planning_policy.get("repo_instructions_manifest_read_first"))
                 )
                 acceptance_rubric_manifest_read_first = (
                     acceptance_rubric_manifest_read_first
-                    or bool(
-                        planning_policy.get(
-                            "acceptance_rubric_manifest_read_first"
-                        )
-                    )
+                    or bool(planning_policy.get("acceptance_rubric_manifest_read_first"))
                 )
-                repair_interface_manifest_read_first = (
-                    repair_interface_manifest_read_first
-                    or bool(planning_policy.get("repair_interface_manifest_read_first"))
+                repair_interface_manifest_read_first = repair_interface_manifest_read_first or bool(
+                    planning_policy.get("repair_interface_manifest_read_first")
                 )
                 resource_budget_read_first = resource_budget_read_first or bool(
                     planning_policy.get("resource_budget_read_first")
@@ -162,9 +146,7 @@ def deepagents_context_budget(trace_path: str | None) -> dict[str, Any]:
         ),
         "deepagents_virtual_file_paths": tuple(dict.fromkeys(virtual_file_paths)),
         "deepagents_max_context_files": max_context_files,
-        "deepagents_context_budgeted": (
-            max_context_files is not None and max_context_files > 0
-        ),
+        "deepagents_context_budgeted": (max_context_files is not None and max_context_files > 0),
         "deepagents_context_budget_manifest_path": context_budget_manifest_path,
         "deepagents_context_budget_manifest_read_first": context_budget_manifest_read_first,
         "deepagents_context_budget_omitted_file_count": (
@@ -173,22 +155,12 @@ def deepagents_context_budget(trace_path: str | None) -> dict[str, Any]:
         "deepagents_context_budget_omitted_paths": tuple(dict.fromkeys(omitted_paths)),
         "deepagents_repo_map_manifest_path": repo_map_manifest_path,
         "deepagents_repo_map_manifest_read_first": repo_map_manifest_read_first,
-        "deepagents_repo_instructions_manifest_path": (
-            repo_instructions_manifest_path
-        ),
-        "deepagents_repo_instructions_manifest_read_first": (
-            repo_instructions_manifest_read_first
-        ),
-        "deepagents_acceptance_rubric_manifest_path": (
-            acceptance_rubric_manifest_path
-        ),
-        "deepagents_acceptance_rubric_manifest_read_first": (
-            acceptance_rubric_manifest_read_first
-        ),
+        "deepagents_repo_instructions_manifest_path": (repo_instructions_manifest_path),
+        "deepagents_repo_instructions_manifest_read_first": (repo_instructions_manifest_read_first),
+        "deepagents_acceptance_rubric_manifest_path": (acceptance_rubric_manifest_path),
+        "deepagents_acceptance_rubric_manifest_read_first": (acceptance_rubric_manifest_read_first),
         "deepagents_repair_interface_manifest_path": repair_interface_manifest_path,
-        "deepagents_repair_interface_manifest_read_first": (
-            repair_interface_manifest_read_first
-        ),
+        "deepagents_repair_interface_manifest_read_first": (repair_interface_manifest_read_first),
         "deepagents_resource_budgeted": resource_budgeted,
         "deepagents_resource_budget_read_first": resource_budget_read_first,
         "deepagents_resource_budget_max_model_responses": (
@@ -197,9 +169,7 @@ def deepagents_context_budget(trace_path: str | None) -> dict[str, Any]:
             else None
         ),
         "deepagents_resource_budget_max_model_tokens": (
-            max(resource_budget_max_model_tokens)
-            if resource_budget_max_model_tokens
-            else None
+            max(resource_budget_max_model_tokens) if resource_budget_max_model_tokens else None
         ),
     }
 

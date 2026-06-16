@@ -558,31 +558,17 @@ class ComplexBenchmarkResult:
             virtual_file_paths=self.deepagents_virtual_file_paths,
             max_context_files=self.deepagents_max_context_files,
             context_budgeted=self.deepagents_context_budgeted,
-            context_budget_manifest_path=(
-                self.deepagents_context_budget_manifest_path
-            ),
-            context_budget_manifest_read_first=(
-                self.deepagents_context_budget_manifest_read_first
-            ),
-            context_budget_omitted_file_count=(
-                self.deepagents_context_budget_omitted_file_count
-            ),
-            context_budget_omitted_paths=(
-                self.deepagents_context_budget_omitted_paths
-            ),
+            context_budget_manifest_path=(self.deepagents_context_budget_manifest_path),
+            context_budget_manifest_read_first=(self.deepagents_context_budget_manifest_read_first),
+            context_budget_omitted_file_count=(self.deepagents_context_budget_omitted_file_count),
+            context_budget_omitted_paths=(self.deepagents_context_budget_omitted_paths),
             repo_map_manifest_path=self.deepagents_repo_map_manifest_path,
-            repo_map_manifest_read_first=(
-                self.deepagents_repo_map_manifest_read_first
-            ),
-            repo_instructions_manifest_path=(
-                self.deepagents_repo_instructions_manifest_path
-            ),
+            repo_map_manifest_read_first=(self.deepagents_repo_map_manifest_read_first),
+            repo_instructions_manifest_path=(self.deepagents_repo_instructions_manifest_path),
             repo_instructions_manifest_read_first=(
                 self.deepagents_repo_instructions_manifest_read_first
             ),
-            repair_interface_manifest_path=(
-                self.deepagents_repair_interface_manifest_path
-            ),
+            repair_interface_manifest_path=(self.deepagents_repair_interface_manifest_path),
             repair_interface_manifest_read_first=(
                 self.deepagents_repair_interface_manifest_read_first
             ),
@@ -592,9 +578,7 @@ class ComplexBenchmarkResult:
     def rubric_evidence(self) -> RubricEvidence:
         return RubricEvidence(
             manifest_path=self.deepagents_acceptance_rubric_manifest_path,
-            manifest_read_first=(
-                self.deepagents_acceptance_rubric_manifest_read_first
-            ),
+            manifest_read_first=(self.deepagents_acceptance_rubric_manifest_read_first),
             aligned=self.deepagents_acceptance_rubric_aligned,
         )
 
@@ -610,9 +594,7 @@ class ComplexBenchmarkResult:
             resource_budget_max_model_responses=(
                 self.deepagents_resource_budget_max_model_responses
             ),
-            resource_budget_max_model_tokens=(
-                self.deepagents_resource_budget_max_model_tokens
-            ),
+            resource_budget_max_model_tokens=(self.deepagents_resource_budget_max_model_tokens),
         )
 
     @property

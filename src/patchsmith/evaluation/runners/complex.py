@@ -155,5 +155,6 @@ def summarize_complex_benchmark_suite(
     )
     return all_results, summary, attempt_summaries, followup_candidates
 
+
 def _attempt_dir_label(attempt_dirs: list[Path]) -> str:
     return "; ".join(str(path) for path in attempt_dirs)

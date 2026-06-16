@@ -95,18 +95,9 @@ def test_complex_benchmark_suite_gate_reports_resource_and_manifest_failures() -
     assert "validation_rate 0.50 below required 1.00" in gate.failures
     assert "live_provider_tasks 1 below required 2" in gate.failures
     assert "unique_task_count 1 below required 2" in gate.failures
-    assert (
-        "selected cost per validated task $0.120000 exceeds $0.070000"
-        in gate.failures
-    )
-    assert (
-        "selected tokens per validated task 120000.00 exceeds 90000.00"
-        in gate.failures
-    )
-    assert (
-        "selected responses per validated task 9.00 exceeds 6.00"
-        in gate.failures
-    )
+    assert "selected cost per validated task $0.120000 exceeds $0.070000" in gate.failures
+    assert "selected tokens per validated task 120000.00 exceeds 90000.00" in gate.failures
+    assert "selected responses per validated task 9.00 exceeds 6.00" in gate.failures
     assert "selected progress score 0.40 below required 0.90" in gate.failures
     assert "target alignment rate 0.50 below required 1.00" in gate.failures
     assert "repo-instructions manifest rate 0.50 below required 1.00" in gate.failures

@@ -26,9 +26,7 @@ def test_session_recommendation_starts_with_preflight_for_new_sessions(
 
     recommendation = session_recommendation(transcript_path)
 
-    assert recommendation.action == (
-        "Run a bounded preflight, then start the first repair run."
-    )
+    assert recommendation.action == ("Run a bounded preflight, then start the first repair run.")
     assert recommendation.commands == ("/preflight <task>", "/run <task>")
     assert recommendation.to_dict()["evidence"] == ["run_count=0"]
 
@@ -88,10 +86,7 @@ def test_session_recommendation_detects_repeated_unresolved_runs(
         "/context add <path[#symbol]>",
     )
     assert "repeat_count=2" in recommendation.evidence
-    assert any(
-        item.startswith("failure=no_patch_generated")
-        for item in recommendation.evidence
-    )
+    assert any(item.startswith("failure=no_patch_generated") for item in recommendation.evidence)
 
 
 def _append(

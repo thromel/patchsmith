@@ -155,9 +155,7 @@ class RepairRunner:
                     refreshed_paths = [
                         context.path for context in refreshed_selection.retrieved_context
                     ]
-                    deprioritized_context_paths = ineffective_target_paths(
-                        retry_attempt_history
-                    )
+                    deprioritized_context_paths = ineffective_target_paths(retry_attempt_history)
                     retrieved_context = _merge_retrieved_contexts(
                         retrieved_context,
                         refreshed_selection.retrieved_context,
@@ -177,9 +175,7 @@ class RepairRunner:
                             "refreshed_context_paths": refreshed_paths,
                             "deprioritized_context_paths": deprioritized_context_paths,
                             "mounted_context_limit": retry_context_mount_limit,
-                            "merged_context_paths": [
-                                context.path for context in retrieved_context
-                            ],
+                            "merged_context_paths": [context.path for context in retrieved_context],
                         },
                     )
                 runtime_config = {
@@ -205,9 +201,7 @@ class RepairRunner:
                     if "max_context_files" in request.runtime_config:
                         pinned_context_paths = mounted_context_paths(retry_attempt_history)
                         if pinned_context_paths:
-                            runtime_config["context_selection_pinned_paths"] = (
-                                pinned_context_paths
-                            )
+                            runtime_config["context_selection_pinned_paths"] = pinned_context_paths
                     if retry_context_mount_limit > 0 and "max_context_files" not in runtime_config:
                         runtime_config["max_context_files"] = retry_context_mount_limit
                 if target_history_paths:
@@ -235,9 +229,7 @@ class RepairRunner:
                     attempt=attempt,
                 )
                 usage = model_usage_from_trace(trace.events)
-                used_model_responses = _nonnegative_int_or_zero(
-                    usage.get("response_count")
-                )
+                used_model_responses = _nonnegative_int_or_zero(usage.get("response_count"))
                 used_model_tokens = _nonnegative_int_or_zero(usage.get("total_tokens"))
                 test_result = run_sandbox_attempt(
                     command=command,
@@ -478,9 +470,7 @@ def _merge_retrieved_contexts(
         for context in existing
         if "reviewed_source_hint" in context.matched_terms or "active_path" in context.matched_terms
     ]
-    older_fallback = [
-        context for context in existing if context not in reviewed_existing
-    ]
+    older_fallback = [context for context in existing if context not in reviewed_existing]
     prioritized_reviewed = [
         context for context in reviewed_existing if context.path not in deprioritized
     ]
@@ -489,9 +479,7 @@ def _merge_retrieved_contexts(
         for context in [*reviewed_existing, *refreshed, *older_fallback]
         if context.path in deprioritized
     ]
-    prioritized_refreshed = [
-        context for context in refreshed if context.path not in deprioritized
-    ]
+    prioritized_refreshed = [context for context in refreshed if context.path not in deprioritized]
     prioritized_fallback = [
         context for context in older_fallback if context.path not in deprioritized
     ]
@@ -538,9 +526,7 @@ def _runtime_config_with_resource_usage(
     used_tokens = max(0, used_model_tokens)
     updated_budget["used_model_responses"] = used_responses
     updated_budget["used_model_tokens"] = used_tokens
-    max_responses = _optional_nonnegative_int(
-        updated_budget.get("max_model_responses")
-    )
+    max_responses = _optional_nonnegative_int(updated_budget.get("max_model_responses"))
     if max_responses is not None:
         updated_budget["remaining_model_responses"] = max(
             0,
@@ -586,9 +572,7 @@ def _retry_resource_budget_block(
         reasons.append("response_budget_exhausted")
     elif remaining_responses is not None and remaining_responses <= 4:
         reasons.append("response_budget_too_low_for_retry")
-    remaining_tokens = _optional_nonnegative_int(
-        resource_budget.get("remaining_model_tokens")
-    )
+    remaining_tokens = _optional_nonnegative_int(resource_budget.get("remaining_model_tokens"))
     if remaining_tokens == 0:
         reasons.append("token_budget_exhausted")
     elif remaining_tokens is not None and remaining_tokens <= 100_000:

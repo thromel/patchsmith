@@ -42,9 +42,7 @@ def test_agent_command_module_registers_and_runs_one_shot(
     handlers = agent_commands.register(subparsers)
     monkeypatch.setattr(agent_commands, "run_agent_once", fake_run_agent_once)
 
-    args = parser.parse_args(
-        ["agent", "Fix parser", "--skip-model-preflight", "--json"]
-    )
+    args = parser.parse_args(["agent", "Fix parser", "--skip-model-preflight", "--json"])
 
     assert handlers["agent"](args) == 0
     payload = json.loads(capsys.readouterr().out)

@@ -553,8 +553,7 @@ def _preflight_summary(result: ComplexBenchmarkResult) -> str:
     if not gates:
         return attempt.preflight_status
     gate_summary = "; ".join(
-        f"{gate.get('name', 'gate')}:{gate.get('status', 'unknown')}"
-        for gate in gates
+        f"{gate.get('name', 'gate')}:{gate.get('status', 'unknown')}" for gate in gates
     )
     return f"{attempt.preflight_status} ({gate_summary})"
 

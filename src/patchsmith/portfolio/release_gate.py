@@ -53,10 +53,7 @@ def build_release_gate_report(
         else logs_dir.resolve()
     )
     benchmark_results_path = benchmark_results_path or (
-        artifacts_dir
-        / "experiments"
-        / "complex_benchmark_suite"
-        / "complex_benchmark_results.json"
+        artifacts_dir / "experiments" / "complex_benchmark_suite" / "complex_benchmark_results.json"
     )
     checks = [
         *_command_checks(
@@ -358,9 +355,7 @@ def _ownership_docs_check(*, project_root: Path) -> QualityGateCheck:
             summary=f"{type(error).__name__}: {error}",
         )
     missing = [
-        reference
-        for reference in REQUIRED_OWNERSHIP_BOUNDARY_REFERENCES
-        if reference not in text
+        reference for reference in REQUIRED_OWNERSHIP_BOUNDARY_REFERENCES if reference not in text
     ]
     if missing:
         return _in_process_check(
@@ -425,10 +420,7 @@ def _saved_benchmark_validation_check(
         project_root=project_root,
         status="passed",
         duration_ms=_duration_ms(started),
-        summary=(
-            f"Loaded {len(results)} saved complex benchmark row(s); "
-            f"{validated} validated."
-        ),
+        summary=(f"Loaded {len(results)} saved complex benchmark row(s); {validated} validated."),
     )
 
 

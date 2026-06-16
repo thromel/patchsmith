@@ -83,9 +83,7 @@ def execute_public_issue_repair_record(
     evidence = _string_list(record.get("evidence"))
     evidence.extend(preflight_evidence or [])
     if deepagents_max_context_files is not None and deepagents_max_context_files > 0:
-        evidence.append(
-            f"DeepAgents max context files configured: {deepagents_max_context_files}"
-        )
+        evidence.append(f"DeepAgents max context files configured: {deepagents_max_context_files}")
     next_actions = _string_list(record.get("next_actions"))
     next_actions.extend(preflight_next_actions or [])
     run_id: str | None = None
@@ -300,9 +298,7 @@ def execute_public_issue_repair_record(
         status = "failed"
         evidence.append("repair validation command exited zero")
         warnings.append("repair validation passed but final patch quality is high-risk")
-        next_actions.append(
-            "inspect or retry the high-risk final diff before claiming repair"
-        )
+        next_actions.append("inspect or retry the high-risk final diff before claiming repair")
     elif test_exit_code == 0:
         status = "failed"
         warnings.append("repair validation passed but no patch was generated")

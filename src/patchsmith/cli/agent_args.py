@@ -57,10 +57,7 @@ def add_agent_options(parser: argparse.ArgumentParser) -> None:
         "--instruction-path",
         action="append",
         default=[],
-        help=(
-            "Extra repo-relative project instruction file to load. Repeat for "
-            "multiple files."
-        ),
+        help=("Extra repo-relative project instruction file to load. Repeat for multiple files."),
     )
     parser.add_argument(
         "--no-agent-instructions",
@@ -108,9 +105,7 @@ def add_agent_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--skip-model-preflight",
         action="store_true",
-        help=(
-            "Skip the live OpenAI model availability check before an actual agent run."
-        ),
+        help=("Skip the live OpenAI model availability check before an actual agent run."),
     )
     parser.add_argument(
         "--max-model-responses",
@@ -280,9 +275,7 @@ def agent_config_from_args(args: argparse.Namespace) -> tuple[AgentCliConfig, st
     profile = load_agent_profile(args.repo, profile_name)
     if profile is None:
         return config, f"agent profile not found: {profile_name}"
-    return config_with_loaded_agent_instructions(
-        config_with_agent_profile(config, profile)
-    ), None
+    return config_with_loaded_agent_instructions(config_with_agent_profile(config, profile)), None
 
 
 def config_with_agent_profile(
@@ -314,7 +307,5 @@ def config_with_agent_profile(
         ),
         top_k=profile.top_k if profile.top_k is not None else config.top_k,
         test_command=profile.test_command or config.test_command,
-        context_paths=tuple(
-            dict.fromkeys((*config.context_paths, *profile.context_paths))
-        ),
+        context_paths=tuple(dict.fromkeys((*config.context_paths, *profile.context_paths))),
     )

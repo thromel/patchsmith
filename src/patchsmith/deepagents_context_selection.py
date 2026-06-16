@@ -114,9 +114,7 @@ def preferred_target_paths(
     limit: int = 5,
 ) -> list[str]:
     revived_historical = [
-        candidate.path
-        for candidate in candidates
-        if is_revived_historical_control_point(candidate)
+        candidate.path for candidate in candidates if is_revived_historical_control_point(candidate)
     ]
     untried = [candidate.path for candidate in candidates if not candidate.historical]
     preferred: list[str] = []
@@ -187,11 +185,7 @@ def preferred_target_symbols(
     *,
     preferred_target_paths: Iterable[str],
 ) -> dict[str, list[str]]:
-    preferred_paths = [
-        path.strip().lstrip("/")
-        for path in preferred_target_paths
-        if path.strip()
-    ]
+    preferred_paths = [path.strip().lstrip("/") for path in preferred_target_paths if path.strip()]
     if not preferred_paths:
         return {}
     preferred = set(preferred_paths)

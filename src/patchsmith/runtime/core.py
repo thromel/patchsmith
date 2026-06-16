@@ -161,8 +161,7 @@ def _apply_plan(
         plan=plan,
     ):
         raise PatchSafetyError(
-            "replacement changes only Python import statements for a non-import "
-            "behavioral failure"
+            "replacement changes only Python import statements for a non-import behavioral failure"
         )
     edit = apply_text_replacement(
         repo_path=repo_path,

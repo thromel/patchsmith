@@ -103,11 +103,7 @@ def test_chat_session_memory_add_uses_registered_command_handler(
     assert (
         run_chat_session(
             config=AgentCliConfig(repo=str(tmp_path), artifacts_dir=str(artifacts)),
-            input_stream=io.StringIO(
-                "/memory add keep parser fixes focused\n"
-                "/memory\n"
-                "/exit\n"
-            ),
+            input_stream=io.StringIO("/memory add keep parser fixes focused\n/memory\n/exit\n"),
             output_stream=output,
             runner_cls=NoRunRepairRunner,
             session_id="memory-add-session",
@@ -119,23 +115,16 @@ def test_chat_session_memory_add_uses_registered_command_handler(
     assert "Project memory added: keep parser fixes focused" in text
     assert "Project memory files:" in text
     assert ".patchsmith/instructions.md | patchsmith" in text
-    memory_text = (tmp_path / ".patchsmith" / "instructions.md").read_text(
-        encoding="utf-8"
-    )
+    memory_text = (tmp_path / ".patchsmith" / "instructions.md").read_text(encoding="utf-8")
     assert "- keep parser fixes focused" in memory_text
 
     transcript_path = artifacts / "chat_sessions" / "memory-add-session.jsonl"
-    rows = [
-        json.loads(line)
-        for line in transcript_path.read_text(encoding="utf-8").splitlines()
-    ]
+    rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     assert any(
-        row["event"] == "memory_update" and row["payload"]["status"] == "added"
-        for row in rows
+        row["event"] == "memory_update" and row["payload"]["status"] == "added" for row in rows
     )
     assert any(
-        row["event"] == "config_update"
-        and row["payload"]["field"] == "project_instructions"
+        row["event"] == "config_update" and row["payload"]["field"] == "project_instructions"
         for row in rows
     )
     assert any(row["event"] == "memory_view" for row in rows)

@@ -289,10 +289,7 @@ def register_portfolio_quality_commands(subparsers: argparse._SubParsersAction) 
     refresh_evidence.add_argument(
         "--complex-suite-max-selected-responses-per-virtual-file",
         type=float,
-        help=(
-            "Fail the complex suite gate above this selected response count per "
-            "virtual file."
-        ),
+        help=("Fail the complex suite gate above this selected response count per virtual file."),
     )
     refresh_evidence.add_argument(
         "--complex-suite-min-selected-progress-score",

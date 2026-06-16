@@ -106,7 +106,7 @@ def test_assess_patch_quality_flags_broad_code_object_patch() -> None:
         "    testfunction = pyfuncitem.obj\n"
         "    try:\n"
         "        co = testfunction.__code__\n"
-        "        filename = getattr(pyfuncitem, \"fspath\", None)\n"
+        '        filename = getattr(pyfuncitem, "fspath", None)\n'
         "        if co.co_filename != filename:\n"
         "            try:\n"
         "                testfunction.__code__ = co.replace(co_filename=str(filename))\n"
@@ -151,16 +151,16 @@ def test_assess_patch_quality_flags_broad_code_object_patch() -> None:
 def test_assess_patch_quality_allows_code_type_checks_and_filename_comparisons() -> None:
     old = (
         "if not isinstance(co, types.CodeType):\n"
-        "    trace(f\"_read_pyc({source}): not a code object\")\n"
+        '    trace(f"_read_pyc({source}): not a code object")\n'
         "    return None\n"
         "return co"
     )
     new = (
         "if not isinstance(co, types.CodeType):\n"
-        "    trace(f\"_read_pyc({source}): not a code object\")\n"
+        '    trace(f"_read_pyc({source}): not a code object")\n'
         "    return None\n"
         "if co.co_filename != str(source):\n"
-        "    trace(f\"_read_pyc({source}): stale co_filename {co.co_filename}\")\n"
+        '    trace(f"_read_pyc({source}): stale co_filename {co.co_filename}")\n'
         "    return None\n"
         "return co"
     )
@@ -182,13 +182,13 @@ def test_assess_patch_quality_allows_code_type_checks_and_filename_comparisons()
 def test_assess_patch_quality_flags_dead_branch_source_recompile() -> None:
     old = (
         "if not isinstance(co, types.CodeType):\n"
-        "    trace(f\"_read_pyc({source}): not a code object\")\n"
+        '    trace(f"_read_pyc({source}): not a code object")\n'
         "    return None\n"
         "return co"
     )
     new = (
         "if not isinstance(co, types.CodeType):\n"
-        "    trace(f\"_read_pyc({source}): not a code object\")\n"
+        '    trace(f"_read_pyc({source}): not a code object")\n'
         "    return None\n"
         "return compile(\n"
         "    co.co_consts[0] if False else source.read_text(encoding='utf-8'),\n"
@@ -216,10 +216,10 @@ def test_assess_patch_quality_flags_dead_branch_source_recompile() -> None:
 def test_assess_patch_quality_allows_edits_inside_existing_broad_handler() -> None:
     old = (
         "try:\n"
-        "    fp = open(pyc, \"rb\")\n"
+        '    fp = open(pyc, "rb")\n'
         "    co = marshal.load(fp)\n"
         "    if not isinstance(co, types.CodeType):\n"
-        "        trace(f\"_read_pyc({source}): not a code object\")\n"
+        '        trace(f"_read_pyc({source}): not a code object")\n'
         "        return None\n"
         "    return co\n"
         "except Exception:\n"
@@ -227,13 +227,13 @@ def test_assess_patch_quality_allows_edits_inside_existing_broad_handler() -> No
     )
     new = (
         "try:\n"
-        "    fp = open(pyc, \"rb\")\n"
+        '    fp = open(pyc, "rb")\n'
         "    co = marshal.load(fp)\n"
         "    if not isinstance(co, types.CodeType):\n"
-        "        trace(f\"_read_pyc({source}): not a code object\")\n"
+        '        trace(f"_read_pyc({source}): not a code object")\n'
         "        return None\n"
         "    if co.co_filename != str(source):\n"
-        "        trace(f\"_read_pyc({source}): stale co_filename {co.co_filename!r}\")\n"
+        '        trace(f"_read_pyc({source}): stale co_filename {co.co_filename!r}")\n'
         "        return None\n"
         "    return co\n"
         "except Exception:\n"
@@ -260,13 +260,7 @@ def test_assess_patch_quality_flags_bare_except_swallowing() -> None:
             name="bare_except",
             path="src/loader.py",
             old="value = load(path)\nreturn value",
-            new=(
-                "try:\n"
-                "    value = load(path)\n"
-                "except:\n"
-                "    pass\n"
-                "return value"
-            ),
+            new=("try:\n    value = load(path)\nexcept:\n    pass\nreturn value"),
             summary="Ignore loader failures.",
         )
     )
@@ -301,32 +295,25 @@ def test_assess_patch_quality_allows_broad_exception_reraise() -> None:
             name="reraises",
             path="src/loader.py",
             old="return load_current(path)",
-            new=(
-                "try:\n"
-                "    return load_current(path)\n"
-                "except Exception:\n"
-                "    raise"
-            ),
+            new=("try:\n    return load_current(path)\nexcept Exception:\n    raise"),
             summary="Keep broad handler behavior explicit.",
         )
     )
 
-    assert "broad_exception_swallow" not in {
-        finding.code for finding in assessment.findings
-    }
+    assert "broad_exception_swallow" not in {finding.code for finding in assessment.findings}
 
 
 def test_assess_patch_quality_flags_module_file_metadata_rewrite() -> None:
     old = (
-        "if modfile.endswith(os.sep + \"__init__.py\"):\n"
-        "    if self.basename != \"__init__.py\":\n"
+        'if modfile.endswith(os.sep + "__init__.py"):\n'
+        '    if self.basename != "__init__.py":\n'
         "        modfile = modfile[:-12]\n"
         "try:\n"
         "    issame = self.samefile(modfile)\n"
     )
     new = (
-        "if modfile.endswith(os.sep + \"__init__.py\"):\n"
-        "    if self.basename != \"__init__.py\":\n"
+        'if modfile.endswith(os.sep + "__init__.py"):\n'
+        '    if self.basename != "__init__.py":\n'
         "        modfile = modfile[:-12]\n"
         "if modfile != str(self):\n"
         "    mod.__file__ = str(self)\n"

@@ -670,15 +670,18 @@ def test_deepagents_repair_planner_maps_virtual_path_and_usage_metadata() -> Non
     assert PATCHSMITH_DEEPAGENTS_ACCEPTANCE_RUBRIC_PATH in files
     assert PATCHSMITH_DEEPAGENTS_REPAIR_INTERFACE_PATH in files
     assert PATCHSMITH_DEEPAGENTS_REPAIR_SKILL_PATH in files
-    assert "PatchSmith Repair Interface" in files[PATCHSMITH_DEEPAGENTS_REPAIR_INTERFACE_PATH][
-        "content"
-    ]
-    assert "PatchSmith Acceptance Rubric" in files[
+    assert (
+        "PatchSmith Repair Interface"
+        in files[PATCHSMITH_DEEPAGENTS_REPAIR_INTERFACE_PATH]["content"]
+    )
+    assert (
+        "PatchSmith Acceptance Rubric"
+        in files[PATCHSMITH_DEEPAGENTS_ACCEPTANCE_RUBRIC_PATH]["content"]
+    )
+    assert (
         PATCHSMITH_DEEPAGENTS_ACCEPTANCE_RUBRIC_PATH
-    ]["content"]
-    assert PATCHSMITH_DEEPAGENTS_ACCEPTANCE_RUBRIC_PATH in files[
-        PATCHSMITH_DEEPAGENTS_REPAIR_INTERFACE_PATH
-    ]["content"]
+        in files[PATCHSMITH_DEEPAGENTS_REPAIR_INTERFACE_PATH]["content"]
+    )
     assert "name: patchsmith-repair" in files[PATCHSMITH_DEEPAGENTS_REPAIR_SKILL_PATH]["content"]
     assert files["/src/simple_calc.py"]["encoding"] == "utf-8"
     assert files["/src/simple_calc.py"]["created_at"]
@@ -796,18 +799,14 @@ def test_deepagents_repair_planner_mounts_scoped_repo_instructions(
     assert PATCHSMITH_DEEPAGENTS_REPO_INSTRUCTIONS_PATH in repair_interface
     contract = plan.metadata["deepagents_contract"]
     assert (
-        contract["repo_instructions_manifest_path"]
-        == PATCHSMITH_DEEPAGENTS_REPO_INSTRUCTIONS_PATH
+        contract["repo_instructions_manifest_path"] == PATCHSMITH_DEEPAGENTS_REPO_INSTRUCTIONS_PATH
     )
     assert contract["repository_instructions"] == {
         "type": "scoped_repo_instructions",
         "manifest_path": PATCHSMITH_DEEPAGENTS_REPO_INSTRUCTIONS_PATH,
         "required": True,
     }
-    assert (
-        contract["planning_policy"]["repo_instructions_manifest_read_first"]
-        is True
-    )
+    assert contract["planning_policy"]["repo_instructions_manifest_read_first"] is True
     assert (
         PATCHSMITH_DEEPAGENTS_REPO_INSTRUCTIONS_PATH
         in contract["filesystem_policy"]["allowed_read_paths"]
@@ -949,8 +948,9 @@ def test_deepagents_repair_planner_caps_context_files_and_preserves_reviewed_hin
     assert contract["max_context_files"] == 2
     assert contract["context_budget_manifest_path"] == PATCHSMITH_DEEPAGENTS_CONTEXT_BUDGET_PATH
     assert contract["planning_policy"]["context_budget_manifest_read_first"] is True
-    assert PATCHSMITH_DEEPAGENTS_CONTEXT_BUDGET_PATH in (
-        contract["filesystem_policy"]["allowed_read_paths"]
+    assert (
+        PATCHSMITH_DEEPAGENTS_CONTEXT_BUDGET_PATH
+        in (contract["filesystem_policy"]["allowed_read_paths"])
     )
     assert contract["virtual_file_count"] == 2
     assert contract["virtual_file_paths"] == [
@@ -1087,9 +1087,7 @@ def test_deepagents_context_cap_preserves_localized_target_and_fixture() -> None
                 "structured_response": {
                     "path": "src/_pytest/assertion/rewrite.py",
                     "old": (
-                        "def _read_pyc(source, pyc):\n"
-                        "    co = marshal.load(pyc)\n"
-                        "    return co"
+                        "def _read_pyc(source, pyc):\n    co = marshal.load(pyc)\n    return co"
                     ),
                     "new": (
                         "def _read_pyc(source, pyc):\n"
@@ -1138,11 +1136,7 @@ def test_deepagents_context_cap_preserves_localized_target_and_fixture() -> None
                     "co_filename",
                     "pyc",
                 ],
-                excerpt=(
-                    "def _read_pyc(source, pyc):\n"
-                    "    co = marshal.load(pyc)\n"
-                    "    return co"
-                ),
+                excerpt=("def _read_pyc(source, pyc):\n    co = marshal.load(pyc)\n    return co"),
             ),
             RetrievedContext(
                 path="testing/test_issue_14552_repro.py",
@@ -1185,9 +1179,7 @@ def test_deepagents_target_context_selection_mounts_only_localized_target() -> N
                 "structured_response": {
                     "path": "src/_pytest/assertion/rewrite.py",
                     "old": (
-                        "def _read_pyc(source, pyc):\n"
-                        "    co = marshal.load(pyc)\n"
-                        "    return co"
+                        "def _read_pyc(source, pyc):\n    co = marshal.load(pyc)\n    return co"
                     ),
                     "new": (
                         "def _read_pyc(source, pyc):\n"
@@ -1236,11 +1228,7 @@ def test_deepagents_target_context_selection_mounts_only_localized_target() -> N
                     "co_filename",
                     "pyc",
                 ],
-                excerpt=(
-                    "def _read_pyc(source, pyc):\n"
-                    "    co = marshal.load(pyc)\n"
-                    "    return co"
-                ),
+                excerpt=("def _read_pyc(source, pyc):\n    co = marshal.load(pyc)\n    return co"),
             ),
             RetrievedContext(
                 path="testing/test_issue_14552_repro.py",
@@ -1269,9 +1257,7 @@ def test_deepagents_target_context_selection_mounts_only_localized_target() -> N
     assert contract["max_context_files"] == 1
     assert contract["virtual_file_count"] == 1
     assert contract["virtual_file_paths"] == ["/src/_pytest/assertion/rewrite.py"]
-    assert contract["context_budget"]["mounted_paths"] == [
-        "src/_pytest/assertion/rewrite.py"
-    ]
+    assert contract["context_budget"]["mounted_paths"] == ["src/_pytest/assertion/rewrite.py"]
     assert contract["context_budget"]["omitted_paths"] == [
         "src/_pytest/python.py",
         "testing/test_issue_14552_repro.py",

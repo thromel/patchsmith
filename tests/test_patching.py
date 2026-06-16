@@ -177,11 +177,7 @@ def test_apply_text_replacement_rejects_removed_module_function_still_used(
     src = repo / "src"
     src.mkdir(parents=True)
     target = src / "rewrite.py"
-    old_function = (
-        "def _read_pyc(source, pyc):\n"
-        "    co = marshal.load(pyc)\n"
-        "    return co\n"
-    )
+    old_function = "def _read_pyc(source, pyc):\n    co = marshal.load(pyc)\n    return co\n"
     target.write_text(
         "def _rewrite_test(fn, config):\n"
         "    return fn.stat()\n"
@@ -293,10 +289,7 @@ def test_apply_text_replacement_allows_available_names_in_python_edit(
         repo_path=repo,
         relative_path="src/rewrite.py",
         old="source_stat, co = _rewrite_test(fn, self.config)",
-        new=(
-            "source_stat, co = _rewrite_test(fn, self.config)\n"
-            "        exec(co, module.__dict__)"
-        ),
+        new=("source_stat, co = _rewrite_test(fn, self.config)\n        exec(co, module.__dict__)"),
         reject_python_syntax_errors=True,
         reject_python_unbound_names=True,
     )
@@ -331,9 +324,7 @@ def test_apply_text_replacement_allows_helper_defined_in_both_module_branches(
         relative_path="src/pathlib.py",
         old="return module_file",
         new=(
-            "if _is_same(str(path), module_file):\n"
-            "        return module_file\n"
-            "    return str(path)"
+            "if _is_same(str(path), module_file):\n        return module_file\n    return str(path)"
         ),
         reject_python_syntax_errors=True,
         reject_python_unbound_names=True,
@@ -386,9 +377,7 @@ def test_apply_text_replacement_can_use_nearest_source_span(
     src.mkdir(parents=True)
     target = src / "module.py"
     target.write_text(
-        "def value(left: int, right: int) -> int:\n"
-        "    result = left - right\n"
-        "    return result\n",
+        "def value(left: int, right: int) -> int:\n    result = left - right\n    return result\n",
         encoding="utf-8",
     )
 
@@ -438,9 +427,7 @@ def test_apply_text_replacement_rejects_unknown_private_self_method_call(
     src.mkdir(parents=True)
     target = src / "rewrite.py"
     target.write_text(
-        "class Hook:\n"
-        "    def exec_module(self, module):\n"
-        "        return module\n",
+        "class Hook:\n    def exec_module(self, module):\n        return module\n",
         encoding="utf-8",
     )
 
@@ -553,9 +540,7 @@ def test_apply_text_replacement_allows_new_private_self_attribute_assignment(
     src.mkdir(parents=True)
     target = src / "rewrite.py"
     target.write_text(
-        "class Hook:\n"
-        "    def exec_module(self, module):\n"
-        "        return module\n",
+        "class Hook:\n    def exec_module(self, module):\n        return module\n",
         encoding="utf-8",
     )
 

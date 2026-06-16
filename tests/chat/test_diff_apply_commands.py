@@ -100,9 +100,7 @@ def test_apply_check_uses_injected_checker_and_records_result(tmp_path: Path) ->
         ),
     )
 
-    assert output.getvalue() == (
-        "Apply check: ready - diff can be applied to working tree\n"
-    )
+    assert output.getvalue() == ("Apply check: ready - diff can be applied to working tree\n")
     assert events[-1][0] == "apply_check_result"
     assert events[-1][1]["status"] == "ready"
 
@@ -170,9 +168,7 @@ def test_approve_and_reject_record_decisions_after_review_and_check(
         output_stream=approve_output,
         context=ChatCommandContext(record=_record_to(events)),
     )
-    assert approve_output.getvalue() == (
-        "Apply approved: high - reviewed risky import move\n"
-    )
+    assert approve_output.getvalue() == ("Apply approved: high - reviewed risky import move\n")
     assert events[-1][0] == "apply_approval"
     assert events[-1][1]["risk_level"] == "high"
 
