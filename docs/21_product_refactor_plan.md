@@ -27,7 +27,7 @@ tests.
   - `tests/evaluation/test_runners.py`: 2608 lines.
   - `tests/evaluation/test_issue_corpus_public_issues.py`: 2586 lines.
   - `tests/deepagents/test_planner.py`: 2398 lines.
-  - `tests/test_cli.py`: 1770 lines.
+  - `tests/cli/test_cli.py`: 1770 lines.
 - Current validation:
   - `uv run ruff check src tests docs README.md`: passed.
   - `uv run mypy src`: passed on 286 source files.
@@ -528,30 +528,30 @@ Progress:
 - 2026-06-16: The standalone `openai-model-preflight` CLI command moved into
   `patchsmith.cli.commands.model_preflight`, while the agent runtime keeps its
   internal model-preflight helper in `run.py`. Focused coverage in
-  `tests/test_cli_model_preflight.py` pins command routing through the dedicated
+  `tests/cli/test_cli_model_preflight.py` pins command routing through the dedicated
   module; `cli/commands/run.py` is now 1094 lines.
 - 2026-06-16: Direct repository `index` and `retrieve` CLI commands moved into
   `patchsmith.cli.commands.repository`, preserving shared repo and issue
   argument helpers while removing clone/index/retriever execution from
-  `run.py`. Focused coverage in `tests/test_cli_repository_commands.py` pins
+  `run.py`. Focused coverage in `tests/cli/test_repository_commands.py` pins
   command routing and argument handoff; `cli/commands/run.py` is now 1039 lines.
 - 2026-06-16: Shared agent/chat parser options, initial prompt loading, issue
   text loading, agent config construction, and project profile merging moved
   into `patchsmith.cli.agent_args`. Focused coverage in
-  `tests/test_cli_agent_args.py` pins defaults, profile merge behavior, missing
+  `tests/cli/test_agent_args.py` pins defaults, profile merge behavior, missing
   profile errors, and issue-file loading; `cli/commands/run.py` is now 738
   lines and 22 top-level definitions.
 - 2026-06-16: The `chat` CLI command, scripted chat startup, saved-session
   offline actions, project command/hook/profile/instruction listing, and
   session gate/export helpers moved into `patchsmith.cli.commands.chat`.
   `agent --interactive` now reuses that boundary for chat startup and offline
-  session actions. Focused coverage in `tests/test_cli_chat_command.py` pins
+  session actions. Focused coverage in `tests/cli/test_chat_command.py` pins
   direct chat command registration and offline-action validation;
   `cli/commands/run.py` is now 326 lines and 7 top-level definitions.
 - 2026-06-16: The `agent` CLI command moved into
   `patchsmith.cli.commands.agent`, while shared human-readable run output moved
   into `patchsmith.cli.result_output` for reuse by agent and legacy run flows.
-  Focused coverage in `tests/test_cli_agent_command.py` pins direct agent
+  Focused coverage in `tests/cli/test_agent_command.py` pins direct agent
   command registration, one-shot run dispatch, and interactive/preflight
   validation; `cli/commands/run.py` is now 99 lines and 2 top-level
   definitions.
@@ -590,6 +590,9 @@ Progress:
   `tests/deepagents/test_run_interface.py` and
   `tests/deepagents/test_budget_routing.py` coverage while broader planner and
   workflow scenario tests remain as smoke coverage.
+- 2026-06-16: CLI tests moved into the `tests/cli/` product boundary, including
+  focused command modules for agent, chat, model-preflight, repository, shared
+  agent args, legacy run, and the broad CLI command registry smoke coverage.
 - 2026-06-15: Phase 3 started by moving complex benchmark suite models,
   threshold/config resolution, spec loading, and suite input preflight into
   `patchsmith.evaluation.complex.models` and
