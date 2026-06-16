@@ -575,6 +575,11 @@ Progress:
   `ComplexBenchmarkSelection` output schema. Focused coverage in
   `tests/evaluation/complex/test_selection.py` preserves strict-validation,
   cost, context-budget, resource-budget, and selected-result behavior.
+- 2026-06-16: Complex benchmark follow-up candidate policy now derives rerun
+  actions, profiles, verifier-threshold reasons, priorities, and candidate rows
+  from the domain views while preserving the flat follow-up candidate schema.
+  Focused coverage in `tests/evaluation/complex/test_followups.py` preserves
+  budget-critical reruns and acceptance-rubric verifier reruns.
 - 2026-06-15: Phase 3 started by moving complex benchmark suite models,
   threshold/config resolution, spec loading, and suite input preflight into
   `patchsmith.evaluation.complex.models` and

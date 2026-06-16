@@ -82,7 +82,8 @@ def _suite_verifier_followup_candidates(
     }
     candidates: list[ComplexBenchmarkFollowupCandidate] = []
     for result in selected:
-        if (result.task_id, result.attempt_index) in existing_verifier_keys:
+        attempt = result.repair_attempt
+        if (attempt.task_id, attempt.attempt_index) in existing_verifier_keys:
             continue
         reasons = _suite_verifier_missing_reasons(
             result,
@@ -113,10 +114,15 @@ def _candidate(
     priority: int,
     reasons: list[str],
 ) -> ComplexBenchmarkFollowupCandidate:
+    attempt = result.repair_attempt
+    outcome = result.patch_outcome
+    trace = result.trace_evidence
+    process = result.process_quality
+    usage = result.model_usage
     return ComplexBenchmarkFollowupCandidate(
-        task_id=result.task_id,
-        attempt_index=result.attempt_index,
-        attempt_count=result.attempt_count,
+        task_id=attempt.task_id,
+        attempt_index=attempt.attempt_index,
+        attempt_count=attempt.attempt_count,
         action=action,
         suggested_profile=profile,
         recommended_command=_followup_command(
@@ -134,19 +140,19 @@ def _candidate(
             action=action,
             profile=profile,
         ),
-        status=result.status,
-        strict_status=result.strict_status,
-        failure_class=result.failure_class,
-        harness_layer=result.harness_layer,
-        process_quality_label=result.process_quality_label,
+        status=outcome.status,
+        strict_status=outcome.strict_status,
+        failure_class=outcome.failure_class,
+        harness_layer=outcome.harness_layer,
+        process_quality_label=process.label,
         priority=priority,
         reasons=tuple(reasons),
-        retry_failure_classes=result.retry_failure_classes,
-        response_count=result.response_count,
-        total_tokens=result.total_tokens,
-        estimated_cost_usd=result.estimated_cost_usd,
-        report_path=result.report_path,
-        trace_path=result.trace_path,
+        retry_failure_classes=trace.retry_failure_classes,
+        response_count=usage.response_count,
+        total_tokens=usage.total_tokens,
+        estimated_cost_usd=usage.estimated_cost_usd,
+        report_path=trace.report_path,
+        trace_path=trace.trace_path,
     )
 
 
@@ -170,11 +176,13 @@ def _suite_verifier_missing_reasons(
     summary: ComplexBenchmarkSummary,
     thresholds: ComplexBenchmarkSuiteThresholds,
 ) -> list[str]:
+    process = result.process_quality
+    rubric = result.rubric_evidence
     reasons: list[str] = []
     if (
         thresholds.min_contextual_verifier_rate is not None
         and summary.contextual_verifier_rate < thresholds.min_contextual_verifier_rate
-        and not result.contextual_verifier
+        and not process.contextual_verifier
     ):
         reasons.append("contextual_verifier_missing")
     manifest_rate = _rate(
@@ -184,21 +192,21 @@ def _suite_verifier_missing_reasons(
     if (
         thresholds.min_acceptance_rubric_manifest_rate is not None
         and manifest_rate < thresholds.min_acceptance_rubric_manifest_rate
-        and result.deepagents_acceptance_rubric_manifest_path is None
+        and rubric.manifest_path is None
     ):
         reasons.append("acceptance_rubric_manifest_missing")
     if (
         thresholds.min_acceptance_rubric_read_first_rate is not None
         and summary.acceptance_rubric_read_first_rate
         < thresholds.min_acceptance_rubric_read_first_rate
-        and not result.deepagents_acceptance_rubric_manifest_read_first
+        and not rubric.manifest_read_first
     ):
         reasons.append("acceptance_rubric_read_first_missing")
     if (
         thresholds.min_acceptance_rubric_alignment_rate is not None
         and summary.acceptance_rubric_alignment_rate
         < thresholds.min_acceptance_rubric_alignment_rate
-        and result.deepagents_acceptance_rubric_aligned is not True
+        and rubric.aligned is not True
     ):
         reasons.append("acceptance_rubric_alignment_missing")
     return reasons
@@ -444,10 +452,14 @@ def _followup_estimated_cost(action: str, profile: str) -> str:
 
 
 def _followup_action(result: ComplexBenchmarkResult) -> str:
-    if result.live_cost_budget_overage or result.harness_layer == "budget":
+    outcome = result.patch_outcome
+    trace = result.trace_evidence
+    process = result.process_quality
+    cost = result.cost_evidence
+    if cost.live_cost_budget_overage or outcome.harness_layer == "budget":
         return "budget_contract_tightening"
     if (
-        result.validation_passed
+        outcome.validation_passed
         and (
             _high_response_count(result)
             or _high_token_count(result)
@@ -455,76 +467,84 @@ def _followup_action(result: ComplexBenchmarkResult) -> str:
         )
     ):
         return "cost_optimization_rerun"
-    if result.harness_layer == "patch_quality" or result.patch_quality_warning:
+    if outcome.harness_layer == "patch_quality" or outcome.quality_warning:
         return "quality_gate_rerun"
-    if result.harness_layer == "context" or result.patch_target_aligned is False:
+    if outcome.harness_layer == "context" or outcome.target_aligned is False:
         return "context_policy_ablation"
-    if result.harness_layer == "retry" or result.retry_failure_classes:
+    if outcome.harness_layer == "retry" or trace.retry_failure_classes:
         return "retry_policy_ablation"
-    if result.process_quality_label == "risky":
+    if process.label == "risky":
         return "process_quality_review"
-    if result.harness_layer == "runtime" or result.failed_trace_event_count >= 3:
+    if outcome.harness_layer == "runtime" or trace.failed_trace_event_count >= 3:
         return "runtime_failure_triage"
-    if result.harness_layer == "planning" or not result.patch_generated:
+    if outcome.harness_layer == "planning" or not outcome.patch_generated:
         return "planning_context_repair"
-    if not result.validation_passed:
+    if not outcome.validation_passed:
         return "validation_failure_rerun"
     return "manual_triage"
 
 
 def _followup_profile(result: ComplexBenchmarkResult) -> str:
-    if result.live_cost_budget_overage or result.harness_layer == "budget":
+    outcome = result.patch_outcome
+    trace = result.trace_evidence
+    process = result.process_quality
+    cost = result.cost_evidence
+    if cost.live_cost_budget_overage or outcome.harness_layer == "budget":
         return "resource_budget_auto"
     if _followup_action(result) == "cost_optimization_rerun":
         return "budget_critical_context_cap"
-    if result.harness_layer == "patch_quality" or result.patch_quality_warning:
+    if outcome.harness_layer == "patch_quality" or outcome.quality_warning:
         return "acceptance_rubric_verifier"
-    if result.harness_layer == "context" or result.patch_target_aligned is False:
+    if outcome.harness_layer == "context" or outcome.target_aligned is False:
         return "targeted_context_ablation"
-    if result.harness_layer == "retry" or result.retry_failure_classes:
+    if outcome.harness_layer == "retry" or trace.retry_failure_classes:
         return "structured_retry_feedback"
-    if result.process_quality_label == "risky":
+    if process.label == "risky":
         return "process_quality_gate"
-    if result.harness_layer == "runtime" or result.failed_trace_event_count >= 3:
+    if outcome.harness_layer == "runtime" or trace.failed_trace_event_count >= 3:
         return "runtime_trace_triage"
-    if result.harness_layer == "planning" or not result.patch_generated:
+    if outcome.harness_layer == "planning" or not outcome.patch_generated:
         return "fast_patch_packet"
-    if not result.validation_passed:
+    if not outcome.validation_passed:
         return "focused_validation_retry"
     return "manual_review"
 
 
 def _followup_priority(result: ComplexBenchmarkResult) -> tuple[int, list[str]]:
+    outcome = result.patch_outcome
+    trace = result.trace_evidence
+    process = result.process_quality
+    cost = result.cost_evidence
     priority = 0
     reasons: list[str] = []
-    if not result.validation_passed:
+    if not outcome.validation_passed:
         priority += 120
         reasons.append("strict_not_validated")
-    if result.strict_status == "failed_quality" or result.patch_quality_warning:
+    if outcome.strict_status == "failed_quality" or outcome.quality_warning:
         priority += 100
         reasons.append("quality_risk")
-    if result.failure_class not in {"validated", "unknown"}:
+    if outcome.failure_class not in {"validated", "unknown"}:
         priority += 80
-        reasons.append(f"failure_class:{result.failure_class}")
-    if result.harness_layer not in {"none", "unknown"}:
+        reasons.append(f"failure_class:{outcome.failure_class}")
+    if outcome.harness_layer not in {"none", "unknown"}:
         priority += 70
-        reasons.append(f"harness_layer:{result.harness_layer}")
-    if result.process_quality_label == "risky":
+        reasons.append(f"harness_layer:{outcome.harness_layer}")
+    if process.label == "risky":
         priority += 90
         reasons.append("process_risky")
-    elif result.process_quality_label == "watch":
+    elif process.label == "watch":
         priority += 40
         reasons.append("process_watch")
-    if result.retry_failure_classes:
+    if trace.retry_failure_classes:
         priority += 60
-        reasons.append("retry_failure:" + ",".join(result.retry_failure_classes))
-    if result.live_cost_budget_overage:
+        reasons.append("retry_failure:" + ",".join(trace.retry_failure_classes))
+    if cost.live_cost_budget_overage:
         priority += 80
         reasons.append("live_cost_budget_overage")
-    if result.patch_target_aligned is False:
+    if outcome.target_aligned is False:
         priority += 70
         reasons.append("target_misaligned")
-    if result.failed_trace_event_count >= 3:
+    if trace.failed_trace_event_count >= 3:
         priority += 35
         reasons.append("failed_event_churn")
     if _high_response_count(result):
@@ -540,15 +560,18 @@ def _followup_priority(result: ComplexBenchmarkResult) -> tuple[int, list[str]]:
 
 
 def _high_response_count(result: ComplexBenchmarkResult) -> bool:
-    return result.response_count is not None and result.response_count >= 7
+    response_count = result.model_usage.response_count
+    return response_count is not None and response_count >= 7
 
 
 def _high_token_count(result: ComplexBenchmarkResult) -> bool:
-    return result.total_tokens is not None and result.total_tokens >= 120_000
+    total_tokens = result.model_usage.total_tokens
+    return total_tokens is not None and total_tokens >= 120_000
 
 
 def _high_cost(result: ComplexBenchmarkResult) -> bool:
-    return result.estimated_cost_usd is not None and result.estimated_cost_usd >= 0.09
+    estimated_cost_usd = result.model_usage.estimated_cost_usd
+    return estimated_cost_usd is not None and estimated_cost_usd >= 0.09
 
 
 def _slug(value: str) -> str:
