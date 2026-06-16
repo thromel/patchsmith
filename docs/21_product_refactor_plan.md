@@ -11,8 +11,8 @@ tests.
 
 ## Current Evidence
 
-- Source size: 286 Python files under `src/patchsmith`, about 59.8k lines.
-- Test size: 110 Python files under `tests`, about 34.7k lines.
+- Source size: 286 Python files under `src/patchsmith`, about 60.2k lines.
+- Test size: 111 Python files under `tests`, about 35.0k lines.
 - Largest source files:
   - `src/patchsmith/runtime/attempts.py`: 1108 lines.
   - `src/patchsmith/runtime/feedback.py`: 735 lines.
@@ -31,7 +31,7 @@ tests.
 - Current validation:
   - `uv run ruff check src tests docs README.md`: passed.
   - `uv run mypy src`: passed on 286 source files.
-  - `uv run pytest -q`: 740 passed.
+  - `uv run pytest -q`: 742 passed.
 - Current local smoke:
   - `patchsmith chat` persisted a natural-language memory note and reloaded it
     from `.patchsmith/instructions.md`.
@@ -555,6 +555,11 @@ Progress:
   command registration, one-shot run dispatch, and interactive/preflight
   validation; `cli/commands/run.py` is now 99 lines and 2 top-level
   definitions.
+- 2026-06-16: `ComplexBenchmarkResult` gained typed domain views for model
+  usage, patch outcome, trace evidence, process quality, DeepAgents context
+  evidence, rubric evidence, cost/resource-budget evidence, and composite repair
+  attempts. The existing flat `to_dict()` schema remains backward-compatible,
+  with focused coverage in `tests/evaluation/complex/test_models.py`.
 - 2026-06-15: Phase 3 started by moving complex benchmark suite models,
   threshold/config resolution, spec loading, and suite input preflight into
   `patchsmith.evaluation.complex.models` and

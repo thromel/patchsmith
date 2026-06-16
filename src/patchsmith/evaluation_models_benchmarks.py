@@ -251,6 +251,151 @@ class PatchSearchEvalSummary:
 
 
 @dataclass(frozen=True)
+class ModelUsage:
+    provider: str | None
+    response_count: int | None
+    input_tokens: int | None
+    output_tokens: int | None
+    total_tokens: int | None
+    estimated_cost_usd: float | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class PatchOutcome:
+    status: str
+    strict_status: str
+    reproduced: bool
+    patch_generated: bool
+    validation_passed: bool
+    test_exit_code: int | None
+    progress_score: float
+    progress_stage: str
+    failure_class: str
+    harness_layer: str
+    quality_severity: str | None
+    quality_warning: bool
+    quality_codes: tuple[str, ...]
+    target_paths: tuple[str, ...]
+    localized_target_paths: tuple[str, ...]
+    target_alignment_status: str
+    target_aligned: bool | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class TraceEvidence:
+    trace_path: str | None
+    report_path: str | None
+    trace_event_count: int
+    runtime_node_count: int
+    failed_trace_event_count: int
+    retry_event_count: int
+    retry_feedback_artifacts: tuple[str, ...]
+    retry_feedback_artifact_count: int
+    retry_labels: tuple[str, ...]
+    retry_label_counts: dict[str, int]
+    retry_failure_classes: tuple[str, ...]
+    retry_failure_class_counts: dict[str, int]
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ProcessQuality:
+    debuggability_score: float
+    agent_trajectory_score: float
+    todo_planning: bool
+    constrained_filesystem: bool
+    specialist_review: bool
+    guardrails: bool
+    structured_output: bool
+    retry_feedback: bool
+    patch_diagnostics: bool
+    contextual_verifier: bool
+    label: str
+    score: float
+    flags: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ContextEvidence:
+    virtual_file_count: int | None
+    virtual_file_paths: tuple[str, ...]
+    max_context_files: int | None
+    context_budgeted: bool
+    context_budget_manifest_path: str | None
+    context_budget_manifest_read_first: bool
+    context_budget_omitted_file_count: int | None
+    context_budget_omitted_paths: tuple[str, ...]
+    repo_map_manifest_path: str | None
+    repo_map_manifest_read_first: bool
+    repo_instructions_manifest_path: str | None
+    repo_instructions_manifest_read_first: bool
+    repair_interface_manifest_path: str | None
+    repair_interface_manifest_read_first: bool
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class RubricEvidence:
+    manifest_path: str | None
+    manifest_read_first: bool
+    aligned: bool | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class CostEvidence:
+    model_usage: ModelUsage
+    live_cost_budget_usd: float | None
+    live_cost_budget_overage: bool
+    live_cost_budget_overage_usd: float | None
+    resource_budgeted: bool
+    resource_budget_read_first: bool
+    resource_budget_max_model_responses: int | None
+    resource_budget_max_model_tokens: int | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class RepairAttemptResult:
+    task_id: str
+    repository: str | None
+    issue_url: str | None
+    runtime: str
+    planner: str
+    context_provider: str
+    attempt_index: int
+    attempt_count: int
+    preflight_status: str
+    preflight_gates: list[dict[str, str]] | None
+    patch_outcome: PatchOutcome
+    trace_evidence: TraceEvidence
+    context_evidence: ContextEvidence
+    rubric_evidence: RubricEvidence
+    process_quality: ProcessQuality
+    cost_evidence: CostEvidence
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class ComplexBenchmarkResult:
     task_id: str
     repository: str | None
@@ -337,6 +482,159 @@ class ComplexBenchmarkResult:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+    @property
+    def model_usage(self) -> ModelUsage:
+        return ModelUsage(
+            provider=self.model_provider,
+            response_count=self.response_count,
+            input_tokens=self.input_tokens,
+            output_tokens=self.output_tokens,
+            total_tokens=self.total_tokens,
+            estimated_cost_usd=self.estimated_cost_usd,
+        )
+
+    @property
+    def patch_outcome(self) -> PatchOutcome:
+        return PatchOutcome(
+            status=self.status,
+            strict_status=self.strict_status,
+            reproduced=self.reproduced,
+            patch_generated=self.patch_generated,
+            validation_passed=self.validation_passed,
+            test_exit_code=self.test_exit_code,
+            progress_score=self.progress_score,
+            progress_stage=self.progress_stage,
+            failure_class=self.failure_class,
+            harness_layer=self.harness_layer,
+            quality_severity=self.patch_quality_severity,
+            quality_warning=self.patch_quality_warning,
+            quality_codes=self.patch_quality_codes,
+            target_paths=self.patch_target_paths,
+            localized_target_paths=self.localized_target_paths,
+            target_alignment_status=self.target_alignment_status,
+            target_aligned=self.patch_target_aligned,
+        )
+
+    @property
+    def trace_evidence(self) -> TraceEvidence:
+        return TraceEvidence(
+            trace_path=self.trace_path,
+            report_path=self.report_path,
+            trace_event_count=self.trace_event_count,
+            runtime_node_count=self.runtime_node_count,
+            failed_trace_event_count=self.failed_trace_event_count,
+            retry_event_count=self.retry_event_count,
+            retry_feedback_artifacts=self.retry_feedback_artifacts,
+            retry_feedback_artifact_count=self.retry_feedback_artifact_count,
+            retry_labels=self.retry_labels,
+            retry_label_counts=self.retry_label_counts,
+            retry_failure_classes=self.retry_failure_classes,
+            retry_failure_class_counts=self.retry_failure_class_counts,
+        )
+
+    @property
+    def process_quality(self) -> ProcessQuality:
+        return ProcessQuality(
+            debuggability_score=self.debuggability_score,
+            agent_trajectory_score=self.agent_trajectory_score,
+            todo_planning=self.todo_planning,
+            constrained_filesystem=self.constrained_filesystem,
+            specialist_review=self.specialist_review,
+            guardrails=self.guardrails,
+            structured_output=self.structured_output,
+            retry_feedback=self.retry_feedback,
+            patch_diagnostics=self.patch_diagnostics,
+            contextual_verifier=self.contextual_verifier,
+            label=self.process_quality_label,
+            score=self.process_quality_score,
+            flags=self.process_quality_flags,
+        )
+
+    @property
+    def context_evidence(self) -> ContextEvidence:
+        return ContextEvidence(
+            virtual_file_count=self.deepagents_virtual_file_count,
+            virtual_file_paths=self.deepagents_virtual_file_paths,
+            max_context_files=self.deepagents_max_context_files,
+            context_budgeted=self.deepagents_context_budgeted,
+            context_budget_manifest_path=(
+                self.deepagents_context_budget_manifest_path
+            ),
+            context_budget_manifest_read_first=(
+                self.deepagents_context_budget_manifest_read_first
+            ),
+            context_budget_omitted_file_count=(
+                self.deepagents_context_budget_omitted_file_count
+            ),
+            context_budget_omitted_paths=(
+                self.deepagents_context_budget_omitted_paths
+            ),
+            repo_map_manifest_path=self.deepagents_repo_map_manifest_path,
+            repo_map_manifest_read_first=(
+                self.deepagents_repo_map_manifest_read_first
+            ),
+            repo_instructions_manifest_path=(
+                self.deepagents_repo_instructions_manifest_path
+            ),
+            repo_instructions_manifest_read_first=(
+                self.deepagents_repo_instructions_manifest_read_first
+            ),
+            repair_interface_manifest_path=(
+                self.deepagents_repair_interface_manifest_path
+            ),
+            repair_interface_manifest_read_first=(
+                self.deepagents_repair_interface_manifest_read_first
+            ),
+        )
+
+    @property
+    def rubric_evidence(self) -> RubricEvidence:
+        return RubricEvidence(
+            manifest_path=self.deepagents_acceptance_rubric_manifest_path,
+            manifest_read_first=(
+                self.deepagents_acceptance_rubric_manifest_read_first
+            ),
+            aligned=self.deepagents_acceptance_rubric_aligned,
+        )
+
+    @property
+    def cost_evidence(self) -> CostEvidence:
+        return CostEvidence(
+            model_usage=self.model_usage,
+            live_cost_budget_usd=self.live_cost_budget_usd,
+            live_cost_budget_overage=self.live_cost_budget_overage,
+            live_cost_budget_overage_usd=self.live_cost_budget_overage_usd,
+            resource_budgeted=self.deepagents_resource_budgeted,
+            resource_budget_read_first=self.deepagents_resource_budget_read_first,
+            resource_budget_max_model_responses=(
+                self.deepagents_resource_budget_max_model_responses
+            ),
+            resource_budget_max_model_tokens=(
+                self.deepagents_resource_budget_max_model_tokens
+            ),
+        )
+
+    @property
+    def repair_attempt(self) -> RepairAttemptResult:
+        return RepairAttemptResult(
+            task_id=self.task_id,
+            repository=self.repository,
+            issue_url=self.issue_url,
+            runtime=self.runtime,
+            planner=self.planner,
+            context_provider=self.context_provider,
+            attempt_index=self.attempt_index,
+            attempt_count=self.attempt_count,
+            preflight_status=self.preflight_status,
+            preflight_gates=self.preflight_gates,
+            patch_outcome=self.patch_outcome,
+            trace_evidence=self.trace_evidence,
+            context_evidence=self.context_evidence,
+            rubric_evidence=self.rubric_evidence,
+            process_quality=self.process_quality,
+            cost_evidence=self.cost_evidence,
+        )
 
 
 @dataclass(frozen=True)
