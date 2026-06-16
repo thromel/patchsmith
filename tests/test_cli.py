@@ -153,7 +153,7 @@ def test_demo_command_runs_seeded_logic_bug_and_inspect_reads_artifacts(
 
 
 def test_agent_command_defaults_to_deepagents_current_repo(monkeypatch, capsys) -> None:
-    import patchsmith.cli.commands.run as run_commands
+    import patchsmith.cli.commands.agent as agent_commands
 
     captured: dict[str, object] = {}
 
@@ -179,7 +179,7 @@ def test_agent_command_defaults_to_deepagents_current_repo(monkeypatch, capsys) 
                 retrieved_context=[],
             )
 
-    monkeypatch.setattr(run_commands, "RepairRunner", FakeRepairRunner)
+    monkeypatch.setattr(agent_commands, "RepairRunner", FakeRepairRunner)
 
     exit_code = main(
         [
@@ -229,7 +229,7 @@ def test_agent_command_applies_project_agent_profile(
     monkeypatch,
     capsys,
 ) -> None:
-    import patchsmith.cli.commands.run as run_commands
+    import patchsmith.cli.commands.agent as agent_commands
 
     profile_dir = tmp_path / ".patchsmith" / "agents"
     profile_dir.mkdir(parents=True)
@@ -266,7 +266,7 @@ def test_agent_command_applies_project_agent_profile(
                 retrieved_context=[],
             )
 
-    monkeypatch.setattr(run_commands, "RepairRunner", FakeRepairRunner)
+    monkeypatch.setattr(agent_commands, "RepairRunner", FakeRepairRunner)
 
     exit_code = main(
         [
@@ -312,7 +312,7 @@ def test_agent_command_loads_project_instructions_into_request(
     monkeypatch,
     capsys,
 ) -> None:
-    import patchsmith.cli.commands.run as run_commands
+    import patchsmith.cli.commands.agent as agent_commands
 
     (tmp_path / "AGENTS.md").write_text(
         "## Repository expectations\n- Preserve public API behavior.\n",
@@ -336,7 +336,7 @@ def test_agent_command_loads_project_instructions_into_request(
                 retrieved_context=[],
             )
 
-    monkeypatch.setattr(run_commands, "RepairRunner", FakeRepairRunner)
+    monkeypatch.setattr(agent_commands, "RepairRunner", FakeRepairRunner)
 
     exit_code = main(
         [
@@ -364,14 +364,14 @@ def test_agent_preflight_reports_config_without_running(
     monkeypatch,
     capsys,
 ) -> None:
-    import patchsmith.cli.commands.run as run_commands
+    import patchsmith.cli.commands.agent as agent_commands
 
     class FakeRepairRunner:
         def __init__(self, *, artifacts_dir: Path) -> None:
             raise AssertionError("preflight should not start the runner")
 
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-    monkeypatch.setattr(run_commands, "RepairRunner", FakeRepairRunner)
+    monkeypatch.setattr(agent_commands, "RepairRunner", FakeRepairRunner)
 
     exit_code = main(
         [
@@ -520,15 +520,15 @@ def test_agent_command_blocks_failed_model_preflight_before_runner(
     monkeypatch,
     capsys,
 ) -> None:
-    import patchsmith.cli.commands.run as run_commands
+    import patchsmith.cli.commands.agent as agent_commands
 
     class FakeRepairRunner:
         def __init__(self, *, artifacts_dir: Path) -> None:
             raise AssertionError("runner must not start after failed model preflight")
 
-    monkeypatch.setattr(run_commands, "RepairRunner", FakeRepairRunner)
+    monkeypatch.setattr(agent_commands, "RepairRunner", FakeRepairRunner)
     monkeypatch.setattr(
-        run_commands,
+        agent_commands,
         "openai_model_preflight_from_env",
         lambda *, model=None: ModelPreflightResult(
             provider="openai_models",
@@ -553,7 +553,7 @@ def test_agent_command_can_apply_generated_diff(
     monkeypatch,
     capsys,
 ) -> None:
-    import patchsmith.cli.commands.run as run_commands
+    import patchsmith.cli.commands.agent as agent_commands
 
     repo = _git_repo(tmp_path / "repo")
     artifacts = tmp_path / "artifacts"
@@ -585,7 +585,7 @@ def test_agent_command_can_apply_generated_diff(
                 retrieved_context=[],
             )
 
-    monkeypatch.setattr(run_commands, "RepairRunner", FakeRepairRunner)
+    monkeypatch.setattr(agent_commands, "RepairRunner", FakeRepairRunner)
 
     exit_code = main(
         [
@@ -613,7 +613,7 @@ def test_agent_apply_rejects_dirty_repo_before_running(
     monkeypatch,
     capsys,
 ) -> None:
-    import patchsmith.cli.commands.run as run_commands
+    import patchsmith.cli.commands.agent as agent_commands
 
     repo = _git_repo(tmp_path / "repo")
     (repo / "app.py").write_text("value = 3\n", encoding="utf-8")
@@ -622,7 +622,7 @@ def test_agent_apply_rejects_dirty_repo_before_running(
         def __init__(self, *, artifacts_dir: Path) -> None:
             raise AssertionError("runner should not start when apply preflight fails")
 
-    monkeypatch.setattr(run_commands, "RepairRunner", FakeRepairRunner)
+    monkeypatch.setattr(agent_commands, "RepairRunner", FakeRepairRunner)
 
     exit_code = main(["agent", "fix app", "--repo", str(repo), "--apply"])
     captured = capsys.readouterr()
