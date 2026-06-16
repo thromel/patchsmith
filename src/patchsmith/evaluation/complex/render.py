@@ -393,57 +393,65 @@ def render_complex_benchmark_report(
         "|---|---|---|---|---|---|---:|---:|---:|---:|---|---|---|---|---:|---:|---:|---:|---|---|---|---|---|---|---|---:|---:|---|---:|---|---|---|---|---|---|---:|---:|---:|---|---|---|---|---:|---:|---:|---:|---:|---|",
     ]
     for result in results:
+        attempt = result.repair_attempt
+        outcome = result.patch_outcome
+        trace = result.trace_evidence
+        context = result.context_evidence
+        rubric = result.rubric_evidence
+        process = result.process_quality
+        usage = result.model_usage
+        cost = result.cost_evidence
         lines.append(
             "| "
             f"{_markdown_table_text(result.task_id)} | "
-            f"{_markdown_table_text(f'{result.attempt_index}/{result.attempt_count}')} | "
-            f"{_markdown_table_text(result.status)} | "
-            f"{_markdown_table_text(result.strict_status)} | "
-            f"{_markdown_table_text(result.repository or 'unknown')} | "
-            f"{_markdown_table_text(result.runtime + '/' + result.planner)} | "
-            f"{_markdown_table_text(str(result.reproduced).lower())} | "
-            f"{_markdown_table_text(str(result.patch_generated).lower())} | "
-            f"{_markdown_table_text(str(result.validation_passed).lower())} | "
-            f"{result.progress_score:.2f} | "
-            f"{_markdown_table_text(result.progress_stage)} | "
-            f"{_markdown_table_text(result.failure_class)} | "
-            f"{_markdown_table_text(result.harness_layer)} | "
+            f"{_markdown_table_text(f'{attempt.attempt_index}/{attempt.attempt_count}')} | "
+            f"{_markdown_table_text(outcome.status)} | "
+            f"{_markdown_table_text(outcome.strict_status)} | "
+            f"{_markdown_table_text(attempt.repository or 'unknown')} | "
+            f"{_markdown_table_text(attempt.runtime + '/' + attempt.planner)} | "
+            f"{_markdown_table_text(str(outcome.reproduced).lower())} | "
+            f"{_markdown_table_text(str(outcome.patch_generated).lower())} | "
+            f"{_markdown_table_text(str(outcome.validation_passed).lower())} | "
+            f"{outcome.progress_score:.2f} | "
+            f"{_markdown_table_text(outcome.progress_stage)} | "
+            f"{_markdown_table_text(outcome.failure_class)} | "
+            f"{_markdown_table_text(outcome.harness_layer)} | "
             f"{_markdown_table_text(_preflight_summary(result))} | "
-            f"{result.trace_event_count} | "
-            f"{result.runtime_node_count} | "
-            f"{result.retry_event_count} | "
-            f"{result.retry_feedback_artifact_count} | "
-            f"{_markdown_table_text(','.join(result.retry_labels))} | "
-            f"{_markdown_table_text(','.join(result.retry_failure_classes))} | "
-            f"{_markdown_table_text(result.patch_quality_severity or '')} | "
-            f"{_markdown_table_text(','.join(result.patch_quality_codes))} | "
-            f"{_markdown_table_text(result.target_alignment_status)} | "
-            f"{_markdown_table_text(','.join(result.patch_target_paths))} | "
-            f"{_markdown_table_text(','.join(result.localized_target_paths))} | "
-            f"{result.deepagents_virtual_file_count if result.deepagents_virtual_file_count is not None else ''} | "
-            f"{result.deepagents_max_context_files if result.deepagents_max_context_files is not None else ''} | "
-            f"{_markdown_table_text(result.deepagents_context_budget_manifest_path or '')} | "
-            f"{result.deepagents_context_budget_omitted_file_count if result.deepagents_context_budget_omitted_file_count is not None else ''} | "
-            f"{_markdown_table_text(result.deepagents_repo_map_manifest_path or '')} | "
-            f"{_markdown_table_text(result.deepagents_repo_instructions_manifest_path or '')} | "
-            f"{_markdown_table_text(result.deepagents_acceptance_rubric_manifest_path or '')} | "
-            f"{_markdown_table_text(_optional_bool_text(result.deepagents_acceptance_rubric_aligned))} | "
-            f"{_markdown_table_text(result.deepagents_repair_interface_manifest_path or '')} | "
-            f"{_markdown_table_text(str(result.deepagents_resource_budgeted).lower())} | "
-            f"{_markdown_table_text(str(result.deepagents_resource_budget_read_first).lower())} | "
-            f"{result.deepagents_resource_budget_max_model_responses if result.deepagents_resource_budget_max_model_responses is not None else ''} | "
-            f"{result.deepagents_resource_budget_max_model_tokens if result.deepagents_resource_budget_max_model_tokens is not None else ''} | "
-            f"{result.agent_trajectory_score:.2f} | "
+            f"{trace.trace_event_count} | "
+            f"{trace.runtime_node_count} | "
+            f"{trace.retry_event_count} | "
+            f"{trace.retry_feedback_artifact_count} | "
+            f"{_markdown_table_text(','.join(trace.retry_labels))} | "
+            f"{_markdown_table_text(','.join(trace.retry_failure_classes))} | "
+            f"{_markdown_table_text(outcome.quality_severity or '')} | "
+            f"{_markdown_table_text(','.join(outcome.quality_codes))} | "
+            f"{_markdown_table_text(outcome.target_alignment_status)} | "
+            f"{_markdown_table_text(','.join(outcome.target_paths))} | "
+            f"{_markdown_table_text(','.join(outcome.localized_target_paths))} | "
+            f"{context.virtual_file_count if context.virtual_file_count is not None else ''} | "
+            f"{context.max_context_files if context.max_context_files is not None else ''} | "
+            f"{_markdown_table_text(context.context_budget_manifest_path or '')} | "
+            f"{context.context_budget_omitted_file_count if context.context_budget_omitted_file_count is not None else ''} | "
+            f"{_markdown_table_text(context.repo_map_manifest_path or '')} | "
+            f"{_markdown_table_text(context.repo_instructions_manifest_path or '')} | "
+            f"{_markdown_table_text(rubric.manifest_path or '')} | "
+            f"{_markdown_table_text(_optional_bool_text(rubric.aligned))} | "
+            f"{_markdown_table_text(context.repair_interface_manifest_path or '')} | "
+            f"{_markdown_table_text(str(cost.resource_budgeted).lower())} | "
+            f"{_markdown_table_text(str(cost.resource_budget_read_first).lower())} | "
+            f"{cost.resource_budget_max_model_responses if cost.resource_budget_max_model_responses is not None else ''} | "
+            f"{cost.resource_budget_max_model_tokens if cost.resource_budget_max_model_tokens is not None else ''} | "
+            f"{process.agent_trajectory_score:.2f} | "
             f"{_markdown_table_text(_trajectory_signal_summary(result))} | "
-            f"{_markdown_table_text(result.process_quality_label)} | "
-            f"{_markdown_table_text(','.join(result.process_quality_flags))} | "
-            f"{_markdown_table_text(result.model_provider or '')} | "
-            f"{result.response_count if result.response_count is not None else ''} | "
-            f"{result.total_tokens if result.total_tokens is not None else ''} | "
-            f"{_format_cost(result.estimated_cost_usd)} | "
-            f"{_format_cost(result.live_cost_budget_usd)} | "
-            f"{_format_cost(result.live_cost_budget_overage_usd)} | "
-            f"{_markdown_table_text(result.report_path or '')} |"
+            f"{_markdown_table_text(process.label)} | "
+            f"{_markdown_table_text(','.join(process.flags))} | "
+            f"{_markdown_table_text(usage.provider or '')} | "
+            f"{usage.response_count if usage.response_count is not None else ''} | "
+            f"{usage.total_tokens if usage.total_tokens is not None else ''} | "
+            f"{_format_cost(usage.estimated_cost_usd)} | "
+            f"{_format_cost(cost.live_cost_budget_usd)} | "
+            f"{_format_cost(cost.live_cost_budget_overage_usd)} | "
+            f"{_markdown_table_text(trace.report_path or '')} |"
         )
     if selected_attempts:
         lines.extend(
@@ -540,14 +548,15 @@ def _shell_command(command: tuple[str, ...]) -> str:
 
 
 def _preflight_summary(result: ComplexBenchmarkResult) -> str:
-    gates = result.preflight_gates or []
+    attempt = result.repair_attempt
+    gates = attempt.preflight_gates or []
     if not gates:
-        return result.preflight_status
+        return attempt.preflight_status
     gate_summary = "; ".join(
         f"{gate.get('name', 'gate')}:{gate.get('status', 'unknown')}"
         for gate in gates
     )
-    return f"{result.preflight_status} ({gate_summary})"
+    return f"{attempt.preflight_status} ({gate_summary})"
 
 
 def _optional_bool_text(value: bool | None) -> str:
@@ -557,15 +566,16 @@ def _optional_bool_text(value: bool | None) -> str:
 
 
 def _trajectory_signal_summary(result: ComplexBenchmarkResult) -> str:
+    process = result.process_quality
     signals = [
-        ("todo", result.todo_planning),
-        ("filesystem", result.constrained_filesystem),
-        ("review", result.specialist_review),
-        ("guardrails", result.guardrails),
-        ("structured", result.structured_output),
-        ("retry", result.retry_feedback),
-        ("diagnostics", result.patch_diagnostics),
-        ("verifier", result.contextual_verifier),
+        ("todo", process.todo_planning),
+        ("filesystem", process.constrained_filesystem),
+        ("review", process.specialist_review),
+        ("guardrails", process.guardrails),
+        ("structured", process.structured_output),
+        ("retry", process.retry_feedback),
+        ("diagnostics", process.patch_diagnostics),
+        ("verifier", process.contextual_verifier),
     ]
     return ",".join(name for name, enabled in signals if enabled)
 

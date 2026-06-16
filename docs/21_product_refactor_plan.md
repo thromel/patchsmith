@@ -565,6 +565,11 @@ Progress:
   `tests/evaluation/complex/test_summary.py` preserves selected-attempt cost,
   token, target-coverage, context-budget, resource-budget, retry, and process
   quality metrics.
+- 2026-06-16: Complex benchmark Markdown report rendering now uses the domain
+  views for per-result rows and helper summaries instead of the flat benchmark
+  result fields. Existing render coverage in
+  `tests/evaluation/complex/test_render.py` preserves report output and claim
+  boundary text.
 - 2026-06-15: Phase 3 started by moving complex benchmark suite models,
   threshold/config resolution, spec loading, and suite input preflight into
   `patchsmith.evaluation.complex.models` and
