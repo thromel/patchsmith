@@ -560,6 +560,11 @@ Progress:
   evidence, rubric evidence, cost/resource-budget evidence, and composite repair
   attempts. The existing flat `to_dict()` schema remains backward-compatible,
   with focused coverage in `tests/evaluation/complex/test_models.py`.
+- 2026-06-16: Complex benchmark summary aggregation now composes those domain
+  views instead of reading the flat result bag directly. Focused coverage in
+  `tests/evaluation/complex/test_summary.py` preserves selected-attempt cost,
+  token, target-coverage, context-budget, resource-budget, retry, and process
+  quality metrics.
 - 2026-06-15: Phase 3 started by moving complex benchmark suite models,
   threshold/config resolution, spec loading, and suite input preflight into
   `patchsmith.evaluation.complex.models` and
