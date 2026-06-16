@@ -10,11 +10,13 @@ from patchsmith.cli.commands.portfolio_handler_payloads import (
     print_json_payload,
     project_status_payload,
     quality_gate_payload,
+    release_gate_payload,
 )
 from patchsmith.portfolio import (
     write_evidence_refresh_report,
     write_project_status_report,
     write_quality_gate_report,
+    write_release_gate_report,
 )
 
 
@@ -45,6 +47,48 @@ def _quality_gate_command(args: argparse.Namespace) -> int:
             print(f"JSON: {json_output_path}")
         print(
             f"Status: {report.quality_status} "
+            f"Passed: {report.passed_count} "
+            f"Failed: {report.failed_count} "
+            f"Skipped: {report.skipped_count}"
+        )
+    return 0
+
+
+def _release_gate_command(args: argparse.Namespace) -> int:
+    json_output_path = Path(args.json_output) if args.json_output else None
+    logs_dir = Path(args.logs_dir) if args.logs_dir else None
+    benchmark_results_path = (
+        Path(args.benchmark_results) if args.benchmark_results else None
+    )
+    report = write_release_gate_report(
+        project_root=Path(args.project_root),
+        artifacts_dir=Path(args.artifacts_dir),
+        output_path=Path(args.output),
+        json_output_path=json_output_path,
+        logs_dir=logs_dir,
+        timeout_seconds=args.timeout_seconds,
+        include_unit_tests=not args.skip_unit_tests,
+        include_smoke=not args.skip_smoke,
+        include_build=not args.skip_build,
+        include_cli_help=not args.skip_cli_help,
+        include_sample_transcript_export=not args.skip_sample_transcript_export,
+        include_benchmark_validation=not args.skip_benchmark_validation,
+        benchmark_results_path=benchmark_results_path,
+    )
+    if args.json:
+        print_json_payload(
+            release_gate_payload(
+                report,
+                output=args.output,
+                json_output_path=json_output_path,
+            )
+        )
+    else:
+        print(f"Release gate report: {Path(args.output)}")
+        if json_output_path:
+            print(f"JSON: {json_output_path}")
+        print(
+            f"Status: {report.release_status} "
             f"Passed: {report.passed_count} "
             f"Failed: {report.failed_count} "
             f"Skipped: {report.skipped_count}"
@@ -200,4 +244,5 @@ __all__ = [
     "_project_status_command",
     "_quality_gate_command",
     "_refresh_evidence_command",
+    "_release_gate_command",
 ]

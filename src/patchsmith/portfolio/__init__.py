@@ -24,6 +24,7 @@ from patchsmith.portfolio.live_calibration import (
 from patchsmith.portfolio.mvp_progress import write_mvp_progress_report
 from patchsmith.portfolio.project_status import write_project_status_report
 from patchsmith.portfolio.quality_gate import write_quality_gate_report
+from patchsmith.portfolio.release_gate import write_release_gate_report
 from patchsmith.portfolio.release_hygiene import write_release_hygiene_report
 
 __all__ = [
@@ -41,5 +42,6 @@ __all__ = [
     "write_mvp_progress_report",
     "write_project_status_report",
     "write_quality_gate_report",
+    "write_release_gate_report",
     "write_release_hygiene_report",
 ]

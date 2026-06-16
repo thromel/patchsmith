@@ -20,6 +20,7 @@ from patchsmith.cli.commands.portfolio_handlers import (
     _project_status_command,
     _quality_gate_command,
     _refresh_evidence_command,
+    _release_gate_command,
     _release_hygiene_command,
 )
 from patchsmith.cli.commands.portfolio_quality_cli import register_portfolio_quality_commands
@@ -42,6 +43,7 @@ def register(subparsers: argparse._SubParsersAction) -> dict[str, CommandHandler
         "mvp-progress": _mvp_progress_command,
         "delivery-audit": _delivery_audit_command,
         "quality-gate": _quality_gate_command,
+        "release-gate": _release_gate_command,
         "project-status": _project_status_command,
         "refresh-evidence": _refresh_evidence_command,
     }

@@ -185,6 +185,24 @@ def quality_gate_payload(
     }
 
 
+def release_gate_payload(
+    report: Any,
+    *,
+    output: str | Path,
+    json_output_path: Path | None,
+) -> dict[str, Any]:
+    return {
+        "project_root": report.project_root,
+        "artifacts_dir": report.artifacts_dir,
+        "generated_at": report.generated_at,
+        "release_status": report.release_status,
+        "passed_count": report.passed_count,
+        "failed_count": report.failed_count,
+        "skipped_count": report.skipped_count,
+        **_report_paths(output, json_output_path),
+    }
+
+
 def project_status_payload(
     report: Any,
     *,
@@ -258,5 +276,6 @@ __all__ = [
     "print_json_payload",
     "project_status_payload",
     "quality_gate_payload",
+    "release_gate_payload",
     "release_hygiene_payload",
 ]

@@ -668,6 +668,12 @@ Progress:
   for older flat benchmark result rows. Focused tests live in
   `tests/session/test_transcript_migration.py` and
   `tests/evaluation/complex/test_compatibility.py`.
+- 2026-06-16: Phase 4 release-gate hardening added the top-level
+  `patchsmith release-gate` command and `patchsmith.portfolio.release_gate`.
+  The gate records unit-test, focused-smoke, package-build, CLI help snapshot,
+  sample transcript export, and saved complex benchmark validation checks with
+  Markdown/JSON reports plus command logs. Focused coverage lives in
+  `tests/portfolio/test_release_gate.py`.
 
 ### Phase 0: Stabilize
 

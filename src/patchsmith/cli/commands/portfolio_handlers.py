@@ -10,6 +10,7 @@ from patchsmith.cli.commands.portfolio_quality_handlers import (
     _project_status_command,
     _quality_gate_command,
     _refresh_evidence_command,
+    _release_gate_command,
 )
 from patchsmith.cli.commands.portfolio_readiness_handlers import (
     _delivery_audit_command,
@@ -31,5 +32,6 @@ __all__ = [
     "_project_status_command",
     "_quality_gate_command",
     "_refresh_evidence_command",
+    "_release_gate_command",
     "_release_hygiene_command",
 ]

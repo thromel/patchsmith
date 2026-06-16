@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 
 from patchsmith.portfolio.quality_gate import DEFAULT_QUALITY_GATE_TIMEOUT_SECONDS
+from patchsmith.portfolio.release_gate import DEFAULT_RELEASE_GATE_TIMEOUT_SECONDS
 
 
 def register_portfolio_quality_commands(subparsers: argparse._SubParsersAction) -> None:
@@ -53,6 +54,79 @@ def register_portfolio_quality_commands(subparsers: argparse._SubParsersAction) 
         help="Skip the package build gate.",
     )
     quality_gate.add_argument("--json", action="store_true", help="Print JSON summary.")
+
+    release_gate = subparsers.add_parser(
+        "release-gate",
+        help="Run the product release gate and save a release-gate report.",
+    )
+    release_gate.add_argument(
+        "--project-root",
+        default=".",
+        help="Project root where verification commands run.",
+    )
+    release_gate.add_argument(
+        "--artifacts-dir",
+        default="artifacts",
+        help="Root artifact directory to write logs and sample artifacts under.",
+    )
+    release_gate.add_argument(
+        "--output",
+        default="artifacts/experiments/release_gate.md",
+        help="Markdown release-gate report output path.",
+    )
+    release_gate.add_argument(
+        "--json-output",
+        default="artifacts/experiments/release_gate.json",
+        help="Optional JSON release-gate output path.",
+    )
+    release_gate.add_argument(
+        "--logs-dir",
+        help="Directory for per-command stdout/stderr logs.",
+    )
+    release_gate.add_argument(
+        "--timeout-seconds",
+        type=int,
+        default=DEFAULT_RELEASE_GATE_TIMEOUT_SECONDS,
+        help="Per-command timeout in seconds.",
+    )
+    release_gate.add_argument(
+        "--skip-unit-tests",
+        action="store_true",
+        help="Skip the full pytest release-gate step.",
+    )
+    release_gate.add_argument(
+        "--skip-smoke",
+        action="store_true",
+        help="Skip the focused smoke lane.",
+    )
+    release_gate.add_argument(
+        "--skip-build",
+        action="store_true",
+        help="Skip the package build step.",
+    )
+    release_gate.add_argument(
+        "--skip-cli-help",
+        action="store_true",
+        help="Skip CLI help snapshot checks.",
+    )
+    release_gate.add_argument(
+        "--skip-sample-transcript-export",
+        action="store_true",
+        help="Skip the sample transcript export check.",
+    )
+    release_gate.add_argument(
+        "--skip-benchmark-validation",
+        action="store_true",
+        help="Skip saved complex benchmark result validation.",
+    )
+    release_gate.add_argument(
+        "--benchmark-results",
+        help=(
+            "Saved complex_benchmark_results.json to validate. Defaults to "
+            "artifacts/experiments/complex_benchmark_suite/complex_benchmark_results.json."
+        ),
+    )
+    release_gate.add_argument("--json", action="store_true", help="Print JSON summary.")
 
     project_status = subparsers.add_parser(
         "project-status",

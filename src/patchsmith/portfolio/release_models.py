@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from patchsmith.portfolio.evaluation_summary_models import QualityGateCheck
+
 
 @dataclass(frozen=True)
 class ReleaseHygieneCheck:
@@ -38,6 +40,32 @@ class ReleaseHygieneReport:
             "passed_count": self.passed_count,
             "warning_count": self.warning_count,
             "blocked_count": self.blocked_count,
+            "checks": [check.to_dict() for check in self.checks],
+            "review_artifacts": self.review_artifacts,
+        }
+
+
+@dataclass(frozen=True)
+class ReleaseGateReport:
+    project_root: str
+    artifacts_dir: str
+    generated_at: str
+    release_status: str
+    passed_count: int
+    failed_count: int
+    skipped_count: int
+    checks: list[QualityGateCheck]
+    review_artifacts: list[str]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "project_root": self.project_root,
+            "artifacts_dir": self.artifacts_dir,
+            "generated_at": self.generated_at,
+            "release_status": self.release_status,
+            "passed_count": self.passed_count,
+            "failed_count": self.failed_count,
+            "skipped_count": self.skipped_count,
             "checks": [check.to_dict() for check in self.checks],
             "review_artifacts": self.review_artifacts,
         }
@@ -87,6 +115,7 @@ class LaunchBlockerReport:
 __all__ = [
     "LaunchBlockerItem",
     "LaunchBlockerReport",
+    "ReleaseGateReport",
     "ReleaseHygieneCheck",
     "ReleaseHygieneReport",
 ]

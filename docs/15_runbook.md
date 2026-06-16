@@ -674,6 +674,25 @@ PYTHONPATH=src python3 -m patchsmith.cli quality-gate \
 
 The quality gate runs local compile, whitespace, full pytest, and package-build checks, then writes a Markdown/JSON review artifact plus per-command stdout/stderr logs. Treat `failed` as a release stop and `passed_with_skips` as acceptable only for explicitly scoped local smoke checks, not final launch review.
 
+Release gate:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli release-gate \
+  --project-root . \
+  --artifacts-dir artifacts \
+  --output artifacts/experiments/release_gate.md \
+  --json-output artifacts/experiments/release_gate.json \
+  --logs-dir artifacts/experiments/release_gate_logs \
+  --json
+```
+
+The release gate layers product-release checks on top of local verification:
+full pytest, focused smoke tests, package build, top-level/agent/chat CLI help
+snapshots, a sample transcript export, and saved complex benchmark result
+validation when `complex_benchmark_results.json` is available. Treat skipped
+benchmark validation as a visible caveat unless the release claim does not
+depend on saved benchmark evidence.
+
 Release hygiene:
 
 ```bash

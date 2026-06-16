@@ -4,6 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from patchsmith.cli import main
+from patchsmith.portfolio import command_checks as command_checks_module
 from patchsmith.portfolio import quality_gate as quality_gate_module
 from patchsmith.portfolio import (
     write_quality_gate_report,
@@ -79,7 +80,7 @@ def test_quality_gate_package_build_uses_uv_provisioned_nonisolated_backend(
         calls.append(command)
         return SimpleNamespace(returncode=0, stdout="", stderr="")
 
-    monkeypatch.setattr(quality_gate_module.subprocess, "run", fake_run)
+    monkeypatch.setattr(command_checks_module.subprocess, "run", fake_run)
 
     report = quality_gate_module.build_quality_gate_report(
         project_root=Path(),

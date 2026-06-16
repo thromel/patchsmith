@@ -207,6 +207,24 @@ PYTHONPATH=src python3 -m patchsmith.cli quality-gate \
 
 Current quality-gate output is a required release review artifact. It records compileall, whitespace diff check, full pytest, package build, exit codes, durations, and per-command stdout/stderr logs.
 
+Run the product release gate:
+
+```bash
+PYTHONPATH=src python3 -m patchsmith.cli release-gate \
+  --project-root . \
+  --artifacts-dir artifacts \
+  --output artifacts/experiments/release_gate.md \
+  --json-output artifacts/experiments/release_gate.json \
+  --logs-dir artifacts/experiments/release_gate_logs \
+  --json
+```
+
+The release gate adds the product-hardening checks that sit above the local
+quality gate: focused smoke tests, CLI help snapshots, sample transcript export,
+and saved complex benchmark result validation. Use `passed` as release evidence;
+use `passed_with_skips` only when every skipped check is called out in the claim
+boundary.
+
 Generate the delivery audit:
 
 ```bash

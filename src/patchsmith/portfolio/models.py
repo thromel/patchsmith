@@ -33,6 +33,7 @@ from patchsmith.portfolio.readiness_models import (
 from patchsmith.portfolio.release_models import (
     LaunchBlockerItem,
     LaunchBlockerReport,
+    ReleaseGateReport,
     ReleaseHygieneCheck,
     ReleaseHygieneReport,
 )
@@ -76,6 +77,7 @@ __all__ = [
     "ProjectStatusSurface",
     "QualityGateCheck",
     "QualityGateReport",
+    "ReleaseGateReport",
     "ReleaseHygieneCheck",
     "ReleaseHygieneReport",
 ]

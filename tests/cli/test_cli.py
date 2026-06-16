@@ -63,6 +63,7 @@ EXPECTED_COMMANDS = {
     "mvp-progress",
     "delivery-audit",
     "quality-gate",
+    "release-gate",
     "project-status",
     "refresh-evidence",
 }
