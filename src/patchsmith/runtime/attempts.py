@@ -18,6 +18,11 @@ from patchsmith.runtime.trace_snapshot import build_runtime_trace_snapshot
 from patchsmith.sandbox import SandboxRunner
 from patchsmith.tracing import RunTrace
 
+# Wall-clock timeout for each sandboxed test command attempt.
+SANDBOX_ATTEMPT_TIMEOUT_SECONDS = 60
+# Default character budget for feedback text blocks embedded in retry prompts.
+FEEDBACK_TRUNCATION_LIMIT = 4_000
+
 
 def emit_agent_result_trace(
     *,
@@ -81,7 +86,7 @@ def run_sandbox_attempt(
     test_result = sandbox.run(
         command=command,
         workspace=repo_path,
-        timeout_seconds=60,
+        timeout_seconds=SANDBOX_ATTEMPT_TIMEOUT_SECONDS,
     )
     (logs_dir / "stdout.txt").write_text(test_result.stdout, encoding="utf-8")
     (logs_dir / "stderr.txt").write_text(test_result.stderr, encoding="utf-8")
@@ -1041,7 +1046,7 @@ def _record_paths(record: dict[str, object]) -> list[str]:
     return paths
 
 
-def _truncate_feedback(text: str, limit: int = 4_000) -> str:
+def _truncate_feedback(text: str, limit: int = FEEDBACK_TRUNCATION_LIMIT) -> str:
     if len(text) <= limit:
         return text
     return text[:limit] + "\n...[truncated]"

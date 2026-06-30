@@ -48,6 +48,10 @@ RETRY_CONTEXT_EXTRA_FILES = 3
 # Upper bound for the workspace `git diff` invocation so a hung git process
 # cannot stall a run indefinitely.
 WORKSPACE_DIFF_TIMEOUT_SECONDS = 120.0
+# Minimum remaining model responses/tokens required before attempting another
+# retry; below these, a retry is unlikely to complete within budget.
+RETRY_MIN_REMAINING_RESPONSES = 4
+RETRY_MIN_REMAINING_TOKENS = 100_000
 
 
 class RepairRunner:
@@ -585,12 +589,12 @@ def _retry_resource_budget_block(
     )
     if remaining_responses == 0:
         reasons.append("response_budget_exhausted")
-    elif remaining_responses is not None and remaining_responses <= 4:
+    elif remaining_responses is not None and remaining_responses <= RETRY_MIN_REMAINING_RESPONSES:
         reasons.append("response_budget_too_low_for_retry")
     remaining_tokens = _optional_nonnegative_int(resource_budget.get("remaining_model_tokens"))
     if remaining_tokens == 0:
         reasons.append("token_budget_exhausted")
-    elif remaining_tokens is not None and remaining_tokens <= 100_000:
+    elif remaining_tokens is not None and remaining_tokens <= RETRY_MIN_REMAINING_TOKENS:
         reasons.append("token_budget_too_low_for_retry")
     if not reasons:
         return None

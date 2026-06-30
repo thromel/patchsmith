@@ -11,6 +11,11 @@ from typing import Protocol
 from patchsmith.models import CommandResult
 from patchsmith.security import CommandPolicy
 
+# Default per-command wall-clock timeout for sandbox runners.
+DEFAULT_SANDBOX_TIMEOUT_SECONDS = 60
+# Maximum number of processes a Docker sandbox container may spawn.
+SANDBOX_PIDS_LIMIT = 256
+
 
 @dataclass(frozen=True)
 class DockerSandboxAvailability:
@@ -24,7 +29,13 @@ class DockerSandboxAvailability:
 
 
 class SandboxRunner(Protocol):
-    def run(self, *, command: str, workspace: Path, timeout_seconds: int = 60) -> CommandResult:
+    def run(
+        self,
+        *,
+        command: str,
+        workspace: Path,
+        timeout_seconds: int = DEFAULT_SANDBOX_TIMEOUT_SECONDS,
+    ) -> CommandResult:
         """Run a policy-checked command in a workspace."""
 
 
@@ -47,7 +58,13 @@ class LocalSandboxRunner:
     def __init__(self, policy: CommandPolicy | None = None) -> None:
         self.policy = policy or CommandPolicy()
 
-    def run(self, *, command: str, workspace: Path, timeout_seconds: int = 60) -> CommandResult:
+    def run(
+        self,
+        *,
+        command: str,
+        workspace: Path,
+        timeout_seconds: int = DEFAULT_SANDBOX_TIMEOUT_SECONDS,
+    ) -> CommandResult:
         workspace = workspace.resolve()
         decision = self.policy.evaluate(command, workspace=workspace)
         if not decision.allowed:
@@ -115,7 +132,13 @@ class DockerSandboxRunner:
         self.cpus = cpus
         self.memory = memory
 
-    def run(self, *, command: str, workspace: Path, timeout_seconds: int = 60) -> CommandResult:
+    def run(
+        self,
+        *,
+        command: str,
+        workspace: Path,
+        timeout_seconds: int = DEFAULT_SANDBOX_TIMEOUT_SECONDS,
+    ) -> CommandResult:
         workspace = workspace.resolve()
         decision = self.policy.evaluate(command, workspace=workspace)
         if not decision.allowed:
@@ -201,7 +224,7 @@ class DockerSandboxRunner:
             "--memory",
             self.memory,
             "--pids-limit",
-            "256",
+            str(SANDBOX_PIDS_LIMIT),
             "--cap-drop",
             "ALL",
             "--security-opt",
