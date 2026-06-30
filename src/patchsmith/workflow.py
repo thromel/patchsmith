@@ -79,6 +79,7 @@ class RepairRunner:
         )
 
         status = "completed"
+        workspace_restorer: WorkspaceRestorer | None = None
         try:
             started = time.perf_counter()
             snapshot = clone_or_copy_repository(
@@ -407,7 +408,6 @@ class RepairRunner:
                 output_summary=str(report_path),
                 payload={"report_path": str(report_path), "final_diff_path": str(final_diff_path)},
             )
-            workspace_restorer.cleanup()
         except Exception as error:
             status = "failed"
             trace.emit(
@@ -418,6 +418,11 @@ class RepairRunner:
                 output_summary=type(error).__name__,
             )
             raise
+        finally:
+            # Always restore the workspace baseline so a failed run does not
+            # leave the retry baseline copy behind on disk.
+            if workspace_restorer is not None:
+                workspace_restorer.cleanup()
 
         return RepairRunResult(
             run_id=run_id,
