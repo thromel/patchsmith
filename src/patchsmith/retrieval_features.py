@@ -3,10 +3,43 @@
 from __future__ import annotations
 
 import re
-from collections import Counter
+from collections import Counter, OrderedDict
 from pathlib import Path
 
 from patchsmith.models import RepositoryIndex, RetrievedContext
+
+# Bounded cache of file text keyed by (path, mtime_ns, size). Retrieval reads the
+# same repository files many times within and across attempts; caching avoids
+# repeated disk I/O while the mtime/size key invalidates entries when a file
+# changes (e.g. after an applied patch).
+_FILE_TEXT_CACHE_MAX_ENTRIES = 4096
+_FILE_TEXT_CACHE: OrderedDict[tuple[str, int, int], str] = OrderedDict()
+
+
+def cached_read_text(path: Path) -> str:
+    """Read text from ``path`` with a bounded, mtime-aware cache.
+
+    Returns an empty string when the file cannot be read.
+    """
+    try:
+        stat = path.stat()
+    except OSError:
+        return ""
+    key = (str(path), stat.st_mtime_ns, stat.st_size)
+    cached = _FILE_TEXT_CACHE.get(key)
+    if cached is not None:
+        _FILE_TEXT_CACHE.move_to_end(key)
+        return cached
+    try:
+        text = path.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return ""
+    _FILE_TEXT_CACHE[key] = text
+    _FILE_TEXT_CACHE.move_to_end(key)
+    while len(_FILE_TEXT_CACHE) > _FILE_TEXT_CACHE_MAX_ENTRIES:
+        _FILE_TEXT_CACHE.popitem(last=False)
+    return text
+
 
 TOKEN_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]+")
 PATH_RE = re.compile(r"(?<![A-Za-z0-9_./-])((?:src|lib|tests|test)/[A-Za-z0-9_./-]+\.py)")
@@ -129,12 +162,11 @@ def _token_counts(text: str) -> Counter[str]:
     )
 
 
-def _path_terms(path: str) -> set[str]:
-    return {
-        token.lower()
-        for token in re.split(r"[^A-Za-z0-9_]+|_", path)
-        if len(token) > 2 and token.lower() not in STOPWORDS
-    }
+def path_terms(path: str, *, drop_stopwords: bool = True) -> set[str]:
+    tokens = {token.lower() for token in re.split(r"[^A-Za-z0-9_]+|_", path) if len(token) > 2}
+    if drop_stopwords:
+        return {token for token in tokens if token not in STOPWORDS}
+    return tokens
 
 
 def _path_hints(issue_text: str) -> set[str]:
@@ -222,15 +254,16 @@ def _add_graph_score(
 
 
 def _graph_neighbor_boost(*, seed_context: RetrievedContext, neighbor_path: str) -> float:
-    if _is_test_path(seed_context.path) and not _is_test_path(neighbor_path):
+    if is_test_path(seed_context.path) and not is_test_path(neighbor_path):
         return seed_context.score + 30.0
-    if _is_test_path(neighbor_path):
+    if is_test_path(neighbor_path):
         return 4.0
     return 10.0
 
 
-def _repo_file_exists(repo_index: RepositoryIndex, path: str) -> bool:
-    return any(file.path == path for file in repo_index.files)
+def repo_file_path_set(repo_index: RepositoryIndex) -> set[str]:
+    """Return the set of indexed file paths for O(1) membership checks."""
+    return {file.path for file in repo_index.files}
 
 
 def _excerpt_terms(features: set[str]) -> list[str]:
@@ -255,10 +288,7 @@ def _symbols(text: str, language: str) -> set[str]:
 
 
 def _safe_read(path: Path) -> str:
-    try:
-        return path.read_text(encoding="utf-8", errors="ignore")
-    except OSError:
-        return ""
+    return cached_read_text(path)
 
 
 def _path_prior(path: str) -> float:
@@ -269,7 +299,7 @@ def _path_prior(path: str) -> float:
     return 0.0
 
 
-def _is_test_path(path: str) -> bool:
+def is_test_path(path: str) -> bool:
     return path.startswith(("tests/", "test/")) or "/test_" in path or path.endswith("_test.py")
 
 

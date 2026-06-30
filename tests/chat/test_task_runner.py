@@ -151,6 +151,66 @@ def test_run_chat_task_stops_when_model_preflight_fails(
     )
 
 
+def test_run_chat_task_caches_available_model_preflight(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    deepagents_dependency_available: None,
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    runtime = _runtime(tmp_path)
+    calls: list[str | None] = []
+
+    def available_model(config: AgentCliConfig) -> ModelPreflightResult:
+        calls.append(config.deepagents_model)
+        return ModelPreflightResult(
+            provider="openai_models",
+            model=config.deepagents_model or "gpt-test",
+            endpoint="https://api.openai.com/v1/models",
+            status="available",
+            available=True,
+        )
+
+    run_index = 0
+
+    class FakeRepairRunner:
+        def __init__(self, *, artifacts_dir: Path) -> None:
+            pass
+
+        def run(self, request):
+            nonlocal run_index
+            run_index += 1
+            run_dir = tmp_path / "artifacts" / "runs" / f"run-{run_index}"
+            run_dir.mkdir(parents=True)
+            final_diff_path = run_dir / "final.diff"
+            final_diff_path.write_text("", encoding="utf-8")
+            trace_path = run_dir / "trace.jsonl"
+            trace_path.write_text("", encoding="utf-8")
+            return SimpleNamespace(
+                run_id=f"run-{run_index}",
+                status="completed",
+                report_path=run_dir / "report.md",
+                trace_path=trace_path,
+                final_diff_path=final_diff_path,
+                test_result=SimpleNamespace(exit_code=0),
+                retrieved_context=[],
+                model_usage={},
+            )
+
+    for _ in range(2):
+        run_chat_task(
+            runtime=runtime,
+            task="fix parser",
+            output_stream=io.StringIO(),
+            runner_cls=FakeRepairRunner,
+            model_preflight_checker=available_model,
+            record=_record_to([]),
+            run_hooks=_hook_to([]),
+        )
+
+    assert calls == [None]
+    assert runtime.model_preflight_cache[""].available is True
+
+
 def _runtime(tmp_path: Path) -> AgentChatRuntime:
     artifacts = tmp_path / "artifacts"
     transcript_path = artifacts / "chat_sessions" / "test.jsonl"

@@ -28,6 +28,9 @@ IGNORED_DIRS = {
 }
 IGNORED_FILES = {".DS_Store"}
 MAX_INDEXED_FILE_BYTES = 256_000
+# Network clone/checkout can be slow; local metadata queries should be quick.
+GIT_CLONE_TIMEOUT_SECONDS = 600.0
+GIT_QUERY_TIMEOUT_SECONDS = 120.0
 
 LANGUAGE_BY_EXTENSION = {
     ".py": "Python",
@@ -72,7 +75,13 @@ def clone_or_copy_repository(
         if not commit:
             command.extend(["--depth", "1"])
         command.extend([repo, str(target_dir)])
-        subprocess.run(command, check=True, capture_output=True, text=True)
+        subprocess.run(
+            command,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=GIT_CLONE_TIMEOUT_SECONDS,
+        )
         if commit:
             subprocess.run(
                 ["git", "checkout", commit],
@@ -80,6 +89,7 @@ def clone_or_copy_repository(
                 check=True,
                 capture_output=True,
                 text=True,
+                timeout=GIT_CLONE_TIMEOUT_SECONDS,
             )
         commit_hash = _resolve_git_commit(target_dir) or _content_hash(target_dir)
         branch_name = branch or _resolve_git_branch(target_dir)
@@ -206,8 +216,9 @@ def _resolve_git_commit(repo_path: Path) -> str | None:
             check=True,
             capture_output=True,
             text=True,
+            timeout=GIT_QUERY_TIMEOUT_SECONDS,
         )
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
         return None
     return result.stdout.strip()
 
@@ -222,8 +233,9 @@ def _resolve_git_branch(repo_path: Path) -> str | None:
             check=True,
             capture_output=True,
             text=True,
+            timeout=GIT_QUERY_TIMEOUT_SECONDS,
         )
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
         return None
     return result.stdout.strip() or None
 

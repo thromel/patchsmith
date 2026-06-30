@@ -68,8 +68,9 @@ def instruction_update_payload(config: AgentCliConfig) -> dict[str, object]:
         "load_agent_instructions": config.load_agent_instructions,
         "instruction_paths": list(config.instruction_paths),
         "agent_instruction_files": list(config.agent_instruction_files),
+        # Full instruction text is deliberately omitted from transcripts; it is
+        # reloaded from disk on resume. See ``rehydrate_config_instructions``.
         "agent_instruction_chars": len(config.agent_instructions or ""),
-        "agent_instructions": config.agent_instructions,
     }
 
 

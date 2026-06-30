@@ -181,7 +181,16 @@ def _run_model_preflight(
     model_preflight_checker: ModelPreflightChecker,
     record: ChatEventRecorder,
 ) -> bool:
-    result = model_preflight_checker(runtime.state.config)
+    cache_key = runtime.state.config.deepagents_model or ""
+    cached = runtime.model_preflight_cache.get(cache_key)
+    if cached is not None:
+        result = cached
+    else:
+        result = model_preflight_checker(runtime.state.config)
+        # Only cache successful availability results so that transient errors
+        # (network/auth) are retried on the next task.
+        if result.available:
+            runtime.model_preflight_cache[cache_key] = result
     payload = result.to_dict()
     record(runtime, "model_preflight", payload)
     if result.available:

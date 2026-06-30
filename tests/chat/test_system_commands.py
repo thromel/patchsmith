@@ -45,6 +45,28 @@ def test_help_command_renders_chat_help(tmp_path: Path) -> None:
     assert "Project instructions are loaded from AGENTS.md/CLAUDE.md-style files.\n" in text
 
 
+def test_help_documents_every_registered_command(tmp_path: Path) -> None:
+    from patchsmith.chat.registry import chat_commands
+
+    runtime = _runtime(tmp_path)
+    output = io.StringIO()
+    build_command_registry(system_commands())["help"].handler(
+        runtime=runtime,
+        argument="",
+        output_stream=output,
+        context=ChatCommandContext(record=_noop_record),
+    )
+    help_text = output.getvalue()
+
+    # The command registry is the source of truth for which slash commands
+    # exist; every primary command must be documented in /help so the two
+    # cannot drift (aliases may be omitted).
+    missing = sorted(
+        command.name for command in chat_commands() if f"/{command.name}" not in help_text
+    )
+    assert missing == []
+
+
 def test_doctor_command_records_diagnostic_payload(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

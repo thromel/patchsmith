@@ -5,6 +5,7 @@ from typing import Any
 
 from patchsmith.models import CommandResult
 from patchsmith.patch_effects import diff_changes_only_python_imports
+from patchsmith.runtime.trace_snapshot import build_runtime_trace_snapshot
 
 FAILURE_MARKERS = (
     "assertionerror",
@@ -14,6 +15,19 @@ FAILURE_MARKERS = (
     "typeerror",
     "valueerror",
     "no such file or directory",
+)
+
+# Compiled once at import time; these run over every sandbox stdout/stderr line.
+_MEMBERSHIP_ASSERTION_PATTERNS = (
+    re.compile(r"assert\s+\((['\"])(?P<missing>.+?)\1\s+in\s+(['\"])(?P<observed>.+?)\3\)"),
+    re.compile(r"assert\s+(['\"])(?P<missing>.+?)\1\s+in\s+(['\"])(?P<observed>.+?)\3"),
+)
+_EXCEPTION_NAME_PATTERN = re.compile(r"\b([A-Za-z_][A-Za-z0-9_]*(?:Error|Exception)):")
+_ASSERTION_COMPARISON_PATTERNS = (
+    re.compile(
+        r"AssertionError:\s+assert\s+(['\"])(?P<actual>.+?)\1\s+==\s+(['\"])(?P<expected>.+?)\3"
+    ),
+    re.compile(r"assert\s+(['\"])(?P<actual>.+?)\1\s+==\s+(['\"])(?P<expected>.+?)\3"),
 )
 
 
@@ -131,13 +145,14 @@ def failure_localization_summary(test_result: CommandResult | None) -> str:
 
 
 def patch_plan_feedback_summary(runtime_trace: list[dict[str, Any]]) -> str:
-    diagnostics = _latest_patch_plan_diagnostics(runtime_trace)
-    patch_quality = _latest_patch_quality_assessment(runtime_trace)
-    no_op_patch_violation = _latest_no_op_patch_violation(runtime_trace)
-    target_history_violation = _latest_target_history_violation(runtime_trace)
-    target_selection_violation = _latest_target_selection_violation(runtime_trace)
-    target_symbol_violation = _latest_target_symbol_violation(runtime_trace)
-    safety_rejection = safety_gate_rejection_summary(runtime_trace)
+    snapshot = build_runtime_trace_snapshot(runtime_trace)
+    diagnostics = snapshot.patch_plan
+    patch_quality = snapshot.quality
+    no_op_patch_violation = snapshot.no_op_patch_violation
+    target_history_violation = snapshot.target_history_violation
+    target_selection_violation = snapshot.target_selection_violation
+    target_symbol_violation = snapshot.target_symbol_violation
+    safety_rejection = safety_gate_rejection_text(snapshot.safety_gate_rejection)
     if (
         not diagnostics
         and patch_quality is None
@@ -189,7 +204,11 @@ def patch_plan_feedback_summary(runtime_trace: list[dict[str, Any]]) -> str:
 
 
 def safety_gate_rejection_summary(runtime_trace: list[dict[str, Any]]) -> str:
-    rejection = _latest_safety_gate_rejection(runtime_trace)
+    snapshot = build_runtime_trace_snapshot(runtime_trace)
+    return safety_gate_rejection_text(snapshot.safety_gate_rejection)
+
+
+def safety_gate_rejection_text(rejection: dict[str, Any] | None) -> str:
     if rejection is None:
         return ""
     summary = _clean_feedback_value(rejection.get("summary", ""))
@@ -220,18 +239,6 @@ def safety_gate_rejection_summary(runtime_trace: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def _latest_safety_gate_rejection(
-    runtime_trace: list[dict[str, Any]],
-) -> dict[str, Any] | None:
-    for event in reversed(runtime_trace):
-        if event.get("node") != "edit" or event.get("status") != "failed":
-            continue
-        summary = event.get("summary")
-        if isinstance(summary, str) and summary.strip():
-            return event
-    return None
-
-
 def _unbound_names_from_safety_summary(summary: str) -> list[str]:
     if "unbound" not in summary.lower():
         return []
@@ -254,26 +261,6 @@ def _looks_like_incomplete_python_span_rejection(summary: str) -> bool:
     )
 
 
-def _latest_patch_plan_diagnostics(
-    runtime_trace: list[dict[str, Any]],
-) -> dict[str, Any] | None:
-    for event in reversed(runtime_trace):
-        diagnostics = event.get("patch_plan")
-        if isinstance(diagnostics, dict):
-            return diagnostics
-    return None
-
-
-def _latest_patch_quality_assessment(
-    runtime_trace: list[dict[str, Any]],
-) -> dict[str, Any] | None:
-    for event in reversed(runtime_trace):
-        quality = event.get("quality")
-        if isinstance(quality, dict):
-            return quality
-    return None
-
-
 def _patch_quality_lines(quality: dict[str, Any]) -> list[str]:
     lines = [f"- Patch quality risk: {_clean_feedback_value(quality.get('severity', 'unknown'))}"]
     findings = quality.get("findings")
@@ -286,58 +273,6 @@ def _patch_quality_lines(quality: dict[str, Any]) -> list[str]:
             message = _clean_feedback_value(finding.get("message", ""))
             lines.append(f"- Quality finding: {severity} {code} - {message}")
     return lines
-
-
-def _latest_target_history_violation(
-    runtime_trace: list[dict[str, Any]],
-) -> dict[str, Any] | None:
-    for event in reversed(runtime_trace):
-        metadata = event.get("metadata")
-        if not isinstance(metadata, dict):
-            continue
-        violation = metadata.get("target_history_violation")
-        if isinstance(violation, dict):
-            return violation
-    return None
-
-
-def _latest_no_op_patch_violation(
-    runtime_trace: list[dict[str, Any]],
-) -> dict[str, Any] | None:
-    for event in reversed(runtime_trace):
-        metadata = event.get("metadata")
-        if not isinstance(metadata, dict):
-            continue
-        violation = metadata.get("no_op_patch_violation")
-        if isinstance(violation, dict):
-            return violation
-    return None
-
-
-def _latest_target_selection_violation(
-    runtime_trace: list[dict[str, Any]],
-) -> dict[str, Any] | None:
-    for event in reversed(runtime_trace):
-        metadata = event.get("metadata")
-        if not isinstance(metadata, dict):
-            continue
-        violation = metadata.get("target_selection_violation")
-        if isinstance(violation, dict):
-            return violation
-    return None
-
-
-def _latest_target_symbol_violation(
-    runtime_trace: list[dict[str, Any]],
-) -> dict[str, Any] | None:
-    for event in reversed(runtime_trace):
-        metadata = event.get("metadata")
-        if not isinstance(metadata, dict):
-            continue
-        violation = metadata.get("target_symbol_violation")
-        if isinstance(violation, dict):
-            return violation
-    return None
 
 
 def _no_op_patch_violation_lines(violation: dict[str, Any]) -> list[str]:
@@ -504,13 +439,9 @@ def _failure_signals(text: str, *, limit: int = 8) -> list[str]:
 
 
 def _membership_assertion_values(text: str) -> list[tuple[str, str]]:
-    patterns = [
-        re.compile(r"assert\s+\((['\"])(?P<missing>.+?)\1\s+in\s+(['\"])(?P<observed>.+?)\3\)"),
-        re.compile(r"assert\s+(['\"])(?P<missing>.+?)\1\s+in\s+(['\"])(?P<observed>.+?)\3"),
-    ]
     matches: list[tuple[str, str]] = []
     for raw_line in text.splitlines():
-        for pattern in patterns:
+        for pattern in _MEMBERSHIP_ASSERTION_PATTERNS:
             match = pattern.search(raw_line)
             if match:
                 matches.append((match.group("missing"), match.group("observed")))
@@ -520,21 +451,15 @@ def _membership_assertion_values(text: str) -> list[tuple[str, str]]:
 
 def _first_exception(text: str) -> str:
     for raw_line in text.splitlines():
-        match = re.search(r"\b([A-Za-z_][A-Za-z0-9_]*(?:Error|Exception)):", raw_line)
+        match = _EXCEPTION_NAME_PATTERN.search(raw_line)
         if match:
             return match.group(1)
     return ""
 
 
 def _assertion_comparison(text: str) -> tuple[str, str] | None:
-    patterns = [
-        re.compile(
-            r"AssertionError:\s+assert\s+(['\"])(?P<actual>.+?)\1\s+==\s+(['\"])(?P<expected>.+?)\3"
-        ),
-        re.compile(r"assert\s+(['\"])(?P<actual>.+?)\1\s+==\s+(['\"])(?P<expected>.+?)\3"),
-    ]
     for raw_line in text.splitlines():
-        for pattern in patterns:
+        for pattern in _ASSERTION_COMPARISON_PATTERNS:
             match = pattern.search(raw_line)
             if match:
                 return match.group("actual"), match.group("expected")

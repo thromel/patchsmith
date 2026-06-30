@@ -2,8 +2,45 @@
 
 from __future__ import annotations
 
+import argparse
+import json
+from pathlib import Path
+from typing import Any, Protocol
+
 from patchsmith.agent_apply import AgentApplyResult
 from patchsmith.models import RepairRunResult
+
+
+class SummaryProtocol(Protocol):
+    """Any evaluation summary that can be serialized for CLI JSON output."""
+
+    def to_dict(self) -> dict[str, Any]: ...
+
+
+def emit_summary(
+    *,
+    args: argparse.Namespace,
+    result_count: int,
+    report_filename: str,
+    summary: SummaryProtocol,
+    text: str,
+) -> None:
+    """Print either a JSON envelope or a human-readable report for a summary."""
+    report_path = Path(args.output) / report_filename
+    if args.json:
+        print(
+            json.dumps(
+                {
+                    "result_count": result_count,
+                    "report_path": str(report_path),
+                    "summary": summary.to_dict(),
+                },
+                indent=2,
+            )
+        )
+        return
+    print(f"Report: {report_path}")
+    print(text)
 
 
 def print_run_result(

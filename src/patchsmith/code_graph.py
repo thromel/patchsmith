@@ -8,8 +8,14 @@ from pathlib import Path
 from typing import Any
 
 from patchsmith.models import RepositoryIndex
+from patchsmith.retrieval_features import cached_read_text, is_test_path, path_terms
 
 TOKEN_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]+")
+
+# Memoize the most recently built graph per repo path. The fingerprint over the
+# Python files' (path, mtime, size) invalidates the cache when sources change,
+# so retries that modify the workspace rebuild correctly.
+_GRAPH_CACHE: dict[str, tuple[tuple[tuple[str, int, int], ...], CodeContextGraph]] = {}
 
 
 @dataclass(frozen=True)
@@ -56,6 +62,34 @@ class CodeContextGraph:
 
 
 def build_code_context_graph(*, repo_path: Path, repo_index: RepositoryIndex) -> CodeContextGraph:
+    fingerprint = _repo_python_fingerprint(repo_path, repo_index)
+    cache_key = str(repo_path)
+    cached = _GRAPH_CACHE.get(cache_key)
+    if cached is not None and cached[0] == fingerprint:
+        return cached[1]
+    graph = _build_code_context_graph(repo_path=repo_path, repo_index=repo_index)
+    _GRAPH_CACHE[cache_key] = (fingerprint, graph)
+    return graph
+
+
+def _repo_python_fingerprint(
+    repo_path: Path, repo_index: RepositoryIndex
+) -> tuple[tuple[str, int, int], ...]:
+    entries: list[tuple[str, int, int]] = []
+    for file in repo_index.files:
+        if file.language != "Python":
+            continue
+        try:
+            stat = (repo_path / file.path).stat()
+        except OSError:
+            entries.append((file.path, -1, -1))
+            continue
+        entries.append((file.path, stat.st_mtime_ns, stat.st_size))
+    entries.sort()
+    return tuple(entries)
+
+
+def _build_code_context_graph(*, repo_path: Path, repo_index: RepositoryIndex) -> CodeContextGraph:
     module_to_path = {
         module: file.path
         for file in repo_index.files
@@ -77,8 +111,8 @@ def build_code_context_graph(*, repo_path: Path, repo_index: RepositoryIndex) ->
             name=file.path,
             path=file.path,
         )
-        text = _safe_read(repo_path / file.path)
-        terms = set(_path_terms(file.path))
+        text = cached_read_text(repo_path / file.path)
+        terms = set(path_terms(file.path, drop_stopwords=False))
 
         parsed = _parse_python(text)
         symbols = _symbols_from_ast(parsed) if parsed else _symbols_from_text(text)
@@ -101,7 +135,7 @@ def build_code_context_graph(*, repo_path: Path, repo_index: RepositoryIndex) ->
                 edges.append(CodeGraphEdge(file_node, target_node, "imports"))
                 related_paths[file.path].add(target_path)
                 related_paths[target_path].add(file.path)
-                if _is_test_path(file.path) and not _is_test_path(target_path):
+                if is_test_path(file.path) and not is_test_path(target_path):
                     edges.append(CodeGraphEdge(file_node, target_node, "tests"))
                     edges.append(CodeGraphEdge(target_node, file_node, "covered_by"))
             else:
@@ -134,11 +168,11 @@ def _add_test_basename_edges(
     sources = [
         file.path
         for file in repo_index.files
-        if file.language == "Python" and not _is_test_path(file.path)
+        if file.language == "Python" and not is_test_path(file.path)
     ]
     source_by_stem = {Path(path).stem: path for path in sources}
     for file in repo_index.files:
-        if file.language != "Python" or not _is_test_path(file.path):
+        if file.language != "Python" or not is_test_path(file.path):
             continue
         stem = Path(file.path).stem
         source_stem = stem.removeprefix("test_").removesuffix("_test")
@@ -216,23 +250,8 @@ def _imports_from_text(text: str) -> set[str]:
     return modules
 
 
-def _path_terms(path: str) -> set[str]:
-    return {token.lower() for token in re.split(r"[^A-Za-z0-9_]+|_", path) if len(token) > 2}
-
-
 def _name_terms(name: str) -> set[str]:
     terms: set[str] = set()
     for raw_token in TOKEN_RE.findall(name.replace(".", "_")):
         terms.update(part.lower() for part in raw_token.split("_") if len(part) > 2)
     return terms
-
-
-def _safe_read(path: Path) -> str:
-    try:
-        return path.read_text(encoding="utf-8", errors="ignore")
-    except OSError:
-        return ""
-
-
-def _is_test_path(path: str) -> bool:
-    return path.startswith(("tests/", "test/")) or "/test_" in path or path.endswith("_test.py")

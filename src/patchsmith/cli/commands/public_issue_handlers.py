@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import argparse
-import json
 from pathlib import Path
-from typing import Any, Protocol
 
 from patchsmith.cli._types import CommandHandler
+from patchsmith.cli.result_output import emit_summary
 from patchsmith.evaluation import (
     check_public_issue_repair_readiness,
     discover_public_issue_failure_signals,
@@ -16,10 +15,6 @@ from patchsmith.evaluation import (
     plan_public_issue_reproductions,
     validate_public_issue_reproduction_specs,
 )
-
-
-class _Summary(Protocol):
-    def to_dict(self) -> dict[str, Any]: ...
 
 
 def public_issue_command_handlers() -> dict[str, CommandHandler]:
@@ -42,7 +37,7 @@ def _plan_public_issue_reproductions_command(args: argparse.Namespace) -> int:
         reproduction_specs_path=reproduction_specs,
         output_dir=Path(args.output),
     )
-    _emit_summary(
+    emit_summary(
         args=args,
         result_count=len(results),
         report_filename="public_issue_reproduction_plan_report.md",
@@ -63,7 +58,7 @@ def _validate_public_issue_reproduction_specs_command(args: argparse.Namespace) 
         focused_plan_path=focused_plan,
         output_dir=Path(args.output),
     )
-    _emit_summary(
+    emit_summary(
         args=args,
         result_count=len(results),
         report_filename="public_issue_reproduction_spec_validation_report.md",
@@ -88,7 +83,7 @@ def _discover_public_issue_failure_signals_command(args: argparse.Namespace) -> 
         max_tasks=max_tasks,
         dry_run=not args.execute,
     )
-    _emit_summary(
+    emit_summary(
         args=args,
         result_count=len(results),
         report_filename="public_issue_failure_signal_discovery_report.md",
@@ -114,7 +109,7 @@ def _execute_public_issue_reproductions_command(args: argparse.Namespace) -> int
         max_tasks=max_tasks,
         dry_run=not args.execute,
     )
-    _emit_summary(
+    emit_summary(
         args=args,
         result_count=len(results),
         report_filename="public_issue_reproduction_execution_report.md",
@@ -137,7 +132,7 @@ def _check_public_issue_repair_readiness_command(args: argparse.Namespace) -> in
         output_dir=Path(args.output),
         tasks_dir=tasks_dir,
     )
-    _emit_summary(
+    emit_summary(
         args=args,
         result_count=len(results),
         report_filename="public_issue_repair_readiness_report.md",
@@ -185,7 +180,7 @@ def _execute_public_issue_repairs_command(args: argparse.Namespace) -> int:
         max_actual_model_tokens=args.max_actual_model_tokens,
         deepagents_subagent_mode=args.deepagents_subagents,
     )
-    _emit_summary(
+    emit_summary(
         args=args,
         result_count=len(results),
         report_filename="public_issue_repair_attempt_report.md",
@@ -197,31 +192,6 @@ def _execute_public_issue_repairs_command(args: argparse.Namespace) -> int:
         ),
     )
     return 0
-
-
-def _emit_summary(
-    *,
-    args: argparse.Namespace,
-    result_count: int,
-    report_filename: str,
-    summary: _Summary,
-    text: str,
-) -> None:
-    report_path = Path(args.output) / report_filename
-    if args.json:
-        print(
-            json.dumps(
-                {
-                    "result_count": result_count,
-                    "report_path": str(report_path),
-                    "summary": summary.to_dict(),
-                },
-                indent=2,
-            )
-        )
-        return
-    print(f"Report: {report_path}")
-    print(text)
 
 
 __all__ = ["public_issue_command_handlers"]

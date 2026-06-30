@@ -15,6 +15,46 @@ from patchsmith.session.store import append_transcript_event
 pytestmark = pytest.mark.unit
 
 
+def test_runtime_from_transcript_rehydrates_instructions_from_disk(
+    tmp_path: Path,
+) -> None:
+    artifacts = tmp_path / "artifacts"
+    transcript_path = artifacts / "chat_sessions" / "rehydrate-session.jsonl"
+    (tmp_path / "AGENTS.md").write_text(
+        "## Repository expectations\n- Keep parser fixes minimal.\n",
+        encoding="utf-8",
+    )
+    config = AgentCliConfig(
+        repo=str(tmp_path),
+        artifacts_dir=str(artifacts),
+        load_agent_instructions=True,
+    )
+
+    persisted = config_payload(config)
+    # The transcript must not carry the full instruction text, only metadata.
+    assert "agent_instructions" not in persisted
+    append_transcript_event(
+        transcript_path,
+        session_id="rehydrate-session",
+        event="session_start",
+        payload={"config": persisted},
+    )
+
+    # Resume with a bare fallback config that has not loaded instructions.
+    fallback = AgentCliConfig(repo=str(tmp_path), artifacts_dir=str(artifacts))
+    runtime = runtime_from_transcript(
+        state=AgentChatState(
+            session_id="rehydrate-session",
+            transcript_path=transcript_path,
+            config=fallback,
+        ),
+        fallback_config=fallback,
+    )
+
+    assert runtime is not None
+    assert "Keep parser fixes minimal." in (runtime.state.config.agent_instructions or "")
+
+
 def test_runtime_from_transcript_returns_none_for_missing_transcript(
     tmp_path: Path,
 ) -> None:

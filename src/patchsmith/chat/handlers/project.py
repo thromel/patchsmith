@@ -228,7 +228,7 @@ def _agent_profile_update_payload(config: AgentCliConfig) -> dict[str, object]:
         "agent_profile": config.agent_profile,
         "agent_profile_path": config.agent_profile_path,
         "agent_profile_description": config.agent_profile_description,
-        "agent_profile_instructions": config.agent_profile_instructions,
+        # Profile text omitted from transcripts; reloaded from disk on resume.
         "agent_profile_instruction_chars": len(config.agent_profile_instructions or ""),
         "deepagents_model": config.deepagents_model,
         "deepagents_subagents": config.deepagents_subagents,

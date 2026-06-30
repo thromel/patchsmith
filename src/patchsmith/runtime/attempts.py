@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-from pathlib import Path
 
 from patchsmith.analysis import RepairOutcomeAnalysis
 from patchsmith.models import CommandResult, RunRequest
@@ -10,102 +9,28 @@ from patchsmith.runtime.feedback import (
     assertion_progress_summary,
     patch_plan_feedback_summary,
     safety_gate_rejection_summary,
+    safety_gate_rejection_text,
     sandbox_failure_signature,
     sandbox_feedback_summary,
 )
-from patchsmith.sandbox import SandboxRunner
-from patchsmith.tracing import RunTrace
+from patchsmith.runtime.sandbox_attempt import (
+    SANDBOX_ATTEMPT_TIMEOUT_SECONDS as SANDBOX_ATTEMPT_TIMEOUT_SECONDS,
+)
+from patchsmith.runtime.sandbox_attempt import (
+    emit_agent_result_trace as emit_agent_result_trace,
+)
+from patchsmith.runtime.sandbox_attempt import (
+    run_sandbox_attempt as run_sandbox_attempt,
+)
+from patchsmith.runtime.trace_snapshot import build_runtime_trace_snapshot
 
+# ``SANDBOX_ATTEMPT_TIMEOUT_SECONDS``, ``emit_agent_result_trace``, and
+# ``run_sandbox_attempt`` are imported above purely to preserve the historical
+# ``patchsmith.runtime.attempts`` import surface; their implementation now lives
+# in :mod:`patchsmith.runtime.sandbox_attempt`.
 
-def emit_agent_result_trace(
-    *,
-    trace: RunTrace,
-    request: RunRequest,
-    agent_result: AgentResult,
-    attempt: int,
-) -> None:
-    trace.emit(
-        node_name="runtime",
-        event_type="agent_result",
-        status=agent_result.status,
-        output_summary=agent_result.summary,
-        payload={
-            "runtime": request.runtime,
-            "planner": request.planner,
-            "attempt": attempt,
-            "patch_candidates": [
-                candidate.to_dict() for candidate in agent_result.patch_candidates
-            ],
-        },
-    )
-    for runtime_event in agent_result.runtime_trace:
-        trace.emit(
-            node_name=f"runtime.{runtime_event.get('node', 'unknown')}",
-            event_type="runtime_node",
-            status=str(runtime_event.get("status", "completed")),
-            output_summary=str(runtime_event.get("summary", "")),
-            payload={
-                "runtime": request.runtime,
-                "planner": request.planner,
-                "workflow_attempt": attempt,
-                **runtime_event,
-            },
-        )
-
-
-def run_sandbox_attempt(
-    *,
-    command: str | None,
-    sandbox: SandboxRunner,
-    repo_path: Path,
-    logs_dir: Path,
-    trace: RunTrace,
-    request: RunRequest,
-    attempt: int,
-) -> CommandResult | None:
-    if not command:
-        trace.emit(
-            node_name="test",
-            event_type="sandbox_command",
-            status="skipped",
-            output_summary="no test command supplied or detected",
-            payload={
-                "attempt": attempt,
-                "sandbox_mode": request.sandbox_mode,
-            },
-        )
-        return None
-
-    test_result = sandbox.run(
-        command=command,
-        workspace=repo_path,
-        timeout_seconds=60,
-    )
-    (logs_dir / "stdout.txt").write_text(test_result.stdout, encoding="utf-8")
-    (logs_dir / "stderr.txt").write_text(test_result.stderr, encoding="utf-8")
-    (logs_dir / f"stdout_attempt_{attempt}.txt").write_text(
-        test_result.stdout,
-        encoding="utf-8",
-    )
-    (logs_dir / f"stderr_attempt_{attempt}.txt").write_text(
-        test_result.stderr,
-        encoding="utf-8",
-    )
-    trace.emit(
-        node_name="test",
-        event_type="sandbox_command",
-        status="completed" if test_result.exit_code == 0 else "failed",
-        input_summary=command,
-        output_summary=f"exit_code={test_result.exit_code}",
-        payload={
-            **test_result.to_dict(),
-            "attempt": attempt,
-            "sandbox_mode": request.sandbox_mode,
-            "sandbox_image": request.sandbox_image if request.sandbox_mode == "docker" else None,
-        },
-        latency_ms=test_result.duration_ms,
-    )
-    return test_result
+# Default character budget for feedback text blocks embedded in retry prompts.
+FEEDBACK_TRUNCATION_LIMIT = 4_000
 
 
 def test_feedback_retry_budget(request: RunRequest) -> int:
@@ -447,7 +372,8 @@ def feedback_attempt_record(
         test_result=test_result,
         final_diff=final_diff,
     )
-    patch_target = _latest_patch_target(runtime_trace or [])
+    snapshot = build_runtime_trace_snapshot(runtime_trace)
+    patch_target = snapshot.patch_target
     history_for_class = list(attempt_history or [])
     if patch_target:
         history_for_class.append({"patch_target": patch_target})
@@ -460,10 +386,10 @@ def feedback_attempt_record(
         "changed_files": _diff_changed_files(final_diff),
         "failure_signature": sandbox_failure_signature(test_result),
         "patch_target": patch_target,
-        "patch_old_sha256_12": _latest_patch_old_hash(runtime_trace or []),
-        "patch_quality_severity": _latest_patch_quality_severity(runtime_trace or []),
-        "patch_quality_findings": _latest_patch_quality_finding_codes(runtime_trace or []),
-        "safety_gate_rejection": safety_gate_rejection_summary(runtime_trace or []),
+        "patch_old_sha256_12": snapshot.patch_old_hash,
+        "patch_quality_severity": snapshot.patch_quality_severity,
+        "patch_quality_findings": snapshot.patch_quality_finding_codes,
+        "safety_gate_rejection": safety_gate_rejection_text(snapshot.safety_gate_rejection),
         "failure_class": retry_failure_class(
             agent_status=agent_status,
             test_result=test_result,
@@ -473,7 +399,7 @@ def feedback_attempt_record(
             attempt_history=history_for_class,
         ),
     }
-    mounted_paths = _latest_mounted_context_paths(runtime_trace or [])
+    mounted_paths = snapshot.mounted_context_paths
     if mounted_paths:
         record["mounted_context_paths"] = mounted_paths
     if assertion_progress:
@@ -541,21 +467,40 @@ def attempt_history_summary(history: list[dict[str, object]]) -> str:
 
 
 def ineffective_target_paths(history: list[dict[str, object]]) -> list[str]:
+    """Return paths to deprioritize because the same failure signature recurred.
+
+    When a failure signature is seen more than once, every path touched under
+    that signature (previously and now) is considered ineffective. Order is
+    preserved while membership tests use sets to stay linear in the history
+    size.
+    """
     paths: list[str] = []
+    paths_seen: set[str] = set()
     paths_by_signature: dict[str, list[str]] = {}
+    seen_by_signature: dict[str, set[str]] = {}
+
+    def _mark_ineffective(candidate: str) -> None:
+        if candidate not in paths_seen:
+            paths_seen.add(candidate)
+            paths.append(candidate)
+
     for record in history:
         signature = str(record.get("failure_signature", ""))
         if not signature:
             continue
         record_paths = _record_paths(record)
         if signature in paths_by_signature:
-            for path in [*paths_by_signature[signature], *record_paths]:
-                if path not in paths:
-                    paths.append(path)
+            for path in paths_by_signature[signature]:
+                _mark_ineffective(path)
+            for path in record_paths:
+                _mark_ineffective(path)
         else:
             paths_by_signature[signature] = []
+            seen_by_signature[signature] = set()
+        signature_seen = seen_by_signature[signature]
         for path in record_paths:
-            if path not in paths_by_signature[signature]:
+            if path not in signature_seen:
+                signature_seen.add(path)
                 paths_by_signature[signature].append(path)
     return paths
 
@@ -948,32 +893,15 @@ def _failed_naked_import_cache_invalidation_guidance(
 
 
 def _latest_patch_quality_severity(runtime_trace: list[dict[str, object]]) -> str:
-    quality = _latest_patch_quality(runtime_trace)
-    severity = quality.get("severity")
-    return str(severity) if severity else ""
+    return build_runtime_trace_snapshot(runtime_trace).patch_quality_severity
 
 
 def _latest_patch_quality_finding_codes(runtime_trace: list[dict[str, object]]) -> list[str]:
-    quality = _latest_patch_quality(runtime_trace)
-    findings = quality.get("findings")
-    if not isinstance(findings, list):
-        return []
-    codes: list[str] = []
-    for finding in findings:
-        if not isinstance(finding, dict):
-            continue
-        code = finding.get("code")
-        if isinstance(code, str) and code and code not in codes:
-            codes.append(code)
-    return codes
+    return build_runtime_trace_snapshot(runtime_trace).patch_quality_finding_codes
 
 
 def _latest_patch_quality(runtime_trace: list[dict[str, object]]) -> dict[str, object]:
-    for event in reversed(runtime_trace):
-        quality = event.get("quality")
-        if isinstance(quality, dict):
-            return quality
-    return {}
+    return build_runtime_trace_snapshot(runtime_trace).quality or {}
 
 
 def _diff_changed_files(diff: str) -> list[str]:
@@ -991,73 +919,19 @@ def _diff_changed_files(diff: str) -> list[str]:
 
 
 def _latest_patch_target(runtime_trace: list[dict[str, object]]) -> str:
-    for event in reversed(runtime_trace):
-        patch_plan = event.get("patch_plan")
-        if isinstance(patch_plan, dict):
-            path = patch_plan.get("path")
-            if path:
-                return str(path)
-        metadata = event.get("metadata")
-        if isinstance(metadata, dict):
-            for key in ("target_history_violation", "target_selection_violation"):
-                violation = metadata.get(key)
-                if isinstance(violation, dict):
-                    path = violation.get("path")
-                    if path:
-                        return str(path)
-    return ""
+    return build_runtime_trace_snapshot(runtime_trace).patch_target
 
 
 def _latest_patch_old_hash(runtime_trace: list[dict[str, object]]) -> str:
-    for event in reversed(runtime_trace):
-        patch_plan = event.get("patch_plan")
-        if not isinstance(patch_plan, dict):
-            continue
-        old = patch_plan.get("old")
-        if not isinstance(old, dict):
-            continue
-        old_hash = old.get("sha256_12")
-        if old_hash:
-            return str(old_hash)
-    return ""
+    return build_runtime_trace_snapshot(runtime_trace).patch_old_hash
 
 
 def _latest_mounted_context_paths(runtime_trace: list[dict[str, object]]) -> list[str]:
-    for event in reversed(runtime_trace):
-        metadata = event.get("metadata")
-        if not isinstance(metadata, dict):
-            continue
-        contract = metadata.get("deepagents_contract")
-        if not isinstance(contract, dict):
-            continue
-        context_budget = contract.get("context_budget")
-        if not isinstance(context_budget, dict):
-            continue
-        mounted_paths = context_budget.get("mounted_paths")
-        if not isinstance(mounted_paths, list):
-            continue
-        paths: list[str] = []
-        for path in mounted_paths:
-            if not isinstance(path, str):
-                continue
-            normalized = path.strip().lstrip("/")
-            if normalized and normalized not in paths:
-                paths.append(normalized)
-        if paths:
-            return paths
-    return []
+    return build_runtime_trace_snapshot(runtime_trace).mounted_context_paths
 
 
 def _latest_target_history_violation(runtime_trace: list[dict[str, object]]) -> bool:
-    for event in reversed(runtime_trace):
-        metadata = event.get("metadata")
-        if not isinstance(metadata, dict):
-            continue
-        if isinstance(metadata.get("target_history_violation"), dict):
-            return True
-        if isinstance(metadata.get("target_selection_violation"), dict):
-            return True
-    return False
+    return build_runtime_trace_snapshot(runtime_trace).has_target_history_or_selection_violation
 
 
 def _prior_attempt_records_for_target_label(
@@ -1090,7 +964,7 @@ def _record_paths(record: dict[str, object]) -> list[str]:
     return paths
 
 
-def _truncate_feedback(text: str, limit: int = 4_000) -> str:
+def _truncate_feedback(text: str, limit: int = FEEDBACK_TRUNCATION_LIMIT) -> str:
     if len(text) <= limit:
         return text
     return text[:limit] + "\n...[truncated]"

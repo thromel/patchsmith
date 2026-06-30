@@ -11,12 +11,9 @@ from patchsmith.retrieval_features import (
     _excerpt,
     _excerpt_terms,
     _graph_neighbor_boost,
-    _is_test_path,
     _path_hint_score,
     _path_hints,
     _path_prior,
-    _path_terms,
-    _repo_file_exists,
     _runtime_cache_retry_query,
     _runtime_cache_source_score,
     _safe_read,
@@ -24,6 +21,9 @@ from patchsmith.retrieval_features import (
     _symbols,
     _token_counts,
     _tokens,
+    is_test_path,
+    path_terms,
+    repo_file_path_set,
 )
 
 
@@ -100,13 +100,13 @@ class HybridRetriever:
             path = repo_path / file.path
             text = _safe_read(path)
             text_terms = _token_counts(text)
-            path_terms = _path_terms(file.path)
+            file_path_terms = path_terms(file.path)
             symbols = _symbols(text, file.language)
 
             matched_terms = sorted(
                 term
                 for term in query_terms
-                if term in text_terms or term in path_terms or term in symbols
+                if term in text_terms or term in file_path_terms or term in symbols
             )
             matched_features = list(matched_terms)
             path_hint_score = _path_hint_score(file.path, path_hints)
@@ -125,11 +125,11 @@ class HybridRetriever:
             if not matched_features:
                 continue
 
-            is_test = _is_test_path(file.path)
+            is_test = is_test_path(file.path)
             score = 0.0
             for term in matched_terms:
                 score += text_terms.get(term, 0) * (1.0 + math.log1p(len(term)))
-                if term in path_terms:
+                if term in file_path_terms:
                     score += 4.0
                 if term in symbols:
                     score += 16.0 if not is_test else 2.0
@@ -190,6 +190,7 @@ class GraphRetriever:
             return []
 
         scored: dict[str, tuple[float, set[str]]] = {}
+        repo_paths = repo_file_path_set(repo_index)
         for context in seed_contexts:
             _add_graph_score(
                 scored,
@@ -198,7 +199,7 @@ class GraphRetriever:
                 features=set(context.matched_terms) | {"graph_seed"},
             )
             for neighbor in sorted(graph.neighbors_for_path(context.path)):
-                if not _repo_file_exists(repo_index, neighbor):
+                if neighbor not in repo_paths:
                     continue
                 neighbor_boost = _graph_neighbor_boost(seed_context=context, neighbor_path=neighbor)
                 _add_graph_score(
@@ -215,7 +216,7 @@ class GraphRetriever:
             if not graph_matches:
                 continue
             match_score = sum(8.0 + math.log1p(len(term)) for term in graph_matches)
-            if _is_test_path(file.path):
+            if is_test_path(file.path):
                 match_score *= 0.35
             _add_graph_score(
                 scored,

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import shlex
 import subprocess
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -236,15 +237,46 @@ def _run_hook(
         "payload": payload,
     }
     try:
+        argv = shlex.split(hook.command)
+    except ValueError as error:
+        return AgentHookRun(
+            hook=hook,
+            status="blocked",
+            exit_code=None,
+            reason=f"could not parse hook command: {error}",
+            stdout="",
+            stderr="",
+        )
+    if not argv:
+        return AgentHookRun(
+            hook=hook,
+            status="blocked",
+            exit_code=None,
+            reason="empty hook command",
+            stdout="",
+            stderr="",
+        )
+    try:
+        # shell=False: hook commands are run as an explicit argv list so that
+        # shell metacharacters in repo-provided config cannot chain commands.
         process = subprocess.run(
-            hook.command,
+            argv,
             cwd=Path(repo).expanduser(),
             input=json.dumps(hook_input, sort_keys=True),
             text=True,
-            shell=True,
+            shell=False,
             capture_output=True,
             timeout=hook.timeout_seconds,
             check=False,
+        )
+    except FileNotFoundError:
+        return AgentHookRun(
+            hook=hook,
+            status="blocked",
+            exit_code=None,
+            reason=f"hook command not found: {argv[0]}",
+            stdout="",
+            stderr="",
         )
     except subprocess.TimeoutExpired as exc:
         return AgentHookRun(

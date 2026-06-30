@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import argparse
-import json
 from pathlib import Path
-from typing import Any, Protocol
 
 from patchsmith.cli._types import CommandHandler
+from patchsmith.cli.result_output import emit_summary
 from patchsmith.evaluation import (
     check_focused_test_setup_readiness,
     check_materialized_issue_run_readiness,
@@ -23,10 +22,6 @@ from patchsmith.evaluation import (
     validate_issue_corpus,
     validate_materialized_issue_tasks,
 )
-
-
-class _Summary(Protocol):
-    def to_dict(self) -> dict[str, Any]: ...
 
 
 def issue_corpus_command_handlers() -> dict[str, CommandHandler]:
@@ -52,7 +47,7 @@ def _validate_issue_corpus_command(args: argparse.Namespace) -> int:
         corpus_path=Path(args.corpus),
         output_dir=Path(args.output),
     )
-    _emit_summary(
+    emit_summary(
         args=args,
         result_count=len(results),
         report_filename="corpus_report.md",
@@ -71,7 +66,7 @@ def _preflight_issue_corpus_command(args: argparse.Namespace) -> int:
         output_dir=Path(args.output),
         timeout_seconds=args.timeout_seconds,
     )
-    _emit_summary(
+    emit_summary(
         args=args,
         result_count=len(results),
         report_filename="repo_preflight_report.md",
@@ -93,7 +88,7 @@ def _preview_issue_corpus_context_command(args: argparse.Namespace) -> int:
         top_k=args.top_k,
         max_issues=max_issues,
     )
-    _emit_summary(
+    emit_summary(
         args=args,
         result_count=len(results),
         report_filename="context_preview_report.md",
@@ -119,7 +114,7 @@ def _materialize_issue_corpus_tasks_command(args: argparse.Namespace) -> int:
         context_preview_path=context_preview,
         max_issues=max_issues,
     )
-    _emit_summary(
+    emit_summary(
         args=args,
         result_count=len(results),
         report_filename="materialized_task_report.md",
@@ -137,7 +132,7 @@ def _validate_materialized_issue_tasks_command(args: argparse.Namespace) -> int:
         tasks_dir=Path(args.tasks_dir),
         output_dir=Path(args.output),
     )
-    _emit_summary(
+    emit_summary(
         args=args,
         result_count=len(results),
         report_filename="materialized_task_validation_report.md",
@@ -155,7 +150,7 @@ def _check_materialized_run_readiness_command(args: argparse.Namespace) -> int:
         tasks_dir=Path(args.tasks_dir),
         output_dir=Path(args.output),
     )
-    _emit_summary(
+    emit_summary(
         args=args,
         result_count=len(results),
         report_filename="materialized_run_readiness_report.md",
@@ -174,7 +169,7 @@ def _plan_materialized_focused_tests_command(args: argparse.Namespace) -> int:
         output_dir=Path(args.output),
         max_paths=args.max_paths,
     )
-    _emit_summary(
+    emit_summary(
         args=args,
         result_count=len(results),
         report_filename="focused_test_plan_report.md",
@@ -197,7 +192,7 @@ def _run_materialized_focused_tests_command(args: argparse.Namespace) -> int:
         timeout_seconds=args.timeout_seconds,
         max_tasks=args.max_tasks,
     )
-    _emit_summary(
+    emit_summary(
         args=args,
         result_count=len(results),
         report_filename="focused_test_run_report.md",
@@ -215,7 +210,7 @@ def _diagnose_focused_test_runs_command(args: argparse.Namespace) -> int:
         results_path=Path(args.results),
         output_dir=Path(args.output),
     )
-    _emit_summary(
+    emit_summary(
         args=args,
         result_count=len(results),
         report_filename="focused_test_diagnosis_report.md",
@@ -234,7 +229,7 @@ def _plan_focused_test_setups_command(args: argparse.Namespace) -> int:
         diagnosis_path=Path(args.diagnosis),
         output_dir=Path(args.output),
     )
-    _emit_summary(
+    emit_summary(
         args=args,
         result_count=len(results),
         report_filename="focused_test_setup_plan_report.md",
@@ -253,7 +248,7 @@ def _check_focused_test_setup_readiness_command(args: argparse.Namespace) -> int
         docker_smoke_path=Path(args.docker_smoke),
         output_dir=Path(args.output),
     )
-    _emit_summary(
+    emit_summary(
         args=args,
         result_count=len(results),
         report_filename="focused_test_setup_readiness_report.md",
@@ -280,7 +275,7 @@ def _execute_focused_test_setups_command(args: argparse.Namespace) -> int:
         allow_warnings=args.allow_warnings,
         allow_dependency_installs=args.allow_dependency_installs,
     )
-    _emit_summary(
+    emit_summary(
         args=args,
         result_count=len(results),
         report_filename="focused_test_setup_execution_report.md",
@@ -305,7 +300,7 @@ def _validate_focused_test_setups_command(args: argparse.Namespace) -> int:
         max_tasks=max_tasks,
         dry_run=not args.execute,
     )
-    _emit_summary(
+    emit_summary(
         args=args,
         result_count=len(results),
         report_filename="focused_test_setup_validation_report.md",
@@ -316,28 +311,3 @@ def _validate_focused_test_setups_command(args: argparse.Namespace) -> int:
         ),
     )
     return 0
-
-
-def _emit_summary(
-    *,
-    args: argparse.Namespace,
-    result_count: int,
-    report_filename: str,
-    summary: _Summary,
-    text: str,
-) -> None:
-    report_path = Path(args.output) / report_filename
-    if args.json:
-        print(
-            json.dumps(
-                {
-                    "result_count": result_count,
-                    "report_path": str(report_path),
-                    "summary": summary.to_dict(),
-                },
-                indent=2,
-            )
-        )
-        return
-    print(f"Report: {report_path}")
-    print(text)

@@ -45,6 +45,13 @@ from patchsmith.workflow_context import WorkflowContextSelector
 from patchsmith.workspace_restore import WorkspaceRestorer
 
 RETRY_CONTEXT_EXTRA_FILES = 3
+# Upper bound for the workspace `git diff` invocation so a hung git process
+# cannot stall a run indefinitely.
+WORKSPACE_DIFF_TIMEOUT_SECONDS = 120.0
+# Minimum remaining model responses/tokens required before attempting another
+# retry; below these, a retry is unlikely to complete within budget.
+RETRY_MIN_REMAINING_RESPONSES = 4
+RETRY_MIN_REMAINING_TOKENS = 100_000
 
 
 class RepairRunner:
@@ -76,6 +83,7 @@ class RepairRunner:
         )
 
         status = "completed"
+        workspace_restorer: WorkspaceRestorer | None = None
         try:
             started = time.perf_counter()
             snapshot = clone_or_copy_repository(
@@ -240,7 +248,11 @@ class RepairRunner:
                     request=request,
                     attempt=attempt,
                 )
-                final_diff = _workspace_diff(repo_path) or agent_result.final_diff
+                # Prefer the diff the agent reported and only shell out to
+                # `git diff` as a fallback (e.g. runtimes that edit the
+                # workspace directly without reporting a diff). This avoids a
+                # git subprocess on every retry attempt in the common case.
+                final_diff = agent_result.final_diff or _workspace_diff(repo_path)
                 repair_analysis = analyze_repair_outcome(
                     patch_status=agent_result.status,
                     final_diff=final_diff,
@@ -400,7 +412,6 @@ class RepairRunner:
                 output_summary=str(report_path),
                 payload={"report_path": str(report_path), "final_diff_path": str(final_diff_path)},
             )
-            workspace_restorer.cleanup()
         except Exception as error:
             status = "failed"
             trace.emit(
@@ -411,6 +422,11 @@ class RepairRunner:
                 output_summary=type(error).__name__,
             )
             raise
+        finally:
+            # Always restore the workspace baseline so a failed run does not
+            # leave the retry baseline copy behind on disk.
+            if workspace_restorer is not None:
+                workspace_restorer.cleanup()
 
         return RepairRunResult(
             run_id=run_id,
@@ -437,8 +453,9 @@ def _workspace_diff(repo_path: Path) -> str:
             check=True,
             capture_output=True,
             text=True,
+            timeout=WORKSPACE_DIFF_TIMEOUT_SECONDS,
         )
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
         return ""
     return result.stdout
 
@@ -504,9 +521,11 @@ def _retry_context_mount_limit(request: RunRequest) -> int:
 
 def _merge_path_lists(*path_lists: list[str]) -> list[str]:
     merged: list[str] = []
+    seen: set[str] = set()
     for path_list in path_lists:
         for path in path_list:
-            if path not in merged:
+            if path not in seen:
+                seen.add(path)
                 merged.append(path)
     return merged
 
@@ -570,12 +589,12 @@ def _retry_resource_budget_block(
     )
     if remaining_responses == 0:
         reasons.append("response_budget_exhausted")
-    elif remaining_responses is not None and remaining_responses <= 4:
+    elif remaining_responses is not None and remaining_responses <= RETRY_MIN_REMAINING_RESPONSES:
         reasons.append("response_budget_too_low_for_retry")
     remaining_tokens = _optional_nonnegative_int(resource_budget.get("remaining_model_tokens"))
     if remaining_tokens == 0:
         reasons.append("token_budget_exhausted")
-    elif remaining_tokens is not None and remaining_tokens <= 100_000:
+    elif remaining_tokens is not None and remaining_tokens <= RETRY_MIN_REMAINING_TOKENS:
         reasons.append("token_budget_too_low_for_retry")
     if not reasons:
         return None

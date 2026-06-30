@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from patchsmith.agent_apply import AgentApplyResult
 from patchsmith.agent_cli import AgentCliConfig
 from patchsmith.agent_plan import AgentPlanItem
+from patchsmith.model_preflight import ModelPreflightResult
 from patchsmith.models import RepairRunResult
 
 
@@ -30,6 +31,9 @@ class AgentChatRuntime:
     history: list[str] | None = None
     plan_items: list[AgentPlanItem] | None = None
     feedback_items: list[str] | None = None
+    # Per-session cache of model availability preflight results, keyed by the
+    # requested model id. Avoids a live HTTP round-trip on every chat task.
+    model_preflight_cache: dict[str, ModelPreflightResult] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.history is None:
