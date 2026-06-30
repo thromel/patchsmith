@@ -15,6 +15,7 @@ from patchsmith.chat.session_payloads import (
     dict_or_none,
     feedback_items_from_update,
     optional_text,
+    rehydrate_config_instructions,
     string_list_from_payload,
 )
 from patchsmith.chat.state import AgentChatRuntime, AgentChatState
@@ -102,6 +103,7 @@ def runtime_from_transcript(
                 chat_mode = chat_mode_from_payload(state_payload.get("chat_mode"))
                 pending_planned_task = optional_text(state_payload.get("pending_planned_task"))
                 compaction_summary = dict_or_none(state_payload.get("compaction_summary"))
+    config = rehydrate_config_instructions(config)
     return AgentChatRuntime(
         state=dataclass_replace(state, config=config),
         chat_mode=chat_mode,

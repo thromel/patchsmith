@@ -3,8 +3,9 @@ from __future__ import annotations
 from dataclasses import replace as dataclass_replace
 
 from patchsmith.agent_apply import AgentApplyResult
-from patchsmith.agent_cli import AgentCliConfig
+from patchsmith.agent_cli import AgentCliConfig, config_with_loaded_agent_instructions
 from patchsmith.agent_plan import plan_items_from_payload, plan_items_payload
+from patchsmith.agent_profiles import load_agent_profile
 from patchsmith.chat.state import AgentChatRuntime
 
 
@@ -32,12 +33,14 @@ def config_payload(config: AgentCliConfig) -> dict[str, object]:
         "agent_profile": config.agent_profile,
         "agent_profile_path": config.agent_profile_path,
         "agent_profile_description": config.agent_profile_description,
-        "agent_profile_instructions": config.agent_profile_instructions,
+        # Instruction/profile text is intentionally not persisted to transcripts
+        # (it may contain secrets or proprietary content). Only metadata is kept;
+        # the full text is reloaded from disk on resume via
+        # ``rehydrate_config_instructions``.
         "agent_profile_instruction_chars": len(config.agent_profile_instructions or ""),
         "load_agent_instructions": config.load_agent_instructions,
         "instruction_paths": list(config.instruction_paths),
         "agent_instruction_files": list(config.agent_instruction_files),
-        "agent_instructions": config.agent_instructions,
         "agent_instruction_chars": len(config.agent_instructions or ""),
     }
 
@@ -77,6 +80,29 @@ def restore_checkpoint_state(
     runtime.last_apply = apply_result_from_state(state.get("last_apply"))
     runtime.last_rewind = apply_result_from_state(state.get("last_rewind"))
     runtime.compaction_summary = dict_or_none(state.get("compaction_summary"))
+
+
+def rehydrate_config_instructions(config: AgentCliConfig) -> AgentCliConfig:
+    """Reload instruction/profile text from disk for a resumed config.
+
+    Transcripts persist only instruction metadata (paths + char counts), never
+    the full text. When a session is resumed the reconstructed config therefore
+    needs its instruction and agent-profile text reloaded from disk so prompts
+    and reporting keep working.
+    """
+    result = config
+    if result.load_agent_instructions and not result.agent_instructions:
+        result = config_with_loaded_agent_instructions(result)
+    if result.agent_profile and not result.agent_profile_instructions:
+        profile = load_agent_profile(result.repo, result.agent_profile)
+        if profile is not None:
+            result = dataclass_replace(
+                result,
+                agent_profile_path=result.agent_profile_path or str(profile.path),
+                agent_profile_description=(result.agent_profile_description or profile.description),
+                agent_profile_instructions=profile.instructions,
+            )
+    return result
 
 
 def config_from_payload(

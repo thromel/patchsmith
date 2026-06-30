@@ -2627,7 +2627,11 @@ def test_chat_session_lists_and_applies_project_agent_profile(tmp_path: Path) ->
         if row["event"] == "config_update" and row["payload"].get("field") == "agent_profile"
     )
     assert profile_update["payload"]["agent_profile"] == "verifier"
-    assert "Localize the failure" in profile_update["payload"]["agent_profile_instructions"]
+    # Profile text is not persisted to transcripts; only metadata is recorded.
+    assert "agent_profile_instructions" not in profile_update["payload"]
+    assert profile_update["payload"]["agent_profile_instruction_chars"] == len(
+        profile_instructions
+    )
 
 
 def test_chat_session_loads_project_instructions_into_runs(tmp_path: Path) -> None:
@@ -2686,7 +2690,9 @@ def test_chat_session_loads_project_instructions_into_runs(tmp_path: Path) -> No
     rows = [json.loads(line) for line in transcript_path.read_text(encoding="utf-8").splitlines()]
     session_start = rows[0]["payload"]["config"]
     assert session_start["agent_instruction_files"] == ["AGENTS.md"]
-    assert "Keep parser fixes minimal." in session_start["agent_instructions"]
+    # Full instruction text must never be persisted to transcripts; only metadata.
+    assert "agent_instructions" not in session_start
+    assert session_start["agent_instruction_chars"] > 0
     assert any(row["event"] == "instruction_view" for row in rows)
 
 
