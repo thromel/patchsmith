@@ -45,6 +45,38 @@ def test_append_transcript_event_writes_compatible_json_row(tmp_path: Path) -> N
     assert decoded == [event]
 
 
+def test_read_transcript_rows_uses_cache_and_invalidates_on_append(
+    tmp_path: Path,
+) -> None:
+    transcript_path = tmp_path / "session.jsonl"
+    append_transcript_event(
+        transcript_path,
+        session_id="session-1",
+        event="user_task",
+        payload={"task": "one"},
+        timestamp="2026-06-15T00:00:00+00:00",
+    )
+
+    first = read_transcript_rows(transcript_path)
+    second = read_transcript_rows(transcript_path)
+    assert first == second
+    # A repeated read returns an equal but distinct list (callers may not
+    # corrupt the cached copy).
+    assert first is not second
+    assert len(first) == 1
+
+    append_transcript_event(
+        transcript_path,
+        session_id="session-1",
+        event="user_task",
+        payload={"task": "two"},
+        timestamp="2026-06-15T00:00:01+00:00",
+    )
+
+    after_append = read_transcript_rows(transcript_path)
+    assert len(after_append) == 2
+
+
 def test_read_transcript_rows_skips_bad_json_but_preserves_dict_rows(
     tmp_path: Path,
 ) -> None:
