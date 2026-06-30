@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from patchsmith.models import RepositoryIndex
-from patchsmith.retrieval_features import _is_test_path, _path_terms, cached_read_text
+from patchsmith.retrieval_features import cached_read_text, is_test_path, path_terms
 
 TOKEN_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]+")
 
@@ -112,7 +112,7 @@ def _build_code_context_graph(*, repo_path: Path, repo_index: RepositoryIndex) -
             path=file.path,
         )
         text = cached_read_text(repo_path / file.path)
-        terms = set(_path_terms(file.path, drop_stopwords=False))
+        terms = set(path_terms(file.path, drop_stopwords=False))
 
         parsed = _parse_python(text)
         symbols = _symbols_from_ast(parsed) if parsed else _symbols_from_text(text)
@@ -135,7 +135,7 @@ def _build_code_context_graph(*, repo_path: Path, repo_index: RepositoryIndex) -
                 edges.append(CodeGraphEdge(file_node, target_node, "imports"))
                 related_paths[file.path].add(target_path)
                 related_paths[target_path].add(file.path)
-                if _is_test_path(file.path) and not _is_test_path(target_path):
+                if is_test_path(file.path) and not is_test_path(target_path):
                     edges.append(CodeGraphEdge(file_node, target_node, "tests"))
                     edges.append(CodeGraphEdge(target_node, file_node, "covered_by"))
             else:
@@ -168,11 +168,11 @@ def _add_test_basename_edges(
     sources = [
         file.path
         for file in repo_index.files
-        if file.language == "Python" and not _is_test_path(file.path)
+        if file.language == "Python" and not is_test_path(file.path)
     ]
     source_by_stem = {Path(path).stem: path for path in sources}
     for file in repo_index.files:
-        if file.language != "Python" or not _is_test_path(file.path):
+        if file.language != "Python" or not is_test_path(file.path):
             continue
         stem = Path(file.path).stem
         source_stem = stem.removeprefix("test_").removesuffix("_test")

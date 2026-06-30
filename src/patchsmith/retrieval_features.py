@@ -162,7 +162,7 @@ def _token_counts(text: str) -> Counter[str]:
     )
 
 
-def _path_terms(path: str, *, drop_stopwords: bool = True) -> set[str]:
+def path_terms(path: str, *, drop_stopwords: bool = True) -> set[str]:
     tokens = {token.lower() for token in re.split(r"[^A-Za-z0-9_]+|_", path) if len(token) > 2}
     if drop_stopwords:
         return {token for token in tokens if token not in STOPWORDS}
@@ -254,9 +254,9 @@ def _add_graph_score(
 
 
 def _graph_neighbor_boost(*, seed_context: RetrievedContext, neighbor_path: str) -> float:
-    if _is_test_path(seed_context.path) and not _is_test_path(neighbor_path):
+    if is_test_path(seed_context.path) and not is_test_path(neighbor_path):
         return seed_context.score + 30.0
-    if _is_test_path(neighbor_path):
+    if is_test_path(neighbor_path):
         return 4.0
     return 10.0
 
@@ -299,7 +299,7 @@ def _path_prior(path: str) -> float:
     return 0.0
 
 
-def _is_test_path(path: str) -> bool:
+def is_test_path(path: str) -> bool:
     return path.startswith(("tests/", "test/")) or "/test_" in path or path.endswith("_test.py")
 
 
