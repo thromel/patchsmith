@@ -2629,9 +2629,7 @@ def test_chat_session_lists_and_applies_project_agent_profile(tmp_path: Path) ->
     assert profile_update["payload"]["agent_profile"] == "verifier"
     # Profile text is not persisted to transcripts; only metadata is recorded.
     assert "agent_profile_instructions" not in profile_update["payload"]
-    assert profile_update["payload"]["agent_profile_instruction_chars"] == len(
-        profile_instructions
-    )
+    assert profile_update["payload"]["agent_profile_instruction_chars"] == len(profile_instructions)
 
 
 def test_chat_session_loads_project_instructions_into_runs(tmp_path: Path) -> None:
