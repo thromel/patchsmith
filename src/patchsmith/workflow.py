@@ -243,7 +243,11 @@ class RepairRunner:
                     request=request,
                     attempt=attempt,
                 )
-                final_diff = _workspace_diff(repo_path) or agent_result.final_diff
+                # Prefer the diff the agent reported and only shell out to
+                # `git diff` as a fallback (e.g. runtimes that edit the
+                # workspace directly without reporting a diff). This avoids a
+                # git subprocess on every retry attempt in the common case.
+                final_diff = agent_result.final_diff or _workspace_diff(repo_path)
                 repair_analysis = analyze_repair_outcome(
                     patch_status=agent_result.status,
                     final_diff=final_diff,
