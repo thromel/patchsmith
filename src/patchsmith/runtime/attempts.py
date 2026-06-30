@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-from pathlib import Path
 
 from patchsmith.analysis import RepairOutcomeAnalysis
 from patchsmith.models import CommandResult, RunRequest
@@ -14,105 +13,24 @@ from patchsmith.runtime.feedback import (
     sandbox_failure_signature,
     sandbox_feedback_summary,
 )
+from patchsmith.runtime.sandbox_attempt import (
+    SANDBOX_ATTEMPT_TIMEOUT_SECONDS as SANDBOX_ATTEMPT_TIMEOUT_SECONDS,
+)
+from patchsmith.runtime.sandbox_attempt import (
+    emit_agent_result_trace as emit_agent_result_trace,
+)
+from patchsmith.runtime.sandbox_attempt import (
+    run_sandbox_attempt as run_sandbox_attempt,
+)
 from patchsmith.runtime.trace_snapshot import build_runtime_trace_snapshot
-from patchsmith.sandbox import SandboxRunner
-from patchsmith.tracing import RunTrace
 
-# Wall-clock timeout for each sandboxed test command attempt.
-SANDBOX_ATTEMPT_TIMEOUT_SECONDS = 60
+# ``SANDBOX_ATTEMPT_TIMEOUT_SECONDS``, ``emit_agent_result_trace``, and
+# ``run_sandbox_attempt`` are imported above purely to preserve the historical
+# ``patchsmith.runtime.attempts`` import surface; their implementation now lives
+# in :mod:`patchsmith.runtime.sandbox_attempt`.
+
 # Default character budget for feedback text blocks embedded in retry prompts.
 FEEDBACK_TRUNCATION_LIMIT = 4_000
-
-
-def emit_agent_result_trace(
-    *,
-    trace: RunTrace,
-    request: RunRequest,
-    agent_result: AgentResult,
-    attempt: int,
-) -> None:
-    trace.emit(
-        node_name="runtime",
-        event_type="agent_result",
-        status=agent_result.status,
-        output_summary=agent_result.summary,
-        payload={
-            "runtime": request.runtime,
-            "planner": request.planner,
-            "attempt": attempt,
-            "patch_candidates": [
-                candidate.to_dict() for candidate in agent_result.patch_candidates
-            ],
-        },
-    )
-    for runtime_event in agent_result.runtime_trace:
-        trace.emit(
-            node_name=f"runtime.{runtime_event.get('node', 'unknown')}",
-            event_type="runtime_node",
-            status=str(runtime_event.get("status", "completed")),
-            output_summary=str(runtime_event.get("summary", "")),
-            payload={
-                "runtime": request.runtime,
-                "planner": request.planner,
-                "workflow_attempt": attempt,
-                **runtime_event,
-            },
-        )
-
-
-def run_sandbox_attempt(
-    *,
-    command: str | None,
-    sandbox: SandboxRunner,
-    repo_path: Path,
-    logs_dir: Path,
-    trace: RunTrace,
-    request: RunRequest,
-    attempt: int,
-) -> CommandResult | None:
-    if not command:
-        trace.emit(
-            node_name="test",
-            event_type="sandbox_command",
-            status="skipped",
-            output_summary="no test command supplied or detected",
-            payload={
-                "attempt": attempt,
-                "sandbox_mode": request.sandbox_mode,
-            },
-        )
-        return None
-
-    test_result = sandbox.run(
-        command=command,
-        workspace=repo_path,
-        timeout_seconds=SANDBOX_ATTEMPT_TIMEOUT_SECONDS,
-    )
-    (logs_dir / "stdout.txt").write_text(test_result.stdout, encoding="utf-8")
-    (logs_dir / "stderr.txt").write_text(test_result.stderr, encoding="utf-8")
-    (logs_dir / f"stdout_attempt_{attempt}.txt").write_text(
-        test_result.stdout,
-        encoding="utf-8",
-    )
-    (logs_dir / f"stderr_attempt_{attempt}.txt").write_text(
-        test_result.stderr,
-        encoding="utf-8",
-    )
-    trace.emit(
-        node_name="test",
-        event_type="sandbox_command",
-        status="completed" if test_result.exit_code == 0 else "failed",
-        input_summary=command,
-        output_summary=f"exit_code={test_result.exit_code}",
-        payload={
-            **test_result.to_dict(),
-            "attempt": attempt,
-            "sandbox_mode": request.sandbox_mode,
-            "sandbox_image": request.sandbox_image if request.sandbox_mode == "docker" else None,
-        },
-        latency_ms=test_result.duration_ms,
-    )
-    return test_result
 
 
 def test_feedback_retry_budget(request: RunRequest) -> int:
