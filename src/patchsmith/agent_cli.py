@@ -15,7 +15,10 @@ from patchsmith.agent_apply import (
 )
 from patchsmith.agent_instructions import load_agent_instruction_bundle
 from patchsmith.deepagents_config import DEFAULT_DEEPAGENTS_MODEL
-from patchsmith.model_config import openai_model_supports_encrypted_reasoning
+from patchsmith.model_config import (
+    budget_limit_label,
+    openai_model_supports_encrypted_reasoning,
+)
 from patchsmith.models import RepairRunResult, RunRequest
 from patchsmith.workflow import RepairRunner
 
@@ -325,8 +328,8 @@ def _budget_check(config: AgentCliConfig) -> dict[str, Any]:
         "status": "passed",
         "message": (
             "responses="
-            f"{_budget_limit_label(config.max_model_responses)}, "
-            f"tokens={_budget_limit_label(config.max_model_tokens)}"
+            f"{budget_limit_label(config.max_model_responses)}, "
+            f"tokens={budget_limit_label(config.max_model_tokens)}"
         ),
     }
 
@@ -441,10 +444,6 @@ def _checks_status(checks: list[dict[str, Any]]) -> str:
     return (
         "passed" if all(check["status"] in {"passed", "skipped"} for check in checks) else "blocked"
     )
-
-
-def _budget_limit_label(value: int) -> str:
-    return "unlimited" if value < 0 else str(value)
 
 
 def config_with_loaded_agent_instructions(config: AgentCliConfig) -> AgentCliConfig:

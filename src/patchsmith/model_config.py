@@ -8,6 +8,11 @@ DEFAULT_OPENAI_INPUT_COST_PER_1M = 0.75
 DEFAULT_OPENAI_OUTPUT_COST_PER_1M = 4.50
 
 
+def budget_limit_label(value: int) -> str:
+    """Render a resource-budget limit, treating negatives as unlimited."""
+    return "unlimited" if value < 0 else str(value)
+
+
 @dataclass(frozen=True)
 class ModelPricing:
     input_cost_per_1m: float

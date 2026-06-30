@@ -7,6 +7,7 @@ import urllib.request
 from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass, field
 
+from patchsmith._http import open_url
 from patchsmith.model_config import DEFAULT_OPENAI_MODEL
 
 OPENAI_MODELS_ENDPOINT = "https://api.openai.com/v1/models"
@@ -107,7 +108,7 @@ def openai_model_preflight(
     )
     try:
         response_bytes = (
-            opener(request, timeout_seconds) if opener else _open_url(request, timeout_seconds)
+            opener(request, timeout_seconds) if opener else open_url(request, timeout_seconds)
         )
     except urllib.error.HTTPError as error:
         return ModelPreflightResult(
@@ -205,11 +206,6 @@ def _http_error_message(error: urllib.error.HTTPError) -> str:
     if error.code == 404:
         return "OpenAI Models API error 404: endpoint or model resource was not found."
     return f"OpenAI Models API error {error.code}."
-
-
-def _open_url(request: urllib.request.Request, timeout_seconds: float) -> bytes:
-    with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
-        return response.read()
 
 
 def _unsafe_header_value(value: str) -> bool:

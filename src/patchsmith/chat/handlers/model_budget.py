@@ -7,6 +7,7 @@ from patchsmith.agent_cli import AgentCliConfig
 from patchsmith.chat.commands import ChatCommand, ChatCommandContext
 from patchsmith.chat.formatting import write_line
 from patchsmith.chat.state import AgentChatRuntime
+from patchsmith.model_config import budget_limit_label
 
 
 def model_budget_commands() -> tuple[ChatCommand, ...]:
@@ -114,8 +115,8 @@ def model_label(config: AgentCliConfig) -> str:
 
 def budget_label(config: AgentCliConfig) -> str:
     return (
-        f"responses={_budget_value_label(config.max_model_responses)}, "
-        f"tokens={_budget_value_label(config.max_model_tokens)}"
+        f"responses={budget_limit_label(config.max_model_responses)}, "
+        f"tokens={budget_limit_label(config.max_model_tokens)}"
     )
 
 
@@ -168,7 +169,3 @@ def _set_budget(
             "max_model_tokens": max_model_tokens,
         },
     )
-
-
-def _budget_value_label(value: int) -> str:
-    return "unlimited" if value < 0 else str(value)

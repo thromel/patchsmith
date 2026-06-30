@@ -8,6 +8,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from patchsmith._http import open_url
 from patchsmith.artifacts import dict_or_empty
 from patchsmith.model_config import DEFAULT_OPENAI_MODEL, configured_model_pricing
 
@@ -133,7 +134,7 @@ class OpenAIResponsesModelClient:
             response_bytes = (
                 self.opener(request, self.timeout_seconds)
                 if self.opener
-                else _open_url(request, self.timeout_seconds)
+                else open_url(request, self.timeout_seconds)
             )
         except urllib.error.HTTPError as error:
             body = error.read().decode("utf-8", errors="replace")
@@ -203,11 +204,6 @@ def repair_plan_json_schema() -> dict[str, Any]:
     model call; callers must treat the returned dict as read-only.
     """
     return _REPAIR_PLAN_JSON_SCHEMA
-
-
-def _open_url(request: urllib.request.Request, timeout_seconds: float) -> bytes:
-    with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
-        return response.read()
 
 
 def _extract_openai_output_text(response: dict[str, Any]) -> str:
