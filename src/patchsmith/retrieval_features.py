@@ -3,10 +3,43 @@
 from __future__ import annotations
 
 import re
-from collections import Counter
+from collections import Counter, OrderedDict
 from pathlib import Path
 
 from patchsmith.models import RepositoryIndex, RetrievedContext
+
+# Bounded cache of file text keyed by (path, mtime_ns, size). Retrieval reads the
+# same repository files many times within and across attempts; caching avoids
+# repeated disk I/O while the mtime/size key invalidates entries when a file
+# changes (e.g. after an applied patch).
+_FILE_TEXT_CACHE_MAX_ENTRIES = 4096
+_FILE_TEXT_CACHE: OrderedDict[tuple[str, int, int], str] = OrderedDict()
+
+
+def cached_read_text(path: Path) -> str:
+    """Read text from ``path`` with a bounded, mtime-aware cache.
+
+    Returns an empty string when the file cannot be read.
+    """
+    try:
+        stat = path.stat()
+    except OSError:
+        return ""
+    key = (str(path), stat.st_mtime_ns, stat.st_size)
+    cached = _FILE_TEXT_CACHE.get(key)
+    if cached is not None:
+        _FILE_TEXT_CACHE.move_to_end(key)
+        return cached
+    try:
+        text = path.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return ""
+    _FILE_TEXT_CACHE[key] = text
+    _FILE_TEXT_CACHE.move_to_end(key)
+    while len(_FILE_TEXT_CACHE) > _FILE_TEXT_CACHE_MAX_ENTRIES:
+        _FILE_TEXT_CACHE.popitem(last=False)
+    return text
+
 
 TOKEN_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]+")
 PATH_RE = re.compile(r"(?<![A-Za-z0-9_./-])((?:src|lib|tests|test)/[A-Za-z0-9_./-]+\.py)")
@@ -256,10 +289,7 @@ def _symbols(text: str, language: str) -> set[str]:
 
 
 def _safe_read(path: Path) -> str:
-    try:
-        return path.read_text(encoding="utf-8", errors="ignore")
-    except OSError:
-        return ""
+    return cached_read_text(path)
 
 
 def _path_prior(path: str) -> float:
