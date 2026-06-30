@@ -16,6 +16,19 @@ FAILURE_MARKERS = (
     "no such file or directory",
 )
 
+# Compiled once at import time; these run over every sandbox stdout/stderr line.
+_MEMBERSHIP_ASSERTION_PATTERNS = (
+    re.compile(r"assert\s+\((['\"])(?P<missing>.+?)\1\s+in\s+(['\"])(?P<observed>.+?)\3\)"),
+    re.compile(r"assert\s+(['\"])(?P<missing>.+?)\1\s+in\s+(['\"])(?P<observed>.+?)\3"),
+)
+_EXCEPTION_NAME_PATTERN = re.compile(r"\b([A-Za-z_][A-Za-z0-9_]*(?:Error|Exception)):")
+_ASSERTION_COMPARISON_PATTERNS = (
+    re.compile(
+        r"AssertionError:\s+assert\s+(['\"])(?P<actual>.+?)\1\s+==\s+(['\"])(?P<expected>.+?)\3"
+    ),
+    re.compile(r"assert\s+(['\"])(?P<actual>.+?)\1\s+==\s+(['\"])(?P<expected>.+?)\3"),
+)
+
 
 def sandbox_feedback_summary(
     *,
@@ -504,13 +517,9 @@ def _failure_signals(text: str, *, limit: int = 8) -> list[str]:
 
 
 def _membership_assertion_values(text: str) -> list[tuple[str, str]]:
-    patterns = [
-        re.compile(r"assert\s+\((['\"])(?P<missing>.+?)\1\s+in\s+(['\"])(?P<observed>.+?)\3\)"),
-        re.compile(r"assert\s+(['\"])(?P<missing>.+?)\1\s+in\s+(['\"])(?P<observed>.+?)\3"),
-    ]
     matches: list[tuple[str, str]] = []
     for raw_line in text.splitlines():
-        for pattern in patterns:
+        for pattern in _MEMBERSHIP_ASSERTION_PATTERNS:
             match = pattern.search(raw_line)
             if match:
                 matches.append((match.group("missing"), match.group("observed")))
@@ -520,21 +529,15 @@ def _membership_assertion_values(text: str) -> list[tuple[str, str]]:
 
 def _first_exception(text: str) -> str:
     for raw_line in text.splitlines():
-        match = re.search(r"\b([A-Za-z_][A-Za-z0-9_]*(?:Error|Exception)):", raw_line)
+        match = _EXCEPTION_NAME_PATTERN.search(raw_line)
         if match:
             return match.group(1)
     return ""
 
 
 def _assertion_comparison(text: str) -> tuple[str, str] | None:
-    patterns = [
-        re.compile(
-            r"AssertionError:\s+assert\s+(['\"])(?P<actual>.+?)\1\s+==\s+(['\"])(?P<expected>.+?)\3"
-        ),
-        re.compile(r"assert\s+(['\"])(?P<actual>.+?)\1\s+==\s+(['\"])(?P<expected>.+?)\3"),
-    ]
     for raw_line in text.splitlines():
-        for pattern in patterns:
+        for pattern in _ASSERTION_COMPARISON_PATTERNS:
             match = pattern.search(raw_line)
             if match:
                 return match.group("actual"), match.group("expected")

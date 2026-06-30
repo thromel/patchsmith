@@ -177,24 +177,32 @@ class OpenAIResponsesModelClient:
         return ModelCompletion(text=text, metadata=metadata)
 
 
-def repair_plan_json_schema() -> dict[str, Any]:
-    return {
-        "type": "json_schema",
-        "name": "repair_plan",
-        "strict": True,
-        "schema": {
-            "type": "object",
-            "additionalProperties": False,
-            "properties": {
-                "name": {"type": "string"},
-                "path": {"type": "string"},
-                "old": {"type": "string"},
-                "new": {"type": "string"},
-                "summary": {"type": "string"},
-            },
-            "required": ["name", "path", "old", "new", "summary"],
+_REPAIR_PLAN_JSON_SCHEMA: dict[str, Any] = {
+    "type": "json_schema",
+    "name": "repair_plan",
+    "strict": True,
+    "schema": {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "name": {"type": "string"},
+            "path": {"type": "string"},
+            "old": {"type": "string"},
+            "new": {"type": "string"},
+            "summary": {"type": "string"},
         },
-    }
+        "required": ["name", "path", "old", "new", "summary"],
+    },
+}
+
+
+def repair_plan_json_schema() -> dict[str, Any]:
+    """Return the (immutable, read-only) repair-plan response schema.
+
+    The schema is a module-level constant to avoid rebuilding it on every
+    model call; callers must treat the returned dict as read-only.
+    """
+    return _REPAIR_PLAN_JSON_SCHEMA
 
 
 def _open_url(request: urllib.request.Request, timeout_seconds: float) -> bytes:
