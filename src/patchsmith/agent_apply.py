@@ -4,6 +4,10 @@ import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+# Upper bound for local git invocations so a hung git process cannot block a run
+# indefinitely.
+GIT_COMMAND_TIMEOUT_SECONDS = 120.0
+
 
 @dataclass(frozen=True)
 class AgentApplyResult:
@@ -226,6 +230,7 @@ def _git(repo_path: Path, *args: str) -> subprocess.CompletedProcess[str]:
         check=False,
         capture_output=True,
         text=True,
+        timeout=GIT_COMMAND_TIMEOUT_SECONDS,
     )
 
 

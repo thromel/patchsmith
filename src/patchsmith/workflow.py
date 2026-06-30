@@ -45,6 +45,9 @@ from patchsmith.workflow_context import WorkflowContextSelector
 from patchsmith.workspace_restore import WorkspaceRestorer
 
 RETRY_CONTEXT_EXTRA_FILES = 3
+# Upper bound for the workspace `git diff` invocation so a hung git process
+# cannot stall a run indefinitely.
+WORKSPACE_DIFF_TIMEOUT_SECONDS = 120.0
 
 
 class RepairRunner:
@@ -437,8 +440,9 @@ def _workspace_diff(repo_path: Path) -> str:
             check=True,
             capture_output=True,
             text=True,
+            timeout=WORKSPACE_DIFF_TIMEOUT_SECONDS,
         )
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
         return ""
     return result.stdout
 
