@@ -508,9 +508,11 @@ def _retry_context_mount_limit(request: RunRequest) -> int:
 
 def _merge_path_lists(*path_lists: list[str]) -> list[str]:
     merged: list[str] = []
+    seen: set[str] = set()
     for path_list in path_lists:
         for path in path_list:
-            if path not in merged:
+            if path not in seen:
+                seen.add(path)
                 merged.append(path)
     return merged
 

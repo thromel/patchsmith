@@ -541,21 +541,40 @@ def attempt_history_summary(history: list[dict[str, object]]) -> str:
 
 
 def ineffective_target_paths(history: list[dict[str, object]]) -> list[str]:
+    """Return paths to deprioritize because the same failure signature recurred.
+
+    When a failure signature is seen more than once, every path touched under
+    that signature (previously and now) is considered ineffective. Order is
+    preserved while membership tests use sets to stay linear in the history
+    size.
+    """
     paths: list[str] = []
+    paths_seen: set[str] = set()
     paths_by_signature: dict[str, list[str]] = {}
+    seen_by_signature: dict[str, set[str]] = {}
+
+    def _mark_ineffective(candidate: str) -> None:
+        if candidate not in paths_seen:
+            paths_seen.add(candidate)
+            paths.append(candidate)
+
     for record in history:
         signature = str(record.get("failure_signature", ""))
         if not signature:
             continue
         record_paths = _record_paths(record)
         if signature in paths_by_signature:
-            for path in [*paths_by_signature[signature], *record_paths]:
-                if path not in paths:
-                    paths.append(path)
+            for path in paths_by_signature[signature]:
+                _mark_ineffective(path)
+            for path in record_paths:
+                _mark_ineffective(path)
         else:
             paths_by_signature[signature] = []
+            seen_by_signature[signature] = set()
+        signature_seen = seen_by_signature[signature]
         for path in record_paths:
-            if path not in paths_by_signature[signature]:
+            if path not in signature_seen:
+                signature_seen.add(path)
                 paths_by_signature[signature].append(path)
     return paths
 

@@ -16,7 +16,6 @@ from patchsmith.retrieval_features import (
     _path_hints,
     _path_prior,
     _path_terms,
-    _repo_file_exists,
     _runtime_cache_retry_query,
     _runtime_cache_source_score,
     _safe_read,
@@ -24,6 +23,7 @@ from patchsmith.retrieval_features import (
     _symbols,
     _token_counts,
     _tokens,
+    repo_file_path_set,
 )
 
 
@@ -190,6 +190,7 @@ class GraphRetriever:
             return []
 
         scored: dict[str, tuple[float, set[str]]] = {}
+        repo_paths = repo_file_path_set(repo_index)
         for context in seed_contexts:
             _add_graph_score(
                 scored,
@@ -198,7 +199,7 @@ class GraphRetriever:
                 features=set(context.matched_terms) | {"graph_seed"},
             )
             for neighbor in sorted(graph.neighbors_for_path(context.path)):
-                if not _repo_file_exists(repo_index, neighbor):
+                if neighbor not in repo_paths:
                     continue
                 neighbor_boost = _graph_neighbor_boost(seed_context=context, neighbor_path=neighbor)
                 _add_graph_score(

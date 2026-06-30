@@ -229,8 +229,9 @@ def _graph_neighbor_boost(*, seed_context: RetrievedContext, neighbor_path: str)
     return 10.0
 
 
-def _repo_file_exists(repo_index: RepositoryIndex, path: str) -> bool:
-    return any(file.path == path for file in repo_index.files)
+def repo_file_path_set(repo_index: RepositoryIndex) -> set[str]:
+    """Return the set of indexed file paths for O(1) membership checks."""
+    return {file.path for file in repo_index.files}
 
 
 def _excerpt_terms(features: set[str]) -> list[str]:
