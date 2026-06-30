@@ -162,12 +162,11 @@ def _token_counts(text: str) -> Counter[str]:
     )
 
 
-def _path_terms(path: str) -> set[str]:
-    return {
-        token.lower()
-        for token in re.split(r"[^A-Za-z0-9_]+|_", path)
-        if len(token) > 2 and token.lower() not in STOPWORDS
-    }
+def _path_terms(path: str, *, drop_stopwords: bool = True) -> set[str]:
+    tokens = {token.lower() for token in re.split(r"[^A-Za-z0-9_]+|_", path) if len(token) > 2}
+    if drop_stopwords:
+        return {token for token in tokens if token not in STOPWORDS}
+    return tokens
 
 
 def _path_hints(issue_text: str) -> set[str]:

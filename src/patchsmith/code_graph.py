@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from patchsmith.models import RepositoryIndex
-from patchsmith.retrieval_features import cached_read_text
+from patchsmith.retrieval_features import _is_test_path, _path_terms, cached_read_text
 
 TOKEN_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]+")
 
@@ -112,7 +112,7 @@ def _build_code_context_graph(*, repo_path: Path, repo_index: RepositoryIndex) -
             path=file.path,
         )
         text = cached_read_text(repo_path / file.path)
-        terms = set(_path_terms(file.path))
+        terms = set(_path_terms(file.path, drop_stopwords=False))
 
         parsed = _parse_python(text)
         symbols = _symbols_from_ast(parsed) if parsed else _symbols_from_text(text)
@@ -250,16 +250,8 @@ def _imports_from_text(text: str) -> set[str]:
     return modules
 
 
-def _path_terms(path: str) -> set[str]:
-    return {token.lower() for token in re.split(r"[^A-Za-z0-9_]+|_", path) if len(token) > 2}
-
-
 def _name_terms(name: str) -> set[str]:
     terms: set[str] = set()
     for raw_token in TOKEN_RE.findall(name.replace(".", "_")):
         terms.update(part.lower() for part in raw_token.split("_") if len(part) > 2)
     return terms
-
-
-def _is_test_path(path: str) -> bool:
-    return path.startswith(("tests/", "test/")) or "/test_" in path or path.endswith("_test.py")
