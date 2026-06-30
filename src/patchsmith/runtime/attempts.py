@@ -10,9 +10,11 @@ from patchsmith.runtime.feedback import (
     assertion_progress_summary,
     patch_plan_feedback_summary,
     safety_gate_rejection_summary,
+    safety_gate_rejection_text,
     sandbox_failure_signature,
     sandbox_feedback_summary,
 )
+from patchsmith.runtime.trace_snapshot import build_runtime_trace_snapshot
 from patchsmith.sandbox import SandboxRunner
 from patchsmith.tracing import RunTrace
 
@@ -447,7 +449,8 @@ def feedback_attempt_record(
         test_result=test_result,
         final_diff=final_diff,
     )
-    patch_target = _latest_patch_target(runtime_trace or [])
+    snapshot = build_runtime_trace_snapshot(runtime_trace)
+    patch_target = snapshot.patch_target
     history_for_class = list(attempt_history or [])
     if patch_target:
         history_for_class.append({"patch_target": patch_target})
@@ -460,10 +463,10 @@ def feedback_attempt_record(
         "changed_files": _diff_changed_files(final_diff),
         "failure_signature": sandbox_failure_signature(test_result),
         "patch_target": patch_target,
-        "patch_old_sha256_12": _latest_patch_old_hash(runtime_trace or []),
-        "patch_quality_severity": _latest_patch_quality_severity(runtime_trace or []),
-        "patch_quality_findings": _latest_patch_quality_finding_codes(runtime_trace or []),
-        "safety_gate_rejection": safety_gate_rejection_summary(runtime_trace or []),
+        "patch_old_sha256_12": snapshot.patch_old_hash,
+        "patch_quality_severity": snapshot.patch_quality_severity,
+        "patch_quality_findings": snapshot.patch_quality_finding_codes,
+        "safety_gate_rejection": safety_gate_rejection_text(snapshot.safety_gate_rejection),
         "failure_class": retry_failure_class(
             agent_status=agent_status,
             test_result=test_result,
@@ -473,7 +476,7 @@ def feedback_attempt_record(
             attempt_history=history_for_class,
         ),
     }
-    mounted_paths = _latest_mounted_context_paths(runtime_trace or [])
+    mounted_paths = snapshot.mounted_context_paths
     if mounted_paths:
         record["mounted_context_paths"] = mounted_paths
     if assertion_progress:
@@ -967,32 +970,15 @@ def _failed_naked_import_cache_invalidation_guidance(
 
 
 def _latest_patch_quality_severity(runtime_trace: list[dict[str, object]]) -> str:
-    quality = _latest_patch_quality(runtime_trace)
-    severity = quality.get("severity")
-    return str(severity) if severity else ""
+    return build_runtime_trace_snapshot(runtime_trace).patch_quality_severity
 
 
 def _latest_patch_quality_finding_codes(runtime_trace: list[dict[str, object]]) -> list[str]:
-    quality = _latest_patch_quality(runtime_trace)
-    findings = quality.get("findings")
-    if not isinstance(findings, list):
-        return []
-    codes: list[str] = []
-    for finding in findings:
-        if not isinstance(finding, dict):
-            continue
-        code = finding.get("code")
-        if isinstance(code, str) and code and code not in codes:
-            codes.append(code)
-    return codes
+    return build_runtime_trace_snapshot(runtime_trace).patch_quality_finding_codes
 
 
 def _latest_patch_quality(runtime_trace: list[dict[str, object]]) -> dict[str, object]:
-    for event in reversed(runtime_trace):
-        quality = event.get("quality")
-        if isinstance(quality, dict):
-            return quality
-    return {}
+    return build_runtime_trace_snapshot(runtime_trace).quality or {}
 
 
 def _diff_changed_files(diff: str) -> list[str]:
@@ -1010,73 +996,19 @@ def _diff_changed_files(diff: str) -> list[str]:
 
 
 def _latest_patch_target(runtime_trace: list[dict[str, object]]) -> str:
-    for event in reversed(runtime_trace):
-        patch_plan = event.get("patch_plan")
-        if isinstance(patch_plan, dict):
-            path = patch_plan.get("path")
-            if path:
-                return str(path)
-        metadata = event.get("metadata")
-        if isinstance(metadata, dict):
-            for key in ("target_history_violation", "target_selection_violation"):
-                violation = metadata.get(key)
-                if isinstance(violation, dict):
-                    path = violation.get("path")
-                    if path:
-                        return str(path)
-    return ""
+    return build_runtime_trace_snapshot(runtime_trace).patch_target
 
 
 def _latest_patch_old_hash(runtime_trace: list[dict[str, object]]) -> str:
-    for event in reversed(runtime_trace):
-        patch_plan = event.get("patch_plan")
-        if not isinstance(patch_plan, dict):
-            continue
-        old = patch_plan.get("old")
-        if not isinstance(old, dict):
-            continue
-        old_hash = old.get("sha256_12")
-        if old_hash:
-            return str(old_hash)
-    return ""
+    return build_runtime_trace_snapshot(runtime_trace).patch_old_hash
 
 
 def _latest_mounted_context_paths(runtime_trace: list[dict[str, object]]) -> list[str]:
-    for event in reversed(runtime_trace):
-        metadata = event.get("metadata")
-        if not isinstance(metadata, dict):
-            continue
-        contract = metadata.get("deepagents_contract")
-        if not isinstance(contract, dict):
-            continue
-        context_budget = contract.get("context_budget")
-        if not isinstance(context_budget, dict):
-            continue
-        mounted_paths = context_budget.get("mounted_paths")
-        if not isinstance(mounted_paths, list):
-            continue
-        paths: list[str] = []
-        for path in mounted_paths:
-            if not isinstance(path, str):
-                continue
-            normalized = path.strip().lstrip("/")
-            if normalized and normalized not in paths:
-                paths.append(normalized)
-        if paths:
-            return paths
-    return []
+    return build_runtime_trace_snapshot(runtime_trace).mounted_context_paths
 
 
 def _latest_target_history_violation(runtime_trace: list[dict[str, object]]) -> bool:
-    for event in reversed(runtime_trace):
-        metadata = event.get("metadata")
-        if not isinstance(metadata, dict):
-            continue
-        if isinstance(metadata.get("target_history_violation"), dict):
-            return True
-        if isinstance(metadata.get("target_selection_violation"), dict):
-            return True
-    return False
+    return build_runtime_trace_snapshot(runtime_trace).has_target_history_or_selection_violation
 
 
 def _prior_attempt_records_for_target_label(
